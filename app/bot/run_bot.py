@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date as date_type
+from datetime import date as date_type, timedelta
 
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import CommandStart, Command
@@ -56,6 +56,8 @@ async def cmd_help(message: types.Message) -> None:
         "/ping - проверить связь с сервером YumYummy\n"
         "/log - вручную записать приём пищи (калории и, опционально, КБЖУ)\n"
         "/ai_log - описать, что ты съел, а я сам оценю КБЖУ с помощью AI\n"
+        "/today - показать сводку за сегодня\n"
+        "/week - показать сводку за последние 7 дней\n"
     )
     await message.answer(text)
 
@@ -206,16 +208,6 @@ async def cmd_log(message: types.Message) -> None:
 
     await message.answer(base_text + macros_text + summary_text)
 
-async def main() -> None:
-    bot = Bot(token=settings.telegram_bot_token)
-    dp = Dispatcher()
-    dp.include_router(router)
-
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
 
 @router.message(Command("ai_log"))
 async def cmd_ai_log(message: types.Message) -> None:
@@ -323,3 +315,110 @@ async def cmd_ai_log(message: types.Message) -> None:
         text_lines.append(f"• Углеводы: {summary['total_carbs_g']} г")
 
     await message.answer("\n".join(text_lines))
+
+@router.message(Command("today"))
+async def cmd_today(message: types.Message) -> None:
+    """
+    Сводка за сегодня.
+    """
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    user_id = user["id"]
+    today = date_type.today()
+
+    summary = await get_day_summary(user_id=user_id, day=today)
+    if summary is None:
+        await message.answer("За сегодня пока нет записей 🥗")
+        return
+
+    date_str = today.strftime("%d.%m.%Y")
+
+    text_lines = [
+        f"📅 Сводка за сегодня ({date_str}):",
+        f"• Калории: {summary['total_calories']}",
+        f"• Белки: {summary['total_protein_g']} г",
+        f"• Жиры: {summary['total_fat_g']} г",
+        f"• Углеводы: {summary['total_carbs_g']} г",
+    ]
+
+    await message.answer("\n".join(text_lines))
+
+@router.message(Command("week"))
+async def cmd_week(message: types.Message) -> None:
+    """
+    Сводка за последние 7 дней (включая сегодня).
+    """
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    user_id = user["id"]
+    today = date_type.today()
+    start_date = today - timedelta(days=6)
+
+    total_calories = 0.0
+    total_protein_g = 0.0
+    total_fat_g = 0.0
+    total_carbs_g = 0.0
+
+    days_with_data = []
+
+    # Проходим по всем дням недели
+    for offset in range(7):
+        day = start_date + timedelta(days=offset)
+        summary = await get_day_summary(user_id=user_id, day=day)
+        if summary is None:
+            continue
+
+        total_calories += summary["total_calories"]
+        total_protein_g += summary["total_protein_g"]
+        total_fat_g += summary["total_fat_g"]
+        total_carbs_g += summary["total_carbs_g"]
+
+        days_with_data.append((day, summary))
+
+    if not days_with_data:
+        await message.answer("За эту неделю записей пока нет 🌱")
+        return
+
+    start_str = start_date.strftime("%d.%m.%Y")
+    end_str = today.strftime("%d.%m.%Y")
+
+    text_lines = [
+        f"📊 Сводка за неделю ({start_str} — {end_str}):",
+        f"• Калории: {total_calories}",
+        f"• Белки: {total_protein_g} г",
+        f"• Жиры: {total_fat_g} г",
+        f"• Углеводы: {total_carbs_g} г",
+        "",
+        "По дням:",
+    ]
+
+    for day, summary in days_with_data:
+        d_str = day.strftime("%d.%m")
+        text_lines.append(
+            f"{d_str}: {summary['total_calories']} ккал, "
+            f"Б {summary['total_protein_g']} / "
+            f"Ж {summary['total_fat_g']} / "
+            f"У {summary['total_carbs_g']}"
+        )
+
+    await message.answer("\n".join(text_lines))
+
+
+async def main() -> None:
+    bot = Bot(token=settings.telegram_bot_token)
+    dp = Dispatcher()
+    dp.include_router(router)
+
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
