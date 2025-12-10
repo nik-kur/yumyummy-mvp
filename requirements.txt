@@ -9,4 +9,5 @@ httpx
 python-dotenv
 redis
 pydantic-settings
+openai
 

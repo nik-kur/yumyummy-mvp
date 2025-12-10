@@ -11,6 +11,10 @@ from app.models.meal_entry import MealEntry
 from app.schemas.user import UserCreate, UserRead
 from app.schemas.meal import MealCreate, MealRead, DaySummary
 
+from app.services.llm_client import chat_completion
+from app.services.meal_parser import parse_meal_text
+from app.schemas.ai import ParseMealRequest, MealParsed
+
 app = FastAPI(title="YumYummy API")
 
 
@@ -21,6 +25,34 @@ async def health_check():
         "app": "YumYummy",
         "db_url_present": bool(settings.database_url),
     }
+
+@app.get("/ai/test")
+async def ai_test():
+    """
+    Тестовый endpoint, чтобы проверить связку с OpenAI.
+    """
+    messages = [
+        {"role": "system", "content": "You are a concise assistant."},
+        {"role": "user", "content": "Ответь одной короткой фразой, что такое проект YumYummy."},
+    ]
+    answer = await chat_completion(messages)
+    return {"answer": answer}
+
+@app.post("/ai/parse_meal", response_model=MealParsed)
+async def ai_parse_meal(payload: ParseMealRequest):
+    """
+    Получить оценку КБЖУ по тексту описания приёма пищи.
+    Пока только парсим текст, ничего не записываем в БД.
+    """
+    try:
+        parsed = await parse_meal_text(payload.text)
+    except ValueError as e:
+        # Если LLM вернул мусор, говорим об этом клиенту
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return MealParsed(**parsed)
 
 
 # ---------- USERS ----------
