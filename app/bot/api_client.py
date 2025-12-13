@@ -104,3 +104,49 @@ async def ai_parse_meal(text: str) -> Optional[Dict[str, Any]]:
             return resp.json()
     except Exception:
         return None
+
+
+async def product_parse_meal_by_barcode(barcode: str) -> Optional[Dict[str, Any]]:
+    """
+    Вызывает POST /ai/product_parse_meal с штрихкодом.
+    Возвращает dict с полями:
+      description, calories, protein_g, fat_g, carbs_g, accuracy_level, source_provider, notes
+    или None, если ошибка.
+    """
+    url = f"{settings.backend_base_url}/ai/product_parse_meal"
+    payload = {"barcode": barcode}
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None
+
+
+async def product_parse_meal_by_name(
+    name: str,
+    brand: Optional[str] = None,
+    store: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Вызывает POST /ai/product_parse_meal с названием продукта.
+    Возвращает dict с полями:
+      description, calories, protein_g, fat_g, carbs_g, accuracy_level, source_provider, notes
+    или None, если ошибка.
+    """
+    url = f"{settings.backend_base_url}/ai/product_parse_meal"
+    payload = {"name": name}
+    if brand:
+        payload["brand"] = brand
+    if store:
+        payload["store"] = store
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None

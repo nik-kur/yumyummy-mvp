@@ -17,3 +17,12 @@ class MealParsed(BaseModel):
     notes: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductMealRequest(BaseModel):
+    """Запрос на парсинг продукта по штрихкоду или названию."""
+    barcode: Optional[str] = None
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    store: Optional[str] = None
+    locale: str = "ru-RU"

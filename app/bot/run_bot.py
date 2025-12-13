@@ -11,6 +11,8 @@ from app.bot.api_client import (
     create_meal,
     get_day_summary,
     ai_parse_meal,
+    product_parse_meal_by_barcode,
+    product_parse_meal_by_name,
 )
 
 
@@ -56,6 +58,8 @@ async def cmd_help(message: types.Message) -> None:
         "/ping - проверить связь с сервером YumYummy\n"
         "/log - вручную записать приём пищи (калории и, опционально, КБЖУ)\n"
         "/ai_log - описать, что ты съел, а я сам оценю КБЖУ с помощью AI\n"
+        "/barcode - записать продукт по штрихкоду\n"
+        "/product - записать продукт по названию (можно указать бренд/магазин)\n"
         "/today - показать сводку за сегодня\n"
         "/week - показать сводку за последние 7 дней\n"
     )
@@ -195,6 +199,248 @@ async def cmd_log(message: types.Message) -> None:
             f"\n• Жиры: {fat_g} г"
             f"\n• Углеводы: {carbs_g} г"
         )
+
+    summary_text = ""
+    if summary:
+        summary_text = (
+            "\n\nСводка за сегодня:\n"
+            f"• Калории: {summary['total_calories']}\n"
+            f"• Белки: {summary['total_protein_g']} г\n"
+            f"• Жиры: {summary['total_fat_g']} г\n"
+            f"• Углеводы: {summary['total_carbs_g']} г"
+        )
+
+    await message.answer(base_text + macros_text + summary_text)
+
+
+@router.message(Command("barcode"))
+async def cmd_barcode(message: types.Message) -> None:
+    """
+    Логируем приём пищи по штрихкоду продукта.
+
+    Формат:
+    /barcode 4607025392147
+
+    Бот:
+    - ищет продукт в OpenFoodFacts по штрихкоду,
+    - создаёт MealEntry в backend,
+    - показывает оценку + сводку за день.
+    """
+    if not message.text:
+        await message.answer(
+            "Не понял сообщение. Пример использования:\n"
+            "/barcode 4607025392147"
+        )
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer(
+            "Нужно добавить штрихкод после команды.\n\n"
+            "Пример:\n"
+            "/barcode 4607025392147"
+        )
+        return
+
+    barcode = parts[1].strip()
+    if not barcode:
+        await message.answer(
+            "Штрихкод пустой. Пример:\n"
+            "/barcode 4607025392147"
+        )
+        return
+
+    # 1) Гарантируем, что пользователь есть в backend
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    user_id = user["id"]
+
+    # 2) Просим backend найти продукт по штрихкоду
+    parsed = await product_parse_meal_by_barcode(barcode)
+    if parsed is None:
+        await message.answer(
+            "Не удалось связаться с backend'ом. Попробуй позже 🙏"
+        )
+        return
+
+    description = parsed.get("description", "Продукт")
+    calories = float(parsed.get("calories") or 0)
+    protein_g = float(parsed.get("protein_g") or 0)
+    fat_g = float(parsed.get("fat_g") or 0)
+    carbs_g = float(parsed.get("carbs_g") or 0)
+    accuracy_level = parsed.get("accuracy_level", "ESTIMATE")
+    notes = parsed.get("notes", "")
+
+    # 3) Записываем это как MealEntry на сегодня
+    today = date_type.today()
+
+    meal = await create_meal(
+        user_id=user_id,
+        day=today,
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+    )
+
+    if meal is None:
+        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        return
+
+    # 4) Получаем сводку за день
+    summary = await get_day_summary(user_id=user_id, day=today)
+
+    # 5) Формируем ответ пользователю
+    base_text = f"✅ Записал приём пищи:\n• {description}\n"
+    macros_text = (
+        f"\nОценка КБЖУ:\n"
+        f"• Калории: {calories}\n"
+        f"• Белки: {protein_g} г\n"
+        f"• Жиры: {fat_g} г\n"
+        f"• Углеводы: {carbs_g} г\n"
+        f"Точность: {accuracy_level}"
+    )
+
+    if notes:
+        macros_text += f"\nПримечание: {notes}"
+
+    summary_text = ""
+    if summary:
+        summary_text = (
+            "\n\nСводка за сегодня:\n"
+            f"• Калории: {summary['total_calories']}\n"
+            f"• Белки: {summary['total_protein_g']} г\n"
+            f"• Жиры: {summary['total_fat_g']} г\n"
+            f"• Углеводы: {summary['total_carbs_g']} г"
+        )
+
+    await message.answer(base_text + macros_text + summary_text)
+
+
+@router.message(Command("product"))
+async def cmd_product(message: types.Message) -> None:
+    """
+    Логируем приём пищи по названию продукта (можно указать бренд/магазин).
+
+    Формат:
+    /product творог Простоквашино 5%
+    /product творог бренд: Простоквашино магазин: Пятёрочка
+
+    Бот:
+    - ищет продукт в OpenFoodFacts по названию,
+    - создаёт MealEntry в backend,
+    - показывает оценку + сводку за день.
+    """
+    if not message.text:
+        await message.answer(
+            "Не понял сообщение. Пример использования:\n"
+            "/product творог Простоквашино 5%"
+        )
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer(
+            "Нужно добавить название после команды.\n\n"
+            "Пример:\n"
+            "/product творог Простоквашино 5%"
+        )
+        return
+
+    text = parts[1].strip()
+    if not text:
+        await message.answer(
+            "Название пустое. Пример:\n"
+            "/product творог Простоквашино 5%"
+        )
+        return
+
+    # Парсим название, бренд и магазин
+    name = text
+    brand = None
+    store = None
+
+    # Простой парсер: ищем "бренд:" и "магазин:"
+    if "бренд:" in text.lower():
+        parts_brand = text.lower().split("бренд:")
+        if len(parts_brand) == 2:
+            name = parts_brand[0].strip()
+            rest = parts_brand[1].strip()
+            if "магазин:" in rest.lower():
+                parts_store = rest.split("магазин:")
+                brand = parts_store[0].strip()
+                store = parts_store[1].strip() if len(parts_store) > 1 else None
+            else:
+                brand = rest
+    elif "магазин:" in text.lower():
+        parts_store = text.lower().split("магазин:")
+        if len(parts_store) == 2:
+            name = parts_store[0].strip()
+            store = parts_store[1].strip()
+
+    # 1) Гарантируем, что пользователь есть в backend
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    user_id = user["id"]
+
+    # 2) Просим backend найти продукт по названию
+    parsed = await product_parse_meal_by_name(name, brand=brand, store=store)
+    if parsed is None:
+        await message.answer(
+            "Не удалось связаться с backend'ом. Попробуй позже 🙏"
+        )
+        return
+
+    description = parsed.get("description", "Продукт")
+    calories = float(parsed.get("calories") or 0)
+    protein_g = float(parsed.get("protein_g") or 0)
+    fat_g = float(parsed.get("fat_g") or 0)
+    carbs_g = float(parsed.get("carbs_g") or 0)
+    accuracy_level = parsed.get("accuracy_level", "ESTIMATE")
+    notes = parsed.get("notes", "")
+
+    # 3) Записываем это как MealEntry на сегодня
+    today = date_type.today()
+
+    meal = await create_meal(
+        user_id=user_id,
+        day=today,
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+    )
+
+    if meal is None:
+        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        return
+
+    # 4) Получаем сводку за день
+    summary = await get_day_summary(user_id=user_id, day=today)
+
+    # 5) Формируем ответ пользователю
+    base_text = f"✅ Записал приём пищи:\n• {description}\n"
+    macros_text = (
+        f"\nОценка КБЖУ:\n"
+        f"• Калории: {calories}\n"
+        f"• Белки: {protein_g} г\n"
+        f"• Жиры: {fat_g} г\n"
+        f"• Углеводы: {carbs_g} г\n"
+        f"Точность: {accuracy_level}"
+    )
+
+    if notes:
+        macros_text += f"\nПримечание: {notes}"
 
     summary_text = ""
     if summary:
