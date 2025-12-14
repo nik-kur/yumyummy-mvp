@@ -14,6 +14,7 @@ from app.schemas.meal import MealCreate, MealRead, DaySummary
 from app.services.llm_client import chat_completion
 from app.services.meal_parser import parse_meal_text
 from app.services.nutrition_lookup import NutritionQuery, nutrition_lookup
+from app.services.web_nutrition import estimate_nutrition_with_web
 from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest
 
 app = FastAPI(title="YumYummy API")
@@ -60,7 +61,7 @@ async def ai_parse_meal(payload: ParseMealRequest):
 async def ai_product_parse_meal(payload: ProductMealRequest):
     """
     Получить оценку КБЖУ по штрихкоду или названию продукта.
-    Сначала пробует OpenFoodFacts, затем fallback на LLM.
+    Приоритет: WebSearch -> OpenFoodFacts -> LLM fallback.
     """
     if not payload.barcode and not payload.name:
         raise HTTPException(
@@ -68,7 +69,29 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
             detail="Нужно указать либо штрихкод, либо название продукта"
         )
     
-    # Пробуем через nutrition_lookup
+    # 1) Пробуем Web Search (только для name-based запросов, без barcode)
+    if payload.name and not payload.barcode:
+        web_result = await estimate_nutrition_with_web(
+            name=payload.name,
+            brand=payload.brand,
+            store=payload.store,
+            locale=payload.locale
+        )
+        
+        if web_result and web_result.get("calories", 0) > 0:
+            return {
+                "description": web_result.get("description") or payload.name,
+                "calories": web_result.get("calories", 0.0),
+                "protein_g": web_result.get("protein_g", 0.0),
+                "fat_g": web_result.get("fat_g", 0.0),
+                "carbs_g": web_result.get("carbs_g", 0.0),
+                "accuracy_level": web_result.get("accuracy_level", "ESTIMATE"),
+                "source_provider": "WEB",
+                "notes": web_result.get("notes", ""),
+                "source_url": web_result.get("source_url"),
+            }
+    
+    # 2) Пробуем через nutrition_lookup (OpenFoodFacts)
     query = NutritionQuery(
         barcode=payload.barcode,
         name=payload.name,
@@ -103,9 +126,10 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
             "accuracy_level": result.accuracy_level,
             "source_provider": "OPENFOODFACTS",
             "notes": notes,
+            "source_url": result.source_url,
         }
     
-    # Fallback на LLM
+    # 3) Fallback на LLM
     desc_parts = []
     if payload.name:
         desc_parts.append(payload.name)
@@ -132,6 +156,7 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
         "accuracy_level": parsed.get("accuracy_level", "ESTIMATE"),
         "source_provider": "LLM_ESTIMATE",
         "notes": parsed.get("notes", ""),
+        "source_url": None,
     }
 
 

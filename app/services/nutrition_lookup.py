@@ -33,6 +33,7 @@ class NutritionResult(BaseModel):
     brand: Optional[str] = None
     source_provider: str = "OPENFOODFACTS"
     accuracy_level: str = "ESTIMATE"
+    source_url: Optional[str] = None  # URL источника данных
     
     # нутриция на порцию
     calories: Optional[float] = None
@@ -212,6 +213,11 @@ async def nutrition_lookup(query: NutritionQuery) -> NutritionResult:
         brands = product.get("brands", "")
         product_brand = brands.split(",")[0].strip() if brands else query.brand
         
+        # Формируем source_url для OpenFoodFacts
+        source_url = product.get("url")
+        if not source_url and query.barcode:
+            source_url = f"https://world.openfoodfacts.org/product/{query.barcode}"
+        
         return NutritionResult(
             found=True,
             name=product_name,
@@ -223,6 +229,7 @@ async def nutrition_lookup(query: NutritionQuery) -> NutritionResult:
             fat_g=fat_total,
             carbs_g=carbs_total,
             portion_grams=portion_grams,
+            source_url=source_url,
         )
         
     except Exception as e:
