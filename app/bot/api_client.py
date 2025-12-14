@@ -150,3 +150,23 @@ async def product_parse_meal_by_name(
             return resp.json()
     except Exception:
         return None
+
+
+async def voice_parse_meal(audio_bytes: bytes) -> Optional[Dict[str, Any]]:
+    """
+    Вызывает POST /ai/voice_parse_meal в backend.
+    Отправляет аудиофайл для распознавания и парсинга.
+    Возвращает dict с полями:
+      transcript, description, calories, protein_g, fat_g, carbs_g, accuracy_level, notes
+    или None, если ошибка.
+    """
+    url = f"{settings.backend_base_url}/ai/voice_parse_meal"
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            files = {"audio": ("voice.ogg", audio_bytes, "audio/ogg")}
+            resp = await client.post(url, files=files)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None

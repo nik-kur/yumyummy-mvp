@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import date as date_type, timedelta
 
-from aiogram import Bot, Dispatcher, Router, types
+from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import CommandStart, Command
 
 from app.core.config import settings
@@ -16,6 +16,7 @@ from app.bot.api_client import (
     ai_parse_meal,
     product_parse_meal_by_barcode,
     product_parse_meal_by_name,
+    voice_parse_meal,
 )
 
 
@@ -64,7 +65,8 @@ async def cmd_help(message: types.Message) -> None:
         "/barcode - записать продукт по штрихкоду\n"
         "/product - записать продукт по названию (можно указать бренд/магазин)\n"
         "/today - показать сводку за сегодня\n"
-        "/week - показать сводку за последние 7 дней\n"
+        "/week - показать сводку за последние 7 дней\n\n"
+        "Можно отправить голосовое сообщение — я распознаю и запишу."
     )
     await message.answer(text)
 
@@ -903,6 +905,115 @@ async def cmd_week(message: types.Message) -> None:
         )
 
     await message.answer("\n".join(text_lines))
+
+
+@router.message(F.voice)
+async def handle_voice(message: types.Message) -> None:
+    """
+    Обработка голосовых сообщений.
+    Скачивает voice, отправляет на backend для STT и парсинга, логирует приём пищи.
+    """
+    # 1) Гарантируем, что пользователь есть в backend
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    user_id = user["id"]
+
+    # 2) Скачиваем голосовое сообщение
+    try:
+        file = await message.bot.get_file(message.voice.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        audio_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[VOICE] Error downloading voice: {e}")
+        await message.answer("Не удалось скачать голосовое сообщение. Попробуй ещё раз 🙏")
+        return
+
+    if not audio_bytes:
+        await message.answer("Голосовое сообщение пустое. Попробуй ещё раз 🙏")
+        return
+
+    # 3) Отправляем сообщение о начале обработки
+    await message.answer("🎙 Секунду, распознаю голос и считаю КБЖУ...")
+
+    # 4) Отправляем на backend для STT и парсинга
+    parsed = await voice_parse_meal(audio_bytes)
+    if parsed is None:
+        await message.answer("Не удалось обработать голос. Попробуй ещё раз 🙏")
+        return
+
+    transcript = parsed.get("transcript", "")
+    description = parsed.get("description", "") or "Описание не указано"
+    calories = float(parsed.get("calories", 0) or 0)
+    protein_g = float(parsed.get("protein_g", 0) or 0)
+    fat_g = float(parsed.get("fat_g", 0) or 0)
+    carbs_g = float(parsed.get("carbs_g", 0) or 0)
+    accuracy_level = str(parsed.get("accuracy_level", "ESTIMATE") or "ESTIMATE").upper()
+    notes = parsed.get("notes", "") or ""
+
+    # Округляем значения для отображения
+    calories = round(calories)
+    protein_g = round(protein_g, 1)
+    fat_g = round(fat_g, 1)
+    carbs_g = round(carbs_g, 1)
+
+    # 5) Логируем приём пищи
+    today = date_type.today()
+    meal = await create_meal(
+        user_id=user_id,
+        day=today,
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+    )
+
+    if meal is None:
+        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        return
+
+    # 6) Получаем сводку за день
+    summary = await get_day_summary(user_id=user_id, day=today)
+
+    # 7) Формируем ответ пользователю
+    lines = [
+        "✅ Записал приём пищи по голосу.",
+    ]
+    if transcript.strip():
+        lines += ["", f"Распознал: \"{transcript.strip()}\""]
+    lines += [
+        "",
+        f"• {description}",
+        f"• Калории: {calories}",
+        f"• Белки: {protein_g} г",
+        f"• Жиры: {fat_g} г",
+        f"• Углеводы: {carbs_g} г",
+        "",
+        f"Точность: {accuracy_level}",
+    ]
+    if notes:
+        lines += ["", f"Примечание: {notes}"]
+    if summary:
+        # Округляем значения сводки
+        total_calories = round(summary.get('total_calories', 0))
+        total_protein = round(summary.get('total_protein_g', 0), 1)
+        total_fat = round(summary.get('total_fat_g', 0), 1)
+        total_carbs = round(summary.get('total_carbs_g', 0), 1)
+        
+        lines += [
+            "",
+            "Сводка за сегодня:",
+            f"• Калории: {total_calories}",
+            f"• Белки: {total_protein} г",
+            f"• Жиры: {total_fat} г",
+            f"• Углеводы: {total_carbs} г",
+        ]
+
+    await message.answer("\n".join(lines))
 
 
 async def main() -> None:

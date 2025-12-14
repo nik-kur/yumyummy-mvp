@@ -1,7 +1,7 @@
 import logging
 from datetime import date as date_type
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -19,6 +19,7 @@ from app.services.meal_parser import parse_meal_text
 from app.services.nutrition_lookup import NutritionQuery, nutrition_lookup
 from app.services.web_nutrition import estimate_nutrition_with_web
 from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest
+from app.ai.stt_client import transcribe_audio
 
 app = FastAPI(title="YumYummy API")
 
@@ -58,6 +59,45 @@ async def ai_parse_meal(payload: ParseMealRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
     return MealParsed(**parsed)
+
+
+@app.post("/ai/voice_parse_meal")
+async def ai_voice_parse_meal(audio: UploadFile = File(...)):
+    """
+    Получить оценку КБЖУ по голосовому сообщению.
+    Делает STT через OpenAI, затем парсит текст как /ai/parse_meal.
+    """
+    try:
+        file_bytes = await audio.read()
+    except Exception as e:
+        logger.error(f"[VOICE] Error reading audio file: {e}")
+        raise HTTPException(status_code=400, detail="Не удалось прочитать аудиофайл")
+
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Пустой аудиофайл")
+
+    try:
+        transcript = await transcribe_audio(
+            file_bytes=file_bytes,
+            filename=audio.filename or "voice.ogg",
+        )
+    except Exception as e:
+        logger.error(f"[VOICE] Error transcribing audio: {e}")
+        raise HTTPException(status_code=500, detail="Не удалось распознать речь")
+
+    if not transcript.strip():
+        raise HTTPException(status_code=400, detail="Не удалось распознать речь")
+
+    try:
+        parsed = await parse_meal_text(transcript)
+    except ValueError as e:
+        logger.error(f"[VOICE] Error parsing meal text: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "transcript": transcript,
+        **parsed,
+    }
 
 
 @app.post("/ai/product_parse_meal")
