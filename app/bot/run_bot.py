@@ -956,6 +956,7 @@ async def handle_voice(message: types.Message) -> None:
     raw_accuracy = parsed.get("accuracy_level", "ESTIMATE")
     accuracy_level = str(raw_accuracy or "ESTIMATE").upper()
     source_provider = parsed.get("source_provider") or "LLM_ESTIMATE"
+    source_url = parsed.get("source_url")
     
     notes = parsed.get("notes", "") or ""
     
@@ -1026,7 +1027,44 @@ async def handle_voice(message: types.Message) -> None:
             f"• Углеводы: {total_carbs} г",
         ]
 
-    await message.answer("\n".join(lines))
+    # Формируем финальный текст
+    text = "\n".join(lines)
+    
+    # Добавляем ссылку на источник в кнопку, если есть
+    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
+    if source_url and str(source_url).strip():
+        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
+        # Проверяем, что это валидный URL
+        if not (source_url.startswith("http://") or source_url.startswith("https://")):
+            # Если URL без протокола, добавляем https://
+            if source_url.startswith("www."):
+                source_url = "https://" + source_url
+            elif not source_url.startswith("http"):
+                source_url = "https://" + source_url
+        
+        logger.info(f"[BOT] Final source_url: {source_url}")
+        
+        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
+        try:
+            keyboard = types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        types.InlineKeyboardButton(
+                            text="🔗 Источник",
+                            url=source_url
+                        )
+                    ]
+                ]
+            )
+            logger.info(f"[BOT] Sending message with keyboard")
+            await message.answer(text, reply_markup=keyboard)
+        except Exception as e:
+            logger.error(f"[BOT] Error creating keyboard: {e}")
+            # Если ошибка с кнопкой, отправляем хотя бы текст
+            await message.answer(text)
+    else:
+        logger.info(f"[BOT] No source_url, sending message without link")
+        await message.answer(text)
 
 
 async def main() -> None:
