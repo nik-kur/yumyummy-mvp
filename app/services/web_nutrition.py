@@ -13,6 +13,158 @@ from app.services.llm_client import chat_completion
 logger = logging.getLogger(__name__)
 
 
+def _user_specified_portion(name: str, brand: Optional[str] = None, store: Optional[str] = None) -> bool:
+    """
+    Проверяет, указал ли пользователь размер порции в запросе.
+    Ищет паттерны вида "200г", "500 грамм", "250мл" и т.д.
+    """
+    text = f"{name} {brand or ''} {store or ''}".lower()
+    
+    # Проверяем наличие цифр
+    has_digit = any(c.isdigit() for c in text)
+    if not has_digit:
+        return False
+    
+    # Проверяем наличие единиц измерения рядом с цифрами
+    units = ["г", "гр", "грамм", "kg", "кг", "ml", "мл", "л", "l"]
+    for unit in units:
+        # Ищем паттерн "число + единица" или "единица + число"
+        pattern1 = r'\d+\s*' + re.escape(unit)
+        pattern2 = re.escape(unit) + r'\s*\d+'
+        if re.search(pattern1, text) or re.search(pattern2, text):
+            return True
+    
+    return False
+
+
+async def _find_portion_size_with_web(
+    name: str,
+    brand: Optional[str] = None,
+    store: Optional[str] = None,
+    api_key: str = None
+) -> Optional[float]:
+    """
+    Ищет размер порции/упаковки продукта через веб-поиск.
+    Возвращает размер в граммах или None.
+    """
+    if not api_key:
+        return None
+    
+    try:
+        # Формируем поисковый запрос специально для размера упаковки
+        query_parts = [name]
+        if brand:
+            query_parts.append(brand)
+        if store:
+            query_parts.append(store)
+        query_parts.extend(["масса нетто", "объем", "упаковка", "сколько грамм", "размер порции"])
+        search_query = " ".join(query_parts)
+        
+        # Выполняем поиск через Tavily
+        tavily_result = await tavily_search(
+            query=search_query,
+            api_key=api_key,
+            max_results=3  # Меньше результатов для более точного поиска
+        )
+        
+        if not tavily_result or "results" not in tavily_result:
+            logger.debug("Tavily returned no results for portion size")
+            return None
+        
+        results = tavily_result.get("results", [])
+        if not results:
+            logger.debug("Tavily returned empty results for portion size")
+            return None
+        
+        # Формируем контекст из результатов
+        context_parts = []
+        for i, result in enumerate(results[:3]):
+            title = result.get("title", "").strip()
+            content = result.get("content", "").strip()
+            
+            if title:
+                context_parts.append(f"Источник {i+1}: {title}")
+            if content:
+                if len(content) > 400:
+                    content = content[:400] + "..."
+                context_parts.append(content)
+        
+        if not context_parts:
+            logger.debug("No useful content for portion size")
+            return None
+        
+        context = "\n\n".join(context_parts)
+        if len(context) > 1500:
+            context = context[:1500] + "..."
+        
+        # Формируем промпт для LLM - только для поиска размера порции
+        system_prompt = (
+            "Ты ассистент. Тебе дают описание продукта и результаты веб-поиска. "
+            "Твоя задача: найти размер упаковки/порции продукта в граммах или миллилитрах.\n\n"
+            "ВАЖНО: отвечай СТРОГО в формате JSON с полями:\n"
+            "- portion_grams: число (размер порции/упаковки в граммах) или null, если не найден\n"
+            "- notes: краткое объяснение, откуда взялось значение\n\n"
+            "Правила:\n"
+            "1) Ищи массу нетто, объем упаковки, размер порции в тексте\n"
+            "2) Если указано в мл - приравняй к граммам (1 мл ≈ 1 г)\n"
+            "3) Если указано в кг - переведи в граммы (1 кг = 1000 г)\n"
+            "4) Если точного размера нет, но можно оценить типичный размер для этого типа продукта - верни оценку и укажи это в notes\n"
+            "5) НЕ возвращай 100 г просто потому что это 'на 100 г' - это нутриция, не размер упаковки\n"
+            "6) Если совсем ничего не найдено - верни null\n\n"
+            "Отвечай ТОЛЬКО JSON, без дополнительного текста."
+        )
+        
+        user_prompt = (
+            f"Продукт: {name}"
+            + (f", бренд: {brand}" if brand else "")
+            + (f", магазин: {store}" if store else "")
+            + f"\n\nРезультаты поиска:\n{context}\n\n"
+            "Найди размер упаковки/порции в граммах."
+        )
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        
+        # Вызываем LLM
+        raw_response = await chat_completion(messages)
+        
+        # Парсим JSON
+        json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+        if not json_match:
+            logger.debug(f"LLM response for portion size does not contain JSON: {raw_response[:200]}")
+            return None
+        
+        try:
+            data = json.loads(json_match.group(0))
+        except json.JSONDecodeError as e:
+            logger.debug(f"Failed to parse LLM JSON for portion size: {e}, raw: {raw_response[:200]}")
+            return None
+        
+        portion_grams_val = data.get("portion_grams")
+        if portion_grams_val is None:
+            logger.debug("LLM did not provide portion_grams")
+            return None
+        
+        try:
+            portion_grams = float(portion_grams_val)
+            # Проверяем разумность значения
+            if portion_grams <= 0:
+                return None
+            if portion_grams < 20 or portion_grams > 3000:
+                logger.debug(f"Portion size out of reasonable bounds: {portion_grams}")
+                return None
+            return portion_grams
+        except (ValueError, TypeError):
+            logger.debug(f"Invalid portion_grams value: {portion_grams_val}")
+            return None
+            
+    except Exception as e:
+        logger.debug(f"Error in _find_portion_size_with_web: {e}")
+        return None
+
+
 async def estimate_nutrition_with_web(
     name: str,
     brand: Optional[str] = None,
@@ -149,17 +301,56 @@ async def estimate_nutrition_with_web(
             logger.info("LLM did not provide calories per 100g")
             return None
         
+        # Получаем notes из ответа LLM (будет использоваться позже)
+        notes = data.get("notes", "").strip()
+        
         # Определяем portion_grams
-        portion_grams_val = data.get("portion_grams")
-        if portion_grams_val is not None:
-            try:
-                portion_grams = float(portion_grams_val)
-                if portion_grams <= 0:
-                    portion_grams = 100.0
-            except (ValueError, TypeError):
-                portion_grams = 100.0
+        # Сначала проверяем, указал ли пользователь размер порции в запросе
+        user_specified = _user_specified_portion(name, brand, store)
+        portion_grams = 100.0
+        
+        if user_specified:
+            # Пытаемся извлечь размер порции из запроса пользователя
+            user_text = f"{name} {brand or ''} {store or ''}".lower()
+            match = re.search(r'(\d+\.?\d*)\s*(г|гр|грамм|kg|кг|ml|мл|л|l)', user_text, re.IGNORECASE)
+            if match:
+                value = float(match.group(1))
+                unit = match.group(2).lower()
+                if unit in ("кг", "kg"):
+                    portion_grams = value * 1000
+                elif unit in ("л", "l"):
+                    portion_grams = value * 1000  # мл
+                elif unit in ("мл", "ml", "г", "гр", "грамм", "g"):
+                    portion_grams = value
+                logger.info(f"User specified portion size: {portion_grams} г")
         else:
-            portion_grams = 100.0
+            # Пробуем получить из ответа LLM (первый проход)
+            portion_grams_val = data.get("portion_grams")
+            if portion_grams_val is not None:
+                try:
+                    portion_grams = float(portion_grams_val)
+                    if portion_grams <= 0:
+                        portion_grams = 100.0
+                except (ValueError, TypeError):
+                    portion_grams = 100.0
+            
+            # Если LLM не вернул размер порции или вернул 100г, делаем отдельный поиск
+            if portion_grams == 100.0:
+                logger.info("Portion size not found in first pass, searching separately...")
+                found_portion = await _find_portion_size_with_web(
+                    name=name,
+                    brand=brand,
+                    store=store,
+                    api_key=settings.tavily_api_key
+                )
+                if found_portion and found_portion != 100.0:
+                    portion_grams = found_portion
+                    logger.info(f"Found portion size from separate search: {portion_grams} г")
+                    # Обновляем notes, если нашли размер порции
+                    if notes:
+                        notes = f"{notes} Размер упаковки найден в интернете: {portion_grams:.0f} г."
+                    else:
+                        notes = f"Размер упаковки найден в интернете: {portion_grams:.0f} г."
         
         # Пересчитываем на порцию
         factor = portion_grams / 100.0
@@ -185,7 +376,6 @@ async def estimate_nutrition_with_web(
         accuracy_level = "HIGH" if (has_explicit_values and has_explicit_portion) else "ESTIMATE"
         
         description = data.get("description", name).strip() or name
-        notes = data.get("notes", "").strip()
         
         return {
             "description": description,
