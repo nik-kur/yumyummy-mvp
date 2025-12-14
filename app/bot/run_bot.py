@@ -1,10 +1,13 @@
 import asyncio
+import logging
 from datetime import date as date_type, timedelta
 
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import CommandStart, Command
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from app.bot.api_client import (
     ping_backend,
     ensure_user,
@@ -153,6 +156,12 @@ async def cmd_log(message: types.Message) -> None:
     fat_g, idx = parse_float_token(idx)
     # Углеводы
     carbs_g, idx = parse_float_token(idx)
+    
+    # Округляем значения для отображения
+    calories = round(calories)
+    protein_g = round(protein_g, 1)
+    fat_g = round(fat_g, 1)
+    carbs_g = round(carbs_g, 1)
 
     # Всё, что осталось — описание
     description = " ".join(tokens[idx:]).strip()
@@ -202,12 +211,18 @@ async def cmd_log(message: types.Message) -> None:
 
     summary_text = ""
     if summary:
+        # Округляем значения сводки
+        total_calories = round(summary.get('total_calories', 0))
+        total_protein = round(summary.get('total_protein_g', 0), 1)
+        total_fat = round(summary.get('total_fat_g', 0), 1)
+        total_carbs = round(summary.get('total_carbs_g', 0), 1)
+        
         summary_text = (
             "\n\nСводка за сегодня:\n"
-            f"• Калории: {summary['total_calories']}\n"
-            f"• Белки: {summary['total_protein_g']} г\n"
-            f"• Жиры: {summary['total_fat_g']} г\n"
-            f"• Углеводы: {summary['total_carbs_g']} г"
+            f"• Калории: {total_calories}\n"
+            f"• Белки: {total_protein} г\n"
+            f"• Жиры: {total_fat} г\n"
+            f"• Углеводы: {total_carbs} г"
         )
 
     await message.answer(base_text + macros_text + summary_text)
@@ -274,6 +289,13 @@ async def cmd_barcode(message: types.Message) -> None:
     carbs_g = float(parsed.get("carbs_g") or 0)
     accuracy_level = parsed.get("accuracy_level", "ESTIMATE")
     notes = parsed.get("notes", "")
+    source_url = parsed.get("source_url")
+
+    # Округляем значения для отображения
+    calories = round(calories)
+    protein_g = round(protein_g, 1)
+    fat_g = round(fat_g, 1)
+    carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
     today = date_type.today()
@@ -311,15 +333,61 @@ async def cmd_barcode(message: types.Message) -> None:
 
     summary_text = ""
     if summary:
+        # Округляем значения сводки
+        total_calories = round(summary.get('total_calories', 0))
+        total_protein = round(summary.get('total_protein_g', 0), 1)
+        total_fat = round(summary.get('total_fat_g', 0), 1)
+        total_carbs = round(summary.get('total_carbs_g', 0), 1)
+        
         summary_text = (
             "\n\nСводка за сегодня:\n"
-            f"• Калории: {summary['total_calories']}\n"
-            f"• Белки: {summary['total_protein_g']} г\n"
-            f"• Жиры: {summary['total_fat_g']} г\n"
-            f"• Углеводы: {summary['total_carbs_g']} г"
+            f"• Калории: {total_calories}\n"
+            f"• Белки: {total_protein} г\n"
+            f"• Жиры: {total_fat} г\n"
+            f"• Углеводы: {total_carbs} г"
         )
 
-    await message.answer(base_text + macros_text + summary_text)
+    # Формируем финальный текст
+    text = base_text + macros_text + summary_text
+    
+    # Добавляем ссылку на источник в текст и кнопку, если есть
+    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
+    if source_url and str(source_url).strip():
+        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
+        # Проверяем, что это валидный URL
+        if not (source_url.startswith("http://") or source_url.startswith("https://")):
+            # Если URL без протокола, добавляем https://
+            if source_url.startswith("www."):
+                source_url = "https://" + source_url
+            elif not source_url.startswith("http"):
+                source_url = "https://" + source_url
+        
+        logger.info(f"[BOT] Final source_url: {source_url}")
+        
+        # Добавляем ссылку в текст (Telegram автоматически сделает её кликабельной)
+        text += f"\n\n🔗 Источник: {source_url}"
+        
+        # Также добавляем кнопку для удобства
+        try:
+            keyboard = types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        types.InlineKeyboardButton(
+                            text="🔗 Источник",
+                            url=source_url
+                        )
+                    ]
+                ]
+            )
+            logger.info(f"[BOT] Sending message with keyboard")
+            await message.answer(text, reply_markup=keyboard)
+        except Exception as e:
+            logger.error(f"[BOT] Error creating keyboard: {e}")
+            # Если ошибка с кнопкой, отправляем хотя бы текст со ссылкой
+            await message.answer(text)
+    else:
+        logger.info(f"[BOT] No source_url, sending message without link")
+        await message.answer(text)
 
 
 @router.message(Command("product"))
@@ -407,6 +475,13 @@ async def cmd_product(message: types.Message) -> None:
     carbs_g = float(parsed.get("carbs_g") or 0)
     accuracy_level = parsed.get("accuracy_level", "ESTIMATE")
     notes = parsed.get("notes", "")
+    source_url = parsed.get("source_url")
+
+    # Округляем значения для отображения
+    calories = round(calories)
+    protein_g = round(protein_g, 1)
+    fat_g = round(fat_g, 1)
+    carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
     today = date_type.today()
@@ -444,15 +519,61 @@ async def cmd_product(message: types.Message) -> None:
 
     summary_text = ""
     if summary:
+        # Округляем значения сводки
+        total_calories = round(summary.get('total_calories', 0))
+        total_protein = round(summary.get('total_protein_g', 0), 1)
+        total_fat = round(summary.get('total_fat_g', 0), 1)
+        total_carbs = round(summary.get('total_carbs_g', 0), 1)
+        
         summary_text = (
             "\n\nСводка за сегодня:\n"
-            f"• Калории: {summary['total_calories']}\n"
-            f"• Белки: {summary['total_protein_g']} г\n"
-            f"• Жиры: {summary['total_fat_g']} г\n"
-            f"• Углеводы: {summary['total_carbs_g']} г"
+            f"• Калории: {total_calories}\n"
+            f"• Белки: {total_protein} г\n"
+            f"• Жиры: {total_fat} г\n"
+            f"• Углеводы: {total_carbs} г"
         )
 
-    await message.answer(base_text + macros_text + summary_text)
+    # Формируем финальный текст
+    text = base_text + macros_text + summary_text
+    
+    # Добавляем ссылку на источник в текст и кнопку, если есть
+    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
+    if source_url and str(source_url).strip():
+        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
+        # Проверяем, что это валидный URL
+        if not (source_url.startswith("http://") or source_url.startswith("https://")):
+            # Если URL без протокола, добавляем https://
+            if source_url.startswith("www."):
+                source_url = "https://" + source_url
+            elif not source_url.startswith("http"):
+                source_url = "https://" + source_url
+        
+        logger.info(f"[BOT] Final source_url: {source_url}")
+        
+        # Добавляем ссылку в текст (Telegram автоматически сделает её кликабельной)
+        text += f"\n\n🔗 Источник: {source_url}"
+        
+        # Также добавляем кнопку для удобства
+        try:
+            keyboard = types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        types.InlineKeyboardButton(
+                            text="🔗 Источник",
+                            url=source_url
+                        )
+                    ]
+                ]
+            )
+            logger.info(f"[BOT] Sending message with keyboard")
+            await message.answer(text, reply_markup=keyboard)
+        except Exception as e:
+            logger.error(f"[BOT] Error creating keyboard: {e}")
+            # Если ошибка с кнопкой, отправляем хотя бы текст со ссылкой
+            await message.answer(text)
+    else:
+        logger.info(f"[BOT] No source_url, sending message without link")
+        await message.answer(text)
 
 
 @router.message(Command("ai_log"))
@@ -516,6 +637,16 @@ async def cmd_ai_log(message: types.Message) -> None:
     carbs_g = float(parsed.get("carbs_g", 0) or 0)
     accuracy_level = str(parsed.get("accuracy_level", "ESTIMATE")).upper()
     notes = parsed.get("notes", "")
+    source_url = parsed.get("source_url")
+    
+    # Логируем для отладки
+    logger.info(f"[BOT /ai_log] source_url received: {source_url}, type: {type(source_url)}")
+
+    # Округляем значения для отображения
+    calories = round(calories)
+    protein_g = round(protein_g, 1)
+    fat_g = round(fat_g, 1)
+    carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
     today = date_type.today()
@@ -553,14 +684,60 @@ async def cmd_ai_log(message: types.Message) -> None:
         text_lines.append(f"Примечание: {notes}")
 
     if summary:
+        # Округляем значения сводки
+        total_calories = round(summary.get('total_calories', 0))
+        total_protein = round(summary.get('total_protein_g', 0), 1)
+        total_fat = round(summary.get('total_fat_g', 0), 1)
+        total_carbs = round(summary.get('total_carbs_g', 0), 1)
+        
         text_lines.append("")
         text_lines.append("Сводка за сегодня:")
-        text_lines.append(f"• Калории: {summary['total_calories']}")
-        text_lines.append(f"• Белки: {summary['total_protein_g']} г")
-        text_lines.append(f"• Жиры: {summary['total_fat_g']} г")
-        text_lines.append(f"• Углеводы: {summary['total_carbs_g']} г")
+        text_lines.append(f"• Калории: {total_calories}")
+        text_lines.append(f"• Белки: {total_protein} г")
+        text_lines.append(f"• Жиры: {total_fat} г")
+        text_lines.append(f"• Углеводы: {total_carbs} г")
 
-    await message.answer("\n".join(text_lines))
+    # Формируем финальный текст
+    text = "\n".join(text_lines)
+    
+    # Добавляем ссылку на источник в текст и кнопку, если есть
+    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
+    if source_url and str(source_url).strip():
+        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
+        # Проверяем, что это валидный URL
+        if not (source_url.startswith("http://") or source_url.startswith("https://")):
+            # Если URL без протокола, добавляем https://
+            if source_url.startswith("www."):
+                source_url = "https://" + source_url
+            elif not source_url.startswith("http"):
+                source_url = "https://" + source_url
+        
+        logger.info(f"[BOT] Final source_url: {source_url}")
+        
+        # Добавляем ссылку в текст (Telegram автоматически сделает её кликабельной)
+        text += f"\n\n🔗 Источник: {source_url}"
+        
+        # Также добавляем кнопку для удобства
+        try:
+            keyboard = types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        types.InlineKeyboardButton(
+                            text="🔗 Источник",
+                            url=source_url
+                        )
+                    ]
+                ]
+            )
+            logger.info(f"[BOT] Sending message with keyboard")
+            await message.answer(text, reply_markup=keyboard)
+        except Exception as e:
+            logger.error(f"[BOT] Error creating keyboard: {e}")
+            # Если ошибка с кнопкой, отправляем хотя бы текст со ссылкой
+            await message.answer(text)
+    else:
+        logger.info(f"[BOT] No source_url, sending message without link")
+        await message.answer(text)
 
 @router.message(Command("today"))
 async def cmd_today(message: types.Message) -> None:
@@ -583,12 +760,18 @@ async def cmd_today(message: types.Message) -> None:
 
     date_str = today.strftime("%d.%m.%Y")
 
+    # Округляем значения
+    total_calories = round(summary.get('total_calories', 0))
+    total_protein = round(summary.get('total_protein_g', 0), 1)
+    total_fat = round(summary.get('total_fat_g', 0), 1)
+    total_carbs = round(summary.get('total_carbs_g', 0), 1)
+    
     text_lines = [
         f"📅 Сводка за сегодня ({date_str}):",
-        f"• Калории: {summary['total_calories']}",
-        f"• Белки: {summary['total_protein_g']} г",
-        f"• Жиры: {summary['total_fat_g']} г",
-        f"• Углеводы: {summary['total_carbs_g']} г",
+        f"• Калории: {total_calories}",
+        f"• Белки: {total_protein} г",
+        f"• Жиры: {total_fat} г",
+        f"• Углеводы: {total_carbs} г",
     ]
 
     await message.answer("\n".join(text_lines))
@@ -622,10 +805,11 @@ async def cmd_week(message: types.Message) -> None:
         if summary is None:
             continue
 
-        total_calories += summary["total_calories"]
-        total_protein_g += summary["total_protein_g"]
-        total_fat_g += summary["total_fat_g"]
-        total_carbs_g += summary["total_carbs_g"]
+        # Округляем значения перед суммированием
+        total_calories += round(summary.get("total_calories", 0))
+        total_protein_g += round(summary.get("total_protein_g", 0), 1)
+        total_fat_g += round(summary.get("total_fat_g", 0), 1)
+        total_carbs_g += round(summary.get("total_carbs_g", 0), 1)
 
         days_with_data.append((day, summary))
 
@@ -636,6 +820,12 @@ async def cmd_week(message: types.Message) -> None:
     start_str = start_date.strftime("%d.%m.%Y")
     end_str = today.strftime("%d.%m.%Y")
 
+    # Округляем итоговые значения
+    total_calories = round(total_calories)
+    total_protein_g = round(total_protein_g, 1)
+    total_fat_g = round(total_fat_g, 1)
+    total_carbs_g = round(total_carbs_g, 1)
+    
     text_lines = [
         f"📊 Сводка за неделю ({start_str} — {end_str}):",
         f"• Калории: {total_calories}",
@@ -649,10 +839,10 @@ async def cmd_week(message: types.Message) -> None:
     for day, summary in days_with_data:
         d_str = day.strftime("%d.%m")
         text_lines.append(
-            f"{d_str}: {summary['total_calories']} ккал, "
-            f"Б {summary['total_protein_g']} / "
-            f"Ж {summary['total_fat_g']} / "
-            f"У {summary['total_carbs_g']}"
+            f"{d_str}: {round(summary.get('total_calories', 0))} ккал, "
+            f"Б {round(summary.get('total_protein_g', 0), 1)} / "
+            f"Ж {round(summary.get('total_fat_g', 0), 1)} / "
+            f"У {round(summary.get('total_carbs_g', 0), 1)}"
         )
 
     await message.answer("\n".join(text_lines))

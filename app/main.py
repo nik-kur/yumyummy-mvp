@@ -1,9 +1,12 @@
+import logging
 from datetime import date as date_type
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from app.deps import get_db
 from app.models.user import User
 from app.models.user_day import UserDay
@@ -79,16 +82,25 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
         )
         
         if web_result and web_result.get("calories", 0) > 0:
+            # Округляем значения (уже округлены в web_nutrition, но на всякий случай)
+            calories = round(web_result.get("calories", 0.0))
+            protein_g = round(web_result.get("protein_g", 0.0), 1)
+            fat_g = round(web_result.get("fat_g", 0.0), 1)
+            carbs_g = round(web_result.get("carbs_g", 0.0), 1)
+            
+            source_url = web_result.get("source_url")
+            logger.info(f"[BACKEND] Web result source_url: {source_url}, type: {type(source_url)}")
+            
             return {
                 "description": web_result.get("description") or payload.name,
-                "calories": web_result.get("calories", 0.0),
-                "protein_g": web_result.get("protein_g", 0.0),
-                "fat_g": web_result.get("fat_g", 0.0),
-                "carbs_g": web_result.get("carbs_g", 0.0),
+                "calories": calories,
+                "protein_g": protein_g,
+                "fat_g": fat_g,
+                "carbs_g": carbs_g,
                 "accuracy_level": web_result.get("accuracy_level", "ESTIMATE"),
                 "source_provider": "WEB",
                 "notes": web_result.get("notes", ""),
-                "source_url": web_result.get("source_url"),
+                "source_url": source_url,
             }
     
     # 2) Пробуем через nutrition_lookup (OpenFoodFacts)
@@ -117,12 +129,18 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
         if result.portion_grams and result.portion_grams != 100.0:
             notes += f" (пересчитано на упаковку {result.portion_grams:.0f} г, исходно на 100 г)"
         
+        # Округляем значения
+        calories = round(result.calories or 0.0)
+        protein_g = round(result.protein_g or 0.0, 1)
+        fat_g = round(result.fat_g or 0.0, 1)
+        carbs_g = round(result.carbs_g or 0.0, 1)
+        
         return {
             "description": description,
-            "calories": result.calories,
-            "protein_g": result.protein_g or 0.0,
-            "fat_g": result.fat_g or 0.0,
-            "carbs_g": result.carbs_g or 0.0,
+            "calories": calories,
+            "protein_g": protein_g,
+            "fat_g": fat_g,
+            "carbs_g": carbs_g,
             "accuracy_level": result.accuracy_level,
             "source_provider": "OPENFOODFACTS",
             "notes": notes,
@@ -147,12 +165,18 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+    # Округляем значения
+    calories = round(parsed.get("calories", 0.0))
+    protein_g = round(parsed.get("protein_g", 0.0), 1)
+    fat_g = round(parsed.get("fat_g", 0.0), 1)
+    carbs_g = round(parsed.get("carbs_g", 0.0), 1)
+    
     return {
         "description": parsed.get("description") or fallback_text,
-        "calories": parsed.get("calories", 0.0),
-        "protein_g": parsed.get("protein_g", 0.0),
-        "fat_g": parsed.get("fat_g", 0.0),
-        "carbs_g": parsed.get("carbs_g", 0.0),
+        "calories": calories,
+        "protein_g": protein_g,
+        "fat_g": fat_g,
+        "carbs_g": carbs_g,
         "accuracy_level": parsed.get("accuracy_level", "ESTIMATE"),
         "source_provider": "LLM_ESTIMATE",
         "notes": parsed.get("notes", ""),
