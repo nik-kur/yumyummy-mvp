@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -12,6 +12,7 @@ class MealCreate(BaseModel):
     protein_g: float = 0
     fat_g: float = 0
     carbs_g: float = 0
+    accuracy_level: Optional[str] = None  # EXACT / ESTIMATE / APPROX
 
 
 class MealRead(BaseModel):

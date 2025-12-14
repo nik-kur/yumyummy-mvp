@@ -88,6 +88,40 @@ async def ai_voice_parse_meal(audio: UploadFile = File(...)):
     if not transcript.strip():
         raise HTTPException(status_code=400, detail="Не удалось распознать речь")
 
+    # Пробуем product pipeline (web-search-first) на основе transcript
+    product_result = None
+    try:
+        payload = ProductMealRequest(
+            name=transcript.strip(),
+            brand=None,
+            store=None,
+            locale="ru-RU",
+        )
+        product_result = await _product_parse_logic(payload)
+        
+        # Если product pipeline вернул результат с WEB или OPENFOODFACTS - используем его
+        source_provider = product_result.get("source_provider", "")
+        if source_provider and source_provider in ("WEB", "OPENFOODFACTS", "WEB_SEARCH_LLM"):
+            logger.info(f"[VOICE] Using product pipeline result with source_provider={source_provider}")
+            return {
+                "transcript": transcript,
+                "description": product_result.get("description", ""),
+                "calories": product_result.get("calories", 0.0),
+                "protein_g": product_result.get("protein_g", 0.0),
+                "fat_g": product_result.get("fat_g", 0.0),
+                "carbs_g": product_result.get("carbs_g", 0.0),
+                "accuracy_level": product_result.get("accuracy_level", "ESTIMATE"),
+                "source_provider": source_provider,
+                "notes": product_result.get("notes", ""),
+                "source_url": product_result.get("source_url"),
+            }
+        else:
+            # Если product pipeline вернул LLM_ESTIMATE или пустой source_provider - fallback
+            logger.info(f"[VOICE] Product pipeline returned {source_provider}, falling back to LLM")
+    except Exception as e:
+        logger.warning(f"[VOICE] Product pipeline failed: {e}, falling back to LLM")
+    
+    # Fallback: если product pipeline вернул LLM_ESTIMATE или упал - используем обычный parse_meal_text
     try:
         parsed = await parse_meal_text(transcript)
     except ValueError as e:
@@ -96,96 +130,104 @@ async def ai_voice_parse_meal(audio: UploadFile = File(...)):
 
     return {
         "transcript": transcript,
-        **parsed,
+        "description": parsed.get("description", ""),
+        "calories": parsed.get("calories", 0.0),
+        "protein_g": parsed.get("protein_g", 0.0),
+        "fat_g": parsed.get("fat_g", 0.0),
+        "carbs_g": parsed.get("carbs_g", 0.0),
+        "accuracy_level": parsed.get("accuracy_level", "ESTIMATE"),
+        "source_provider": "LLM_ESTIMATE",
+        "notes": parsed.get("notes", ""),
+        "source_url": None,
     }
 
 
-@app.post("/ai/product_parse_meal")
-async def ai_product_parse_meal(payload: ProductMealRequest):
+async def _product_parse_logic(payload: ProductMealRequest) -> dict:
     """
-    Получить оценку КБЖУ по штрихкоду или названию продукта.
-    Приоритет: WebSearch -> OpenFoodFacts -> LLM fallback.
+    Внутренняя логика парсинга продукта (WebSearch -> OpenFoodFacts -> LLM fallback).
+    Возвращает dict с полями: description, calories, protein_g, fat_g, carbs_g,
+    accuracy_level, source_provider, notes, source_url.
     """
-    if not payload.barcode and not payload.name:
-        raise HTTPException(
-            status_code=400,
-            detail="Нужно указать либо штрихкод, либо название продукта"
-        )
-    
     # 1) Пробуем Web Search (только для name-based запросов, без barcode)
     if payload.name and not payload.barcode:
-        web_result = await estimate_nutrition_with_web(
+        try:
+            web_result = await estimate_nutrition_with_web(
+                name=payload.name,
+                brand=payload.brand,
+                store=payload.store,
+                locale=payload.locale
+            )
+            
+            if web_result and web_result.get("calories", 0) > 0:
+                # Округляем значения (уже округлены в web_nutrition, но на всякий случай)
+                calories = round(web_result.get("calories", 0.0))
+                protein_g = round(web_result.get("protein_g", 0.0), 1)
+                fat_g = round(web_result.get("fat_g", 0.0), 1)
+                carbs_g = round(web_result.get("carbs_g", 0.0), 1)
+                
+                source_url = web_result.get("source_url")
+                logger.info(f"[BACKEND] Web result source_url: {source_url}, type: {type(source_url)}")
+                
+                return {
+                    "description": web_result.get("description") or payload.name,
+                    "calories": calories,
+                    "protein_g": protein_g,
+                    "fat_g": fat_g,
+                    "carbs_g": carbs_g,
+                    "accuracy_level": web_result.get("accuracy_level", "ESTIMATE"),
+                    "source_provider": "WEB",
+                    "notes": web_result.get("notes", ""),
+                    "source_url": source_url,
+                }
+        except Exception as e:
+            logger.warning(f"[BACKEND] Web search failed: {e}, falling back")
+    
+    # 2) Пробуем через nutrition_lookup (OpenFoodFacts)
+    try:
+        query = NutritionQuery(
+            barcode=payload.barcode,
             name=payload.name,
             brand=payload.brand,
             store=payload.store,
-            locale=payload.locale
+            locale=payload.locale,
         )
         
-        if web_result and web_result.get("calories", 0) > 0:
-            # Округляем значения (уже округлены в web_nutrition, но на всякий случай)
-            calories = round(web_result.get("calories", 0.0))
-            protein_g = round(web_result.get("protein_g", 0.0), 1)
-            fat_g = round(web_result.get("fat_g", 0.0), 1)
-            carbs_g = round(web_result.get("carbs_g", 0.0), 1)
+        result = await nutrition_lookup(query)
+        
+        # Если нашли в OpenFoodFacts
+        if result.found and result.calories is not None and result.calories > 0:
+            # Формируем описание
+            parts = [result.name or payload.name or "Продукт"]
+            if result.brand or payload.brand:
+                parts.append(f"бренд: {result.brand or payload.brand}")
+            if payload.store:
+                parts.append(f"магазин: {payload.store}")
+            description = ", ".join(parts)
             
-            source_url = web_result.get("source_url")
-            logger.info(f"[BACKEND] Web result source_url: {source_url}, type: {type(source_url)}")
+            # Формируем notes
+            notes = "Данные из OpenFoodFacts"
+            if result.portion_grams and result.portion_grams != 100.0:
+                notes += f" (пересчитано на упаковку {result.portion_grams:.0f} г, исходно на 100 г)"
+            
+            # Округляем значения
+            calories = round(result.calories or 0.0)
+            protein_g = round(result.protein_g or 0.0, 1)
+            fat_g = round(result.fat_g or 0.0, 1)
+            carbs_g = round(result.carbs_g or 0.0, 1)
             
             return {
-                "description": web_result.get("description") or payload.name,
+                "description": description,
                 "calories": calories,
                 "protein_g": protein_g,
                 "fat_g": fat_g,
                 "carbs_g": carbs_g,
-                "accuracy_level": web_result.get("accuracy_level", "ESTIMATE"),
-                "source_provider": "WEB",
-                "notes": web_result.get("notes", ""),
-                "source_url": source_url,
+                "accuracy_level": result.accuracy_level,
+                "source_provider": "OPENFOODFACTS",
+                "notes": notes,
+                "source_url": result.source_url,
             }
-    
-    # 2) Пробуем через nutrition_lookup (OpenFoodFacts)
-    query = NutritionQuery(
-        barcode=payload.barcode,
-        name=payload.name,
-        brand=payload.brand,
-        store=payload.store,
-        locale=payload.locale,
-    )
-    
-    result = await nutrition_lookup(query)
-    
-    # Если нашли в OpenFoodFacts
-    if result.found and result.calories is not None and result.calories > 0:
-        # Формируем описание
-        parts = [result.name or payload.name or "Продукт"]
-        if result.brand or payload.brand:
-            parts.append(f"бренд: {result.brand or payload.brand}")
-        if payload.store:
-            parts.append(f"магазин: {payload.store}")
-        description = ", ".join(parts)
-        
-        # Формируем notes
-        notes = "Данные из OpenFoodFacts"
-        if result.portion_grams and result.portion_grams != 100.0:
-            notes += f" (пересчитано на упаковку {result.portion_grams:.0f} г, исходно на 100 г)"
-        
-        # Округляем значения
-        calories = round(result.calories or 0.0)
-        protein_g = round(result.protein_g or 0.0, 1)
-        fat_g = round(result.fat_g or 0.0, 1)
-        carbs_g = round(result.carbs_g or 0.0, 1)
-        
-        return {
-            "description": description,
-            "calories": calories,
-            "protein_g": protein_g,
-            "fat_g": fat_g,
-            "carbs_g": carbs_g,
-            "accuracy_level": result.accuracy_level,
-            "source_provider": "OPENFOODFACTS",
-            "notes": notes,
-            "source_url": result.source_url,
-        }
+    except Exception as e:
+        logger.warning(f"[BACKEND] OpenFoodFacts lookup failed: {e}, falling back")
     
     # 3) Fallback на LLM
     desc_parts = []
@@ -203,7 +245,8 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
     try:
         parsed = await parse_meal_text(fallback_text)
     except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[BACKEND] LLM fallback failed: {e}")
+        raise
     
     # Округляем значения
     calories = round(parsed.get("calories", 0.0))
@@ -222,6 +265,21 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
         "notes": parsed.get("notes", ""),
         "source_url": None,
     }
+
+
+@app.post("/ai/product_parse_meal")
+async def ai_product_parse_meal(payload: ProductMealRequest):
+    """
+    Получить оценку КБЖУ по штрихкоду или названию продукта.
+    Приоритет: WebSearch -> OpenFoodFacts -> LLM fallback.
+    """
+    if not payload.barcode and not payload.name:
+        raise HTTPException(
+            status_code=400,
+            detail="Нужно указать либо штрихкод, либо название продукта"
+        )
+    
+    return await _product_parse_logic(payload)
 
 
 # ---------- USERS ----------
@@ -279,6 +337,16 @@ def create_meal(meal_in: MealCreate, db: Session = Depends(get_db)):
         db.add(user_day)
         db.flush()  # чтобы у user_day появился id до коммита
 
+    # Определяем accuracy_level: если передан - используем, иначе по умолчанию
+    accuracy = meal_in.accuracy_level or "EXACT"
+    # Нормализуем: EXACT / ESTIMATE / APPROX
+    accuracy_upper = accuracy.upper()
+    if accuracy_upper == "HIGH":
+        # Если пришло HIGH из web-search, маппим на ESTIMATE
+        accuracy = "ESTIMATE"
+    elif accuracy_upper not in ("EXACT", "ESTIMATE", "APPROX"):
+        accuracy = "ESTIMATE"
+    
     meal = MealEntry(
         user_id=user.id,
         user_day_id=user_day.id,
@@ -288,7 +356,7 @@ def create_meal(meal_in: MealCreate, db: Session = Depends(get_db)):
         fat_g=meal_in.fat_g,
         carbs_g=meal_in.carbs_g,
         uc_type="UC1",          # пока считаем, что это ручной ввод
-        accuracy_level="EXACT",  # вручную заданные КБЖУ
+        accuracy_level=accuracy,
     )
 
     # Обновляем агрегаты по дню

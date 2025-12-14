@@ -951,8 +951,20 @@ async def handle_voice(message: types.Message) -> None:
     protein_g = float(parsed.get("protein_g", 0) or 0)
     fat_g = float(parsed.get("fat_g", 0) or 0)
     carbs_g = float(parsed.get("carbs_g", 0) or 0)
-    accuracy_level = str(parsed.get("accuracy_level", "ESTIMATE") or "ESTIMATE").upper()
+    
+    # Извлекаем accuracy_level и source_provider из ответа
+    raw_accuracy = parsed.get("accuracy_level", "ESTIMATE")
+    accuracy_level = str(raw_accuracy or "ESTIMATE").upper()
+    source_provider = parsed.get("source_provider") or "LLM_ESTIMATE"
+    
     notes = parsed.get("notes", "") or ""
+    
+    # Добавляем source_provider в notes, если он есть и отличается от LLM_ESTIMATE
+    if source_provider and source_provider != "LLM_ESTIMATE":
+        if notes:
+            notes = f"[{source_provider}] {notes}"
+        else:
+            notes = f"[{source_provider}]"
 
     # Округляем значения для отображения
     calories = round(calories)
@@ -970,6 +982,7 @@ async def handle_voice(message: types.Message) -> None:
         protein_g=protein_g,
         fat_g=fat_g,
         carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
     )
 
     if meal is None:

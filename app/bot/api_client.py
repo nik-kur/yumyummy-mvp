@@ -47,6 +47,7 @@ async def create_meal(
     protein_g: float = 0,
     fat_g: float = 0,
     carbs_g: float = 0,
+    accuracy_level: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Создаём приём пищи через POST /meals.
@@ -61,6 +62,8 @@ async def create_meal(
         "fat_g": fat_g,
         "carbs_g": carbs_g,
     }
+    if accuracy_level:
+        payload["accuracy_level"] = accuracy_level
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
