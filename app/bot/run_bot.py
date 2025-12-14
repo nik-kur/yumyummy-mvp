@@ -274,9 +274,17 @@ async def cmd_barcode(message: types.Message) -> None:
 
     user_id = user["id"]
 
+    # Отправляем немедленный ответ, что запрос получен
+    processing_msg = await message.answer("⏳ Обрабатываю запрос, это может занять несколько секунд...")
+
     # 2) Просим backend найти продукт по штрихкоду
     parsed = await product_parse_meal_by_barcode(barcode)
     if parsed is None:
+        # Удаляем сообщение "Обрабатываю..." перед отправкой ошибки
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
         await message.answer(
             "Не удалось связаться с backend'ом. Попробуй позже 🙏"
         )
@@ -364,10 +372,7 @@ async def cmd_barcode(message: types.Message) -> None:
         
         logger.info(f"[BOT] Final source_url: {source_url}")
         
-        # Добавляем ссылку в текст (Telegram автоматически сделает её кликабельной)
-        text += f"\n\n🔗 Источник: {source_url}"
-        
-        # Также добавляем кнопку для удобства
+        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
         try:
             keyboard = types.InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -380,13 +385,27 @@ async def cmd_barcode(message: types.Message) -> None:
                 ]
             )
             logger.info(f"[BOT] Sending message with keyboard")
+            # Удаляем сообщение "Обрабатываю..." и отправляем результат
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
             await message.answer(text, reply_markup=keyboard)
         except Exception as e:
             logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст со ссылкой
+            # Если ошибка с кнопкой, отправляем хотя бы текст
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
             await message.answer(text)
     else:
         logger.info(f"[BOT] No source_url, sending message without link")
+        # Удаляем сообщение "Обрабатываю..." и отправляем результат
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
         await message.answer(text)
 
 
@@ -460,9 +479,17 @@ async def cmd_product(message: types.Message) -> None:
 
     user_id = user["id"]
 
+    # Отправляем немедленный ответ, что запрос получен
+    processing_msg = await message.answer("⏳ Обрабатываю запрос, это может занять несколько секунд...")
+
     # 2) Просим backend найти продукт по названию
     parsed = await product_parse_meal_by_name(name, brand=brand, store=store)
     if parsed is None:
+        # Удаляем сообщение "Обрабатываю..." перед отправкой ошибки
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
         await message.answer(
             "Не удалось связаться с backend'ом. Попробуй позже 🙏"
         )
@@ -550,10 +577,7 @@ async def cmd_product(message: types.Message) -> None:
         
         logger.info(f"[BOT] Final source_url: {source_url}")
         
-        # Добавляем ссылку в текст (Telegram автоматически сделает её кликабельной)
-        text += f"\n\n🔗 Источник: {source_url}"
-        
-        # Также добавляем кнопку для удобства
+        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
         try:
             keyboard = types.InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -566,13 +590,27 @@ async def cmd_product(message: types.Message) -> None:
                 ]
             )
             logger.info(f"[BOT] Sending message with keyboard")
+            # Удаляем сообщение "Обрабатываю..." и отправляем результат
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
             await message.answer(text, reply_markup=keyboard)
         except Exception as e:
             logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст со ссылкой
+            # Если ошибка с кнопкой, отправляем хотя бы текст
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
             await message.answer(text)
     else:
         logger.info(f"[BOT] No source_url, sending message without link")
+        # Удаляем сообщение "Обрабатываю..." и отправляем результат
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
         await message.answer(text)
 
 
@@ -622,9 +660,17 @@ async def cmd_ai_log(message: types.Message) -> None:
 
     user_id = user["id"]
 
+    # Отправляем немедленный ответ, что запрос получен
+    processing_msg = await message.answer("⏳ Обрабатываю запрос, это может занять несколько секунд...")
+
     # 2) Просим backend/LLM оценить КБЖУ
     parsed = await ai_parse_meal(raw_text)
     if parsed is None:
+        # Удаляем сообщение "Обрабатываю..." перед отправкой ошибки
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
         await message.answer(
             "Не получилось получить оценку КБЖУ от AI. Попробуй чуть позже 🙏"
         )
@@ -714,10 +760,7 @@ async def cmd_ai_log(message: types.Message) -> None:
         
         logger.info(f"[BOT] Final source_url: {source_url}")
         
-        # Добавляем ссылку в текст (Telegram автоматически сделает её кликабельной)
-        text += f"\n\n🔗 Источник: {source_url}"
-        
-        # Также добавляем кнопку для удобства
+        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
         try:
             keyboard = types.InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -730,13 +773,27 @@ async def cmd_ai_log(message: types.Message) -> None:
                 ]
             )
             logger.info(f"[BOT] Sending message with keyboard")
+            # Удаляем сообщение "Обрабатываю..." и отправляем результат
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
             await message.answer(text, reply_markup=keyboard)
         except Exception as e:
             logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст со ссылкой
+            # Если ошибка с кнопкой, отправляем хотя бы текст
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
             await message.answer(text)
     else:
         logger.info(f"[BOT] No source_url, sending message without link")
+        # Удаляем сообщение "Обрабатываю..." и отправляем результат
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
         await message.answer(text)
 
 @router.message(Command("today"))
