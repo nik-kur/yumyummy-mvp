@@ -1,4 +1,6 @@
+import json
 import logging
+import re
 from datetime import date as date_type
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
@@ -19,7 +21,7 @@ from app.services.meal_parser import parse_meal_text
 from app.services.nutrition_lookup import NutritionQuery, nutrition_lookup
 from app.services.web_nutrition import estimate_nutrition_with_web
 from app.services.web_restaurant import estimate_restaurant_meal_with_web
-from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest
+from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest, RestaurantTextRequest
 from app.ai.stt_client import transcribe_audio
 
 app = FastAPI(title="YumYummy API")
@@ -296,6 +298,7 @@ async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
         locale=payload.locale
     )
     
+    # Если web_result есть и calories > 0 - успешное извлечение из web
     if web_result and web_result.get("calories", 0) > 0:
         # Округляем значения (уже округлены в web_restaurant, но на всякий случай)
         calories = round(web_result.get("calories", 0.0))
@@ -318,7 +321,7 @@ async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
             "source_url": source_url,
         }
     
-    # 2) Fallback на LLM
+    # 2) Fallback на LLM (если web_result is None или calories=0)
     fallback_text = f"блюдо из ресторана: {payload.dish} в {payload.restaurant}"
     
     try:
@@ -344,6 +347,145 @@ async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
         "notes": parsed.get("notes", ""),
         "source_url": None,
     }
+
+
+@app.post("/ai/restaurant_parse_text")
+async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
+    """
+    Получить оценку КБЖУ блюда из ресторана по свободному тексту.
+    LLM парсит текст, извлекает restaurant и dish, затем использует web-search.
+    Приоритет: WebSearch -> LLM fallback.
+    """
+    try:
+        text = payload.text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Текст не может быть пустым")
+        
+        # 1) LLM парсит текст в JSON: restaurant, dish, city
+        parse_prompt = (
+            "Ты ассистент. Тебе дают текст с описанием блюда из ресторана/кафе/доставки. "
+            "Извлеки из текста название ресторана (если есть) и название блюда.\n\n"
+            "Отвечай СТРОГО в формате JSON с полями:\n"
+            "- restaurant: строка или null (название ресторана/кафе/доставки, если указано)\n"
+            "- dish: строка (название блюда, ПОЛНОЕ название со всеми деталями)\n"
+            "- city: строка или null (город, если указан)\n\n"
+            "Правила:\n"
+            "1) Если ресторан не удаётся выделить, restaurant=null, dish=исходный текст (убери только предлоги 'в/из/at/in' если они есть в начале)\n"
+            "2) Если в тексте есть 'в/из/at/in' - это может указывать на ресторан\n"
+            "3) dish должно содержать ПОЛНОЕ название блюда со всеми деталями (например, 'бенедикт с ветчиной', а не просто 'бенедикт')\n"
+            "4) Примеры:\n"
+            "   'сырники из кофемании' -> {\"restaurant\": \"кофемания\", \"dish\": \"сырники\", \"city\": null}\n"
+            "   'бенедикт с ветчиной из Кофемании' -> {\"restaurant\": \"Кофемания\", \"dish\": \"бенедикт с ветчиной\", \"city\": null}\n"
+            "   'паста карбонара в vapiano' -> {\"restaurant\": \"vapiano\", \"dish\": \"паста карбонара\", \"city\": null}\n"
+            "   'бургер' -> {\"restaurant\": null, \"dish\": \"бургер\", \"city\": null}\n\n"
+            "Отвечай ТОЛЬКО JSON, без дополнительного текста."
+        )
+        
+        try:
+            parse_messages = [
+                {"role": "system", "content": parse_prompt},
+                {"role": "user", "content": f"Текст: {text}"},
+            ]
+            parse_response = await chat_completion(parse_messages)
+            
+            # Парсим JSON из ответа LLM
+            json_match = re.search(r'\{.*\}', parse_response, re.DOTALL)
+            if not json_match:
+                logger.warning(f"LLM parse response does not contain JSON: {parse_response[:200]}")
+                # Fallback: используем весь текст как dish
+                restaurant = None
+                dish = text
+            else:
+                try:
+                    parse_data = json.loads(json_match.group(0))
+                    restaurant = parse_data.get("restaurant")
+                    dish = parse_data.get("dish", text).strip()
+                    if not dish:
+                        dish = text
+                    logger.info(f"[BACKEND] Restaurant text parsed: restaurant={restaurant}, dish={dish}")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse LLM JSON: {e}, raw: {parse_response[:200]}")
+                    restaurant = None
+                    dish = text
+                    logger.info(f"[BACKEND] Restaurant text parse failed, using fallback: restaurant=None, dish={dish}")
+        except Exception as e:
+            logger.warning(f"Error parsing text with LLM: {e}, using full text as dish")
+            restaurant = None
+            dish = text
+        
+        # 2) Вызываем существующую логику restaurant web estimation
+        try:
+            web_result = await estimate_restaurant_meal_with_web(
+                restaurant=restaurant,
+                dish=dish,
+                locale=payload.locale
+            )
+        except Exception as e:
+            logger.error(f"[BACKEND] Error in estimate_restaurant_meal_with_web: {e}", exc_info=True)
+            # Продолжаем с fallback на LLM
+            web_result = None
+        
+        # Если web_result есть и calories > 0 - успешное извлечение из web
+        if web_result and web_result.get("calories", 0) > 0:
+            # Округляем значения (уже округлены в web_restaurant, но на всякий случай)
+            calories = round(web_result.get("calories", 0.0))
+            protein_g = round(web_result.get("protein_g", 0.0), 1)
+            fat_g = round(web_result.get("fat_g", 0.0), 1)
+            carbs_g = round(web_result.get("carbs_g", 0.0), 1)
+            
+            source_url = web_result.get("source_url")
+            logger.info(f"[BACKEND] Restaurant text web result source_url: {source_url}, type: {type(source_url)}")
+            
+            return {
+                "description": web_result.get("description") or (f"{dish} в {restaurant}" if restaurant else dish),
+                "calories": calories,
+                "protein_g": protein_g,
+                "fat_g": fat_g,
+                "carbs_g": carbs_g,
+                "accuracy_level": web_result.get("accuracy_level", "ESTIMATE"),
+                "notes": web_result.get("notes", ""),
+                "source_provider": "WEB_RESTAURANT",
+                "source_url": source_url,
+            }
+        
+        # 3) Fallback на LLM (если web_result is None или calories=0)
+        if restaurant:
+            fallback_text = f"блюдо из ресторана: {dish} в {restaurant}"
+        else:
+            fallback_text = f"блюдо: {dish}"
+        
+        try:
+            parsed = await parse_meal_text(fallback_text)
+        except ValueError as e:
+            logger.error(f"[BACKEND] LLM fallback failed for restaurant text: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            logger.error(f"[BACKEND] Unexpected error in LLM fallback: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+        
+        # Округляем значения
+        calories = round(parsed.get("calories", 0.0))
+        protein_g = round(parsed.get("protein_g", 0.0), 1)
+        fat_g = round(parsed.get("fat_g", 0.0), 1)
+        carbs_g = round(parsed.get("carbs_g", 0.0), 1)
+        
+        return {
+            "description": parsed.get("description") or fallback_text,
+            "calories": calories,
+            "protein_g": protein_g,
+            "fat_g": fat_g,
+            "carbs_g": carbs_g,
+            "accuracy_level": parsed.get("accuracy_level", "ESTIMATE"),
+            "source_provider": "LLM_RESTAURANT_ESTIMATE",
+            "notes": parsed.get("notes", ""),
+            "source_url": None,
+        }
+    except HTTPException:
+        # Пробрасываем HTTPException как есть
+        raise
+    except Exception as e:
+        logger.error(f"[BACKEND] Unexpected error in restaurant_parse_text: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
 
 
 # ---------- USERS ----------

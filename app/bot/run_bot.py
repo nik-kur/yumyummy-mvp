@@ -18,6 +18,7 @@ from app.bot.api_client import (
     product_parse_meal_by_name,
     voice_parse_meal,
     restaurant_parse_meal,
+    restaurant_parse_text,
 )
 
 
@@ -65,7 +66,7 @@ async def cmd_help(message: types.Message) -> None:
         "/ai_log - описать, что ты съел, а я сам оценю КБЖУ с помощью AI\n"
         "/barcode - записать продукт по штрихкоду\n"
         "/product - записать продукт по названию (можно указать бренд/магазин)\n"
-        "/eatout - записать блюдо из ресторана (пример: /eatout Vapiano | паста карбонара)\n"
+        "/eatout - записать блюдо из ресторана (пример: /eatout сырники из кофемании)\n"
         "/today - показать сводку за сегодня\n"
         "/week - показать сводку за последние 7 дней\n\n"
         "Можно отправить голосовое сообщение — я распознаю и запишу."
@@ -804,46 +805,29 @@ async def cmd_ai_log(message: types.Message) -> None:
 @router.message(Command("eatout"))
 async def cmd_eatout(message: types.Message) -> None:
     """
-    Обработка /eatout <restaurant> | <dish>
+    Обработка /eatout <свободный текст>
     Записывает блюдо из ресторана/кафе/доставки.
+    Примеры: /eatout сырники из кофемании, /eatout паста карбонара в vapiano
     """
-    # Парсим команду: /eatout <restaurant> | <dish>
+    # Парсим команду: /eatout <свободный текст>
     text = message.text or ""
     parts = text.split(maxsplit=1)
     
     if len(parts) < 2:
         await message.answer(
-            "Использование: /eatout <ресторан> | <блюдо>\n"
-            "Пример: /eatout Vapiano | паста карбонара"
+            "Использование: /eatout <описание блюда>\n"
+            "Примеры:\n"
+            "• /eatout сырники из кофемании\n"
+            "• /eatout паста карбонара в vapiano"
         )
         return
     
-    args = parts[1].strip()
+    raw_text = parts[1].strip()
     
-    # Ищем разделитель "|"
-    if "|" not in args:
+    if not raw_text:
         await message.answer(
-            "Используй вертикальную черту для разделения ресторана и блюда:\n"
-            "Пример: /eatout Vapiano | паста карбонара"
-        )
-        return
-    
-    # Разделяем на restaurant и dish
-    split_parts = args.split("|", 1)
-    if len(split_parts) != 2:
-        await message.answer(
-            "Используй вертикальную черту для разделения ресторана и блюда:\n"
-            "Пример: /eatout Vapiano | паста карбонара"
-        )
-        return
-    
-    restaurant = split_parts[0].strip()
-    dish = split_parts[1].strip()
-    
-    if not restaurant or not dish:
-        await message.answer(
-            "Укажи и ресторан, и блюдо:\n"
-            "Пример: /eatout Vapiano | паста карбонара"
+            "Укажи описание блюда:\n"
+            "Пример: /eatout сырники из кофемании"
         )
         return
     
@@ -859,8 +843,8 @@ async def cmd_eatout(message: types.Message) -> None:
     # Отправляем немедленный ответ, что запрос получен
     processing_msg = await message.answer("⏳ Обрабатываю запрос, это может занять несколько секунд...")
     
-    # 2) Просим backend найти блюдо из ресторана
-    parsed = await restaurant_parse_meal(restaurant=restaurant, dish=dish)
+    # 2) Просим backend найти блюдо из ресторана по свободному тексту
+    parsed = await restaurant_parse_text(text=raw_text)
     if parsed is None:
         # Удаляем сообщение "Обрабатываю..." перед отправкой ошибки
         try:
@@ -872,7 +856,7 @@ async def cmd_eatout(message: types.Message) -> None:
         )
         return
     
-    description = parsed.get("description", "") or f"{dish} в {restaurant}"
+    description = parsed.get("description", "") or raw_text
     calories = float(parsed.get("calories", 0) or 0)
     protein_g = float(parsed.get("protein_g", 0) or 0)
     fat_g = float(parsed.get("fat_g", 0) or 0)

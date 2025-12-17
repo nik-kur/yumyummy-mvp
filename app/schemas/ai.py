@@ -33,3 +33,9 @@ class RestaurantMealRequest(BaseModel):
     restaurant: str
     dish: str
     locale: str = "ru-RU"
+
+
+class RestaurantTextRequest(BaseModel):
+    """Запрос на парсинг блюда из ресторана по свободному тексту."""
+    text: str
+    locale: str = "ru-RU"
