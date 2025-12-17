@@ -173,3 +173,25 @@ async def voice_parse_meal(audio_bytes: bytes) -> Optional[Dict[str, Any]]:
             return resp.json()
     except Exception:
         return None
+
+
+async def restaurant_parse_meal(restaurant: str, dish: str) -> Optional[Dict[str, Any]]:
+    """
+    Вызывает POST /ai/restaurant_parse_meal в backend.
+    Возвращает dict с полями:
+      description, calories, protein_g, fat_g, carbs_g, accuracy_level, source_provider, notes, source_url
+    или None, если ошибка.
+    """
+    url = f"{settings.backend_base_url}/ai/restaurant_parse_meal"
+    payload = {
+        "restaurant": restaurant,
+        "dish": dish,
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None

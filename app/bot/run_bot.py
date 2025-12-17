@@ -17,6 +17,7 @@ from app.bot.api_client import (
     product_parse_meal_by_barcode,
     product_parse_meal_by_name,
     voice_parse_meal,
+    restaurant_parse_meal,
 )
 
 
@@ -64,6 +65,7 @@ async def cmd_help(message: types.Message) -> None:
         "/ai_log - описать, что ты съел, а я сам оценю КБЖУ с помощью AI\n"
         "/barcode - записать продукт по штрихкоду\n"
         "/product - записать продукт по названию (можно указать бренд/магазин)\n"
+        "/eatout - записать блюдо из ресторана (пример: /eatout Vapiano | паста карбонара)\n"
         "/today - показать сводку за сегодня\n"
         "/week - показать сводку за последние 7 дней\n\n"
         "Можно отправить голосовое сообщение — я распознаю и запишу."
@@ -797,6 +799,202 @@ async def cmd_ai_log(message: types.Message) -> None:
         except Exception:
             pass
         await message.answer(text)
+
+
+@router.message(Command("eatout"))
+async def cmd_eatout(message: types.Message) -> None:
+    """
+    Обработка /eatout <restaurant> | <dish>
+    Записывает блюдо из ресторана/кафе/доставки.
+    """
+    # Парсим команду: /eatout <restaurant> | <dish>
+    text = message.text or ""
+    parts = text.split(maxsplit=1)
+    
+    if len(parts) < 2:
+        await message.answer(
+            "Использование: /eatout <ресторан> | <блюдо>\n"
+            "Пример: /eatout Vapiano | паста карбонара"
+        )
+        return
+    
+    args = parts[1].strip()
+    
+    # Ищем разделитель "|"
+    if "|" not in args:
+        await message.answer(
+            "Используй вертикальную черту для разделения ресторана и блюда:\n"
+            "Пример: /eatout Vapiano | паста карбонара"
+        )
+        return
+    
+    # Разделяем на restaurant и dish
+    split_parts = args.split("|", 1)
+    if len(split_parts) != 2:
+        await message.answer(
+            "Используй вертикальную черту для разделения ресторана и блюда:\n"
+            "Пример: /eatout Vapiano | паста карбонара"
+        )
+        return
+    
+    restaurant = split_parts[0].strip()
+    dish = split_parts[1].strip()
+    
+    if not restaurant or not dish:
+        await message.answer(
+            "Укажи и ресторан, и блюдо:\n"
+            "Пример: /eatout Vapiano | паста карбонара"
+        )
+        return
+    
+    # 1) Гарантируем, что пользователь есть в backend
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+    
+    user_id = user["id"]
+    
+    # Отправляем немедленный ответ, что запрос получен
+    processing_msg = await message.answer("⏳ Обрабатываю запрос, это может занять несколько секунд...")
+    
+    # 2) Просим backend найти блюдо из ресторана
+    parsed = await restaurant_parse_meal(restaurant=restaurant, dish=dish)
+    if parsed is None:
+        # Удаляем сообщение "Обрабатываю..." перед отправкой ошибки
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer(
+            "Не удалось связаться с backend'ом. Попробуй позже 🙏"
+        )
+        return
+    
+    description = parsed.get("description", "") or f"{dish} в {restaurant}"
+    calories = float(parsed.get("calories", 0) or 0)
+    protein_g = float(parsed.get("protein_g", 0) or 0)
+    fat_g = float(parsed.get("fat_g", 0) or 0)
+    carbs_g = float(parsed.get("carbs_g", 0) or 0)
+    accuracy_level = parsed.get("accuracy_level", "ESTIMATE")
+    notes = parsed.get("notes", "")
+    source_provider = parsed.get("source_provider", "LLM_RESTAURANT_ESTIMATE")
+    source_url = parsed.get("source_url")
+    
+    # Округляем значения для отображения
+    calories = round(calories)
+    protein_g = round(protein_g, 1)
+    fat_g = round(fat_g, 1)
+    carbs_g = round(carbs_g, 1)
+    
+    # 3) Записываем это как MealEntry на сегодня
+    today = date_type.today()
+    meal = await create_meal(
+        user_id=user_id,
+        day=today,
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+    )
+    
+    if meal is None:
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        return
+    
+    # 4) Получаем сводку за день
+    summary = await get_day_summary(user_id=user_id, day=today)
+    
+    # 5) Формируем ответ пользователю
+    base_text = f"✅ Записал: {description}"
+    macros_text = (
+        f"\n\nКБЖУ:\n"
+        f"• Калории: {calories}\n"
+        f"• Белки: {protein_g} г\n"
+        f"• Жиры: {fat_g} г\n"
+        f"• Углеводы: {carbs_g} г\n"
+        f"Точность: {accuracy_level}"
+    )
+    
+    if notes:
+        macros_text += f"\nПримечание: {notes}"
+    
+    summary_text = ""
+    if summary:
+        # Округляем значения сводки
+        total_calories = round(summary.get('total_calories', 0))
+        total_protein = round(summary.get('total_protein_g', 0), 1)
+        total_fat = round(summary.get('total_fat_g', 0), 1)
+        total_carbs = round(summary.get('total_carbs_g', 0), 1)
+        
+        summary_text = (
+            "\n\nСводка за сегодня:\n"
+            f"• Калории: {total_calories}\n"
+            f"• Белки: {total_protein} г\n"
+            f"• Жиры: {total_fat} г\n"
+            f"• Углеводы: {total_carbs} г"
+        )
+    
+    # Формируем финальный текст
+    text = base_text + macros_text + summary_text
+    
+    # Добавляем ссылку на источник в кнопку, если есть
+    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
+    if source_url and str(source_url).strip():
+        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
+        # Проверяем, что это валидный URL
+        if not (source_url.startswith("http://") or source_url.startswith("https://")):
+            # Если URL без протокола, добавляем https://
+            if source_url.startswith("www."):
+                source_url = "https://" + source_url
+            elif not source_url.startswith("http"):
+                source_url = "https://" + source_url
+        
+        logger.info(f"[BOT] Final source_url: {source_url}")
+        
+        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
+        try:
+            keyboard = types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        types.InlineKeyboardButton(
+                            text="🔗 Источник",
+                            url=source_url
+                        )
+                    ]
+                ]
+            )
+            logger.info(f"[BOT] Sending message with keyboard")
+            # Удаляем сообщение "Обрабатываю..." и отправляем результат
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            await message.answer(text, reply_markup=keyboard)
+        except Exception as e:
+            logger.error(f"[BOT] Error creating keyboard: {e}")
+            # Если ошибка с кнопкой, отправляем хотя бы текст
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            await message.answer(text)
+    else:
+        logger.info(f"[BOT] No source_url, sending message without link")
+        # Удаляем сообщение "Обрабатываю..." и отправляем результат
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer(text)
+
 
 @router.message(Command("today"))
 async def cmd_today(message: types.Message) -> None:

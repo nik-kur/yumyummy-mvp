@@ -18,7 +18,8 @@ from app.services.llm_client import chat_completion
 from app.services.meal_parser import parse_meal_text
 from app.services.nutrition_lookup import NutritionQuery, nutrition_lookup
 from app.services.web_nutrition import estimate_nutrition_with_web
-from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest
+from app.services.web_restaurant import estimate_restaurant_meal_with_web
+from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest
 from app.ai.stt_client import transcribe_audio
 
 app = FastAPI(title="YumYummy API")
@@ -280,6 +281,69 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
         )
     
     return await _product_parse_logic(payload)
+
+
+@app.post("/ai/restaurant_parse_meal")
+async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
+    """
+    Получить оценку КБЖУ блюда из ресторана/кафе/доставки.
+    Приоритет: WebSearch -> LLM fallback.
+    """
+    # 1) Пробуем Web Search
+    web_result = await estimate_restaurant_meal_with_web(
+        restaurant=payload.restaurant,
+        dish=payload.dish,
+        locale=payload.locale
+    )
+    
+    if web_result and web_result.get("calories", 0) > 0:
+        # Округляем значения (уже округлены в web_restaurant, но на всякий случай)
+        calories = round(web_result.get("calories", 0.0))
+        protein_g = round(web_result.get("protein_g", 0.0), 1)
+        fat_g = round(web_result.get("fat_g", 0.0), 1)
+        carbs_g = round(web_result.get("carbs_g", 0.0), 1)
+        
+        source_url = web_result.get("source_url")
+        logger.info(f"[BACKEND] Restaurant web result source_url: {source_url}, type: {type(source_url)}")
+        
+        return {
+            "description": web_result.get("description") or f"{payload.dish} в {payload.restaurant}",
+            "calories": calories,
+            "protein_g": protein_g,
+            "fat_g": fat_g,
+            "carbs_g": carbs_g,
+            "accuracy_level": web_result.get("accuracy_level", "ESTIMATE"),
+            "notes": web_result.get("notes", ""),
+            "source_provider": "WEB_RESTAURANT",
+            "source_url": source_url,
+        }
+    
+    # 2) Fallback на LLM
+    fallback_text = f"блюдо из ресторана: {payload.dish} в {payload.restaurant}"
+    
+    try:
+        parsed = await parse_meal_text(fallback_text)
+    except ValueError as e:
+        logger.error(f"[BACKEND] LLM fallback failed for restaurant meal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    # Округляем значения
+    calories = round(parsed.get("calories", 0.0))
+    protein_g = round(parsed.get("protein_g", 0.0), 1)
+    fat_g = round(parsed.get("fat_g", 0.0), 1)
+    carbs_g = round(parsed.get("carbs_g", 0.0), 1)
+    
+    return {
+        "description": parsed.get("description") or fallback_text,
+        "calories": calories,
+        "protein_g": protein_g,
+        "fat_g": fat_g,
+        "carbs_g": carbs_g,
+        "accuracy_level": parsed.get("accuracy_level", "ESTIMATE"),
+        "source_provider": "LLM_RESTAURANT_ESTIMATE",
+        "notes": parsed.get("notes", ""),
+        "source_url": None,
+    }
 
 
 # ---------- USERS ----------

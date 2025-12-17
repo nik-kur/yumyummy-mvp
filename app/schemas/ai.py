@@ -26,3 +26,10 @@ class ProductMealRequest(BaseModel):
     brand: Optional[str] = None
     store: Optional[str] = None
     locale: str = "ru-RU"
+
+
+class RestaurantMealRequest(BaseModel):
+    """Запрос на парсинг блюда из ресторана."""
+    restaurant: str
+    dish: str
+    locale: str = "ru-RU"
