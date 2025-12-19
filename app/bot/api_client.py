@@ -48,6 +48,7 @@ async def create_meal(
     fat_g: float = 0,
     carbs_g: float = 0,
     accuracy_level: Optional[str] = None,
+    source_provider: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Создаём приём пищи через POST /meals.
@@ -64,6 +65,8 @@ async def create_meal(
     }
     if accuracy_level:
         payload["accuracy_level"] = accuracy_level
+    if source_provider:
+        payload["source_provider"] = source_provider
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -215,4 +218,36 @@ async def restaurant_parse_text(text: str) -> Optional[Dict[str, Any]]:
             resp.raise_for_status()
             return resp.json()
     except Exception:
+        return None
+
+
+async def restaurant_parse_text_openai(text: str) -> Optional[Dict[str, Any]]:
+    """
+    EXPERIMENTAL: Вызывает POST /ai/restaurant_parse_text_openai в backend.
+    Использует OpenAI Responses API с web_search tool (Path A для A/B тестирования).
+    Возвращает dict с полями:
+      description, calories, protein_g, fat_g, carbs_g, accuracy_level, source_provider, notes, source_url
+    или None, если ошибка.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    url = f"{settings.backend_base_url}/ai/restaurant_parse_text_openai"
+    payload = {
+        "text": text,
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:  # Longer timeout for OpenAI API
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[API] restaurant_parse_text_openai HTTP error: {e.response.status_code} - {e.response.text[:200]}")
+        return None
+    except httpx.RequestError as e:
+        logger.error(f"[API] restaurant_parse_text_openai request error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"[API] restaurant_parse_text_openai unexpected error: {e}", exc_info=True)
         return None

@@ -21,8 +21,11 @@ from app.services.meal_parser import parse_meal_text
 from app.services.nutrition_lookup import NutritionQuery, nutrition_lookup
 from app.services.web_nutrition import estimate_nutrition_with_web
 from app.services.web_restaurant import estimate_restaurant_meal_with_web
+from app.services.openai_websearch_restaurant import estimate_restaurant_meal_with_openai_websearch
 from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest, RestaurantTextRequest
 from app.ai.stt_client import transcribe_audio
+from anyio import to_thread
+from openai import OpenAI
 
 app = FastAPI(title="YumYummy API")
 
@@ -486,6 +489,425 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
     except Exception as e:
         logger.error(f"[BACKEND] Unexpected error in restaurant_parse_text: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+
+
+@app.post("/ai/restaurant_parse_text_openai")
+async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
+    """
+    EXPERIMENTAL: Получить оценку КБЖУ блюда из ресторана через OpenAI Responses API с web_search.
+    Это Path A для A/B тестирования - параллельно существующему подходу на основе Tavily.
+    
+    Использует двухшаговый поиск: сначала находит официальный URL, затем извлекает нутрицию с проверкой evidence.
+    """
+    try:
+        text = payload.text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Текст не может быть пустым")
+        
+        # Определяем domain hint для известных ресторанов
+        domain_hint = None
+        text_lower = text.lower()
+        if "кофеман" in text_lower:
+            domain_hint = "coffeemania.ru"
+            logger.info(f"[BACKEND] Domain hint: coffeemania.ru")
+        elif "joe and the juice" in text_lower or "joe&thejuice" in text_lower:
+            domain_hint = "joeandthejuice.is"
+            logger.info(f"[BACKEND] Domain hint: joeandthejuice.is")
+        
+        # System prompt
+        system_prompt = (
+            "You are a nutrition researcher. Your task is to find accurate nutritional information "
+            "for restaurant dishes using web search.\n\n"
+            "CRITICAL RULES:\n"
+            "1. You MUST use web_search tool.\n"
+            "2. Prefer official restaurant site or official menu item page.\n"
+            "3. If official site has no nutrition, then prefer reputable delivery/menu pages (UberEats, Yandex.Eda, etc.).\n"
+            "4. Do NOT use user-generated calorie databases (FatSecret, MyFitnessPal, EatThisMuch, health-diet) as sources.\n"
+            "5. Return source_url only if the page contains nutrition numbers and you can quote evidence snippets from it.\n"
+            "6. Return STRICT JSON only, no additional text.\n\n"
+            "JSON format:\n"
+            "{\n"
+            '  "restaurant": str|null,\n'
+            '  "dish": str,\n'
+            '  "description": "full dish name with restaurant",\n'
+            '  "portion_grams": number|null,\n'
+            '  "calories": number,\n'
+            '  "protein_g": number,\n'
+            '  "fat_g": number,\n'
+            '  "carbs_g": number,\n'
+            '  "accuracy_level": "HIGH"|"ESTIMATE",\n'
+            '  "source_url": str|null,\n'
+            '  "evidence_snippets": [str, ...],\n'
+            '  "notes": str\n'
+            "}\n\n"
+            "RULES:\n"
+            "- Set accuracy_level=\"HIGH\" only if source_url is official/delivery/menu page with evidence_snippets.\n"
+            "- Otherwise accuracy_level=\"ESTIMATE\" and source_url=null.\n"
+            "- evidence_snippets must be 2-4 short verbatim strings from the page that include the numbers.\n"
+        )
+        
+        # User prompt с двухшаговым поиском
+        user_prompt_parts = [
+            f"Input query: {text}\n\n",
+            "TWO-STAGE PROCESS:\n",
+            "1) First, identify restaurant name and dish name from the query.\n",
+            "2) Then find the official menu item URL.\n"
+        ]
+        
+        if domain_hint:
+            user_prompt_parts.append(f"   - Use site:{domain_hint} queries if helpful.\n")
+        
+        user_prompt_parts.extend([
+            "3) Extract nutrition (calories/protein/fat/carbs and portion grams) from that official page.\n",
+            "4) Provide evidence_snippets: 2-4 short verbatim strings from the page that include the numbers.\n",
+            "5) Output STRICT JSON with the format specified above.\n\n",
+            "If you only find user-generated databases, do not cite them as source_url."
+        ])
+        
+        user_prompt = "".join(user_prompt_parts)
+        
+        # Инициализируем OpenAI client
+        openai_client = OpenAI(api_key=settings.openai_api_key)
+        
+        # Вызываем Responses API
+        def _call_responses_api():
+            if not hasattr(openai_client, 'responses') or not hasattr(openai_client.responses, 'create'):
+                raise AttributeError("Responses API not available")
+            
+            return openai_client.responses.create(
+                model="gpt-4o",
+                tools=[{"type": "web_search"}],
+                # НЕ форсируем tool_choice - оставляем auto
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+            )
+        
+        try:
+            response = await to_thread.run_sync(_call_responses_api)
+        except AttributeError as e:
+            logger.error(f"[BACKEND] Responses API not available: {e}")
+            # Fallback на parse_meal_text
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        except Exception as e:
+            logger.error(f"[BACKEND] Error calling Responses API: {e}", exc_info=True)
+            # Fallback на parse_meal_text
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        
+        # Извлекаем данные из response
+        output_items = []
+        has_web_search_call = False
+        source_url = None
+        output_content = None
+        web_context_all = ""  # Агрегированный веб-контекст для проверки evidence
+        
+        # Проверяем response.output
+        if hasattr(response, 'output') and response.output:
+            if isinstance(response.output, list):
+                output_types = [getattr(item, 'type', type(item).__name__) for item in response.output]
+                logger.info(f"[BACKEND] Response output types: {output_types}")
+                output_items = response.output
+            else:
+                logger.info(f"[BACKEND] Response output is not a list: {type(response.output)}")
+                output_items = [response.output] if response.output else []
+            
+            # Проверяем наличие web_search_call и извлекаем контент
+            for item in output_items:
+                item_type = getattr(item, 'type', None)
+                if item_type == "web_search_call":
+                    has_web_search_call = True
+                    logger.info(f"[BACKEND] Found web_search_call in output")
+                    # Пытаемся извлечь контент из web_search результатов
+                    if hasattr(item, 'results') and item.results:
+                        for result in item.results:
+                            if hasattr(result, 'content'):
+                                web_context_all += str(result.content) + " "
+                            elif hasattr(result, 'text'):
+                                web_context_all += str(result.text) + " "
+                            elif isinstance(result, dict):
+                                web_context_all += str(result.get('content', '')) + " "
+                                web_context_all += str(result.get('text', '')) + " "
+                    break
+            
+            logger.info(f"[BACKEND] Has web_search_call: {has_web_search_call}")
+            
+            # Извлекаем content из message items и ищем annotations
+            for item in output_items:
+                item_type = getattr(item, 'type', None)
+                
+                # Если это message item, извлекаем content
+                if item_type == "message" or hasattr(item, 'content'):
+                    content = getattr(item, 'content', None)
+                    if content:
+                        if isinstance(content, list):
+                            for block in content:
+                                if hasattr(block, 'text'):
+                                    block_text = block.text
+                                    if not output_content:
+                                        output_content = block_text
+                                    web_context_all += block_text + " "
+                                elif isinstance(block, str):
+                                    if not output_content:
+                                        output_content = block
+                                    web_context_all += block + " "
+                                elif isinstance(block, dict):
+                                    block_text = block.get('text', '')
+                                    if block_text:
+                                        if not output_content:
+                                            output_content = block_text
+                                        web_context_all += block_text + " "
+                        elif isinstance(content, str):
+                            output_content = content
+                            web_context_all += content + " "
+                    
+                    # Ищем annotations в message item
+                    if hasattr(item, 'annotations'):
+                        annotations = item.annotations
+                        if annotations:
+                            if isinstance(annotations, list):
+                                for ann in annotations:
+                                    ann_type = getattr(ann, 'type', None)
+                                    if ann_type == "url_citation" or hasattr(ann, 'url_citation'):
+                                        url_citation = getattr(ann, 'url_citation', None)
+                                        if url_citation:
+                                            if hasattr(url_citation, 'url'):
+                                                source_url = url_citation.url
+                                            elif isinstance(url_citation, dict) and 'url' in url_citation:
+                                                source_url = url_citation['url']
+                                            elif isinstance(url_citation, str):
+                                                source_url = url_citation
+                                            
+                                            if source_url:
+                                                logger.info(f"[BACKEND] Extracted source_url from url_citation: {source_url}")
+                                                break
+                            elif hasattr(annotations, 'url_citation'):
+                                url_citation = annotations.url_citation
+                                if hasattr(url_citation, 'url'):
+                                    source_url = url_citation.url
+                                elif isinstance(url_citation, dict) and 'url' in url_citation:
+                                    source_url = url_citation['url']
+                                
+                                if source_url:
+                                    logger.info(f"[BACKEND] Extracted source_url from annotations.url_citation: {source_url}")
+        
+        # Если не нашли content, пробуем альтернативные пути
+        if not output_content:
+            if hasattr(response, 'content'):
+                output_content = response.content
+                web_context_all += str(response.content) + " "
+            elif hasattr(response, 'text'):
+                output_content = response.text
+                web_context_all += str(response.text) + " "
+        
+        if not output_content:
+            logger.warning("[BACKEND] No content extracted from response, falling back to parse_meal_text")
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        
+        # Парсим JSON из ответа
+        json_match = re.search(r'\{.*\}', output_content, re.DOTALL)
+        if not json_match:
+            logger.warning(f"[BACKEND] Response does not contain JSON: {output_content[:200]}")
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        
+        try:
+            data = json.loads(json_match.group(0))
+        except json.JSONDecodeError as e:
+            logger.warning(f"[BACKEND] Failed to parse JSON: {e}, raw: {output_content[:200]}")
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        
+        # Извлекаем данные из JSON
+        restaurant = data.get("restaurant")
+        dish = data.get("dish", text)
+        description = data.get("description", text)
+        portion_grams = data.get("portion_grams")
+        calories = float(data.get("calories", 0) or 0)
+        protein_g = float(data.get("protein_g", 0) or 0)
+        fat_g = float(data.get("fat_g", 0) or 0)
+        carbs_g = float(data.get("carbs_g", 0) or 0)
+        accuracy_level = data.get("accuracy_level", "ESTIMATE")
+        notes = data.get("notes", "")
+        evidence_snippets = data.get("evidence_snippets", [])
+        
+        # Извлекаем source_url из JSON (если не был извлечен из citations)
+        extracted_source_url_from_json = data.get("source_url")
+        if extracted_source_url_from_json and extracted_source_url_from_json != "null" and extracted_source_url_from_json:
+            if not source_url:
+                source_url = extracted_source_url_from_json
+        
+        # Логируем извлеченные данные
+        logger.info(f"[BACKEND] Parsed data: restaurant={restaurant}, dish={dish}, calories={calories}, "
+                   f"source_url={source_url}, evidence_snippets_count={len(evidence_snippets) if evidence_snippets else 0}")
+        
+        # Валидация: если calories <= 0 или source_url is null -> fallback
+        if calories <= 0:
+            logger.info(f"[BACKEND] calories={calories} <= 0, falling back to parse_meal_text")
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        
+        if not source_url:
+            logger.info(f"[BACKEND] source_url is null, falling back to parse_meal_text")
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        
+        # Верификация evidence_snippets
+        web_context_lower = web_context_all.lower()
+        evidence_verified = True
+        
+        if not evidence_snippets or not isinstance(evidence_snippets, list) or len(evidence_snippets) == 0:
+            logger.warning(f"[BACKEND] No evidence_snippets provided")
+            evidence_verified = False
+        else:
+            # Проверяем каждую snippet
+            for snippet in evidence_snippets:
+                if not snippet or not isinstance(snippet, str) or not snippet.strip():
+                    logger.warning(f"[BACKEND] Empty or invalid evidence_snippet: {snippet}")
+                    evidence_verified = False
+                    break
+                
+                snippet_lower = snippet.lower().strip()
+                # Проверяем, что snippet встречается в web_context (case-insensitive)
+                if snippet_lower not in web_context_lower:
+                    logger.warning(f"[BACKEND] Evidence snippet not found in web context: {snippet[:50]}...")
+                    evidence_verified = False
+                    break
+        
+        logger.info(f"[BACKEND] Evidence verification result: {evidence_verified}")
+        
+        # Если верификация не прошла -> fallback
+        if not evidence_verified:
+            logger.info(f"[BACKEND] Evidence verification failed, falling back to parse_meal_text")
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        
+        # Валидация accuracy_level
+        if accuracy_level not in ["HIGH", "ESTIMATE"]:
+            accuracy_level = "ESTIMATE"
+        
+        # Если верификация прошла - возвращаем результат
+        if notes:
+            notes = f"Verified by evidence. {notes}"
+        else:
+            notes = "Verified by evidence."
+        
+        return {
+            "description": description,
+            "calories": round(calories),
+            "protein_g": round(protein_g, 1),
+            "fat_g": round(fat_g, 1),
+            "carbs_g": round(carbs_g, 1),
+            "accuracy_level": accuracy_level,
+            "source_provider": "OPENAI_WEB_SEARCH",
+            "notes": notes,
+            "source_url": source_url,
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[BACKEND] Unexpected error in restaurant_parse_text_openai: {e}", exc_info=True)
+        # Fallback на parse_meal_text даже при неожиданной ошибке
+        try:
+            parsed = await parse_meal_text(text)
+            return {
+                "description": parsed.get("description") or text,
+                "calories": round(parsed.get("calories", 0.0)),
+                "protein_g": round(parsed.get("protein_g", 0.0), 1),
+                "fat_g": round(parsed.get("fat_g", 0.0), 1),
+                "carbs_g": round(parsed.get("carbs_g", 0.0), 1),
+                "accuracy_level": "ESTIMATE",
+                "source_provider": "LLM_RESTAURANT_ESTIMATE",
+                "notes": "Official nutrition not found; estimate. " + (parsed.get("notes", "") or ""),
+                "source_url": None,
+            }
+        except Exception as fallback_error:
+            logger.error(f"[BACKEND] Fallback parse_meal_text also failed: {fallback_error}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
 
 
 # ---------- USERS ----------
