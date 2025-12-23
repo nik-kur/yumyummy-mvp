@@ -504,18 +504,44 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
         if not text:
             raise HTTPException(status_code=400, detail="Текст не может быть пустым")
         
-        # Определяем domain hint для известных ресторанов
-        domain_hint = None
+        # Определяем стратегию поиска и domain hints
         text_lower = text.lower()
-        if "кофеман" in text_lower:
-            domain_hint = "coffeemania.ru"
-            logger.info(f"[BACKEND] Domain hint: coffeemania.ru")
-        elif "joe and the juice" in text_lower or "joe&thejuice" in text_lower:
-            domain_hint = "joeandthejuice.is"
-            logger.info(f"[BACKEND] Domain hint: joeandthejuice.is")
+        domain_hint_candidates = []
+        strategy = None
         
-        # System prompt
-        system_prompt = (
+        # Проверяем known_official_domain case
+        if "кофеман" in text_lower:
+            domain_hint_candidates = ["coffeemania.ru"]
+            strategy = "official_domain"
+            logger.info(f"[BACKEND] Domain hint candidates: {domain_hint_candidates}, strategy=official_domain")
+        elif "joe and the juice" in text_lower or "joe&thejuice" in text_lower:
+            domain_hint_candidates = ["joeandthejuice.is"]
+            strategy = "official_domain"
+            logger.info(f"[BACKEND] Domain hint candidates: {domain_hint_candidates}, strategy=official_domain")
+        
+        # Проверяем global_chain case
+        global_chains = [
+            ("starbucks", "старбакс"),
+            ("mcdonald", "макдон"),
+            ("kfc", "кфс"),
+            ("burger king", "бургер кинг"),
+            ("subway", "сабвей")
+        ]
+        
+        for chain_en, chain_ru in global_chains:
+            if chain_en in text_lower or chain_ru in text_lower:
+                if strategy is None:
+                    strategy = "global_chain"
+                    logger.info(f"[BACKEND] Detected global chain: {chain_en}, strategy=global_chain")
+                break
+        
+        # Если не определили стратегию, используем по умолчанию global_chain
+        if strategy is None:
+            strategy = "global_chain"
+            logger.info(f"[BACKEND] No specific strategy detected, defaulting to strategy=global_chain")
+        
+        # Базовый system prompt (общий для обеих стратегий)
+        base_system_prompt = (
             "You are a nutrition researcher. Your task is to find accurate nutritional information "
             "for restaurant dishes using web search.\n\n"
             "CRITICAL RULES:\n"
@@ -546,25 +572,60 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
             "- evidence_snippets must be 2-4 short verbatim strings from the page that include the numbers.\n"
         )
         
-        # User prompt с двухшаговым поиском
-        user_prompt_parts = [
-            f"Input query: {text}\n\n",
-            "TWO-STAGE PROCESS:\n",
-            "1) First, identify restaurant name and dish name from the query.\n",
-            "2) Then find the official menu item URL.\n"
-        ]
+        # Формируем промпты в зависимости от стратегии
+        if strategy == "official_domain" and domain_hint_candidates:
+            # Стратегия для известных официальных доменов
+            domain_hint = domain_hint_candidates[0]
+            
+            system_prompt = base_system_prompt + (
+                "\nSPECIFIC INSTRUCTIONS FOR OFFICIAL DOMAIN SEARCH:\n"
+                "- You MUST run exactly 1 web_search query with site:{domain} + dish name first.\n"
+                "- If that fails to find nutrition, run one more query without site: restriction but include the domain as keyword.\n"
+                "- STRONGLY prefer pages on {domain} domain.\n"
+                "- Return best single source_url from {domain} if possible.\n"
+            ).format(domain=domain_hint)
+            
+            user_prompt_parts = [
+                f"Input query: {text}\n\n",
+                "OFFICIAL DOMAIN SEARCH PROCESS:\n",
+                f"1) Identify restaurant name and dish name from the query.\n",
+                f"2) Run EXACTLY 1 web_search query: site:{domain_hint} [dish name]\n",
+                f"3) If that doesn't find nutrition, run 1 more query: {domain_hint} [dish name] nutrition (without site: restriction)\n",
+                f"4) Prefer pages from {domain_hint} domain.\n",
+                f"5) Extract nutrition (calories/protein/fat/carbs and portion grams) from the best page found.\n",
+                f"6) Provide evidence_snippets: 2-4 short verbatim strings from the page that include the numbers.\n",
+                f"7) Output STRICT JSON with the format specified above.\n\n",
+                "If you only find user-generated databases, do not cite them as source_url."
+            ]
+            user_prompt = "".join(user_prompt_parts)
+            
+        else:
+            # Стратегия для глобальных сетей (multi-query с региональными вариантами)
+            system_prompt = base_system_prompt + (
+                "\nSPECIFIC INSTRUCTIONS FOR GLOBAL CHAIN SEARCH:\n"
+                "- You MUST perform at least 3 separate web_search calls with different queries.\n"
+                "- You MUST include at least 2 English queries even if user input is in Russian.\n"
+                "- For global chains: explicitly try US and UK/EU variants if the first attempt fails.\n"
+                "- Prefer official nutrition pages, nutrition PDFs, or official menu item pages that show calories/macros and serving size.\n"
+            )
+            
+            user_prompt_parts = [
+                f"Input query: {text}\n\n",
+                "GLOBAL CHAIN SEARCH PROCESS:\n",
+                "1) Identify restaurant name and dish name from the query.\n",
+                "2) Generate at least 3 different search queries:\n",
+                "   - Include queries in both Russian (if applicable) and English.\n",
+                "   - For global chains, include region variants (US, UK, EU) if applicable.\n",
+                "   - Examples: \"[restaurant] [dish] nutrition\", \"[restaurant] [dish] calories\", \"[restaurant] [dish] menu nutrition facts\"\n",
+                "3) Run web_search with at least 3 of these queries (prioritize official sources).\n",
+                "4) Extract nutrition (calories/protein/fat/carbs and portion grams) from the best page found.\n",
+                "5) Provide evidence_snippets: 2-4 short verbatim strings from the page that include the numbers.\n",
+                "6) Output STRICT JSON with the format specified above.\n\n",
+                "If you only find user-generated databases, do not cite them as source_url."
+            ]
+            user_prompt = "".join(user_prompt_parts)
         
-        if domain_hint:
-            user_prompt_parts.append(f"   - Use site:{domain_hint} queries if helpful.\n")
-        
-        user_prompt_parts.extend([
-            "3) Extract nutrition (calories/protein/fat/carbs and portion grams) from that official page.\n",
-            "4) Provide evidence_snippets: 2-4 short verbatim strings from the page that include the numbers.\n",
-            "5) Output STRICT JSON with the format specified above.\n\n",
-            "If you only find user-generated databases, do not cite them as source_url."
-        ])
-        
-        user_prompt = "".join(user_prompt_parts)
+        logger.info(f"[BACKEND] Using strategy={strategy} for query: {text[:50]}...")
         
         # Инициализируем OpenAI client
         openai_client = OpenAI(api_key=settings.openai_api_key)
