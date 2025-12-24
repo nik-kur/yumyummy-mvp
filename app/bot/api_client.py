@@ -253,7 +253,7 @@ async def restaurant_parse_text_openai(text: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def agent_query(user_id: int, text: str, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+async def agent_query(user_id: int, text: str, date: Optional[str] = None, conversation_context: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Вызывает POST /ai/agent в backend.
     Возвращает dict с полями:
@@ -267,6 +267,8 @@ async def agent_query(user_id: int, text: str, date: Optional[str] = None) -> Op
     }
     if date:
         payload["date"] = date
+    if conversation_context:
+        payload["conversation_context"] = conversation_context
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for agent processing

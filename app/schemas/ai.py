@@ -46,6 +46,7 @@ class AgentRequest(BaseModel):
     user_id: int
     text: str
     date: Optional[str] = None  # YYYY-MM-DD format, defaults to today
+    conversation_context: Optional[str] = None  # Previous conversation context for clarifications
 
 
 class AgentResponse(BaseModel):

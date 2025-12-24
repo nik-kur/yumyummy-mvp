@@ -233,6 +233,7 @@ async def run_agent(
     user_id: int,
     text: str,
     date_str: Optional[str] = None,
+    conversation_context: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run the agent with OpenAI Responses API.
@@ -379,12 +380,17 @@ async def run_agent(
         "- If intent is 'log_meal', the 'meal' field MUST be an object (not null) with all required fields\n"
         "- If you found nutrition data from web_search, you MUST include it in the 'meal' field\n"
         "- If you found portion size (grams) on the official page, include it in meal.grams\n"
-        "- If portion size is not found, set meal.grams to null but still provide calories/macros for the standard portion\n\n"
+        "- If portion size is not found, set meal.grams to null but still provide calories/macros for the standard portion\n"
+        "- ALWAYS include source_url in meal object if you found any source (even if unofficial) - this is required for the UI\n"
+        "- If you need clarification (e.g., portion size, which variant), return intent='needs_clarification' with a clear question\n\n"
         "IMPORTANT:\n"
         "- Always respond in Russian for reply_text\n"
         "- If user asks to delete/edit meals, return intent='needs_clarification' with reply_text explaining it's not implemented yet\n"
         "- If web_search finds nutrition info from official source, use it and set accuracy_level='HIGH'\n"
-        "- If only unofficial sources found, return ESTIMATE with source_url=null\n"
+        "- If only unofficial sources found, return ESTIMATE but STILL include source_url in meal object (required for UI)\n"
+        "- ALWAYS include source_url in meal object if you found any source (even if unofficial) - this is required for UI\n"
+        "- If you need clarification (e.g., portion size, which variant of dish), return intent='needs_clarification' with a clear question in reply_text\n"
+        "- When user provides clarification, use it to complete the meal logging with the clarified information\n"
         "- Never call log_meal without user explicitly wanting to log something\n"
         "- For 'сырники кофемания' or similar restaurant queries:\n"
         "  1. Search for 'coffeemania.ru сырники nutrition' or 'site:coffeemania.ru сырники'\n"
@@ -392,15 +398,44 @@ async def run_agent(
         "  3. Return JSON with intent='log_meal' and complete 'meal' object with all fields\n"
     )
     
-    user_prompt = (
-        f"User ID: {user_id}\n"
-        f"Date: {date_str}\n"
-        f"User input: {text}\n\n"
-        "Understand the user's intent and help them accordingly. "
-        "If they want to log a meal, search for nutrition info if needed, then call log_meal. "
-        "If they want to see summaries, call get_day or get_week. "
-        "Always return the final JSON result."
-    )
+    # Build user prompt with optional conversation context
+    user_prompt_parts = [
+        f"User ID: {user_id}\n",
+        f"Date: {date_str}\n",
+    ]
+    
+    if conversation_context:
+        user_prompt_parts.append(f"=== PREVIOUS CONVERSATION CONTEXT ===\n{conversation_context}\n=== END OF CONTEXT ===\n\n")
+        user_prompt_parts.append(
+            "🚨 CRITICAL: The user is responding to your clarification question. "
+            "You MUST use their answer to complete the meal logging. "
+            "Do NOT ask for clarification again - you have all the information needed now.\n\n"
+        )
+        user_prompt_parts.append(
+            "STEP-BY-STEP INSTRUCTIONS FOR CLARIFICATION RESPONSE:\n"
+            "1. Parse the user's answer from the context above (e.g., '350 грам' = 350 grams, 'большой' = large size, etc.)\n"
+            "2. If partial meal data exists in context, use it as a base\n"
+            "3. Recalculate nutrition values based on the clarified portion size:\n"
+            "   - If user specified grams (e.g., '350 грам'), recalculate all macros proportionally\n"
+            "   - Example: if original was 224g with 459 kcal, and user says 350g, then: 459 * (350/224) = ~717 kcal\n"
+            "4. Call log_meal tool with the complete, recalculated data\n"
+            "5. Return JSON with intent='log_meal' (NOT 'needs_clarification') and complete meal object\n"
+            "6. In reply_text, confirm what was logged (e.g., 'Записал стейк, 350г, 717 ккал')\n\n"
+        )
+    
+    user_prompt_parts.extend([
+        f"Current user input: {text}\n\n",
+    ])
+    
+    if not conversation_context:
+        user_prompt_parts.append(
+            "Understand the user's intent and help them accordingly. "
+            "If they want to log a meal, search for nutrition info if needed, then call log_meal. "
+            "If they want to see summaries, call get_day or get_week. "
+        )
+    
+    user_prompt_parts.append("Always return the final JSON result.")
+    user_prompt = "".join(user_prompt_parts)
     
     # Tool handler mapping
     tool_handlers = {
@@ -668,6 +703,15 @@ async def run_agent(
                         final_json["meal"][field] = "ESTIMATE"
                     else:
                         final_json["meal"][field] = 0
+            
+            # If source_url is missing but we have meal data, try to extract from reply_text
+            if not final_json["meal"].get("source_url") and final_json.get("intent") == "log_meal":
+                # Try to find URL in reply_text (if agent mentioned a source)
+                reply_text = final_json.get("reply_text", "")
+                url_match = re.search(r'https?://[^\s\)]+', reply_text)
+                if url_match:
+                    final_json["meal"]["source_url"] = url_match.group(0)
+                    logger.info(f"[AGENT] Extracted source_url from reply_text: {final_json['meal']['source_url']}")
         
         logger.info(f"[AGENT] Final JSON intent: {final_json.get('intent')}, meal present: {final_json.get('meal') is not None}")
         if final_json.get("meal"):

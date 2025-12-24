@@ -987,6 +987,7 @@ async def ai_agent(payload: AgentRequest, db: Session = Depends(get_db)):
             user_id=payload.user_id,
             text=payload.text,
             date_str=payload.date,
+            conversation_context=payload.conversation_context,
         )
         return result
     except Exception as e:
