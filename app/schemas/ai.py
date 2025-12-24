@@ -39,3 +39,19 @@ class RestaurantTextRequest(BaseModel):
     """Запрос на парсинг блюда из ресторана по свободному тексту."""
     text: str
     locale: str = "ru-RU"
+
+
+class AgentRequest(BaseModel):
+    """Запрос к агенту."""
+    user_id: int
+    text: str
+    date: Optional[str] = None  # YYYY-MM-DD format, defaults to today
+
+
+class AgentResponse(BaseModel):
+    """Ответ агента."""
+    intent: str  # "log_meal" | "show_today" | "show_week" | "needs_clarification" | "error"
+    reply_text: str
+    meal: Optional[dict] = None
+    day_summary: Optional[dict] = None
+    week_summary: Optional[dict] = None

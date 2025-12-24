@@ -9,7 +9,7 @@ httpx
 python-dotenv
 redis
 pydantic-settings
-openai
+openai>=1.0.0
 python-multipart
 anyio
 

@@ -251,3 +251,34 @@ async def restaurant_parse_text_openai(text: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"[API] restaurant_parse_text_openai unexpected error: {e}", exc_info=True)
         return None
+
+
+async def agent_query(user_id: int, text: str, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Вызывает POST /ai/agent в backend.
+    Возвращает dict с полями:
+      intent, reply_text, meal, day_summary, week_summary
+    или None, если ошибка.
+    """
+    url = f"{settings.backend_base_url}/ai/agent"
+    payload = {
+        "user_id": user_id,
+        "text": text,
+    }
+    if date:
+        payload["date"] = date
+    
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for agent processing
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[API] agent_query HTTP error: {e.response.status_code} - {e.response.text[:200]}")
+        return None
+    except httpx.RequestError as e:
+        logger.error(f"[API] agent_query request error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"[API] agent_query unexpected error: {e}", exc_info=True)
+        return None

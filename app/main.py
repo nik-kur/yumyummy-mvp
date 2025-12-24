@@ -22,7 +22,8 @@ from app.services.nutrition_lookup import NutritionQuery, nutrition_lookup
 from app.services.web_nutrition import estimate_nutrition_with_web
 from app.services.web_restaurant import estimate_restaurant_meal_with_web
 from app.services.openai_websearch_restaurant import estimate_restaurant_meal_with_openai_websearch
-from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest, RestaurantTextRequest
+from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest, RestaurantTextRequest, AgentRequest, AgentResponse
+from app.services.agent_runner import run_agent
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
@@ -969,6 +970,34 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
         except Exception as fallback_error:
             logger.error(f"[BACKEND] Fallback parse_meal_text also failed: {fallback_error}", exc_info=True)
             raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+
+
+# ---------- AGENT ----------
+
+
+@app.post("/ai/agent", response_model=AgentResponse)
+async def ai_agent(payload: AgentRequest, db: Session = Depends(get_db)):
+    """
+    Agentic mode endpoint using OpenAI Responses API with tools.
+    Understands user intent and can log meals, show summaries, etc.
+    """
+    try:
+        result = await run_agent(
+            db=db,
+            user_id=payload.user_id,
+            text=payload.text,
+            date_str=payload.date,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"[BACKEND] Error in agent endpoint: {e}", exc_info=True)
+        return {
+            "intent": "error",
+            "reply_text": f"Произошла ошибка: {str(e)}",
+            "meal": None,
+            "day_summary": None,
+            "week_summary": None,
+        }
 
 
 # ---------- USERS ----------

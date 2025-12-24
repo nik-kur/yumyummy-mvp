@@ -20,6 +20,7 @@ from app.bot.api_client import (
     restaurant_parse_meal,
     restaurant_parse_text,
     restaurant_parse_text_openai,
+    agent_query,
 )
 
 
@@ -1430,6 +1431,101 @@ async def handle_voice(message: types.Message) -> None:
     else:
         logger.info(f"[BOT] No source_url, sending message without link")
         await message.answer(text)
+
+
+@router.message(Command("agent"))
+async def cmd_agent(message: types.Message) -> None:
+    """
+    EXPERIMENTAL: Agentic mode command.
+    Uses OpenAI Responses API with tools to understand intent and perform actions.
+    """
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+    
+    user_id = user["id"]
+    
+    # Extract text after /agent command
+    text = message.text
+    if text.startswith("/agent"):
+        text = text[6:].strip()  # Remove "/agent" prefix
+    
+    if not text:
+        await message.answer("Пожалуйста, введите запрос после команды /agent")
+        return
+    
+    # Send processing message
+    processing_msg = await message.answer("⏳ Обрабатываю запрос, это может занять несколько секунд...")
+    
+    try:
+        # Call agent endpoint
+        result = await agent_query(user_id=user_id, text=text)
+        
+        if result is None:
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            await message.answer("Не удалось обработать запрос. Попробуйте позже 🙏")
+            return
+        
+        # DEBUG TEMP: Show raw backend response
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        debug_output = "DEBUG from backend:\n" + str(result)[:800]
+        await message.answer(debug_output)
+        return  # DEBUG TEMP: Return early to skip normal processing
+        
+        intent = result.get("intent", "error")
+        reply_text = result.get("reply_text", "Ошибка обработки")
+        meal = result.get("meal")
+        day_summary = result.get("day_summary")
+        week_summary = result.get("week_summary")
+        source_url = meal.get("source_url") if meal else None
+        
+        # Delete processing message
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        
+        # Build response with inline keyboard if source_url exists
+        reply_markup = None
+        if source_url:
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="Источник", url=source_url)]]
+            )
+        
+        await message.answer(reply_text, reply_markup=reply_markup)
+        
+        # If meal was logged, optionally show day summary
+        if intent == "log_meal" and day_summary:
+            total_calories = round(day_summary.get("total_calories", 0))
+            total_protein = round(day_summary.get("total_protein_g", 0), 1)
+            total_fat = round(day_summary.get("total_fat_g", 0), 1)
+            total_carbs = round(day_summary.get("total_carbs_g", 0), 1)
+            
+            summary_text = (
+                f"\n\n📊 За сегодня:\n"
+                f"• Калории: {total_calories}\n"
+                f"• Белки: {total_protein} г\n"
+                f"• Жиры: {total_fat} г\n"
+                f"• Углеводы: {total_carbs} г"
+            )
+            await message.answer(summary_text)
+        
+    except Exception as e:
+        logger.error(f"[BOT /agent] Error: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Произошла ошибка при обработке запроса. Попробуйте позже 🙏")
 
 
 async def main() -> None:
