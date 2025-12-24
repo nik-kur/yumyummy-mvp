@@ -228,6 +228,30 @@ def _get_week_tool(db: Session, user_id: int, date_start_str: str) -> Dict[str, 
         }
 
 
+def _detect_known_restaurant_domain(text: str) -> Optional[str]:
+    """
+    Detect if the text mentions a known restaurant with an official domain.
+    Returns the official domain if found, None otherwise.
+    """
+    text_lower = text.lower()
+    
+    # Known restaurants with official domains
+    known_restaurants = {
+        "кофеман": "coffeemania.ru",
+        "coffeemania": "coffeemania.ru",
+        "joe and the juice": "joeandthejuice.is",
+        "joe&thejuice": "joeandthejuice.is",
+        "joe and the": "joeandthejuice.is",
+    }
+    
+    for keyword, domain in known_restaurants.items():
+        if keyword in text_lower:
+            logger.info(f"[AGENT] Detected known restaurant domain: {domain} for query: {text[:50]}...")
+            return domain
+    
+    return None
+
+
 async def run_agent(
     db: Session,
     user_id: int,
@@ -243,6 +267,7 @@ async def run_agent(
         user_id: User ID
         text: User input text
         date_str: Optional date string (YYYY-MM-DD), defaults to today
+        conversation_context: Optional conversation context for follow-up questions
     
     Returns:
         Dict with structured output matching the schema:
@@ -277,6 +302,9 @@ async def run_agent(
             "day_summary": None,
             "week_summary": None,
         }
+    
+    # Detect known restaurant domain
+    known_domain = _detect_known_restaurant_domain(text)
     
     # Define function tools (Responses API format: flattened structure)
     function_tools = [
@@ -343,11 +371,15 @@ async def run_agent(
         "   - error: Something went wrong\n\n"
         "2. For restaurant/menu items and packaged products:\n"
         "   - Use web_search tool to find nutrition information\n"
+        "   - CRITICAL: If you detect a known restaurant (e.g., Кофемания/Coffeemania, Joe and the Juice), you MUST:\n"
+        "     * FIRST: Search on the official restaurant website using site:domain query (e.g., 'site:coffeemania.ru [dish name]')\n"
+        "     * ONLY if official site search fails: try broader search with domain as keyword\n"
+        "     * NEVER use user-generated databases (health-diet.ru, FatSecret, MyFitnessPal, carbmanager.com) if official site exists\n"
         "   - Source priority (from highest to lowest):\n"
-        "     1. Official restaurant websites (e.g., coffeemania.ru, joeandthejuice.is) - HIGHEST priority\n"
+        "     1. Official restaurant websites (e.g., coffeemania.ru, joeandthejuice.is) - HIGHEST priority, MUST try first\n"
         "     2. Official menu pages with nutrition facts\n"
         "     3. Reputable delivery platforms (UberEats, Yandex.Eda, Wolt, Glovo)\n"
-        "     4. User-generated nutrition databases (FatSecret, MyFitnessPal, health-diet.ru, calorizator) - acceptable but lower priority\n"
+        "     4. User-generated nutrition databases (FatSecret, MyFitnessPal, health-diet.ru, calorizator, carbmanager) - acceptable but lower priority, ONLY if official sources not found\n"
         "     5. LLM estimation based on similar foods - LOWEST priority (only if no sources found)\n"
         "   - ALWAYS search for portion size/weight (grams) on pages - it's usually listed alongside nutrition\n"
         "   - Return HIGH accuracy_level if you found reliable evidence from official/delivery source with source_url\n"
@@ -392,10 +424,12 @@ async def run_agent(
         "- If you need clarification (e.g., portion size, which variant of dish), return intent='needs_clarification' with a clear question in reply_text\n"
         "- When user provides clarification, use it to complete the meal logging with the clarified information\n"
         "- Never call log_meal without user explicitly wanting to log something\n"
-        "- For 'сырники кофемания' or similar restaurant queries:\n"
-        "  1. Search for 'coffeemania.ru сырники nutrition' or 'site:coffeemania.ru сырники'\n"
-        "  2. Extract portion size (grams) and nutrition from official page\n"
-        "  3. Return JSON with intent='log_meal' and complete 'meal' object with all fields\n"
+        "- For restaurant queries with known official domains:\n"
+        "  1. FIRST: Use site:domain query (e.g., 'site:coffeemania.ru бенедикт с ветчиной')\n"
+        "  2. If that fails, try broader: 'coffeemania.ru бенедикт с ветчиной nutrition'\n"
+        "  3. Extract portion size (grams) and nutrition from official page\n"
+        "  4. Return JSON with intent='log_meal' and complete 'meal' object with all fields\n"
+        "  5. NEVER use health-diet.ru, FatSecret, MyFitnessPal, carbmanager.com if official site exists\n"
     )
     
     # Build user prompt with optional conversation context
@@ -426,6 +460,21 @@ async def run_agent(
     user_prompt_parts.extend([
         f"Current user input: {text}\n\n",
     ])
+    
+    # Add specific instructions for known restaurant domains
+    if known_domain and not conversation_context:
+        user_prompt_parts.append(
+            f"🚨 CRITICAL: This query mentions a restaurant with known official domain: {known_domain}\n"
+            f"SEARCH STRATEGY:\n"
+            f"1. FIRST: Run web_search with query: 'site:{known_domain} [dish name from user input]'\n"
+            f"   Example: If user said 'бенедикт с ветчиной из кофемании', search 'site:{known_domain} бенедикт с ветчиной'\n"
+            f"2. If that finds nutrition data on {known_domain}, use it and set accuracy_level='HIGH'\n"
+            f"3. If site: search doesn't find nutrition, try: '{known_domain} [dish name] nutrition' (without site:)\n"
+            f"4. ONLY if official site search completely fails, consider other sources\n"
+            f"5. NEVER use health-diet.ru, FatSecret, MyFitnessPal, carbmanager.com if {known_domain} exists\n"
+            f"6. Extract portion size (grams) from the official page if available\n"
+            f"7. Return source_url pointing to the {known_domain} page if found\n\n"
+        )
     
     if not conversation_context:
         user_prompt_parts.append(
@@ -704,14 +753,52 @@ async def run_agent(
                     else:
                         final_json["meal"][field] = 0
             
+            # Validate source_url for known restaurants: filter out user-generated databases
+            if known_domain:
+                source_url = final_json["meal"].get("source_url")
+                if source_url:
+                    # List of user-generated database domains to filter
+                    user_generated_domains = [
+                        "health-diet.ru",
+                        "fatsecret",
+                        "myfitnesspal",
+                        "carbmanager.com",
+                        "calorizator",
+                        "eatthismuch",
+                    ]
+                    
+                    source_lower = source_url.lower()
+                    is_user_generated = any(domain in source_lower for domain in user_generated_domains)
+                    
+                    if is_user_generated:
+                        logger.warning(
+                            f"[AGENT] Filtered out user-generated source for known restaurant {known_domain}: {source_url}"
+                        )
+                        # Remove source_url and downgrade accuracy
+                        final_json["meal"]["source_url"] = None
+                        final_json["meal"]["accuracy_level"] = "ESTIMATE"
+                        if final_json["meal"].get("notes"):
+                            final_json["meal"]["notes"] = f"Официальный источник не найден. {final_json['meal']['notes']}"
+                        else:
+                            final_json["meal"]["notes"] = "Официальный источник не найден; оценка."
+            
             # If source_url is missing but we have meal data, try to extract from reply_text
             if not final_json["meal"].get("source_url") and final_json.get("intent") == "log_meal":
                 # Try to find URL in reply_text (if agent mentioned a source)
                 reply_text = final_json.get("reply_text", "")
                 url_match = re.search(r'https?://[^\s\)]+', reply_text)
                 if url_match:
-                    final_json["meal"]["source_url"] = url_match.group(0)
-                    logger.info(f"[AGENT] Extracted source_url from reply_text: {final_json['meal']['source_url']}")
+                    found_url = url_match.group(0)
+                    # Don't use user-generated URLs if we have a known domain
+                    if known_domain:
+                        url_lower = found_url.lower()
+                        user_generated_domains = ["health-diet.ru", "fatsecret", "myfitnesspal", "carbmanager.com", "calorizator", "eatthismuch"]
+                        if not any(domain in url_lower for domain in user_generated_domains):
+                            final_json["meal"]["source_url"] = found_url
+                            logger.info(f"[AGENT] Extracted source_url from reply_text: {found_url}")
+                    else:
+                        final_json["meal"]["source_url"] = found_url
+                        logger.info(f"[AGENT] Extracted source_url from reply_text: {found_url}")
         
         logger.info(f"[AGENT] Final JSON intent: {final_json.get('intent')}, meal present: {final_json.get('meal') is not None}")
         if final_json.get("meal"):
