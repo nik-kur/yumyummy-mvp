@@ -1578,10 +1578,15 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         if intent == "log_meal" and meal and isinstance(meal, dict):
             # Format meal information nicely
             meal_title = meal.get("title", "Блюдо")
-            calories = round(meal.get("calories", 0))
-            protein_g = round(meal.get("protein_g", 0), 1)
-            fat_g = round(meal.get("fat_g", 0), 1)
-            carbs_g = round(meal.get("carbs_g", 0), 1)
+            # Safely handle None values before rounding
+            calories_val = meal.get("calories")
+            calories = round(calories_val if calories_val is not None else 0)
+            protein_val = meal.get("protein_g")
+            protein_g = round(protein_val if protein_val is not None else 0, 1)
+            fat_val = meal.get("fat_g")
+            fat_g = round(fat_val if fat_val is not None else 0, 1)
+            carbs_val = meal.get("carbs_g")
+            carbs_g = round(carbs_val if carbs_val is not None else 0, 1)
             grams = meal.get("grams")
             accuracy_level = meal.get("accuracy_level", "ESTIMATE")
             

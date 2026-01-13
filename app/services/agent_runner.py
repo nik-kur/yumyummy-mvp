@@ -252,6 +252,77 @@ def _detect_known_restaurant_domain(text: str) -> Optional[str]:
     return None
 
 
+def _detect_known_store_domain(text: str) -> Optional[str]:
+    """
+    Detect if the text mentions a known store with an official domain.
+    Returns the official domain if found, None otherwise.
+    """
+    text_lower = text.lower()
+    
+    # Known stores with official domains
+    known_stores = {
+        "азбука вкуса": "av.ru",
+        "азбука вкус": "av.ru",
+        "azbuka vkusa": "av.ru",
+        "перекресток": "perekrestok.ru",
+        "perekrestok": "perekrestok.ru",
+        "магнит": "magnit.ru",
+        "magnit": "magnit.ru",
+        "ашан": "auchan.ru",
+        "auchan": "auchan.ru",
+    }
+    
+    for keyword, domain in known_stores.items():
+        if keyword in text_lower:
+            logger.info(f"[AGENT] Detected known store domain: {domain} for query: {text[:50]}...")
+            return domain
+    
+    return None
+
+
+def _detect_query_type(text: str) -> str:
+    """
+    Detect if the query is about a restaurant/menu item or a packaged product.
+    Returns 'restaurant' or 'product'.
+    """
+    text_lower = text.lower()
+    
+    # Restaurant indicators
+    restaurant_keywords = [
+        "из", "в", "at", "from",  # "из кофемании", "в ресторане"
+        "ресторан", "кафе", "ресторане", "кафе",
+        "меню", "menu",
+        "блюдо", "dish",
+        "кофеман", "coffeemania", "joe and the juice", "starbucks", "mcdonald", "kfc",
+    ]
+    
+    # Product indicators
+    product_keywords = [
+        "бренд", "brand",
+        "упаковка", "пачка", "банка", "бутылка", "package", "pack",
+        "штрихкод", "barcode",
+        "магазин", "store", "купил", "купила",
+        "производитель", "manufacturer",
+    ]
+    
+    restaurant_score = sum(1 for keyword in restaurant_keywords if keyword in text_lower)
+    product_score = sum(1 for keyword in product_keywords if keyword in text_lower)
+    
+    # If we detected a known restaurant domain, it's definitely a restaurant query
+    if _detect_known_restaurant_domain(text):
+        return "restaurant"
+    
+    # If product indicators are stronger, it's a product
+    if product_score > restaurant_score:
+        return "product"
+    
+    # Default: assume restaurant if restaurant keywords found, otherwise product
+    if restaurant_score > 0:
+        return "restaurant"
+    
+    return "product"  # Default to product for ambiguous cases
+
+
 async def run_agent(
     db: Session,
     user_id: int,
@@ -303,8 +374,11 @@ async def run_agent(
             "week_summary": None,
         }
     
-    # Detect known restaurant domain
+    # Detect known restaurant/store domain and query type
     known_domain = _detect_known_restaurant_domain(text)
+    known_store = _detect_known_store_domain(text)
+    query_type = _detect_query_type(text)
+    logger.info(f"[AGENT] Query type detected: {query_type}, known_domain: {known_domain}, known_store: {known_store}")
     
     # Define function tools (Responses API format: flattened structure)
     function_tools = [
@@ -369,7 +443,7 @@ async def run_agent(
         "   - show_week: User wants to see week summary (e.g., 'week summary', 'сводка за неделю')\n"
         "   - needs_clarification: User's intent is unclear\n"
         "   - error: Something went wrong\n\n"
-        "2. For restaurant/menu items and packaged products:\n"
+        "2. For restaurant/menu items:\n"
         "   - Use web_search tool to find nutrition information\n"
         "   - CRITICAL: If you detect a known restaurant (e.g., Кофемания/Coffeemania, Joe and the Juice), you MUST:\n"
         "     * FIRST: Search on the official restaurant website using site:domain query (e.g., 'site:coffeemania.ru [dish name]')\n"
@@ -385,11 +459,39 @@ async def run_agent(
         "   - Return HIGH accuracy_level if you found reliable evidence from official/delivery source with source_url\n"
         "   - Return ESTIMATE with source_url if using user-generated databases (they're acceptable but less reliable)\n"
         "   - Return ESTIMATE with no source_url only if no sources found and using LLM estimation\n\n"
-        "3. When ready to log a meal:\n"
+        "3. For packaged products (food items from stores, brands, packaged goods):\n"
+        "   - MANDATORY: You MUST use web_search tool to find nutrition information - NEVER estimate without searching\n"
+        "   - CRITICAL: For ANY product query (e.g., 'творог Президент', 'шоколад Milka'), you MUST:\n"
+        "     * FIRST: Run web_search with query like '[product name] [brand] кбжу' or '[product name] [brand] nutrition facts'\n"
+        "     * Extract calories, protein_g, fat_g, carbs_g from the search results\n"
+        "     * NEVER return calories=0 or null values without searching first\n"
+        "   - CRITICAL: ALWAYS search for package size/weight (grams) - it's essential for accurate nutrition calculation\n"
+        "   - CRITICAL: NEVER use FatSecret, MyFitnessPal, health-diet.ru, calorizator if official store/manufacturer source exists\n"
+        "   - Source priority (from highest to lowest):\n"
+        "     1. Official store websites (e.g., av.ru, perekrestok.ru, magnit.ru, azbuka-vkusa.ru) - HIGHEST priority\n"
+        "        * If store is mentioned, search with 'site:store.ru [product name]' or 'store.ru [product name] кбжу'\n"
+        "     2. Official manufacturer/brand websites (e.g., brand.com, manufacturer.ru) - HIGH priority\n"
+        "        * Search with 'site:brand.com [product name]' or '[brand] [product name] кбжу официальный сайт'\n"
+        "     3. OpenFoodFacts (search 'openfoodfacts.org [product name]' or 'openfoodfacts [barcode]' if barcode mentioned)\n"
+        "     4. Reputable food databases and nutrition sites\n"
+        "     5. User-generated nutrition databases (FatSecret, MyFitnessPal, health-diet.ru, calorizator) - ONLY if no official sources found\n"
+        "     6. LLM estimation based on similar products - LOWEST priority (only if no sources found)\n"
+        "   - IMPORTANT: For products with brand name, search specifically for that brand (e.g., 'Президент творог кбжу')\n"
+        "   - IMPORTANT: For known stores (Азбука вкуса, Перекресток, Магнит, АВ), search on their official websites first\n"
+        "   - CRITICAL: For known stores, you MUST try multiple search queries on their site (site:domain, site:domain кбжу, domain product кбжу)\n"
+        "   - CRITICAL: If user asks to find portion size, you MUST do an additional web_search to find it on the official store page\n"
+        "   - IMPORTANT: Extract BOTH nutrition per 100g AND package size (grams) from sources\n"
+        "   - If package size is found, calculate total nutrition for the package: multiply per_100g values by (package_grams / 100)\n"
+        "   - If package size is not found in first search, do a separate search: '[product name] [brand] вес упаковки грамм'\n"
+        "   - Return HIGH accuracy_level if you found reliable evidence from official/manufacturer/store source with source_url AND package size\n"
+        "   - Return ESTIMATE with source_url if using user-generated databases or if package size is missing\n"
+        "   - Return ESTIMATE with no source_url only if no sources found and using LLM estimation\n"
+        "   - ALWAYS include package size (grams) in meal.grams if found, otherwise set to null\n\n"
+        "4. When ready to log a meal:\n"
         "   - Call log_meal tool with all required fields\n"
         "   - Use the date provided in context (default: today)\n"
         "   - IMPORTANT: If you found nutrition data, you MUST also return it in the 'meal' field of the final JSON\n\n"
-        "4. Always produce a FINAL JSON result matching this schema. Return ONLY valid JSON, no additional text:\n"
+        "5. Always produce a FINAL JSON result matching this schema. Return ONLY valid JSON, no additional text:\n"
         "{\n"
         '  "intent": "log_meal" | "show_today" | "show_week" | "needs_clarification" | "error",\n'
         '  "reply_text": string (user-friendly response in Russian),\n'
@@ -410,7 +512,9 @@ async def run_agent(
         "CRITICAL RULES:\n"
         "- You MUST return valid JSON only. Start your response with { and end with }.\n"
         "- If intent is 'log_meal', the 'meal' field MUST be an object (not null) with all required fields\n"
+        "- For products: You MUST use web_search tool BEFORE returning nutrition data - NEVER return null or 0 values without searching\n"
         "- If you found nutrition data from web_search, you MUST include it in the 'meal' field\n"
+        "- If web_search didn't find data, you MUST still provide estimated values (not null) based on similar products\n"
         "- If you found portion size (grams) on the official page, include it in meal.grams\n"
         "- If portion size is not found, set meal.grams to null but still provide calories/macros for the standard portion\n"
         "- ALWAYS include source_url in meal object if you found any source (even if unofficial) - this is required for the UI\n"
@@ -430,6 +534,14 @@ async def run_agent(
         "  3. Extract portion size (grams) and nutrition from official page\n"
         "  4. Return JSON with intent='log_meal' and complete 'meal' object with all fields\n"
         "  5. NEVER use health-diet.ru, FatSecret, MyFitnessPal, carbmanager.com if official site exists\n"
+        "- For packaged products:\n"
+        "  1. Search for '[product name] [brand if mentioned] кбжу калории' or '[product name] [brand] nutrition facts'\n"
+        "  2. If brand is mentioned, prioritize official brand website: search 'site:[brand-domain] [product name]'\n"
+        "  3. ALWAYS search for package size separately if not found: '[product name] [brand] вес упаковки грамм' or '[product name] [brand] package size grams'\n"
+        "  4. Extract nutrition per 100g AND package size (grams) from sources\n"
+        "  5. Calculate total nutrition for the package: multiply per_100g values by (package_grams / 100)\n"
+        "  6. If OpenFoodFacts is mentioned or found, prefer it for packaged products (it's a reliable source)\n"
+        "  7. Return JSON with intent='log_meal' and complete 'meal' object with package size in grams field\n"
     )
     
     # Build user prompt with optional conversation context
@@ -461,26 +573,69 @@ async def run_agent(
         f"Current user input: {text}\n\n",
     ])
     
-    # Add specific instructions for known restaurant domains
-    if known_domain and not conversation_context:
-        user_prompt_parts.append(
-            f"🚨 CRITICAL: This query mentions a restaurant with known official domain: {known_domain}\n"
-            f"SEARCH STRATEGY:\n"
-            f"1. FIRST: Run web_search with query: 'site:{known_domain} [dish name from user input]'\n"
-            f"   Example: If user said 'бенедикт с ветчиной из кофемании', search 'site:{known_domain} бенедикт с ветчиной'\n"
-            f"2. If that finds nutrition data on {known_domain}, use it and set accuracy_level='HIGH'\n"
-            f"3. If site: search doesn't find nutrition, try: '{known_domain} [dish name] nutrition' (without site:)\n"
-            f"4. ONLY if official site search completely fails, consider other sources\n"
-            f"5. NEVER use health-diet.ru, FatSecret, MyFitnessPal, carbmanager.com if {known_domain} exists\n"
-            f"6. Extract portion size (grams) from the official page if available\n"
-            f"7. Return source_url pointing to the {known_domain} page if found\n\n"
-        )
+    # Add specific instructions based on query type
+    if not conversation_context:
+        if known_domain:
+            # Known restaurant with official domain
+            user_prompt_parts.append(
+                f"🚨 CRITICAL: This query mentions a restaurant with known official domain: {known_domain}\n"
+                f"SEARCH STRATEGY:\n"
+                f"1. FIRST: Run web_search with query: 'site:{known_domain} [dish name from user input]'\n"
+                f"   Example: If user said 'бенедикт с ветчиной из кофемании', search 'site:{known_domain} бенедикт с ветчиной'\n"
+                f"2. If that finds nutrition data on {known_domain}, use it and set accuracy_level='HIGH'\n"
+                f"3. If site: search doesn't find nutrition, try: '{known_domain} [dish name] nutrition' (without site:)\n"
+                f"4. ONLY if official site search completely fails, consider other sources\n"
+                f"5. NEVER use health-diet.ru, FatSecret, MyFitnessPal, carbmanager.com if {known_domain} exists\n"
+                f"6. Extract portion size (grams) from the official page if available\n"
+                f"7. Return source_url pointing to the {known_domain} page if found\n\n"
+            )
+        elif query_type == "product":
+            # Packaged product
+            if known_store:
+                # Known store with official domain
+                user_prompt_parts.append(
+                    f"🚨 CRITICAL: This query is about a PACKAGED PRODUCT from known store: {known_store}\n"
+                    f"SEARCH STRATEGY (MANDATORY - you MUST follow these steps):\n"
+                    f"1. FIRST: Run web_search with query: 'site:{known_store} [product name]'\n"
+                    f"   Example: If user said 'борщ из Азбуки вкуса', search 'site:av.ru борщ'\n"
+                    f"2. If that doesn't find results, try: 'site:{known_store} [product name] кбжу'\n"
+                    f"3. If still no results, try: '{known_store} [product name]' (without site:)\n"
+                    f"4. If still no results, try: '{known_store} [product name] кбжу калории'\n"
+                    f"5. You MUST find the product page on {known_store} - it exists for most products\n"
+                    f"6. Extract nutrition per 100g from the {known_store} page\n"
+                    f"7. ALWAYS search for package/portion size on the SAME {known_store} page or separately: 'site:{known_store} [product name] вес грамм' or '[product name] {known_store} вес упаковки'\n"
+                    f"8. If user asks to find portion size, you MUST do an additional web_search to find it\n"
+                    f"9. Extract BOTH nutrition per 100g AND package/portion size (grams) from sources\n"
+                    f"10. Calculate total nutrition for the package: multiply per_100g values by (package_grams / 100)\n"
+                    f"11. ONLY if ALL searches on {known_store} completely fail (after trying all variants above), consider other sources\n"
+                    f"12. NEVER use FatSecret, MyFitnessPal, health-diet.ru, calorizator if {known_store} exists - you MUST find the official page first\n"
+                    f"13. Return meal.grams with package/portion size if found, otherwise null\n"
+                    f"14. Return source_url pointing to the {known_store} page (format: {known_store}/i/XXXXX/) if found\n\n"
+                )
+            else:
+                # Generic product
+                user_prompt_parts.append(
+                    f"🚨 CRITICAL: This query is about a PACKAGED PRODUCT\n"
+                    f"SEARCH STRATEGY:\n"
+                    f"1. FIRST: Search for nutrition information: '[product name] [brand if mentioned] кбжу калории' or '[product name] [brand] nutrition facts'\n"
+                    f"2. If brand is mentioned, try official brand website: search 'site:[brand-domain] [product name]' (if you can infer domain)\n"
+                    f"3. ALWAYS search for package size separately: '[product name] [brand] вес упаковки грамм' or '[product name] [brand] package size grams'\n"
+                    f"4. Extract BOTH nutrition per 100g AND package size (grams) from sources\n"
+                    f"5. Calculate total nutrition for the package: multiply per_100g values by (package_grams / 100)\n"
+                    f"6. If OpenFoodFacts is found, prefer it (it's a reliable source for packaged products)\n"
+                    f"7. NEVER use FatSecret, MyFitnessPal, health-diet.ru, calorizator if official store/manufacturer source exists\n"
+                    f"8. Return meal.grams with package size if found, otherwise null\n"
+                    f"9. Return source_url pointing to the best source found\n\n"
+                )
     
     if not conversation_context:
         user_prompt_parts.append(
             "Understand the user's intent and help them accordingly. "
             "If they want to log a meal, search for nutrition info if needed, then call log_meal. "
             "If they want to see summaries, call get_day or get_week. "
+            "If user asks to find portion size or package size (e.g., 'найди размер порции', 'find package size'), "
+            "you MUST do an additional web_search to find it on the official store/manufacturer website, "
+            "then recalculate nutrition values based on the found portion size and update the meal data. "
         )
     
     user_prompt_parts.append("Always return the final JSON result.")
@@ -623,11 +778,73 @@ async def run_agent(
             # Try to extract JSON from output
             json_match = re.search(r'\{.*\}', str(output_content), re.DOTALL)
             if json_match:
+                json_str = json_match.group(0)
                 try:
-                    final_json = json.loads(json_match.group(0))
+                    final_json = json.loads(json_str)
                     logger.info(f"[AGENT] Successfully parsed JSON, intent: {final_json.get('intent')}")
                 except json.JSONDecodeError as e:
                     logger.warning(f"[AGENT] Failed to parse JSON: {e}, raw: {str(output_content)[:500]}")
+                    # Try to fix truncated JSON by closing unclosed structures
+                    try:
+                        # Count braces to see if JSON is incomplete
+                        open_braces = json_str.count('{')
+                        close_braces = json_str.count('}')
+                        open_brackets = json_str.count('[')
+                        close_brackets = json_str.count(']')
+                        
+                        # Try to close incomplete JSON
+                        fixed_json = json_str
+                        if open_braces > close_braces:
+                            # Close unclosed objects
+                            fixed_json += '}' * (open_braces - close_braces)
+                        if open_brackets > close_brackets:
+                            # Close unclosed arrays
+                            fixed_json += ']' * (open_brackets - close_brackets)
+                        
+                        # Remove trailing commas before closing braces
+                        fixed_json = re.sub(r',\s*([}\]])', r'\1', fixed_json)
+                        
+                        # Try parsing fixed JSON
+                        final_json = json.loads(fixed_json)
+                        logger.info(f"[AGENT] Successfully parsed fixed JSON, intent: {final_json.get('intent')}")
+                    except (json.JSONDecodeError, Exception) as e2:
+                        logger.warning(f"[AGENT] Failed to fix JSON: {e2}, trying to extract partial data")
+                        # Try to extract partial data from truncated JSON
+                        try:
+                            # Extract what we can using regex
+                            intent_match = re.search(r'"intent"\s*:\s*"([^"]+)"', json_str)
+                            reply_text_match = re.search(r'"reply_text"\s*:\s*"([^"]*)"', json_str)
+                            meal_match = re.search(r'"meal"\s*:\s*(\{[^}]*\})', json_str, re.DOTALL)
+                            
+                            if intent_match:
+                                intent = intent_match.group(1)
+                                reply_text = reply_text_match.group(1) if reply_text_match else "Ошибка парсинга ответа"
+                                
+                                # Try to extract meal data
+                                meal = None
+                                if meal_match:
+                                    try:
+                                        meal_str = meal_match.group(1)
+                                        # Try to close incomplete meal object
+                                        if meal_str.count('{') > meal_str.count('}'):
+                                            meal_str += '}'
+                                        meal = json.loads(meal_str)
+                                    except:
+                                        pass
+                                
+                                final_json = {
+                                    "intent": intent,
+                                    "reply_text": reply_text,
+                                    "meal": meal,
+                                    "day_summary": None,
+                                    "week_summary": None,
+                                }
+                                logger.info(f"[AGENT] Extracted partial JSON, intent: {intent}")
+                            else:
+                                raise e2
+                        except Exception as e3:
+                            logger.error(f"[AGENT] Failed to extract partial JSON: {e3}")
+                            # Will fall through to function call inference
             else:
                 logger.warning(f"[AGENT] No JSON pattern found in output_content")
         else:
@@ -740,9 +957,70 @@ async def run_agent(
                 "notes": "Не удалось извлечь данные о блюде из ответа модели",
             }
         
+        # Fallback for products: if meal has all zeros/None and query is a product, try product parsing
+        if (final_json.get("intent") == "log_meal" and 
+            final_json.get("meal") and isinstance(final_json["meal"], dict) and
+            query_type == "product"):
+            meal = final_json["meal"]
+            calories = meal.get("calories", 0) or 0
+            protein_g = meal.get("protein_g", 0) or 0
+            fat_g = meal.get("fat_g", 0) or 0
+            carbs_g = meal.get("carbs_g", 0) or 0
+            
+            # If all values are zero/None, try fallback to product parsing via HTTP
+            if calories == 0 and protein_g == 0 and fat_g == 0 and carbs_g == 0:
+                logger.warning(f"[AGENT] Product query returned all zeros, trying fallback to product parsing")
+                try:
+                    import httpx
+                    # settings already imported at top of file
+                    
+                    # Try to extract brand from text
+                    brand = None
+                    store = None
+                    name = text
+                    
+                    # Simple extraction: look for common brand/store patterns
+                    text_lower = text.lower()
+                    if "президент" in text_lower or "president" in text_lower:
+                        brand = "Президент"
+                    if "азбука вкуса" in text_lower or "azbuka" in text_lower:
+                        store = "Азбука вкуса"
+                    
+                    # Call product parsing endpoint
+                    url = f"{settings.backend_base_url}/ai/product_parse_meal"
+                    payload = {
+                        "name": name,
+                        "brand": brand,
+                        "store": store,
+                        "locale": "ru-RU",
+                    }
+                    
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.post(url, json=payload)
+                        if resp.status_code == 200:
+                            product_result = resp.json()
+                            
+                            if product_result and product_result.get("calories", 0) > 0:
+                                logger.info(f"[AGENT] Fallback product parsing found data: {product_result.get('calories')} kcal")
+                                # Update meal with product data
+                                final_json["meal"].update({
+                                    "title": product_result.get("description", name),
+                                    "calories": product_result.get("calories", 0),
+                                    "protein_g": product_result.get("protein_g", 0),
+                                    "fat_g": product_result.get("fat_g", 0),
+                                    "carbs_g": product_result.get("carbs_g", 0),
+                                    "accuracy_level": product_result.get("accuracy_level", "ESTIMATE"),
+                                    "source_url": product_result.get("source_url"),
+                                    "notes": product_result.get("notes", ""),
+                                })
+                                if not final_json["meal"].get("title"):
+                                    final_json["meal"]["title"] = name
+                except Exception as e:
+                    logger.warning(f"[AGENT] Fallback product parsing failed: {e}")
+        
         # Validate meal object structure
         if final_json.get("meal") and isinstance(final_json["meal"], dict):
-            # Ensure all required fields are present
+            # Ensure all required fields are present and not None for numeric fields
             required_meal_fields = ["title", "grams", "calories", "protein_g", "fat_g", "carbs_g", "accuracy_level", "source_url", "notes"]
             for field in required_meal_fields:
                 if field not in final_json["meal"]:
@@ -752,9 +1030,21 @@ async def run_agent(
                         final_json["meal"][field] = "ESTIMATE"
                     else:
                         final_json["meal"][field] = 0
+                elif field in ["calories", "protein_g", "fat_g", "carbs_g"]:
+                    # Ensure numeric fields are not None
+                    if final_json["meal"][field] is None:
+                        logger.warning(f"[AGENT] Meal field {field} is None, setting to 0")
+                        final_json["meal"][field] = 0
+                    # Ensure it's a number
+                    try:
+                        final_json["meal"][field] = float(final_json["meal"][field])
+                    except (ValueError, TypeError):
+                        logger.warning(f"[AGENT] Meal field {field} is not a number: {final_json['meal'][field]}, setting to 0")
+                        final_json["meal"][field] = 0
             
-            # Validate source_url for known restaurants: filter out user-generated databases
-            if known_domain:
+            # Validate source_url for known restaurants/stores: filter out user-generated databases
+            if known_domain or known_store:
+                domain_to_check = known_domain or known_store
                 source_url = final_json["meal"].get("source_url")
                 if source_url:
                     # List of user-generated database domains to filter
@@ -771,8 +1061,9 @@ async def run_agent(
                     is_user_generated = any(domain in source_lower for domain in user_generated_domains)
                     
                     if is_user_generated:
+                        entity_type = "restaurant" if known_domain else "store"
                         logger.warning(
-                            f"[AGENT] Filtered out user-generated source for known restaurant {known_domain}: {source_url}"
+                            f"[AGENT] Filtered out user-generated source for known {entity_type} {domain_to_check}: {source_url}"
                         )
                         # Remove source_url and downgrade accuracy
                         final_json["meal"]["source_url"] = None
