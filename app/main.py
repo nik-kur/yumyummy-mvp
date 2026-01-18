@@ -5,11 +5,13 @@ from datetime import date as date_type
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 from app.deps import get_db
+from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
@@ -22,11 +24,30 @@ from app.services.nutrition_lookup import NutritionQuery, nutrition_lookup
 from app.services.web_nutrition import estimate_nutrition_with_web
 from app.services.web_restaurant import estimate_restaurant_meal_with_web
 from app.services.openai_websearch_restaurant import estimate_restaurant_meal_with_openai_websearch
-from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest, RestaurantTextRequest, AgentRequest, AgentResponse
+from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, RestaurantMealRequest, RestaurantTextRequest, AgentRequest, AgentResponse, WorkflowRunRequest, WorkflowRunResponse, WorkflowTotals, WorkflowItem
 from app.services.agent_runner import run_agent
+from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
+from app.services.agent_persist import persist_agent_result
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
+import uuid
+
+# Import OpenAI exceptions - handle both old and new SDK versions
+try:
+    from openai import RateLimitError, APIConnectionError, APIError
+except ImportError:
+    # Fallback for older SDK versions
+    try:
+        from openai.error import RateLimitError, APIConnectionError, APIError
+    except ImportError:
+        # If exceptions don't exist, define dummy classes
+        class RateLimitError(Exception):
+            pass
+        class APIConnectionError(Exception):
+            pass
+        class APIError(Exception):
+            pass
 
 app = FastAPI(title="YumYummy API")
 
@@ -999,6 +1020,182 @@ async def ai_agent(payload: AgentRequest, db: Session = Depends(get_db)):
             "day_summary": None,
             "week_summary": None,
         }
+
+
+# ---------- WORKFLOW (Telegram Bridge) ----------
+
+
+@app.post("/agent/run", response_model=WorkflowRunResponse)
+async def agent_run(payload: WorkflowRunRequest):
+    """
+    Run the YumYummy Agent Builder workflow.
+    Returns the final JSON with intent, message_text, confidence, totals, items, source_url.
+    Also persists meal entries to database for log_meal/product/eatout/barcode intents.
+    
+    Note: Workflow runs WITHOUT DB connection to avoid stale connections during long operations.
+    Persist uses a fresh DB session after workflow completes, with retry on OperationalError.
+    """
+    request_id = str(uuid.uuid4())[:8]
+    telegram_id = payload.telegram_id
+    user_text = payload.text
+    
+    try:
+        # Run the workflow WITHOUT DB connection
+        result = await run_yumyummy_workflow(user_text=user_text, telegram_id=telegram_id)
+        
+        # Extract values for logging
+        intent = result.get("intent", "unknown")
+        confidence = result.get("confidence")
+        source_url = result.get("source_url")
+        has_source_url = source_url is not None and source_url != ""
+        
+        # Log the request
+        logger.info(
+            f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} "
+            f"intent={intent} confidence={confidence} source_url_present={has_source_url}"
+        )
+        
+        # Persist to database (if applicable) using a FRESH session
+        # Retry once if OperationalError occurs (connection closed)
+        try:
+            db2 = SessionLocal()
+            try:
+                persist_agent_result(db=db2, telegram_id=telegram_id, agent_result=result)
+            finally:
+                db2.close()
+        except OperationalError as op_error:
+            # Retry once with a fresh session
+            logger.warning(
+                f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} "
+                f"OperationalError during persist: {op_error}, retrying once with new session"
+            )
+            db3 = SessionLocal()
+            try:
+                persist_agent_result(db=db3, telegram_id=telegram_id, agent_result=result)
+            finally:
+                db3.close()
+        except Exception as persist_error:
+            # Don't fail the request if persistence fails, just log it
+            logger.error(
+                f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} "
+                f"Failed to persist result: {persist_error}",
+                exc_info=True
+            )
+        
+        # Ensure the response matches the expected schema
+        # Convert to WorkflowRunResponse model (will validate)
+        try:
+            # Log result structure for debugging
+            logger.debug(
+                f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} "
+                f"result keys: {list(result.keys())}, "
+                f"intent={result.get('intent')}, "
+                f"has_totals={'totals' in result}, "
+                f"has_items={'items' in result}"
+            )
+            
+            # Validate and convert to WorkflowRunResponse
+            response = WorkflowRunResponse(**result)
+            return response
+        except Exception as validation_error:
+            # Log validation error with full details
+            logger.error(
+                f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} "
+                f"Validation error: {validation_error}, "
+                f"result structure: {result}",
+                exc_info=True
+            )
+            # Return friendly error response instead of crashing
+            return WorkflowRunResponse(
+                intent="help",
+                message_text="Произошла ошибка при обработке ответа. Попробуйте позже.",
+                confidence=None,
+                totals=WorkflowTotals(
+                    calories_kcal=0.0,
+                    protein_g=0.0,
+                    fat_g=0.0,
+                    carbs_g=0.0,
+                ),
+                items=[],
+                source_url=None,
+            )
+        
+    except WorkflowNotInstalledError as e:
+        error_msg = str(e)
+        # Check if it's an OPENAI_API_KEY error
+        if "OPENAI_API_KEY" in error_msg:
+            logger.error(f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} {error_msg}")
+            return WorkflowRunResponse(
+                intent="help",
+                message_text="Сервис временно не настроен (нет ключа OpenAI). Сообщите администратору.",
+                confidence=None,
+                totals=WorkflowTotals(
+                    calories_kcal=0.0,
+                    protein_g=0.0,
+                    fat_g=0.0,
+                    carbs_g=0.0,
+                ),
+                items=[],
+                source_url=None,
+            )
+        else:
+            logger.warning(f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} workflow not installed: {e}")
+            # Return friendly JSON saying workflow is not connected
+            return WorkflowRunResponse(
+                intent="help",
+                message_text="Сервис временно не подключен. Попробуйте позже.",
+                confidence=None,
+                totals=WorkflowTotals(
+                    calories_kcal=0.0,
+                    protein_g=0.0,
+                    fat_g=0.0,
+                    carbs_g=0.0,
+                ),
+                items=[],
+                source_url=None,
+            )
+    
+    except (RateLimitError, APIConnectionError, APIError) as e:
+        logger.error(
+            f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} "
+            f"OpenAI API error: {e}",
+            exc_info=True
+        )
+        # Return friendly JSON for quota/rate-limit errors
+        return WorkflowRunResponse(
+            intent="help",
+            message_text="Сервис перегружен или лимит исчерпан. Попробуй чуть позже.",
+            confidence=None,
+            totals=WorkflowTotals(
+                calories_kcal=0.0,
+                protein_g=0.0,
+                fat_g=0.0,
+                carbs_g=0.0,
+            ),
+            items=[],
+            source_url=None,
+        )
+    
+    except Exception as e:
+        logger.error(
+            f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} "
+            f"unexpected error: {e}",
+            exc_info=True
+        )
+        # Return friendly JSON for any other error (never crash)
+        return WorkflowRunResponse(
+            intent="help",
+            message_text="Произошла ошибка при обработке запроса. Попробуйте позже.",
+            confidence=None,
+            totals=WorkflowTotals(
+                calories_kcal=0.0,
+                protein_g=0.0,
+                fat_g=0.0,
+                carbs_g=0.0,
+            ),
+            items=[],
+            source_url=None,
+        )
 
 
 # ---------- USERS ----------

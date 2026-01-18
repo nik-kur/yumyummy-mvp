@@ -25,6 +25,7 @@ from app.bot.api_client import (
     restaurant_parse_text,
     restaurant_parse_text_openai,
     agent_query,
+    agent_run_workflow,
 )
 
 
@@ -1442,103 +1443,62 @@ async def handle_voice(message: types.Message) -> None:
 
 
 @router.message(Command("agent"))
-async def cmd_agent(message: types.Message, state: FSMContext) -> None:
+async def cmd_agent(message: types.Message) -> None:
     """
-    EXPERIMENTAL: Agentic mode command.
-    Uses OpenAI Responses API with tools to understand intent and perform actions.
+    Agent command that uses /agent/run endpoint.
+    Takes free text after /agent command.
     """
-    tg_id = message.from_user.id
-    user = await ensure_user(tg_id)
-    if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
-        return
-    
-    user_id = user["id"]
-    
-    # Extract text after /agent command (or use full message if responding to clarification)
+    tg_id = str(message.from_user.id)
     text = message.text or ""
     
-    # Check if this is a new /agent command or a response to clarification
-    current_state = await state.get_state()
-    is_clarification_response = current_state == AgentClarification.waiting_for_clarification
-    
+    # Extract text after /agent command
     if text.startswith("/agent"):
         text = text[6:].strip()  # Remove "/agent" prefix
-        # If user sent /agent while in clarification state, clear the state
-        if is_clarification_response:
-            await state.clear()
-            is_clarification_response = False
     
-    # If no text and not responding to clarification, ask for input
-    if not text and not is_clarification_response:
-        await message.answer("Пожалуйста, введите запрос после команды /agent")
+    # If no text, show usage hint
+    if not text:
+        await message.answer("Использование: /agent <ваш запрос>\n\nПример: /agent сырники из кофемании")
         return
     
-    # If responding to clarification but no text, use empty string (will be handled by agent)
-    if not text and is_clarification_response:
-        text = ""
-    
-    # Extract conversation context if responding to clarification
-    conversation_context = None
-    if is_clarification_response:
-        # User is responding to a clarification question
-        stored_context = await state.get_data()
-        base_context = stored_context.get("agent_context", "")
-        original_query = stored_context.get("original_query", "")
-        meal_data = stored_context.get("meal_data")
-        
-        logger.info(f"[BOT /agent] User responding to clarification")
-        logger.info(f"[BOT /agent] Original query: {original_query}")
-        logger.info(f"[BOT /agent] User answer: {text}")
-        logger.info(f"[BOT /agent] Base context: {base_context[:200]}")
-        
-        # Build enhanced context with user's answer
-        enhanced_context_parts = [base_context]
-        enhanced_context_parts.append(f"\n\n=== USER'S ANSWER TO YOUR QUESTION ===")
-        enhanced_context_parts.append(f"User said: {text}")
-        enhanced_context_parts.append("=== END OF USER'S ANSWER ===\n")
-        
-        if meal_data:
-            enhanced_context_parts.append(f"\nIMPORTANT: You already found this partial meal data: {meal_data}")
-            enhanced_context_parts.append("Use the user's answer to complete the missing information (e.g., portion size).")
-            enhanced_context_parts.append("Recalculate nutrition values based on the clarified portion size if needed.")
-        
-        conversation_context = "\n".join(enhanced_context_parts)
-        # Clear the state after extracting context
-        await state.clear()
-        logger.info(f"[BOT /agent] Enhanced context length: {len(conversation_context)}")
-    
     # Send processing message
-    processing_msg = await message.answer("⏳ Обрабатываю запрос, это может занять несколько секунд...")
+    processing_msg = await message.answer("⏳ Обрабатываю запрос...")
     
     try:
-        
-        # Call agent endpoint
-        result = await agent_query(
-            user_id=user_id, 
-            text=text,
-            conversation_context=conversation_context
-        )
+        # Call agent/run endpoint
+        logger.info(f"[BOT /agent] Calling agent_run_workflow for telegram_id={tg_id}, text={text[:50]}...")
+        result = await agent_run_workflow(telegram_id=tg_id, text=text)
         
         if result is None:
+            logger.warning(f"[BOT /agent] agent_run_workflow returned None for telegram_id={tg_id}")
             try:
                 await processing_msg.delete()
             except Exception:
                 pass
-            await message.answer("Не удалось обработать запрос. Попробуйте позже 🙏")
+            await message.answer("Сервис временно недоступен, попробуй позже.")
             return
         
-        intent = result.get("intent", "error")
-        reply_text = result.get("reply_text", "Ошибка обработки")
-        meal = result.get("meal")
-        day_summary = result.get("day_summary")
-        week_summary = result.get("week_summary")
-        source_url = meal.get("source_url") if meal and isinstance(meal, dict) else None
+        # Extract result fields
+        intent = result.get("intent", "unknown")
+        message_text = result.get("message_text", "Ошибка обработки")
+        confidence = result.get("confidence")
+        source_url = result.get("source_url")
+        has_source_url = source_url is not None and source_url != ""
         
-        # Log result for debugging (terminal only)
-        logger.info(f"[BOT /agent] Result: intent={intent}, has_meal={meal is not None}, source_url={source_url}")
-        if meal and isinstance(meal, dict):
-            logger.info(f"[BOT /agent] Meal data: title={meal.get('title')}, calories={meal.get('calories')}, grams={meal.get('grams')}")
+        # Log result
+        logger.info(
+            f"[BOT /agent] telegram_id={tg_id} intent={intent} "
+            f"confidence={confidence} source_url_present={has_source_url} "
+            f"message_text_length={len(message_text) if message_text else 0}"
+        )
+        
+        # Log full result structure for debugging eatout issues
+        if intent == "eatout":
+            logger.info(
+                f"[BOT /agent] eatout result details: "
+                f"totals={result.get('totals')}, "
+                f"items_count={len(result.get('items', []))}, "
+                f"source_url={source_url}"
+            )
         
         # Delete processing message
         try:
@@ -1546,114 +1506,33 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         except Exception:
             pass
         
-        # Handle needs_clarification intent - save context and set FSM state
-        if intent == "needs_clarification":
-            # Save conversation context for follow-up
-            # Include original query, agent's question, and any meal data found so far
-            context_parts = [
-                f"Original user query: {text}",
-                f"Agent asked: {reply_text}",
-            ]
-            if meal and isinstance(meal, dict):
-                context_parts.append(f"Partial meal data found: {meal}")
-            
-            context_text = "\n".join(context_parts)
-            await state.set_state(AgentClarification.waiting_for_clarification)
-            await state.update_data(
-                agent_context=context_text,
-                original_query=text,
-                meal_data=meal  # Save partial meal data if available
-            )
-            logger.info(f"[BOT /agent] Setting clarification state, context saved: {context_text[:200]}")
-            await message.answer(reply_text)
-            return
-        
-        # Handle error intent
-        if intent == "error":
-            logger.error(f"[BOT /agent] Agent returned error: {reply_text}")
-            await message.answer(reply_text)
-            return
-        
-        # Build user-friendly response for log_meal intent
-        if intent == "log_meal" and meal and isinstance(meal, dict):
-            # Format meal information nicely
-            meal_title = meal.get("title", "Блюдо")
-            # Safely handle None values before rounding
-            calories_val = meal.get("calories")
-            calories = round(calories_val if calories_val is not None else 0)
-            protein_val = meal.get("protein_g")
-            protein_g = round(protein_val if protein_val is not None else 0, 1)
-            fat_val = meal.get("fat_g")
-            fat_g = round(fat_val if fat_val is not None else 0, 1)
-            carbs_val = meal.get("carbs_g")
-            carbs_g = round(carbs_val if carbs_val is not None else 0, 1)
-            grams = meal.get("grams")
-            accuracy_level = meal.get("accuracy_level", "ESTIMATE")
-            
-            # Build formatted response
-            response_parts = []
-            
-            # Success message
-            if "успешно" in reply_text.lower() or "записал" in reply_text.lower():
-                response_parts.append("✅ " + reply_text)
-            else:
-                response_parts.append(f"✅ Записал: {meal_title}")
-            
-            # Nutrition info
-            nutrition_parts = [f"• Калории: {calories}"]
-            if protein_g > 0 or fat_g > 0 or carbs_g > 0:
-                nutrition_parts.append(f"• Белки: {protein_g} г")
-                nutrition_parts.append(f"• Жиры: {fat_g} г")
-                nutrition_parts.append(f"• Углеводы: {carbs_g} г")
-            if grams:
-                nutrition_parts.append(f"• Порция: {grams} г")
-            
-            if nutrition_parts:
-                response_parts.append("\n" + "\n".join(nutrition_parts))
-            
-            # Accuracy indicator
-            if accuracy_level == "HIGH":
-                response_parts.append("\n📊 Данные из официального источника")
-            elif accuracy_level == "ESTIMATE":
-                response_parts.append("\n📊 Оценка")
-            
-            formatted_reply = "\n".join(response_parts)
-            
-            # Build response with inline keyboard if source_url exists
-            reply_markup = None
-            if source_url:
+        # Build reply with optional source URL button
+        reply_markup = None
+        if has_source_url:
+            try:
                 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
                 reply_markup = InlineKeyboardMarkup(
                     inline_keyboard=[[InlineKeyboardButton(text="Источник", url=source_url)]]
                 )
-            
-            await message.answer(formatted_reply, reply_markup=reply_markup)
-        else:
-            # For other intents (show_today, show_week, etc.), use reply_text as is
-            reply_markup = None
-            if source_url:
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                reply_markup = InlineKeyboardMarkup(
-                    inline_keyboard=[[InlineKeyboardButton(text="Источник", url=source_url)]]
-                )
-            
-            await message.answer(reply_text, reply_markup=reply_markup)
+            except Exception as e:
+                logger.error(f"[BOT /agent] Error creating reply_markup: {e}", exc_info=True)
+                # Continue without button if there's an error
         
-        # If meal was logged, optionally show day summary
-        if intent == "log_meal" and day_summary:
-            total_calories = round(day_summary.get("total_calories", 0))
-            total_protein = round(day_summary.get("total_protein_g", 0), 1)
-            total_fat = round(day_summary.get("total_fat_g", 0), 1)
-            total_carbs = round(day_summary.get("total_carbs_g", 0), 1)
-            
-            summary_text = (
-                f"\n\n📊 За сегодня:\n"
-                f"• Калории: {total_calories}\n"
-                f"• Белки: {total_protein} г\n"
-                f"• Жиры: {total_fat} г\n"
-                f"• Углеводы: {total_carbs} г"
+        # Send the message
+        try:
+            await message.answer(message_text, reply_markup=reply_markup)
+            logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
+        except Exception as send_error:
+            logger.error(
+                f"[BOT /agent] Error sending message: {send_error}, "
+                f"message_text_length={len(message_text) if message_text else 0}",
+                exc_info=True
             )
-            await message.answer(summary_text)
+            # Try to send a simpler message
+            try:
+                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
+            except Exception:
+                pass
         
     except Exception as e:
         logger.error(f"[BOT /agent] Error: {e}", exc_info=True)
@@ -1661,20 +1540,124 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Произошла ошибка при обработке запроса. Попробуйте позже 🙏")
+        try:
+            await message.answer("Сервис временно недоступен, попробуй позже.")
+        except Exception:
+            pass
 
 
 @router.message(AgentClarification.waiting_for_clarification)
 async def handle_agent_clarification(message: types.Message, state: FSMContext) -> None:
     """
     Handle user response to agent clarification question.
-    Treats the message as a continuation of the /agent command.
-    This handler has higher priority than regular message handlers.
+    For MVP, treat as a regular /agent command.
     """
     logger.info(f"[BOT] Handling clarification response: {message.text}")
-    # Treat this as a regular /agent command with context
-    # The cmd_agent function will detect the state and extract context
-    await cmd_agent(message, state)
+    # Clear state and treat as regular command
+    await state.clear()
+    await cmd_agent(message)
+
+
+@router.message(F.text)
+async def handle_plain_text(message: types.Message) -> None:
+    """
+    Fallback handler for plain text messages (not commands).
+    For MVP, send every plain text message through /agent/run.
+    """
+    tg_id = str(message.from_user.id)
+    text = message.text or ""
+    
+    # Skip commands (they are handled by specific command handlers)
+    if text.startswith("/"):
+        return
+    
+    if not text.strip():
+        return  # Skip empty messages
+    
+    # Send processing message
+    processing_msg = await message.answer("⏳ Обрабатываю запрос...")
+    
+    try:
+        # Call agent/run endpoint
+        logger.info(f"[BOT plain_text] Calling agent_run_workflow for telegram_id={tg_id}, text={text[:50]}...")
+        result = await agent_run_workflow(telegram_id=tg_id, text=text)
+        
+        if result is None:
+            logger.warning(f"[BOT plain_text] agent_run_workflow returned None for telegram_id={tg_id}")
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            await message.answer("Сервис временно недоступен, попробуй позже.")
+            return
+        
+        # Extract result fields
+        intent = result.get("intent", "unknown")
+        message_text = result.get("message_text", "Ошибка обработки")
+        confidence = result.get("confidence")
+        source_url = result.get("source_url")
+        has_source_url = source_url is not None and source_url != ""
+        
+        # Log result
+        logger.info(
+            f"[BOT plain_text] telegram_id={tg_id} intent={intent} "
+            f"confidence={confidence} source_url_present={has_source_url} "
+            f"message_text_length={len(message_text) if message_text else 0}"
+        )
+        
+        # Log full result structure for debugging eatout issues
+        if intent == "eatout":
+            logger.info(
+                f"[BOT plain_text] eatout result details: "
+                f"totals={result.get('totals')}, "
+                f"items_count={len(result.get('items', []))}, "
+                f"source_url={source_url}"
+            )
+        
+        # Delete processing message
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        
+        # Build reply with optional source URL button
+        reply_markup = None
+        if has_source_url:
+            try:
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                reply_markup = InlineKeyboardMarkup(
+                    inline_keyboard=[[InlineKeyboardButton(text="Источник", url=source_url)]]
+                )
+            except Exception as e:
+                logger.error(f"[BOT plain_text] Error creating reply_markup: {e}", exc_info=True)
+                # Continue without button if there's an error
+        
+        # Send the message
+        try:
+            await message.answer(message_text, reply_markup=reply_markup)
+            logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")
+        except Exception as send_error:
+            logger.error(
+                f"[BOT plain_text] Error sending message: {send_error}, "
+                f"message_text_length={len(message_text) if message_text else 0}",
+                exc_info=True
+            )
+            # Try to send a simpler message
+            try:
+                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
+            except Exception:
+                pass
+        
+    except Exception as e:
+        logger.error(f"[BOT plain_text] Error: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        try:
+            await message.answer("Сервис временно недоступен, попробуй позже.")
+        except Exception:
+            pass
 
 
 async def main() -> None:

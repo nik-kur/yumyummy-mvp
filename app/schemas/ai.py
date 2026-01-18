@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, ConfigDict
 
@@ -56,3 +56,37 @@ class AgentResponse(BaseModel):
     meal: Optional[dict] = None
     day_summary: Optional[dict] = None
     week_summary: Optional[dict] = None
+
+
+class WorkflowRunRequest(BaseModel):
+    """Запрос на запуск workflow."""
+    telegram_id: str
+    text: str
+
+
+class WorkflowTotals(BaseModel):
+    """Итоговые значения КБЖУ."""
+    calories_kcal: float
+    protein_g: float
+    fat_g: float
+    carbs_g: float
+
+
+class WorkflowItem(BaseModel):
+    """Элемент в результате workflow."""
+    name: str
+    grams: Optional[float] = None
+    calories_kcal: float
+    protein_g: float
+    fat_g: float
+    carbs_g: float
+
+
+class WorkflowRunResponse(BaseModel):
+    """Ответ workflow."""
+    intent: str
+    message_text: str
+    confidence: Optional[str] = None
+    totals: WorkflowTotals
+    items: List[WorkflowItem]
+    source_url: Optional[str] = None

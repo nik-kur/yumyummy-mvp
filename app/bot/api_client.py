@@ -2,8 +2,11 @@ from datetime import date
 from typing import Any, Dict, Optional
 
 import httpx
+import logging
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 async def ping_backend() -> Optional[Dict[str, Any]]:
@@ -229,9 +232,6 @@ async def restaurant_parse_text_openai(text: str) -> Optional[Dict[str, Any]]:
       description, calories, protein_g, fat_g, carbs_g, accuracy_level, source_provider, notes, source_url
     или None, если ошибка.
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     url = f"{settings.backend_base_url}/ai/restaurant_parse_text_openai"
     payload = {
         "text": text,
@@ -283,4 +283,58 @@ async def agent_query(user_id: int, text: str, date: Optional[str] = None, conve
         return None
     except Exception as e:
         logger.error(f"[API] agent_query unexpected error: {e}", exc_info=True)
+        return None
+
+
+async def agent_run_workflow(telegram_id: str, text: str) -> Optional[Dict[str, Any]]:
+    """
+    Вызывает POST /agent/run в backend.
+    Возвращает dict с полями:
+      intent, message_text, confidence, totals, items, source_url
+    или None, если ошибка.
+    """
+    url = f"{settings.backend_base_url}/agent/run"
+    payload = {
+        "telegram_id": str(telegram_id),
+        "text": text,
+    }
+    
+    # Увеличенный таймаут для агентных ответов (до 180 секунд для web search)
+    timeout = httpx.Timeout(180.0)
+    
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            result = resp.json()
+            
+            # Log response for debugging
+            logger.debug(
+                f"[API] agent_run_workflow response: "
+                f"status={resp.status_code}, "
+                f"intent={result.get('intent')}, "
+                f"has_message_text={'message_text' in result}, "
+                f"has_totals={'totals' in result}, "
+                f"has_items={'items' in result}"
+            )
+            
+            return result
+    except httpx.ReadTimeout:
+        logger.warning("[API] agent_run_workflow timeout")
+        return {
+            "intent": "help",
+            "message_text": "Я думаю дольше обычного 😅 Попробуй ещё раз через 10–20 секунд или уточни запрос.",
+            "confidence": None,
+            "totals": {"calories_kcal": 0.0, "protein_g": 0.0, "fat_g": 0.0, "carbs_g": 0.0},
+            "items": [],
+            "source_url": None
+        }
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[API] agent_run_workflow HTTP error: {e.response.status_code} - {e.response.text[:200]}")
+        return None
+    except httpx.RequestError as e:
+        logger.error(f"[API] agent_run_workflow request error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"[API] agent_run_workflow unexpected error: {e}", exc_info=True)
         return None
