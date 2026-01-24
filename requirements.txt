@@ -3,14 +3,14 @@ uvicorn[standard]
 SQLAlchemy
 alembic
 psycopg2-binary
-pydantic==2.9.1
+pydantic>=2.4.1,<2.10
 aiogram==3.13.1
 httpx
 python-dotenv
 redis
 pydantic-settings>=2.3.0
-openai>=2.9.0,<3
-openai-agents==0.7.0
+openai>=1.107.1,<2
+openai-agents==0.3.3
 pyyaml>=6.0
 python-multipart
 anyio
