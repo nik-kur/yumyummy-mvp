@@ -1,5 +1,6 @@
 import express from 'express';
 import axios from 'axios';
+import cors from 'cors';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ if (!BACKEND_BASE_URL) {
 }
 
 // Middleware
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // Health check endpoint
