@@ -78,6 +78,11 @@ async function start() {
   // MCP endpoint
   app.post("/mcp", async (req, res) => {
     try {
+      // Ensure Accept header includes both required types for MCP streamable transport
+      const acceptHeader = req.headers.accept || "";
+      if (!acceptHeader.includes("application/json") || !acceptHeader.includes("text/event-stream")) {
+        req.headers.accept = "application/json, text/event-stream";
+      }
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error("Error handling MCP request:", error);
