@@ -80,14 +80,39 @@ function jsonRpcError(id, code, message, data) {
 // MCP handler function (JSON-RPC 2.0)
 async function handleMCPRequest(req, res) {
   try {
-    const { jsonrpc, id, method, params } = req.body || {};
+    const { id, method, params } = req.body || {};
 
     if (!method) {
       return res.status(400).json(jsonRpcError(id, -32600, 'Invalid Request: missing method'));
     }
 
-    // Accept both MCP and legacy method names for compatibility
-    const normalizedMethod = method === 'listTools' ? 'tools/list'
+    // 1) REQUIRED: initialize handshake
+    if (method === 'initialize') {
+      const protocolVersion = params?.protocolVersion || '2025-03-26';
+      return res.json(
+        jsonRpcResult(id ?? 1, {
+          protocolVersion,
+          serverInfo: { name: 'yumyummy-mcp-server', version: '1.0.0' },
+          capabilities: {
+            tools: { listChanged: false }
+          }
+        })
+      );
+    }
+
+    // 2) notification after initialize (no response required)
+    if (method === 'notifications/initialized') {
+      return res.status(204).send();
+    }
+
+    // 3) optional but commonly called by clients
+    if (method === 'ping') {
+      return res.json(jsonRpcResult(id ?? 1, {}));
+    }
+
+    // Compatibility aliases (some clients use these names)
+    const normalizedMethod =
+      method === 'listTools' ? 'tools/list'
       : method === 'callTool' ? 'tools/call'
       : method;
 
@@ -108,8 +133,11 @@ async function handleMCPRequest(req, res) {
       const toolArgs = params.arguments || params.input || {};
 
       if (toolName === 'get_day_context') {
-        // Validate input
-        if (typeof toolArgs.user_id !== 'number' || typeof toolArgs.day !== 'string') {
+        // Accept number or numeric string just in case
+        const userId = typeof toolArgs.user_id === 'string' ? Number(toolArgs.user_id) : toolArgs.user_id;
+        const day = toolArgs.day;
+
+        if (!Number.isFinite(userId) || typeof day !== 'string') {
           return res.status(400).json(
             jsonRpcError(
               id,
@@ -119,72 +147,45 @@ async function handleMCPRequest(req, res) {
           );
         }
 
-        // Validate date format
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!dateRegex.test(toolArgs.day)) {
+        if (!dateRegex.test(day)) {
           return res.status(400).json(
             jsonRpcError(id, -32602, 'Invalid date format. Expected YYYY-MM-DD')
           );
         }
 
-        // Build request URL
-        const url = `${BACKEND_BASE_URL}/day/${toolArgs.user_id}/${toolArgs.day}`;
+        const url = `${BACKEND_BASE_URL}/day/${userId}/${day}`;
 
-        // Prepare headers
         const headers = {};
-        if (INTERNAL_API_TOKEN) {
-          headers['X-Internal-Token'] = INTERNAL_API_TOKEN;
-        }
+        if (INTERNAL_API_TOKEN) headers['X-Internal-Token'] = INTERNAL_API_TOKEN;
 
-        // Make request to backend
         try {
           const response = await axios.get(url, { headers });
           return res.json(
             jsonRpcResult(id ?? 1, {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(response.data)
-                }
-              ]
+              content: [{ type: 'text', text: JSON.stringify(response.data) }]
             })
           );
         } catch (error) {
           if (error.response) {
             return res.status(500).json(
-              jsonRpcError(
-                id,
-                -32000,
-                `Backend error: ${error.response.status}`,
-                error.response.data
-              )
+              jsonRpcError(id, -32000, `Backend error: ${error.response.status}`, error.response.data)
             );
           }
           if (error.request) {
-            return res.status(500).json(
-              jsonRpcError(id, -32001, 'Backend unreachable')
-            );
+            return res.status(500).json(jsonRpcError(id, -32001, 'Backend unreachable'));
           }
-          return res.status(500).json(
-            jsonRpcError(id, -32002, 'Request setup error', error.message)
-          );
+          return res.status(500).json(jsonRpcError(id, -32002, 'Request setup error', error.message));
         }
       }
 
-      return res.status(400).json(
-        jsonRpcError(id, -32601, `Unknown tool: ${toolName}`)
-      );
+      return res.status(400).json(jsonRpcError(id, -32601, `Unknown tool: ${toolName}`));
     }
 
-    // Unknown method
-    return res.status(400).json(
-      jsonRpcError(id, -32601, `Unknown method: ${method}`)
-    );
+    return res.status(400).json(jsonRpcError(id, -32601, `Unknown method: ${method}`));
   } catch (error) {
     console.error('Error processing MCP request:', error);
-    return res.status(500).json(
-      jsonRpcError(null, -32603, 'Internal error', error.message)
-    );
+    return res.status(500).json(jsonRpcError(null, -32603, 'Internal error', error.message));
   }
 }
 
