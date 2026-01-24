@@ -79,13 +79,22 @@ const handleMcpPost = async (req, res) => {
   // #region agent log
   res.on("finish", () => {
     fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_finish',message:'POST /mcp finished',data:{status:res.statusCode,mcpSessionId:res.getHeader('mcp-session-id') ?? null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+    console.log("MCP POST finished", {
+      status: res.statusCode,
+      mcpSessionId: res.getHeader("mcp-session-id") ?? null,
+      contentType: res.getHeader("content-type") ?? null
+    });
   });
   // #endregion agent log
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_entry',message:'POST /mcp entry',data:{method:req.body?.method,hasParams:!!req.body?.params,accept:req.headers?.accept,contentType:req.headers?.['content-type'],sessionId:req.headers?.['mcp-session-id']},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
   // #endregion agent log
   console.log("MCP POST request:", JSON.stringify(req.body));
-  console.log("Headers:", JSON.stringify(req.headers));
+  console.log("MCP POST headers:", {
+    accept: req.headers?.accept ?? null,
+    contentType: req.headers?.["content-type"] ?? null,
+    sessionId: req.headers?.["mcp-session-id"] ?? null
+  });
 
   try {
     // #region agent log
@@ -117,6 +126,10 @@ const handleMcpGet = async (req, res) => {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:get_entry',message:'GET /mcp entry',data:{accept:req.headers?.accept,sessionId:req.headers?.['mcp-session-id'] ?? null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
   // #endregion agent log
+  console.log("MCP GET request", {
+    accept: req.headers?.accept ?? null,
+    sessionId: req.headers?.["mcp-session-id"] ?? null
+  });
   try {
     await transport.handleRequest(req, res);
   } catch (error) {
