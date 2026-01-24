@@ -8,11 +8,10 @@ aiogram==3.13.1
 httpx
 python-dotenv
 redis
-pydantic-settings
+pydantic-settings>=2.3.0
 openai>=2.9.0,<3
-openai-agents>=0.4.0
+openai-agents==0.7.0
 pyyaml>=6.0
 python-multipart
 anyio
 pytz
-
