@@ -8,7 +8,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 
 const app = express();
-app.use(cors({ origin: "*" }));
+app.use(cors({ origin: "*", exposedHeaders: ["mcp-session-id"] }));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
@@ -77,6 +77,11 @@ app.get("/health", (req, res) => {
 
 // MCP endpoint - handles both initialization and ongoing communication
 app.post("/mcp", async (req, res) => {
+  // #region agent log
+  res.on("finish", () => {
+    fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_finish',message:'POST /mcp finished',data:{status:res.statusCode,mcpSessionId:res.getHeader('mcp-session-id') ?? null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+  });
+  // #endregion agent log
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_entry',message:'POST /mcp entry',data:{method:req.body?.method,hasParams:!!req.body?.params,accept:req.headers?.accept,contentType:req.headers?.['content-type'],sessionId:req.headers?.['mcp-session-id']},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
   // #endregion agent log
