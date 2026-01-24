@@ -75,7 +75,7 @@ app.get("/health", (req, res) => {
 });
 
 // MCP endpoint - handles both initialization and ongoing communication
-app.post("/mcp", async (req, res) => {
+const handleMcpPost = async (req, res) => {
   // #region agent log
   res.on("finish", () => {
     fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_finish',message:'POST /mcp finished',data:{status:res.statusCode,mcpSessionId:res.getHeader('mcp-session-id') ?? null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
@@ -110,10 +110,10 @@ app.post("/mcp", async (req, res) => {
       });
     }
   }
-});
+};
 
 // Handle GET for SSE streams (if client reconnects)
-app.get("/mcp", async (req, res) => {
+const handleMcpGet = async (req, res) => {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:get_entry',message:'GET /mcp entry',data:{accept:req.headers?.accept,sessionId:req.headers?.['mcp-session-id'] ?? null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
   // #endregion agent log
@@ -129,7 +129,12 @@ app.get("/mcp", async (req, res) => {
       });
     }
   }
-});
+};
+
+app.post("/mcp", handleMcpPost);
+app.post("/", handleMcpPost);
+app.get("/mcp", handleMcpGet);
+app.get("/", handleMcpGet);
 
 // Start server
   app.listen(PORT, () => {
