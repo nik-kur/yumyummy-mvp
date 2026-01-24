@@ -3,7 +3,7 @@ uvicorn[standard]
 SQLAlchemy
 alembic
 psycopg2-binary
-pydantic
+pydantic==2.9.1
 aiogram==3.13.1
 httpx
 python-dotenv
