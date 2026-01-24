@@ -59,8 +59,14 @@ https://yumyummy-mcp-server.onrender.com
 
 Use this URL in OpenAI Agent Builder as your MCP server endpoint:
 ```
+https://yumyummy-mcp-server.onrender.com
+```
+or
+```
 https://yumyummy-mcp-server.onrender.com/mcp
 ```
+
+Both endpoints support the same MCP protocol.
 
 ## Local Development
 
@@ -87,30 +93,82 @@ npm start
 curl http://localhost:3000/health
 ```
 
-5. Test MCP endpoint:
+5. Test MCP endpoint - listTools:
 ```bash
 curl -X POST http://localhost:3000/mcp \
   -H "Content-Type: application/json" \
   -d '{
-    "tool": "get_day_context",
-    "input": {
-      "user_id": 1,
-      "day": "2024-01-15"
+    "method": "listTools"
+  }'
+```
+
+6. Test MCP endpoint - callTool:
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "callTool",
+    "params": {
+      "name": "get_day_context",
+      "arguments": {
+        "user_id": 1,
+        "day": "2024-01-15"
+      }
     }
   }'
 ```
 
 ## MCP Protocol
 
-The server implements a simplified MCP protocol:
+The server implements Model Context Protocol (MCP) for OpenAI Agent Builder:
+
+### listTools
 
 **Request:**
 ```json
 {
-  "tool": "get_day_context",
-  "input": {
-    "user_id": 1,
-    "day": "2024-01-15"
+  "method": "listTools"
+}
+```
+
+**Response:**
+```json
+{
+  "tools": [
+    {
+      "name": "get_day_context",
+      "description": "Get day nutrition summary from YumYummy backend",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "description": "User ID"
+          },
+          "day": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format"
+          }
+        },
+        "required": ["user_id", "day"]
+      }
+    }
+  ]
+}
+```
+
+### callTool
+
+**Request:**
+```json
+{
+  "method": "callTool",
+  "params": {
+    "name": "get_day_context",
+    "arguments": {
+      "user_id": 1,
+      "day": "2024-01-15"
+    }
   }
 }
 ```
@@ -118,16 +176,12 @@ The server implements a simplified MCP protocol:
 **Response:**
 ```json
 {
-  "tool": "get_day_context",
-  "output": {
-    "user_id": 1,
-    "date": "2024-01-15",
-    "total_calories": 1850.0,
-    "total_protein_g": 120.5,
-    "total_fat_g": 65.0,
-    "total_carbs_g": 210.0,
-    "meals": [...]
-  }
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"user_id\":1,\"date\":\"2024-01-15\",\"total_calories\":1850.0,\"total_protein_g\":120.5,\"total_fat_g\":65.0,\"total_carbs_g\":210.0,\"meals\":[...]}"
+    }
+  ]
 }
 ```
 

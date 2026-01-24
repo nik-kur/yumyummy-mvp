@@ -19,73 +19,124 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'yumyummy-mcp-server' });
 });
 
-// MCP endpoint
-app.post('/mcp', async (req, res) => {
+// Tool definition
+const getDayContextTool = {
+  name: 'get_day_context',
+  description: 'Get day nutrition summary from YumYummy backend',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      user_id: {
+        type: 'integer',
+        description: 'User ID'
+      },
+      day: {
+        type: 'string',
+        description: 'Date in YYYY-MM-DD format'
+      }
+    },
+    required: ['user_id', 'day']
+  }
+};
+
+// MCP handler function
+async function handleMCPRequest(req, res) {
   try {
-    const { tool, input } = req.body;
+    const { method, params } = req.body;
 
-    if (!tool) {
-      return res.status(400).json({ error: 'Missing "tool" field in request body' });
-    }
-
-    if (tool === 'get_day_context') {
-      // Validate input
-      if (!input || typeof input.user_id !== 'number' || typeof input.day !== 'string') {
-        return res.status(400).json({ 
-          error: 'Invalid input. Expected: { user_id: number, day: string (YYYY-MM-DD) }' 
-        });
-      }
-
-      // Validate date format
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(input.day)) {
-        return res.status(400).json({ 
-          error: 'Invalid date format. Expected YYYY-MM-DD' 
-        });
-      }
-
-      // Build request URL
-      const url = `${BACKEND_BASE_URL}/day/${input.user_id}/${input.day}`;
-
-      // Prepare headers
-      const headers = {};
-      if (INTERNAL_API_TOKEN) {
-        headers['X-Internal-Token'] = INTERNAL_API_TOKEN;
-      }
-
-      // Make request to backend
-      try {
-        const response = await axios.get(url, { headers });
-        return res.json({
-          tool: 'get_day_context',
-          output: response.data
-        });
-      } catch (error) {
-        if (error.response) {
-          // Backend returned an error status
-          return res.status(error.response.status).json({
-            error: `Backend error: ${error.response.status}`,
-            message: error.response.data?.detail || error.response.data?.message || 'Unknown error'
-          });
-        } else if (error.request) {
-          // Request was made but no response received
-          return res.status(502).json({
-            error: 'Backend unreachable',
-            message: 'Could not connect to backend server'
-          });
-        } else {
-          // Error setting up request
-          return res.status(500).json({
-            error: 'Request setup error',
-            message: error.message
-          });
-        }
-      }
-    } else {
+    if (!method) {
       return res.status(400).json({ 
-        error: `Unknown tool: ${tool}. Supported tools: get_day_context` 
+        error: 'Missing "method" field in request body' 
       });
     }
+
+    // Handle listTools
+    if (method === 'listTools') {
+      return res.json({
+        tools: [getDayContextTool]
+      });
+    }
+
+    // Handle callTool
+    if (method === 'callTool') {
+      if (!params || !params.name) {
+        return res.status(400).json({ 
+          error: 'Missing "params.name" field. Expected: { name: string, arguments: object }' 
+        });
+      }
+
+      const toolName = params.name;
+      const toolArgs = params.arguments || {};
+
+      if (toolName === 'get_day_context') {
+        // Validate input
+        if (typeof toolArgs.user_id !== 'number' || typeof toolArgs.day !== 'string') {
+          return res.status(400).json({ 
+            error: 'Invalid arguments. Expected: { user_id: number, day: string (YYYY-MM-DD) }' 
+          });
+        }
+
+        // Validate date format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(toolArgs.day)) {
+          return res.status(400).json({ 
+            error: 'Invalid date format. Expected YYYY-MM-DD' 
+          });
+        }
+
+        // Build request URL
+        const url = `${BACKEND_BASE_URL}/day/${toolArgs.user_id}/${toolArgs.day}`;
+
+        // Prepare headers
+        const headers = {};
+        if (INTERNAL_API_TOKEN) {
+          headers['X-Internal-Token'] = INTERNAL_API_TOKEN;
+        }
+
+        // Make request to backend
+        try {
+          const response = await axios.get(url, { headers });
+          return res.json({
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(response.data, null, 2)
+              }
+            ]
+          });
+        } catch (error) {
+          if (error.response) {
+            // Backend returned an error status
+            return res.status(500).json({
+              error: `Backend error: ${error.response.status}`,
+              message: error.response.data?.detail || error.response.data?.message || 'Unknown error'
+            });
+          } else if (error.request) {
+            // Request was made but no response received
+            return res.status(500).json({
+              error: 'Backend unreachable',
+              message: 'Could not connect to backend server'
+            });
+          } else {
+            // Error setting up request
+            return res.status(500).json({
+              error: 'Request setup error',
+              message: error.message
+            });
+          }
+        }
+      } else {
+        return res.status(400).json({ 
+          error: `Unknown tool: ${toolName}. Supported tools: get_day_context` 
+        });
+      }
+    }
+
+    // Unknown method
+    return res.status(400).json({ 
+      error: `Unknown method: ${method}. Supported methods: listTools, callTool` 
+    });
+
   } catch (error) {
     console.error('Error processing MCP request:', error);
     return res.status(500).json({ 
@@ -93,7 +144,11 @@ app.post('/mcp', async (req, res) => {
       message: error.message 
     });
   }
-});
+}
+
+// MCP endpoints - both root and /mcp
+app.post('/', handleMCPRequest);
+app.post('/mcp', handleMCPRequest);
 
 // Start server
 app.listen(PORT, () => {
