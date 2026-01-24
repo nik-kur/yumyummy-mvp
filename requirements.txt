@@ -10,7 +10,8 @@ python-dotenv
 redis
 pydantic-settings
 openai>=2.9.0,<3
-openai-agents
+openai-agents>=0.4.0
+pyyaml>=6.0
 python-multipart
 anyio
 pytz
