@@ -51,6 +51,10 @@ except ImportError:
 
 app = FastAPI(title="YumYummy API")
 
+# Include context API router for agent tools
+from app.api.context import router as context_router
+app.include_router(context_router)
+
 
 @app.get("/health")
 async def health_check():

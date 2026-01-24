@@ -12,4 +12,5 @@ pydantic-settings
 openai>=1.0.0
 python-multipart
 anyio
+pytz
 

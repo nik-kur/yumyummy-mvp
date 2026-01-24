@@ -90,3 +90,39 @@ class WorkflowRunResponse(BaseModel):
     totals: WorkflowTotals
     items: List[WorkflowItem]
     source_url: Optional[str] = None
+
+
+# Context API schemas for agent tools
+class ContextDayTotals(BaseModel):
+    """Totals for a day."""
+    calories_kcal: float
+    protein_g: float
+    fat_g: float
+    carbs_g: float
+
+
+class ContextDayItem(BaseModel):
+    """Meal entry item for context API."""
+    name: str
+    grams: Optional[float] = None
+    calories_kcal: float
+    protein_g: float
+    fat_g: float
+    carbs_g: float
+    created_at: str  # ISO datetime
+
+
+class ContextDayResponse(BaseModel):
+    """Response for GET /context/day."""
+    date: str  # YYYY-MM-DD
+    telegram_id: str
+    entries_count: int
+    totals: ContextDayTotals
+    items: List[ContextDayItem]
+
+
+class MealsRecentResponse(BaseModel):
+    """Response for GET /meals/recent."""
+    telegram_id: str
+    limit: int
+    items: List[ContextDayItem]

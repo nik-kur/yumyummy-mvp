@@ -14,6 +14,9 @@ class Settings(BaseSettings):
 
     # чтобы .env мог содержать ключ, даже если фича временно не используется
     tavily_api_key: Optional[str] = None
+    
+    # Internal API token for agent tools
+    internal_api_token: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

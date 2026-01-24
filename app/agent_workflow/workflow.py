@@ -441,6 +441,7 @@ B) Если порция всё равно неизвестна — сделай
 
 class WorkflowInput(BaseModel):
   input_as_text: str
+  telegram_id: Optional[str] = None
 
 
 # Main code entrypoint
@@ -450,6 +451,18 @@ async def run_workflow(workflow_input: WorkflowInput):
 
     }
     workflow = workflow_input.model_dump()
+    telegram_id = workflow.get("telegram_id")
+    
+    # Helper function to build trace_metadata with telegram_id
+    def get_trace_metadata() -> dict:
+        metadata = {
+            "__trace_source__": "agent-builder",
+            "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+        }
+        if telegram_id:
+            metadata["telegram_id"] = telegram_id
+        return metadata
+    
     conversation_history: List[TResponseInputItem] = [
       {
         "role": "user",
@@ -466,10 +479,7 @@ async def run_workflow(workflow_input: WorkflowInput):
       input=[
         *conversation_history
       ],
-      run_config=RunConfig(trace_metadata={
-        "__trace_source__": "agent-builder",
-        "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-      })
+      run_config=RunConfig(trace_metadata=trace_metadata)
     )
 
     conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])
@@ -487,10 +497,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in meal_parser_result_temp.new_items])
@@ -504,10 +511,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
@@ -526,10 +530,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in eatout_agent_result_temp.new_items])
@@ -543,10 +544,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
@@ -565,10 +563,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in product_agent_result_temp.new_items])
@@ -582,10 +577,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
@@ -604,10 +596,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in barcode_agent_result_temp.new_items])
@@ -621,10 +610,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
@@ -643,10 +629,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in help_agent_result_temp.new_items])
@@ -660,10 +643,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
       )
 
       conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
@@ -679,15 +659,16 @@ async def run_workflow(workflow_input: WorkflowInput):
 
 
 # Module-level helper function
-async def run_text(text: str) -> dict:
+async def run_text(text: str, telegram_id: Optional[str] = None) -> dict:
   """
   Helper function that calls run_workflow with WorkflowInput.
   
   Args:
     text: User input text
+    telegram_id: Optional Telegram user ID (for agent tools context)
     
   Returns:
     Dict with the workflow result
   """
-  workflow_input = WorkflowInput(input_as_text=text)
+  workflow_input = WorkflowInput(input_as_text=text, telegram_id=telegram_id)
   return await run_workflow(workflow_input)

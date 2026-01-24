@@ -74,17 +74,28 @@ async def run_yumyummy_workflow(user_text: str, telegram_id: str) -> dict:
         # We'll try common patterns
         try:
             from app.agent_workflow.workflow import run_text
-            result = await run_text(text=user_text)
+            # Try to pass telegram_id if function supports it
+            try:
+                result = await run_text(text=user_text, telegram_id=telegram_id)
+            except TypeError:
+                # Fallback if function doesn't accept telegram_id
+                result = await run_text(text=user_text)
             return result
         except ImportError:
             try:
                 from app.agent_workflow import run_text
-                result = await run_text(text=user_text)
+                try:
+                    result = await run_text(text=user_text, telegram_id=telegram_id)
+                except TypeError:
+                    result = await run_text(text=user_text)
                 return result
             except ImportError:
                 try:
                     from app.agent_workflow.main import run_text
-                    result = await run_text(text=user_text)
+                    try:
+                        result = await run_text(text=user_text, telegram_id=telegram_id)
+                    except TypeError:
+                        result = await run_text(text=user_text)
                     return result
                 except ImportError:
                     # If none of the imports work, raise the error
