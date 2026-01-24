@@ -19,6 +19,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'yumyummy-mcp-server' });
 });
 
+// MCP tools (GET fallback for platforms that probe via GET)
+function getToolsResponse() {
+  return {
+    tools: [getDayContextTool]
+  };
+}
+
+app.get('/', (req, res) => {
+  res.json(getToolsResponse());
+});
+
+app.get('/mcp', (req, res) => {
+  res.json(getToolsResponse());
+});
+
 // Tool definition
 const getDayContextTool = {
   name: 'get_day_context',
