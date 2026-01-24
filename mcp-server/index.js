@@ -126,6 +126,16 @@ const handleMcpGet = async (req, res) => {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:get_entry',message:'GET /mcp entry',data:{accept:req.headers?.accept,sessionId:req.headers?.['mcp-session-id'] ?? null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
   // #endregion agent log
+  // #region agent log
+  res.on("finish", () => {
+    fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:get_finish',message:'GET /mcp finished',data:{status:res.statusCode,contentType:res.getHeader('content-type') ?? null,mcpSessionId:res.getHeader('mcp-session-id') ?? null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D'})}).catch(()=>{});
+    console.log("MCP GET finished", {
+      status: res.statusCode,
+      contentType: res.getHeader("content-type") ?? null,
+      mcpSessionId: res.getHeader("mcp-session-id") ?? null
+    });
+  });
+  // #endregion agent log
   console.log("MCP GET request", {
     accept: req.headers?.accept ?? null,
     sessionId: req.headers?.["mcp-session-id"] ?? null
@@ -133,6 +143,9 @@ const handleMcpGet = async (req, res) => {
   try {
     await transport.handleRequest(req, res);
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:get_error',message:'Error handling MCP GET request',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion agent log
     console.error("Error handling MCP GET request:", error);
     if (!res.headersSent) {
       res.status(500).json({
