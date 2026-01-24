@@ -1,201 +1,111 @@
-import express from 'express';
-import axios from 'axios';
-import cors from 'cors';
+import express from "express";
+import cors from "cors";
+import axios from "axios";
+import { z } from "zod";
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
 const app = express();
+app.use(cors({ origin: "*" }));
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL;
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
 
 if (!BACKEND_BASE_URL) {
-  console.error('ERROR: BACKEND_BASE_URL environment variable is required');
+  console.error("ERROR: BACKEND_BASE_URL environment variable is required");
   process.exit(1);
 }
 
-// Middleware
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'yumyummy-mcp-server' });
+// 1) Create MCP server
+const mcp = new McpServer({
+  name: "yumyummy-mcp-server",
+  version: "1.0.0",
 });
 
-// MCP tools (GET fallback for platforms that probe via GET)
-function getToolsResponse() {
-  return {
-    tools: [getDayContextTool]
-  };
-}
+// 2) Register tool
+mcp.tool(
+  "get_day_context",
+  "Get day nutrition summary from YumYummy backend",
+  {
+    user_id: z.number().int().describe("Telegram user id"),
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("YYYY-MM-DD"),
+  },
+  async ({ user_id, day }) => {
+    const url = `${BACKEND_BASE_URL}/day/${user_id}/${day}`;
 
-app.get('/', (req, res) => {
-  res.json(getToolsResponse());
+    const headers = {};
+    if (INTERNAL_API_TOKEN) headers["X-Internal-Token"] = INTERNAL_API_TOKEN;
+
+    try {
+      const response = await axios.get(url, { headers });
+      return {
+        content: [{ type: "text", text: JSON.stringify(response.data) }],
+      };
+    } catch (e) {
+      const status = e?.response?.status;
+      const data = e?.response?.data;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: "backend_request_failed",
+              status: status ?? null,
+              details: data ?? e?.message ?? "unknown",
+            }),
+          },
+        ],
+      };
+    }
+  }
+);
+
+// 3) Streamable HTTP transport (stateless)
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: undefined,
 });
 
-app.get('/mcp', (req, res) => {
-  res.json(getToolsResponse());
-});
+async function start() {
+  await mcp.connect(transport);
 
-// Tool definition
-const getDayContextTool = {
-  name: 'get_day_context',
-  description: 'Get day nutrition summary from YumYummy backend',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      user_id: {
-        type: 'integer',
-        description: 'User ID'
-      },
-      day: {
-        type: 'string',
-        description: 'Date in YYYY-MM-DD format'
+  app.get("/health", (req, res) => {
+    res.json({ status: "ok", service: "yumyummy-mcp-server" });
+  });
+
+  // MCP endpoint
+  app.post("/mcp", async (req, res) => {
+    try {
+      await transport.handleRequest(req, res, req.body);
+    } catch (error) {
+      console.error("Error handling MCP request:", error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "Internal server error" },
+          id: null,
+        });
       }
-    },
-    required: ['user_id', 'day']
-  }
-};
+    }
+  });
 
-// JSON-RPC helpers
-function jsonRpcResult(id, result) {
-  return {
-    jsonrpc: '2.0',
-    id,
-    result
-  };
+  // GET should not return tools
+  app.get("/mcp", (req, res) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed." },
+      id: null,
+    });
+  });
+
+  app.listen(PORT, () => {
+    console.log(`MCP server listening on port ${PORT}`);
+  });
 }
 
-function jsonRpcError(id, code, message, data) {
-  const error = { code, message };
-  if (data !== undefined) {
-    error.data = data;
-  }
-  return {
-    jsonrpc: '2.0',
-    id: id ?? null,
-    error
-  };
-}
-
-// MCP handler function (JSON-RPC 2.0)
-async function handleMCPRequest(req, res) {
-  try {
-    const { id, method, params } = req.body || {};
-
-    if (!method) {
-      return res.status(400).json(jsonRpcError(id, -32600, 'Invalid Request: missing method'));
-    }
-
-    // 1) REQUIRED: initialize handshake
-    if (method === 'initialize') {
-      const protocolVersion = params?.protocolVersion || '2025-03-26';
-      return res.json(
-        jsonRpcResult(id ?? 1, {
-          protocolVersion,
-          serverInfo: { name: 'yumyummy-mcp-server', version: '1.0.0' },
-          capabilities: {
-            tools: { listChanged: false }
-          }
-        })
-      );
-    }
-
-    // 2) notification after initialize (no response required)
-    if (method === 'notifications/initialized') {
-      return res.status(204).send();
-    }
-
-    // 3) optional but commonly called by clients
-    if (method === 'ping') {
-      return res.json(jsonRpcResult(id ?? 1, {}));
-    }
-
-    // Compatibility aliases (some clients use these names)
-    const normalizedMethod =
-      method === 'listTools' ? 'tools/list'
-      : method === 'callTool' ? 'tools/call'
-      : method;
-
-    // Handle tools/list
-    if (normalizedMethod === 'tools/list') {
-      return res.json(jsonRpcResult(id ?? 1, { tools: [getDayContextTool] }));
-    }
-
-    // Handle tools/call
-    if (normalizedMethod === 'tools/call') {
-      if (!params || !params.name) {
-        return res.status(400).json(
-          jsonRpcError(id, -32602, 'Invalid params: missing params.name')
-        );
-      }
-
-      const toolName = params.name;
-      const toolArgs = params.arguments || params.input || {};
-
-      if (toolName === 'get_day_context') {
-        // Accept number or numeric string just in case
-        const userId = typeof toolArgs.user_id === 'string' ? Number(toolArgs.user_id) : toolArgs.user_id;
-        const day = toolArgs.day;
-
-        if (!Number.isFinite(userId) || typeof day !== 'string') {
-          return res.status(400).json(
-            jsonRpcError(
-              id,
-              -32602,
-              'Invalid arguments. Expected: { user_id: number, day: string (YYYY-MM-DD) }'
-            )
-          );
-        }
-
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!dateRegex.test(day)) {
-          return res.status(400).json(
-            jsonRpcError(id, -32602, 'Invalid date format. Expected YYYY-MM-DD')
-          );
-        }
-
-        const url = `${BACKEND_BASE_URL}/day/${userId}/${day}`;
-
-        const headers = {};
-        if (INTERNAL_API_TOKEN) headers['X-Internal-Token'] = INTERNAL_API_TOKEN;
-
-        try {
-          const response = await axios.get(url, { headers });
-          return res.json(
-            jsonRpcResult(id ?? 1, {
-              content: [{ type: 'text', text: JSON.stringify(response.data) }]
-            })
-          );
-        } catch (error) {
-          if (error.response) {
-            return res.status(500).json(
-              jsonRpcError(id, -32000, `Backend error: ${error.response.status}`, error.response.data)
-            );
-          }
-          if (error.request) {
-            return res.status(500).json(jsonRpcError(id, -32001, 'Backend unreachable'));
-          }
-          return res.status(500).json(jsonRpcError(id, -32002, 'Request setup error', error.message));
-        }
-      }
-
-      return res.status(400).json(jsonRpcError(id, -32601, `Unknown tool: ${toolName}`));
-    }
-
-    return res.status(400).json(jsonRpcError(id, -32601, `Unknown method: ${method}`));
-  } catch (error) {
-    console.error('Error processing MCP request:', error);
-    return res.status(500).json(jsonRpcError(null, -32603, 'Internal error', error.message));
-  }
-}
-
-// MCP endpoints - both root and /mcp
-app.post('/', handleMCPRequest);
-app.post('/mcp', handleMCPRequest);
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`MCP server listening on port ${PORT}`);
-  console.log(`Backend URL: ${BACKEND_BASE_URL}`);
-  console.log(`Internal token: ${INTERNAL_API_TOKEN ? 'configured' : 'not set'}`);
+start().catch((e) => {
+  console.error("Failed to start MCP server:", e);
+  process.exit(1);
 });
