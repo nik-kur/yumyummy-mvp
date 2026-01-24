@@ -39,49 +39,75 @@ const getDayContextTool = {
   }
 };
 
-// MCP handler function
+// JSON-RPC helpers
+function jsonRpcResult(id, result) {
+  return {
+    jsonrpc: '2.0',
+    id,
+    result
+  };
+}
+
+function jsonRpcError(id, code, message, data) {
+  const error = { code, message };
+  if (data !== undefined) {
+    error.data = data;
+  }
+  return {
+    jsonrpc: '2.0',
+    id: id ?? null,
+    error
+  };
+}
+
+// MCP handler function (JSON-RPC 2.0)
 async function handleMCPRequest(req, res) {
   try {
-    const { method, params } = req.body;
+    const { jsonrpc, id, method, params } = req.body || {};
 
     if (!method) {
-      return res.status(400).json({ 
-        error: 'Missing "method" field in request body' 
-      });
+      return res.status(400).json(jsonRpcError(id, -32600, 'Invalid Request: missing method'));
     }
 
-    // Handle listTools
-    if (method === 'listTools') {
-      return res.json({
-        tools: [getDayContextTool]
-      });
+    // Accept both MCP and legacy method names for compatibility
+    const normalizedMethod = method === 'listTools' ? 'tools/list'
+      : method === 'callTool' ? 'tools/call'
+      : method;
+
+    // Handle tools/list
+    if (normalizedMethod === 'tools/list') {
+      return res.json(jsonRpcResult(id ?? 1, { tools: [getDayContextTool] }));
     }
 
-    // Handle callTool
-    if (method === 'callTool') {
+    // Handle tools/call
+    if (normalizedMethod === 'tools/call') {
       if (!params || !params.name) {
-        return res.status(400).json({ 
-          error: 'Missing "params.name" field. Expected: { name: string, arguments: object }' 
-        });
+        return res.status(400).json(
+          jsonRpcError(id, -32602, 'Invalid params: missing params.name')
+        );
       }
 
       const toolName = params.name;
-      const toolArgs = params.arguments || {};
+      const toolArgs = params.arguments || params.input || {};
 
       if (toolName === 'get_day_context') {
         // Validate input
         if (typeof toolArgs.user_id !== 'number' || typeof toolArgs.day !== 'string') {
-          return res.status(400).json({ 
-            error: 'Invalid arguments. Expected: { user_id: number, day: string (YYYY-MM-DD) }' 
-          });
+          return res.status(400).json(
+            jsonRpcError(
+              id,
+              -32602,
+              'Invalid arguments. Expected: { user_id: number, day: string (YYYY-MM-DD) }'
+            )
+          );
         }
 
         // Validate date format
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRegex.test(toolArgs.day)) {
-          return res.status(400).json({ 
-            error: 'Invalid date format. Expected YYYY-MM-DD' 
-          });
+          return res.status(400).json(
+            jsonRpcError(id, -32602, 'Invalid date format. Expected YYYY-MM-DD')
+          );
         }
 
         // Build request URL
@@ -96,53 +122,52 @@ async function handleMCPRequest(req, res) {
         // Make request to backend
         try {
           const response = await axios.get(url, { headers });
-          return res.json({
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(response.data, null, 2)
-              }
-            ]
-          });
+          return res.json(
+            jsonRpcResult(id ?? 1, {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(response.data)
+                }
+              ]
+            })
+          );
         } catch (error) {
           if (error.response) {
-            // Backend returned an error status
-            return res.status(500).json({
-              error: `Backend error: ${error.response.status}`,
-              message: error.response.data?.detail || error.response.data?.message || 'Unknown error'
-            });
-          } else if (error.request) {
-            // Request was made but no response received
-            return res.status(500).json({
-              error: 'Backend unreachable',
-              message: 'Could not connect to backend server'
-            });
-          } else {
-            // Error setting up request
-            return res.status(500).json({
-              error: 'Request setup error',
-              message: error.message
-            });
+            return res.status(500).json(
+              jsonRpcError(
+                id,
+                -32000,
+                `Backend error: ${error.response.status}`,
+                error.response.data
+              )
+            );
           }
+          if (error.request) {
+            return res.status(500).json(
+              jsonRpcError(id, -32001, 'Backend unreachable')
+            );
+          }
+          return res.status(500).json(
+            jsonRpcError(id, -32002, 'Request setup error', error.message)
+          );
         }
-      } else {
-        return res.status(400).json({ 
-          error: `Unknown tool: ${toolName}. Supported tools: get_day_context` 
-        });
       }
+
+      return res.status(400).json(
+        jsonRpcError(id, -32601, `Unknown tool: ${toolName}`)
+      );
     }
 
     // Unknown method
-    return res.status(400).json({ 
-      error: `Unknown method: ${method}. Supported methods: listTools, callTool` 
-    });
-
+    return res.status(400).json(
+      jsonRpcError(id, -32601, `Unknown method: ${method}`)
+    );
   } catch (error) {
     console.error('Error processing MCP request:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
+    return res.status(500).json(
+      jsonRpcError(null, -32603, 'Internal error', error.message)
+    );
   }
 }
 
