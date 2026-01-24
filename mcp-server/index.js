@@ -77,6 +77,9 @@ app.get("/health", (req, res) => {
 
 // MCP endpoint - handles both initialization and ongoing communication
 app.post("/mcp", async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_entry',message:'POST /mcp entry',data:{method:req.body?.method,hasParams:!!req.body?.params,accept:req.headers?.accept,contentType:req.headers?.['content-type'],sessionId:req.headers?.['mcp-session-id']},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion agent log
   console.log("MCP POST request:", JSON.stringify(req.body));
   console.log("Headers:", JSON.stringify(req.headers));
 
@@ -87,11 +90,17 @@ app.post("/mcp", async (req, res) => {
     let transport;
     
     if (sessionId && transports.has(sessionId)) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_session_reuse',message:'Reusing existing MCP session',data:{sessionId,known:true},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion agent log
       // Reuse existing transport
       transport = transports.get(sessionId);
     } else if (!sessionId && req.body?.method === "initialize") {
       // New session - create new transport and server
       const newSessionId = randomUUID();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_session_create',message:'Creating new MCP session',data:{newSessionId,method:req.body?.method},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion agent log
       
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => newSessionId,
@@ -104,6 +113,9 @@ app.post("/mcp", async (req, res) => {
       
       console.log(`New MCP session created: ${newSessionId}`);
     } else if (!sessionId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_no_session',message:'No session and not initialize',data:{method:req.body?.method},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion agent log
       // No session and not initialize - error
       return res.status(400).json({
         jsonrpc: "2.0",
@@ -111,6 +123,9 @@ app.post("/mcp", async (req, res) => {
         id: null,
       });
     } else {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_session_missing',message:'Session id provided but not found',data:{sessionId},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion agent log
       // Session ID provided but not found
       return res.status(400).json({
         jsonrpc: "2.0",
@@ -121,8 +136,14 @@ app.post("/mcp", async (req, res) => {
 
     // Handle the request
     await transport.handleRequest(req, res, req.body);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_handle_success',message:'transport.handleRequest success',data:{method:req.body?.method},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion agent log
     
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:post_error',message:'Error handling MCP request',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion agent log
     console.error("Error handling MCP request:", error);
     if (!res.headersSent) {
       res.status(500).json({
@@ -136,6 +157,9 @@ app.post("/mcp", async (req, res) => {
 
 // Handle GET for SSE streams (if client reconnects)
 app.get("/mcp", async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:get_entry',message:'GET /mcp entry',data:{accept:req.headers?.accept,sessionId:req.headers?.['mcp-session-id']},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion agent log
   const sessionId = req.headers["mcp-session-id"];
   
   if (!sessionId || !transports.has(sessionId)) {
@@ -152,6 +176,9 @@ app.get("/mcp", async (req, res) => {
 
 // Handle DELETE for session cleanup
 app.delete("/mcp", async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:delete_entry',message:'DELETE /mcp entry',data:{sessionId:req.headers?.['mcp-session-id']},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion agent log
   const sessionId = req.headers["mcp-session-id"];
   
   if (sessionId && transports.has(sessionId)) {
