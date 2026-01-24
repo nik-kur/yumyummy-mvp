@@ -141,6 +141,14 @@ const handleMcpGet = async (req, res) => {
     sessionId: req.headers?.["mcp-session-id"] ?? null
   });
   try {
+    // Ensure Accept header includes both required types for MCP streamable transport
+    const acceptHeader = req.headers.accept || "";
+    if (!acceptHeader.includes("application/json") || !acceptHeader.includes("text/event-stream")) {
+      req.headers.accept = "application/json, text/event-stream";
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4fe014b3-6723-4d28-a73e-d62e1df8347b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'mcp-server/index.js:get_accept_fix',message:'Adjusted Accept header for MCP GET',data:{originalAccept:acceptHeader,updatedAccept:req.headers.accept},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion agent log
+    }
     await transport.handleRequest(req, res);
   } catch (error) {
     // #region agent log
