@@ -1605,98 +1605,64 @@ async def handle_voice(message: types.Message) -> None:
         await message.answer("Не удалось обработать голос. Попробуй ещё раз 🙏")
         return
 
-    transcript = parsed.get("transcript", "")
-    description = parsed.get("description", "") or "Описание не указано"
-    calories = float(parsed.get("calories", 0) or 0)
-    protein_g = float(parsed.get("protein_g", 0) or 0)
-    fat_g = float(parsed.get("fat_g", 0) or 0)
-    carbs_g = float(parsed.get("carbs_g", 0) or 0)
-    
-    # Извлекаем accuracy_level и source_provider из ответа
-    raw_accuracy = parsed.get("accuracy_level", "ESTIMATE")
-    accuracy_level = str(raw_accuracy or "ESTIMATE").upper()
-    source_provider = parsed.get("source_provider") or "LLM_ESTIMATE"
-    source_url = parsed.get("source_url")
-    
-    notes = parsed.get("notes", "") or ""
-    
-    # Добавляем source_provider в notes, если он есть и отличается от LLM_ESTIMATE
-    if source_provider and source_provider != "LLM_ESTIMATE":
-        if notes:
-            notes = f"[{source_provider}] {notes}"
-        else:
-            notes = f"[{source_provider}]"
-
-    # Округляем значения для отображения
-    calories = round(calories)
-    protein_g = round(protein_g, 1)
-    fat_g = round(fat_g, 1)
-    carbs_g = round(carbs_g, 1)
-
-    # 5) Логируем приём пищи
-    today = date_type.today()
-    meal = await create_meal(
-        user_id=user_id,
-        day=today,
-        description=description,
-        calories=calories,
-        protein_g=protein_g,
-        fat_g=fat_g,
-        carbs_g=carbs_g,
-        accuracy_level=accuracy_level,
-    )
-
-    if meal is None:
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+    transcript = (parsed.get("transcript", "") or "").strip()
+    if not transcript:
+        await message.answer("Не удалось распознать речь. Попробуй ещё раз 🙏")
         return
 
-    # 6) Получаем сводку за день
-    summary = await get_day_summary(user_id=user_id, day=today)
+    processing_msg = await message.answer("⏳ Обрабатываю распознанный текст...")
 
-    # 7) Формируем ответ пользователю
-    lines = [
-        "✅ Записал приём пищи по голосу.",
-    ]
-    if transcript.strip():
-        lines += ["", f"Распознал: \"{transcript.strip()}\""]
-    lines += [
-        "",
-        f"• {description}",
-        f"• Калории: {calories}",
-        f"• Белки: {protein_g} г",
-        f"• Жиры: {fat_g} г",
-        f"• Углеводы: {carbs_g} г",
-        "",
-        f"Точность: {accuracy_level}",
-    ]
-    if notes:
-        lines += ["", f"Примечание: {notes}"]
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        lines += [
-            "",
-            "Сводка за сегодня:",
-            f"• Калории: {total_calories}",
-            f"• Белки: {total_protein} г",
-            f"• Жиры: {total_fat} г",
-            f"• Углеводы: {total_carbs} г",
-        ]
+    try:
+        result = await agent_run_workflow(
+            telegram_id=str(message.from_user.id),
+            text=transcript,
+        )
+    except Exception as e:
+        logger.error(f"[VOICE] Error running agent workflow: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
 
-    # Формируем финальный текст
-    text = "\n".join(lines)
+    if result is None:
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
 
-    meal_id = meal.get("id")
-    reply_markup = (
-        build_meal_keyboard(meal_id=meal_id, day=today, source_url=source_url)
-        if meal_id
-        else None
-    )
-    await message.answer(text, reply_markup=reply_markup)
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    intent = result.get("intent", "unknown")
+    message_text = result.get("message_text", "Ошибка обработки")
+    source_url = result.get("source_url")
+    has_source_url = source_url is not None and source_url != ""
+
+    reply_markup = None
+    if intent in {"log_meal", "product", "eatout", "barcode"}:
+        meal_id = await get_latest_meal_id_for_today(message.from_user.id)
+        if meal_id:
+            reply_markup = build_meal_keyboard(
+                meal_id=meal_id,
+                day=date_type.today(),
+                source_url=source_url,
+            )
+
+    if reply_markup is None and has_source_url:
+        reply_markup = types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [types.InlineKeyboardButton(text="Источник", url=source_url)]
+            ]
+        )
+
+    await message.answer(f"Распознал: \"{transcript}\"")
+    await message.answer(message_text, reply_markup=reply_markup)
 
 
 @router.message(Command("agent"))
