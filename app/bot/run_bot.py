@@ -2,6 +2,7 @@ import asyncio
 import logging
 from datetime import date as date_type, datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import CommandStart, Command
@@ -54,6 +55,136 @@ def normalize_source_url(source_url: Optional[str]) -> Optional[str]:
                 url = "https://" + url
         return url
     return None
+
+
+def format_accuracy_label(accuracy_level: Optional[str]) -> Optional[str]:
+    if not accuracy_level:
+        return None
+    return str(accuracy_level).upper()
+
+
+def format_source_label(source_url: Optional[str]) -> str:
+    normalized = normalize_source_url(source_url)
+    if not normalized:
+        return "оценка на базе модели и внутренних данных"
+    try:
+        domain = urlparse(normalized).netloc
+    except ValueError:
+        domain = ""
+    return domain or normalized
+
+
+def build_summary_lines(summary: Dict[str, Any]) -> list[str]:
+    total_calories = round(summary.get("total_calories", 0))
+    total_protein = round(summary.get("total_protein_g", 0), 1)
+    total_fat = round(summary.get("total_fat_g", 0), 1)
+    total_carbs = round(summary.get("total_carbs_g", 0), 1)
+    return [
+        "Сводка за сегодня:",
+        f"• Калории: {total_calories}",
+        f"• Белки: {total_protein} г",
+        f"• Жиры: {total_fat} г",
+        f"• Углеводы: {total_carbs} г",
+    ]
+
+
+def build_meal_response_text(
+    *,
+    description: str,
+    calories: float,
+    protein_g: float,
+    fat_g: float,
+    carbs_g: float,
+    accuracy_level: Optional[str] = None,
+    notes: Optional[str] = None,
+    source_url: Optional[str] = None,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    accuracy_label = format_accuracy_label(accuracy_level) or "ESTIMATE"
+    source_label = format_source_label(source_url)
+    lines = [
+        f"✅ Записал {description}",
+        "",
+        f"{calories} ккал · Б {protein_g} г · Ж {fat_g} г · У {carbs_g} г",
+        "",
+        f"Оценка точности: {accuracy_label}",
+    ]
+    if notes:
+        lines.append("")
+        lines.append(f"Примечание: {notes}")
+    lines.append("")
+    lines.append(f"Источник: {source_label}")
+    if summary:
+        lines.append("")
+        lines.extend(build_summary_lines(summary))
+    return "\n".join(lines)
+
+
+def build_meal_response_from_agent(
+    result: Dict[str, Any],
+    *,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    totals = result.get("totals") or {}
+    calories = round(float(totals.get("calories_kcal") or 0))
+    protein_g = round(float(totals.get("protein_g") or 0), 1)
+    fat_g = round(float(totals.get("fat_g") or 0), 1)
+    carbs_g = round(float(totals.get("carbs_g") or 0), 1)
+    items = result.get("items") or []
+    description_parts = [
+        item.get("name") for item in items if isinstance(item, dict) and item.get("name")
+    ]
+    description = ", ".join(description_parts).strip()
+    message_text = (result.get("message_text") or "").strip()
+    if not description:
+        description = message_text or "Без описания"
+
+    if (
+        not description_parts
+        and calories == 0
+        and protein_g == 0
+        and fat_g == 0
+        and carbs_g == 0
+        and message_text
+    ):
+        return message_text
+
+    base_text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=result.get("confidence"),
+        source_url=result.get("source_url"),
+        summary=summary,
+    )
+    if len(items) <= 1:
+        return base_text
+
+    accuracy_label = format_accuracy_label(result.get("confidence")) or "ESTIMATE"
+    source_label = format_source_label(result.get("source_url"))
+    lines = [base_text, "", "По блюдам:"]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_name = item.get("name") or "Блюдо"
+        item_calories = round(float(item.get("calories_kcal") or 0))
+        item_protein = round(float(item.get("protein_g") or 0), 1)
+        item_fat = round(float(item.get("fat_g") or 0), 1)
+        item_carbs = round(float(item.get("carbs_g") or 0), 1)
+        lines.extend(
+            [
+                f"{item_name}:",
+                f"{item_calories} ккал · Б {item_protein} г · Ж {item_fat} г · У {item_carbs} г",
+                f"Оценка точности: {accuracy_label}",
+                f"Источник: {source_label}",
+                "",
+            ]
+        )
+    while lines and lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines)
 
 
 def build_meal_keyboard(
@@ -397,41 +528,21 @@ async def cmd_log(message: types.Message) -> None:
     # Пробуем ещё и сводку за день вытащить
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    base_text = (
-        "✅ Записал приём пищи:\n"
-        f"• {description}\n"
-        f"• Калории: {calories}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level="ESTIMATE",
+        summary=summary,
     )
-
-    macros_text = ""
-    if protein_g or fat_g or carbs_g:
-        macros_text = (
-            f"\n• Белки: {protein_g} г"
-            f"\n• Жиры: {fat_g} г"
-            f"\n• Углеводы: {carbs_g} г"
-        )
-
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
 
     meal_id = meal.get("id")
     reply_markup = (
         build_meal_keyboard(meal_id=meal_id, day=today) if meal_id else None
     )
-    await message.answer(base_text + macros_text + summary_text, reply_markup=reply_markup)
+    await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("barcode"))
@@ -531,38 +642,17 @@ async def cmd_barcode(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал приём пищи:\n• {description}\n"
-    macros_text = (
-        f"\nОценка КБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г\n"
-        f"Точность: {accuracy_level}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
-
-    if notes:
-        macros_text += f"\nПримечание: {notes}"
-
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
 
     meal_id = meal.get("id")
     reply_markup = (
@@ -699,38 +789,17 @@ async def cmd_product(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал приём пищи:\n• {description}\n"
-    macros_text = (
-        f"\nОценка КБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г\n"
-        f"Точность: {accuracy_level}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
-
-    if notes:
-        macros_text += f"\nПримечание: {notes}"
-
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
 
     meal_id = meal.get("id")
     reply_markup = (
@@ -846,37 +915,17 @@ async def cmd_ai_log(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    # 5) Формируем ответ пользователю
-    text_lines = [
-        "✅ Записал приём пищи (оценка с помощью AI):",
-        f"• {description}",
-        f"• Калории: {calories}",
-        f"• Белки: {protein_g} г",
-        f"• Жиры: {fat_g} г",
-        f"• Углеводы: {carbs_g} г",
-        "",
-        f"Уровень точности: {accuracy_level}",
-    ]
-
-    if notes:
-        text_lines.append(f"Примечание: {notes}")
-
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        text_lines.append("")
-        text_lines.append("Сводка за сегодня:")
-        text_lines.append(f"• Калории: {total_calories}")
-        text_lines.append(f"• Белки: {total_protein} г")
-        text_lines.append(f"• Жиры: {total_fat} г")
-        text_lines.append(f"• Углеводы: {total_carbs} г")
-
-    # Формируем финальный текст
-    text = "\n".join(text_lines)
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
+    )
     
     meal_id = meal.get("id")
     reply_markup = (
@@ -986,38 +1035,17 @@ async def cmd_eatout(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
     
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал: {description}"
-    macros_text = (
-        f"\n\nКБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г\n"
-        f"Точность: {accuracy_level}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
-    
-    if notes:
-        macros_text += f"\nПримечание: {notes}"
-    
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-    
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
 
     meal_id = meal.get("id")
     reply_markup = (
@@ -1129,39 +1157,17 @@ async def cmd_eatout_a(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
     
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал: {description}"
-    macros_text = (
-        f"\n\nКБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
-    
-    if accuracy_level:
-        macros_text += f"\n\nТочность: {accuracy_level}"
-    
-    if notes:
-        macros_text += f"\n\nПримечание: {notes}"
-    
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-    
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
 
     meal_id = meal.get("id")
     reply_markup = (
@@ -1661,8 +1667,12 @@ async def handle_voice(message: types.Message) -> None:
             ]
         )
 
+    response_text = message_text
+    if intent in {"log_meal", "product", "eatout", "barcode"}:
+        response_text = build_meal_response_from_agent(result)
+
     await message.answer(f"Распознал: \"{transcript}\"")
-    await message.answer(message_text, reply_markup=reply_markup)
+    await message.answer(response_text, reply_markup=reply_markup)
 
 
 @router.message(Command("agent"))
@@ -1749,7 +1759,10 @@ async def cmd_agent(message: types.Message) -> None:
         
         # Send the message
         try:
-            await message.answer(message_text, reply_markup=reply_markup)
+            response_text = message_text
+            if intent in {"log_meal", "product", "eatout", "barcode"}:
+                response_text = build_meal_response_from_agent(result)
+            await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
         except Exception as send_error:
             logger.error(
@@ -1869,7 +1882,10 @@ async def handle_plain_text(message: types.Message) -> None:
         
         # Send the message
         try:
-            await message.answer(message_text, reply_markup=reply_markup)
+            response_text = message_text
+            if intent in {"log_meal", "product", "eatout", "barcode"}:
+                response_text = build_meal_response_from_agent(result)
+            await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")
         except Exception as send_error:
             logger.error(
