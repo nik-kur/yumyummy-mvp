@@ -15,6 +15,14 @@ class MealCreate(BaseModel):
     accuracy_level: Optional[str] = None  # EXACT / ESTIMATE / APPROX
 
 
+class MealUpdate(BaseModel):
+    description_user: Optional[str] = None
+    calories: Optional[float] = None
+    protein_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+
+
 class MealRead(BaseModel):
     id: int
     eaten_at: datetime
