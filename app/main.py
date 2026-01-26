@@ -15,7 +15,7 @@ from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
-from app.schemas.user import UserCreate, UserRead
+from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.meal import MealCreate, MealRead, MealUpdate, DaySummary
 
 from app.services.llm_client import chat_completion
@@ -1220,6 +1220,92 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return user
+
+
+@app.get("/users/{telegram_id}", response_model=UserRead)
+def get_user_by_telegram_id(telegram_id: str, db: Session = Depends(get_db)):
+    """
+    Получить пользователя по telegram_id.
+    """
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@app.patch("/users/{telegram_id}", response_model=UserRead)
+def update_user_profile(telegram_id: str, user_update: UserUpdate, db: Session = Depends(get_db)):
+    """
+    Обновить профиль пользователя (онбординг, цели КБЖУ и т.д.)
+    """
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Обновляем только переданные поля
+    update_data = user_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.get("/users/{telegram_id}/export")
+def export_user_meals(telegram_id: str, db: Session = Depends(get_db)):
+    """
+    Экспорт всех приёмов пищи пользователя в CSV формате.
+    """
+    from fastapi.responses import StreamingResponse
+    import csv
+    import io
+    
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Получаем все приёмы пищи
+    meals = (
+        db.query(MealEntry)
+        .filter(MealEntry.user_id == user.id)
+        .order_by(MealEntry.eaten_at.desc())
+        .all()
+    )
+    
+    # Создаём CSV в памяти
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Заголовок
+    writer.writerow([
+        "date", "time", "description", "calories", 
+        "protein_g", "fat_g", "carbs_g", "accuracy", "source"
+    ])
+    
+    # Данные
+    for meal in meals:
+        writer.writerow([
+            meal.eaten_at.strftime("%Y-%m-%d"),
+            meal.eaten_at.strftime("%H:%M"),
+            meal.description_user,
+            meal.calories,
+            meal.protein_g,
+            meal.fat_g,
+            meal.carbs_g,
+            meal.accuracy_level or "UNKNOWN",
+            meal.uc_type or "UNKNOWN"
+        ])
+    
+    output.seek(0)
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=yumyummy_export_{telegram_id}.csv"
+        }
+    )
 
 
 # ---------- MEALS ----------

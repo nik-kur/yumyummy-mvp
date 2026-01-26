@@ -387,3 +387,49 @@ async def agent_run_workflow(telegram_id: str, text: str) -> Optional[Dict[str, 
     except Exception as e:
         logger.error(f"[API] agent_run_workflow unexpected error: {e}", exc_info=True)
         return None
+
+
+# ============ Функции для онбординга ============
+
+async def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Получить данные пользователя по telegram_id.
+    """
+    url = f"{settings.backend_base_url}/users/{telegram_id}"
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_user error: {e}")
+        return None
+
+
+async def update_user(telegram_id: int, **kwargs) -> Optional[Dict[str, Any]]:
+    """
+    Обновить профиль пользователя.
+    kwargs: goal_type, gender, age, height_cm, weight_kg, activity_level,
+            target_calories, target_protein_g, target_fat_g, target_carbs_g,
+            onboarding_completed
+    """
+    url = f"{settings.backend_base_url}/users/{telegram_id}"
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.patch(url, json=kwargs)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] update_user error: {e}")
+        return None
+
+
+async def get_user_export_url(telegram_id: int) -> str:
+    """
+    Получить URL для скачивания экспорта данных пользователя.
+    """
+    return f"{settings.backend_base_url}/users/{telegram_id}/export"

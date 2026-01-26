@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 from app.bot.api_client import (
     ping_backend,
     ensure_user,
+    get_user,
     create_meal,
     get_day_summary,
     update_meal,
@@ -30,6 +31,7 @@ from app.bot.api_client import (
     agent_query,
     agent_run_workflow,
 )
+from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard
 
 
 router = Router()
@@ -353,11 +355,13 @@ def parse_macros_input(text: str) -> Optional[Tuple[float, float, float, float]]
 
 
 @router.message(CommandStart())
-async def cmd_start(message: types.Message) -> None:
+async def cmd_start(message: types.Message, state: FSMContext) -> None:
     """
     Обработка /start:
     - регистрируем пользователя в backend (POST /users)
-    - показываем приветствие
+    - проверяем, прошёл ли пользователь онбординг
+    - если нет — запускаем онбординг
+    - если да — показываем приветствие с меню
     """
     tg_id = message.from_user.id
 
@@ -371,35 +375,52 @@ async def cmd_start(message: types.Message) -> None:
         )
         return
 
+    # Проверяем, прошёл ли пользователь онбординг
+    if not user.get("onboarding_completed", False):
+        # Запускаем онбординг
+        await start_onboarding(message, state)
+        return
+    
+    # Пользователь уже прошёл онбординг — показываем приветствие с меню
+    target_cal = user.get('target_calories') or 2000
+    target_prot = user.get('target_protein_g') or 150
+    target_fat = user.get('target_fat_g') or 65
+    target_carbs = user.get('target_carbs_g') or 200
+    
     text = (
-        "Привет! Я YumYummy 🧃\n\n"
-        "Я помогу тебе логировать питание и считать КБЖУ.\n"
-        "Пока я на стадии MVP, но уже умею:\n"
-        "• создавать твою учётку в системе (/start)\n"
-        "• проверять связь с сервером (/ping)\n\n"
-        f"Твой внутренний id в системе: {user['id']}"
+        f"С возвращением! 👋\n\n"
+        f"Твои цели на день:\n"
+        f"• 🔥 {target_cal:.0f} ккал\n"
+        f"• 🥩 {target_prot:.0f} г белка\n"
+        f"• 🥑 {target_fat:.0f} г жиров\n"
+        f"• 🍞 {target_carbs:.0f} г углеводов\n\n"
+        f"Напиши или надиктуй, что ты съел, и я всё запишу!"
     )
-    await message.answer(text)
+    await message.answer(text, reply_markup=get_main_menu_keyboard())
 
 
 @router.message(Command("help"))
 async def cmd_help(message: types.Message) -> None:
     text = (
-        "Доступные команды:\n"
-        "/start - приветствие и регистрация в системе\n"
-        "/help - помощь\n"
-        "/ping - проверить связь с сервером YumYummy\n"
-        "/log - вручную записать приём пищи (калории и, опционально, КБЖУ)\n"
-        "/ai_log - описать, что ты съел, а я сам оценю КБЖУ с помощью AI\n"
-        "/barcode - записать продукт по штрихкоду\n"
-        "/product - записать продукт по названию (можно указать бренд/магазин)\n"
-        "/eatout - записать блюдо из ресторана (пример: /eatout сырники из кофемании)\n"
-        "/eatoutA - экспериментальная версия через OpenAI (пример: /eatoutA сырники из кофемании)\n"
-        "/today - показать сводку за сегодня\n"
-        "/week - показать сводку за последние 7 дней\n\n"
-        "Можно отправить голосовое сообщение — я распознаю и запишу."
+        "📝 Как пользоваться ботом:\n\n"
+        "1️⃣ Логирование еды:\n"
+        "• Просто напиши что съел: \"2 яйца и тост\"\n"
+        "• Или отправь голосовое сообщение\n"
+        "• Сфотографируй штрих-код продукта\n"
+        "• Укажи место: \"капучино в Старбаксе\"\n\n"
+        "2️⃣ Кнопки меню:\n"
+        "📊 Сегодня — прогресс за день\n"
+        "📈 Неделя — статистика за 7 дней\n"
+        "🤔 Что съесть? — умный совет по питанию\n"
+        "👤 Профиль — твои данные и цели\n"
+        "📤 Экспорт — скачать все записи в CSV\n"
+        "💬 Поддержка — связь с разработчиком\n\n"
+        "3️⃣ Команды:\n"
+        "/start — перезапустить бота\n"
+        "/help — эта справка\n"
+        "/ping — проверить связь с сервером"
     )
-    await message.answer(text)
+    await message.answer(text, reply_markup=get_main_menu_keyboard())
 
 
 
@@ -1296,8 +1317,10 @@ async def cmd_week(message: types.Message) -> None:
 
 
 @router.callback_query(F.data.startswith("daylist:"))
-async def handle_daylist(query: types.CallbackQuery) -> None:
+async def handle_daylist(query: types.CallbackQuery, state: FSMContext) -> None:
     await query.answer()
+    # Сбрасываем состояние при входе в список записей
+    await state.clear()
 
     day_str = query.data.split(":", 1)[1]
     try:
@@ -1915,6 +1938,9 @@ async def main() -> None:
     bot = Bot(token=settings.telegram_bot_token)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+    
+    # Важно: onboarding_router должен быть первым для приоритета обработки меню
+    dp.include_router(onboarding_router)
     dp.include_router(router)
 
     await dp.start_polling(bot)
