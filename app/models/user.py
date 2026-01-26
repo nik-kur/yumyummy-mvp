@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, func
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -11,6 +11,23 @@ class User(Base):
     telegram_id = Column(String, unique=True, index=True, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Профиль пользователя (онбординг)
+    goal_type = Column(String, nullable=True)  # 'lose', 'maintain', 'gain'
+    gender = Column(String, nullable=True)  # 'male', 'female'
+    age = Column(Integer, nullable=True)
+    height_cm = Column(Integer, nullable=True)
+    weight_kg = Column(Float, nullable=True)
+    activity_level = Column(String, nullable=True)  # 'sedentary', 'light', 'moderate', 'high', 'very_high'
+
+    # Рассчитанные цели КБЖУ
+    target_calories = Column(Float, nullable=True)
+    target_protein_g = Column(Float, nullable=True)
+    target_fat_g = Column(Float, nullable=True)
+    target_carbs_g = Column(Float, nullable=True)
+
+    # Флаг завершения онбординга
+    onboarding_completed = Column(Boolean, default=False, nullable=False)
 
     # Связи
     days = relationship("UserDay", back_populates="user")
