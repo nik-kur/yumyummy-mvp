@@ -721,7 +721,7 @@ async def on_menu_today(message: types.Message, state: FSMContext) -> None:
         return
     
     today = date_type.today()
-    day_summary = await get_day_summary(user["id"], today.isoformat())
+    day_summary = await get_day_summary(user["id"], today)
     
     # Целевые значения
     target_cal = user.get("target_calories") or 2000
@@ -795,7 +795,7 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
     
     for i in range(7):
         day = today - timedelta(days=6-i)
-        day_summary = await get_day_summary(user["id"], day.isoformat())
+        day_summary = await get_day_summary(user["id"], day)
         
         if day_summary:
             cal = day_summary.get("total_calories", 0)
@@ -855,7 +855,7 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
         return
     
     today = date_type.today()
-    day_summary = await get_day_summary(user["id"], today.isoformat())
+    day_summary = await get_day_summary(user["id"], today)
     
     # Целевые значения
     target_cal = user.get("target_calories") or 2000

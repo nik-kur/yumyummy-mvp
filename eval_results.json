@@ -1,0 +1,410 @@
+[
+  {
+    "index": 1,
+    "input_text": "Съел омлет из 3 яиц и 2 тоста с маслом",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 570 ккал • Б 25г • Ж 38г • У 34г\nОмлет из 3 яиц (без молока), 2 тоста белого хлеба с маслом (10 г).",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 570.0,
+        "protein_g": 25.0,
+        "fat_g": 38.0,
+        "carbs_g": 34.0
+      },
+      "items": [
+        {
+          "name": "Омлет из 3 яиц (без молока)",
+          "grams": 165.0,
+          "calories_kcal": 270.0,
+          "protein_g": 21.0,
+          "fat_g": 21.0,
+          "carbs_g": 2.0
+        },
+        {
+          "name": "Тост белый (2 шт)",
+          "grams": 60.0,
+          "calories_kcal": 160.0,
+          "protein_g": 5.0,
+          "fat_g": 2.0,
+          "carbs_g": 30.0
+        },
+        {
+          "name": "Масло сливочное (10 г)",
+          "grams": 10.0,
+          "calories_kcal": 90.0,
+          "protein_g": 0.0,
+          "fat_g": 10.0,
+          "carbs_g": 0.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737147",
+    "success": true,
+    "error": null,
+    "duration_ms": 25330.47
+  },
+  {
+    "index": 2,
+    "input_text": "На ужин: гречка 200 г и куриная грудка 180 г",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 410 ккал, 46 г белка, 5 г жиров, 48 г углеводов. Гречка 200 г и куриная грудка 180 г (варёные).",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 410.0,
+        "protein_g": 46.0,
+        "fat_g": 5.0,
+        "carbs_g": 48.0
+      },
+      "items": [
+        {
+          "name": "Гречка, варёная",
+          "grams": 200.0,
+          "calories_kcal": 210.0,
+          "protein_g": 5.0,
+          "fat_g": 2.0,
+          "carbs_g": 42.0
+        },
+        {
+          "name": "Куриная грудка, варёная",
+          "grams": 180.0,
+          "calories_kcal": 200.0,
+          "protein_g": 41.0,
+          "fat_g": 3.0,
+          "carbs_g": 6.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737542",
+    "success": true,
+    "error": null,
+    "duration_ms": 33073.26
+  },
+  {
+    "index": 3,
+    "input_text": "Пельмени 250 г + сметана 1 ст.л.",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 525 ккал • Б 20г • Ж 23г • У 59г\nПельмени 250 г (обычно около 20–22 шт.) + сметана 1 ст.л. (~25 г).",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 525.0,
+        "protein_g": 20.0,
+        "fat_g": 23.0,
+        "carbs_g": 59.0
+      },
+      "items": [
+        {
+          "name": "Пельмени",
+          "grams": 250.0,
+          "calories_kcal": 480.0,
+          "protein_g": 18.0,
+          "fat_g": 20.0,
+          "carbs_g": 54.0
+        },
+        {
+          "name": "Сметана 20% (1 ст.л.)",
+          "grams": 25.0,
+          "calories_kcal": 45.0,
+          "protein_g": 2.0,
+          "fat_g": 3.0,
+          "carbs_g": 5.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737627",
+    "success": true,
+    "error": null,
+    "duration_ms": 24236.79
+  },
+  {
+    "index": 4,
+    "input_text": "Салат: помидоры, огурцы, фета, оливковое масло (1 порция)",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 210 ккал • Б 6г • Ж 17г • У 7г\nОценка: ESTIMATE\nКоротко: 1 порция салата (~180 г): помидоры, огурцы, фета, оливковое масло. Пропорции оценены стандартно.",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 210.0,
+        "protein_g": 6.0,
+        "fat_g": 17.0,
+        "carbs_g": 7.0
+      },
+      "items": [
+        {
+          "name": "Помидоры",
+          "grams": 60.0,
+          "calories_kcal": 12.0,
+          "protein_g": 0.6,
+          "fat_g": 0.2,
+          "carbs_g": 2.5
+        },
+        {
+          "name": "Огурцы",
+          "grams": 50.0,
+          "calories_kcal": 7.0,
+          "protein_g": 0.3,
+          "fat_g": 0.1,
+          "carbs_g": 1.5
+        },
+        {
+          "name": "Сыр фета",
+          "grams": 40.0,
+          "calories_kcal": 100.0,
+          "protein_g": 5.0,
+          "fat_g": 8.0,
+          "carbs_g": 1.0
+        },
+        {
+          "name": "Оливковое масло",
+          "grams": 15.0,
+          "calories_kcal": 91.0,
+          "protein_g": 0.0,
+          "fat_g": 9.7,
+          "carbs_g": 0.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737629",
+    "success": true,
+    "error": null,
+    "duration_ms": 22376.1
+  },
+  {
+    "index": 5,
+    "input_text": "2 банана и протеиновый батончик",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "2 банана и протеиновый батончик",
+      "confidence": "high",
+      "totals": {
+        "calories_kcal": 345.0,
+        "protein_g": 13.0,
+        "fat_g": 5.0,
+        "carbs_g": 71.0
+      },
+      "items": [
+        {
+          "name": "Банан",
+          "grams": 240.0,
+          "calories_kcal": 210.0,
+          "protein_g": 2.0,
+          "fat_g": 1.0,
+          "carbs_g": 54.0
+        },
+        {
+          "name": "Протеиновый батончик",
+          "grams": 40.0,
+          "calories_kcal": 135.0,
+          "protein_g": 11.0,
+          "fat_g": 4.0,
+          "carbs_g": 17.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737631",
+    "success": true,
+    "error": null,
+    "duration_ms": 24014.85
+  },
+  {
+    "index": 6,
+    "input_text": "Йогурт натуральный 200 г и мюсли 50 г",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Йогурт натуральный 200 г и мюсли 50 г",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 242.0,
+        "protein_g": 10.0,
+        "fat_g": 7.0,
+        "carbs_g": 33.0
+      },
+      "items": [
+        {
+          "name": "Йогурт натуральный",
+          "grams": 200.0,
+          "calories_kcal": 120.0,
+          "protein_g": 8.0,
+          "fat_g": 7.0,
+          "carbs_g": 10.0
+        },
+        {
+          "name": "Мюсли",
+          "grams": 50.0,
+          "calories_kcal": 122.0,
+          "protein_g": 2.0,
+          "fat_g": 0.0,
+          "carbs_g": 23.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737633",
+    "success": true,
+    "error": null,
+    "duration_ms": 26267.3
+  },
+  {
+    "index": 7,
+    "input_text": "Пицца 2 кусочка и кола без сахара 330 мл",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 330 ккал • Б 14г • Ж 12г • У 38г\nПицца (2 кусочка, ~180 г): 330 ккал, Б 14г, Ж 12г, У 38г\nКола без сахара (330 мл): 0 ккал, Б 0г, Ж 0г, У 0г",
+      "confidence": "high",
+      "totals": {
+        "calories_kcal": 330.0,
+        "protein_g": 14.0,
+        "fat_g": 12.0,
+        "carbs_g": 38.0
+      },
+      "items": [
+        {
+          "name": "Пицца (2 кусочка, ~180 г)",
+          "grams": 180.0,
+          "calories_kcal": 330.0,
+          "protein_g": 14.0,
+          "fat_g": 12.0,
+          "carbs_g": 38.0
+        },
+        {
+          "name": "Кола без сахара (330 мл)",
+          "grams": 330.0,
+          "calories_kcal": 0.0,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 0.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737635",
+    "success": true,
+    "error": null,
+    "duration_ms": 22634.23
+  },
+  {
+    "index": 8,
+    "input_text": "Съел борщ 400 мл и хлеб 2 кусочка",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 320 ккал • Б 8г • Ж 6г • У 56г\nБорщ (400 мл) и хлеб белый (2 кусочка, 60 г)",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 320.0,
+        "protein_g": 8.0,
+        "fat_g": 6.0,
+        "carbs_g": 56.0
+      },
+      "items": [
+        {
+          "name": "Борщ",
+          "grams": 400.0,
+          "calories_kcal": 120.0,
+          "protein_g": 4.0,
+          "fat_g": 4.0,
+          "carbs_g": 16.0
+        },
+        {
+          "name": "Хлеб белый",
+          "grams": 60.0,
+          "calories_kcal": 200.0,
+          "protein_g": 4.0,
+          "fat_g": 2.0,
+          "carbs_g": 40.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737636",
+    "success": true,
+    "error": null,
+    "duration_ms": 22076.16
+  },
+  {
+    "index": 9,
+    "input_text": "Суши: 8 роллов калифорния",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 320 ккал • Б 8г • Ж 6г • У 60г\nОценка: ESTIMATE\nПорция: 8 роллов калифорния (примерно 200 г), без учёта соуса и добавок.",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 320.0,
+        "protein_g": 8.0,
+        "fat_g": 6.0,
+        "carbs_g": 60.0
+      },
+      "items": [
+        {
+          "name": "Роллы Калифорния (8 шт)",
+          "grams": 200.0,
+          "calories_kcal": 320.0,
+          "protein_g": 8.0,
+          "fat_g": 6.0,
+          "carbs_g": 60.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737637",
+    "success": true,
+    "error": null,
+    "duration_ms": 17641.04
+  },
+  {
+    "index": 10,
+    "input_text": "Каша овсяная на молоке, 1 тарелка",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 210 ккал • Б 7г • Ж 7г • У 30г\n1 тарелка овсяной каши на молоке (примерно 250 г).",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 210.0,
+        "protein_g": 7.0,
+        "fat_g": 7.0,
+        "carbs_g": 30.0
+      },
+      "items": [
+        {
+          "name": "Каша овсяная на молоке",
+          "grams": 250.0,
+          "calories_kcal": 210.0,
+          "protein_g": 7.0,
+          "fat_g": 7.0,
+          "carbs_g": 30.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:34:48.737639",
+    "success": true,
+    "error": null,
+    "duration_ms": 19416.42
+  }
+]
