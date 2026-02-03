@@ -96,6 +96,55 @@ async def get_day_summary(user_id: int, day: date) -> Optional[Dict[str, Any]]:
     except Exception:
         return None
 
+
+async def update_meal(
+    meal_id: int,
+    description: Optional[str] = None,
+    calories: Optional[float] = None,
+    protein_g: Optional[float] = None,
+    fat_g: Optional[float] = None,
+    carbs_g: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Обновляем приём пищи через PATCH /meals/{meal_id}.
+    """
+    url = f"{settings.backend_base_url}/meals/{meal_id}"
+    payload: Dict[str, Any] = {}
+    if description is not None:
+        payload["description_user"] = description
+    if calories is not None:
+        payload["calories"] = calories
+    if protein_g is not None:
+        payload["protein_g"] = protein_g
+    if fat_g is not None:
+        payload["fat_g"] = fat_g
+    if carbs_g is not None:
+        payload["carbs_g"] = carbs_g
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.patch(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception:
+        return None
+
+
+async def delete_meal(meal_id: int) -> bool:
+    """
+    Удаляем приём пищи через DELETE /meals/{meal_id}.
+    """
+    url = f"{settings.backend_base_url}/meals/{meal_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.delete(url)
+            if resp.status_code == 404:
+                return False
+            resp.raise_for_status()
+            return True
+    except Exception:
+        return False
+
 async def ai_parse_meal(text: str) -> Optional[Dict[str, Any]]:
     """
     Вызывает POST /ai/parse_meal в backend.
@@ -338,3 +387,49 @@ async def agent_run_workflow(telegram_id: str, text: str) -> Optional[Dict[str, 
     except Exception as e:
         logger.error(f"[API] agent_run_workflow unexpected error: {e}", exc_info=True)
         return None
+
+
+# ============ Функции для онбординга ============
+
+async def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Получить данные пользователя по telegram_id.
+    """
+    url = f"{settings.backend_base_url}/users/{telegram_id}"
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_user error: {e}")
+        return None
+
+
+async def update_user(telegram_id: int, **kwargs) -> Optional[Dict[str, Any]]:
+    """
+    Обновить профиль пользователя.
+    kwargs: goal_type, gender, age, height_cm, weight_kg, activity_level,
+            target_calories, target_protein_g, target_fat_g, target_carbs_g,
+            onboarding_completed
+    """
+    url = f"{settings.backend_base_url}/users/{telegram_id}"
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.patch(url, json=kwargs)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] update_user error: {e}")
+        return None
+
+
+async def get_user_export_url(telegram_id: int) -> str:
+    """
+    Получить URL для скачивания экспорта данных пользователя.
+    """
+    return f"{settings.backend_base_url}/users/{telegram_id}/export"

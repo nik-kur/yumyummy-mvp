@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from datetime import date as date_type, timedelta
-from typing import Dict, Optional
+from datetime import date as date_type, datetime, timedelta
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import CommandStart, Command
@@ -15,8 +16,11 @@ logger = logging.getLogger(__name__)
 from app.bot.api_client import (
     ping_backend,
     ensure_user,
+    get_user,
     create_meal,
     get_day_summary,
+    update_meal,
+    delete_meal,
     ai_parse_meal,
     product_parse_meal_by_barcode,
     product_parse_meal_by_name,
@@ -27,6 +31,7 @@ from app.bot.api_client import (
     agent_query,
     agent_run_workflow,
 )
+from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard
 
 
 router = Router()
@@ -36,12 +41,327 @@ class AgentClarification(StatesGroup):
     waiting_for_clarification = State()
 
 
+class MealEditState(StatesGroup):
+    waiting_for_choice = State()
+    waiting_for_name = State()
+    waiting_for_macros = State()
+
+
+def normalize_source_url(source_url: Optional[str]) -> Optional[str]:
+    if source_url and str(source_url).strip():
+        url = str(source_url).strip()
+        if not (url.startswith("http://") or url.startswith("https://")):
+            if url.startswith("www."):
+                url = "https://" + url
+            elif not url.startswith("http"):
+                url = "https://" + url
+        return url
+    return None
+
+
+def format_accuracy_label(accuracy_level: Optional[str]) -> Optional[str]:
+    if not accuracy_level:
+        return None
+    return str(accuracy_level).upper()
+
+
+def format_source_label(source_url: Optional[str]) -> str:
+    normalized = normalize_source_url(source_url)
+    if not normalized:
+        return "оценка на базе модели и внутренних данных"
+    try:
+        domain = urlparse(normalized).netloc
+    except ValueError:
+        domain = ""
+    return domain or normalized
+
+
+def build_summary_lines(summary: Dict[str, Any]) -> list[str]:
+    total_calories = round(summary.get("total_calories", 0))
+    total_protein = round(summary.get("total_protein_g", 0), 1)
+    total_fat = round(summary.get("total_fat_g", 0), 1)
+    total_carbs = round(summary.get("total_carbs_g", 0), 1)
+    return [
+        "Сводка за сегодня:",
+        f"• Калории: {total_calories}",
+        f"• Белки: {total_protein} г",
+        f"• Жиры: {total_fat} г",
+        f"• Углеводы: {total_carbs} г",
+    ]
+
+
+def build_meal_response_text(
+    *,
+    description: str,
+    calories: float,
+    protein_g: float,
+    fat_g: float,
+    carbs_g: float,
+    accuracy_level: Optional[str] = None,
+    notes: Optional[str] = None,
+    source_url: Optional[str] = None,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    accuracy_label = format_accuracy_label(accuracy_level) or "ESTIMATE"
+    source_label = format_source_label(source_url)
+    lines = [
+        f"✅ Записал {description}",
+        "",
+        f"{calories} ккал · Б {protein_g} г · Ж {fat_g} г · У {carbs_g} г",
+        "",
+        f"Оценка точности: {accuracy_label}",
+    ]
+    if notes:
+        lines.append("")
+        lines.append(f"Примечание: {notes}")
+    lines.append("")
+    lines.append(f"Источник: {source_label}")
+    if summary:
+        lines.append("")
+        lines.extend(build_summary_lines(summary))
+    return "\n".join(lines)
+
+
+def build_meal_response_from_agent(
+    result: Dict[str, Any],
+    *,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    totals = result.get("totals") or {}
+    calories = round(float(totals.get("calories_kcal") or 0))
+    protein_g = round(float(totals.get("protein_g") or 0), 1)
+    fat_g = round(float(totals.get("fat_g") or 0), 1)
+    carbs_g = round(float(totals.get("carbs_g") or 0), 1)
+    items = result.get("items") or []
+    description_parts = [
+        item.get("name") for item in items if isinstance(item, dict) and item.get("name")
+    ]
+    description = ", ".join(description_parts).strip()
+    message_text = (result.get("message_text") or "").strip()
+    if not description:
+        description = message_text or "Без описания"
+
+    if (
+        not description_parts
+        and calories == 0
+        and protein_g == 0
+        and fat_g == 0
+        and carbs_g == 0
+        and message_text
+    ):
+        return message_text
+
+    base_text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=result.get("confidence"),
+        source_url=result.get("source_url"),
+        summary=summary,
+    )
+    if len(items) <= 1:
+        return base_text
+
+    accuracy_label = format_accuracy_label(result.get("confidence")) or "ESTIMATE"
+    source_label = format_source_label(result.get("source_url"))
+    lines = [base_text, "", "По блюдам:"]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_name = item.get("name") or "Блюдо"
+        item_calories = round(float(item.get("calories_kcal") or 0))
+        item_protein = round(float(item.get("protein_g") or 0), 1)
+        item_fat = round(float(item.get("fat_g") or 0), 1)
+        item_carbs = round(float(item.get("carbs_g") or 0), 1)
+        lines.extend(
+            [
+                f"{item_name}:",
+                f"{item_calories} ккал · Б {item_protein} г · Ж {item_fat} г · У {item_carbs} г",
+                f"Оценка точности: {accuracy_label}",
+                f"Источник: {source_label}",
+                "",
+            ]
+        )
+    while lines and lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines)
+
+
+def build_meal_keyboard(
+    meal_id: int,
+    day: date_type,
+    source_url: Optional[str] = None,
+) -> types.InlineKeyboardMarkup:
+    rows = [
+        [
+            types.InlineKeyboardButton(
+                text="✏️ Редактировать",
+                callback_data=f"meal_edit:{meal_id}:{day.isoformat()}",
+            ),
+            types.InlineKeyboardButton(
+                text="🗑 Удалить",
+                callback_data=f"meal_delete:{meal_id}:{day.isoformat()}",
+            ),
+        ]
+    ]
+
+    url = normalize_source_url(source_url)
+    if url:
+        rows.append([types.InlineKeyboardButton(text="🔗 Источник", url=url)])
+
+    return types.InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_day_actions_keyboard(day: date_type) -> types.InlineKeyboardMarkup:
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="🍽 Посмотреть приёмы пищи",
+                    callback_data=f"daylist:{day.isoformat()}",
+                )
+            ]
+        ]
+    )
+
+
+def build_week_days_keyboard(days: list[date_type]) -> types.InlineKeyboardMarkup:
+    rows = []
+    for day in days:
+        label = day.strftime("%d.%m")
+        rows.append(
+            [
+                types.InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"daylist:{day.isoformat()}",
+                )
+            ]
+        )
+    return types.InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_edit_choice_keyboard(meal_id: int, day: date_type) -> types.InlineKeyboardMarkup:
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="Название",
+                    callback_data=f"meal_edit_field:name:{meal_id}:{day.isoformat()}",
+                ),
+                types.InlineKeyboardButton(
+                    text="КБЖУ",
+                    callback_data=f"meal_edit_field:macros:{meal_id}:{day.isoformat()}",
+                ),
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="Отмена",
+                    callback_data=f"meal_edit_field:cancel:{meal_id}:{day.isoformat()}",
+                )
+            ],
+        ]
+    )
+
+
+async def get_latest_meal_id_for_today(telegram_id: int) -> Optional[int]:
+    user = await ensure_user(telegram_id)
+    if user is None:
+        return None
+
+    summary = await get_day_summary(user_id=user["id"], day=date_type.today())
+    if not summary:
+        return None
+
+    meals = summary.get("meals", [])
+    if not meals:
+        return None
+
+    latest_meal = meals[-1]
+    return latest_meal.get("id")
+
+
+def build_day_summary_text(summary: Dict[str, Any], day: date_type) -> str:
+    date_str = day.strftime("%d.%m.%Y")
+    total_calories = round(summary.get("total_calories", 0))
+    total_protein = round(summary.get("total_protein_g", 0), 1)
+    total_fat = round(summary.get("total_fat_g", 0), 1)
+    total_carbs = round(summary.get("total_carbs_g", 0), 1)
+    return "\n".join(
+        [
+            f"📅 Сводка за день ({date_str}):",
+            f"• Калории: {total_calories}",
+            f"• Белки: {total_protein} г",
+            f"• Жиры: {total_fat} г",
+            f"• Углеводы: {total_carbs} г",
+        ]
+    )
+
+
+def format_meal_entry(meal: Dict[str, Any]) -> str:
+    description = meal.get("description_user") or "Без описания"
+    calories = round(meal.get("calories", 0))
+    protein_g = round(meal.get("protein_g", 0), 1)
+    fat_g = round(meal.get("fat_g", 0), 1)
+    carbs_g = round(meal.get("carbs_g", 0), 1)
+
+    time_str = "??:??"
+    eaten_at = meal.get("eaten_at")
+    if eaten_at:
+        try:
+            cleaned = eaten_at.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(cleaned)
+            time_str = dt.strftime("%H:%M")
+        except ValueError:
+            pass
+
+    lines = [
+        f"🍽 {time_str} — {description}",
+        f"• Калории: {calories}",
+    ]
+    if protein_g or fat_g or carbs_g:
+        lines.extend(
+            [
+                f"• Белки: {protein_g} г",
+                f"• Жиры: {fat_g} г",
+                f"• Углеводы: {carbs_g} г",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def parse_macros_input(text: str) -> Optional[Tuple[float, float, float, float]]:
+    cleaned = text.strip()
+    if not cleaned:
+        return None
+
+    for delimiter in ["/", ","]:
+        cleaned = cleaned.replace(delimiter, " ")
+
+    parts = [p for p in cleaned.split() if p]
+    if len(parts) != 4:
+        return None
+
+    try:
+        calories = float(parts[0])
+        protein = float(parts[1])
+        fat = float(parts[2])
+        carbs = float(parts[3])
+    except ValueError:
+        return None
+
+    return calories, protein, fat, carbs
+
+
 @router.message(CommandStart())
-async def cmd_start(message: types.Message) -> None:
+async def cmd_start(message: types.Message, state: FSMContext) -> None:
     """
     Обработка /start:
     - регистрируем пользователя в backend (POST /users)
-    - показываем приветствие
+    - проверяем, прошёл ли пользователь онбординг
+    - если нет — запускаем онбординг
+    - если да — показываем приветствие с меню
     """
     tg_id = message.from_user.id
 
@@ -55,35 +375,52 @@ async def cmd_start(message: types.Message) -> None:
         )
         return
 
+    # Проверяем, прошёл ли пользователь онбординг
+    if not user.get("onboarding_completed", False):
+        # Запускаем онбординг
+        await start_onboarding(message, state)
+        return
+    
+    # Пользователь уже прошёл онбординг — показываем приветствие с меню
+    target_cal = user.get('target_calories') or 2000
+    target_prot = user.get('target_protein_g') or 150
+    target_fat = user.get('target_fat_g') or 65
+    target_carbs = user.get('target_carbs_g') or 200
+    
     text = (
-        "Привет! Я YumYummy 🧃\n\n"
-        "Я помогу тебе логировать питание и считать КБЖУ.\n"
-        "Пока я на стадии MVP, но уже умею:\n"
-        "• создавать твою учётку в системе (/start)\n"
-        "• проверять связь с сервером (/ping)\n\n"
-        f"Твой внутренний id в системе: {user['id']}"
+        f"С возвращением! 👋\n\n"
+        f"Твои цели на день:\n"
+        f"• 🔥 {target_cal:.0f} ккал\n"
+        f"• 🥩 {target_prot:.0f} г белка\n"
+        f"• 🥑 {target_fat:.0f} г жиров\n"
+        f"• 🍞 {target_carbs:.0f} г углеводов\n\n"
+        f"Напиши или надиктуй, что ты съел, и я всё запишу!"
     )
-    await message.answer(text)
+    await message.answer(text, reply_markup=get_main_menu_keyboard())
 
 
 @router.message(Command("help"))
 async def cmd_help(message: types.Message) -> None:
     text = (
-        "Доступные команды:\n"
-        "/start - приветствие и регистрация в системе\n"
-        "/help - помощь\n"
-        "/ping - проверить связь с сервером YumYummy\n"
-        "/log - вручную записать приём пищи (калории и, опционально, КБЖУ)\n"
-        "/ai_log - описать, что ты съел, а я сам оценю КБЖУ с помощью AI\n"
-        "/barcode - записать продукт по штрихкоду\n"
-        "/product - записать продукт по названию (можно указать бренд/магазин)\n"
-        "/eatout - записать блюдо из ресторана (пример: /eatout сырники из кофемании)\n"
-        "/eatoutA - экспериментальная версия через OpenAI (пример: /eatoutA сырники из кофемании)\n"
-        "/today - показать сводку за сегодня\n"
-        "/week - показать сводку за последние 7 дней\n\n"
-        "Можно отправить голосовое сообщение — я распознаю и запишу."
+        "📝 Как пользоваться ботом:\n\n"
+        "1️⃣ Логирование еды:\n"
+        "• Просто напиши что съел: \"2 яйца и тост\"\n"
+        "• Или отправь голосовое сообщение\n"
+        "• Сфотографируй штрих-код продукта\n"
+        "• Укажи место: \"капучино в Старбаксе\"\n\n"
+        "2️⃣ Кнопки меню:\n"
+        "📊 Сегодня — прогресс за день\n"
+        "📈 Неделя — статистика за 7 дней\n"
+        "🤔 Что съесть? — умный совет по питанию\n"
+        "👤 Профиль — твои данные и цели\n"
+        "📤 Экспорт — скачать все записи в CSV\n"
+        "💬 Поддержка — связь с разработчиком\n\n"
+        "3️⃣ Команды:\n"
+        "/start — перезапустить бота\n"
+        "/help — эта справка\n"
+        "/ping — проверить связь с сервером"
     )
-    await message.answer(text)
+    await message.answer(text, reply_markup=get_main_menu_keyboard())
 
 
 
@@ -212,37 +549,21 @@ async def cmd_log(message: types.Message) -> None:
     # Пробуем ещё и сводку за день вытащить
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    base_text = (
-        "✅ Записал приём пищи:\n"
-        f"• {description}\n"
-        f"• Калории: {calories}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level="ESTIMATE",
+        summary=summary,
     )
 
-    macros_text = ""
-    if protein_g or fat_g or carbs_g:
-        macros_text = (
-            f"\n• Белки: {protein_g} г"
-            f"\n• Жиры: {fat_g} г"
-            f"\n• Углеводы: {carbs_g} г"
-        )
-
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-
-    await message.answer(base_text + macros_text + summary_text)
+    meal_id = meal.get("id")
+    reply_markup = (
+        build_meal_keyboard(meal_id=meal_id, day=today) if meal_id else None
+    )
+    await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("barcode"))
@@ -342,88 +663,30 @@ async def cmd_barcode(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал приём пищи:\n• {description}\n"
-    macros_text = (
-        f"\nОценка КБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г\n"
-        f"Точность: {accuracy_level}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
 
-    if notes:
-        macros_text += f"\nПримечание: {notes}"
+    meal_id = meal.get("id")
+    reply_markup = (
+        build_meal_keyboard(meal_id=meal_id, day=today, source_url=source_url)
+        if meal_id
+        else None
+    )
 
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
-    
-    # Добавляем ссылку на источник в текст и кнопку, если есть
-    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
-    if source_url and str(source_url).strip():
-        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
-        # Проверяем, что это валидный URL
-        if not (source_url.startswith("http://") or source_url.startswith("https://")):
-            # Если URL без протокола, добавляем https://
-            if source_url.startswith("www."):
-                source_url = "https://" + source_url
-            elif not source_url.startswith("http"):
-                source_url = "https://" + source_url
-        
-        logger.info(f"[BOT] Final source_url: {source_url}")
-        
-        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
-        try:
-            keyboard = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        types.InlineKeyboardButton(
-                            text="🔗 Источник",
-                            url=source_url
-                        )
-                    ]
-                ]
-            )
-            logger.info(f"[BOT] Sending message with keyboard")
-            # Удаляем сообщение "Обрабатываю..." и отправляем результат
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text, reply_markup=keyboard)
-        except Exception as e:
-            logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text)
-    else:
-        logger.info(f"[BOT] No source_url, sending message without link")
-        # Удаляем сообщение "Обрабатываю..." и отправляем результат
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer(text)
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+    await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("product"))
@@ -547,88 +810,30 @@ async def cmd_product(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал приём пищи:\n• {description}\n"
-    macros_text = (
-        f"\nОценка КБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г\n"
-        f"Точность: {accuracy_level}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
 
-    if notes:
-        macros_text += f"\nПримечание: {notes}"
+    meal_id = meal.get("id")
+    reply_markup = (
+        build_meal_keyboard(meal_id=meal_id, day=today, source_url=source_url)
+        if meal_id
+        else None
+    )
 
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
-    
-    # Добавляем ссылку на источник в текст и кнопку, если есть
-    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
-    if source_url and str(source_url).strip():
-        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
-        # Проверяем, что это валидный URL
-        if not (source_url.startswith("http://") or source_url.startswith("https://")):
-            # Если URL без протокола, добавляем https://
-            if source_url.startswith("www."):
-                source_url = "https://" + source_url
-            elif not source_url.startswith("http"):
-                source_url = "https://" + source_url
-        
-        logger.info(f"[BOT] Final source_url: {source_url}")
-        
-        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
-        try:
-            keyboard = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        types.InlineKeyboardButton(
-                            text="🔗 Источник",
-                            url=source_url
-                        )
-                    ]
-                ]
-            )
-            logger.info(f"[BOT] Sending message with keyboard")
-            # Удаляем сообщение "Обрабатываю..." и отправляем результат
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text, reply_markup=keyboard)
-        except Exception as e:
-            logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text)
-    else:
-        logger.info(f"[BOT] No source_url, sending message without link")
-        # Удаляем сообщение "Обрабатываю..." и отправляем результат
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer(text)
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+    await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("ai_log"))
@@ -731,87 +936,30 @@ async def cmd_ai_log(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
 
-    # 5) Формируем ответ пользователю
-    text_lines = [
-        "✅ Записал приём пищи (оценка с помощью AI):",
-        f"• {description}",
-        f"• Калории: {calories}",
-        f"• Белки: {protein_g} г",
-        f"• Жиры: {fat_g} г",
-        f"• Углеводы: {carbs_g} г",
-        "",
-        f"Уровень точности: {accuracy_level}",
-    ]
-
-    if notes:
-        text_lines.append(f"Примечание: {notes}")
-
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        text_lines.append("")
-        text_lines.append("Сводка за сегодня:")
-        text_lines.append(f"• Калории: {total_calories}")
-        text_lines.append(f"• Белки: {total_protein} г")
-        text_lines.append(f"• Жиры: {total_fat} г")
-        text_lines.append(f"• Углеводы: {total_carbs} г")
-
-    # Формируем финальный текст
-    text = "\n".join(text_lines)
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
+    )
     
-    # Добавляем ссылку на источник в текст и кнопку, если есть
-    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
-    if source_url and str(source_url).strip():
-        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
-        # Проверяем, что это валидный URL
-        if not (source_url.startswith("http://") or source_url.startswith("https://")):
-            # Если URL без протокола, добавляем https://
-            if source_url.startswith("www."):
-                source_url = "https://" + source_url
-            elif not source_url.startswith("http"):
-                source_url = "https://" + source_url
-        
-        logger.info(f"[BOT] Final source_url: {source_url}")
-        
-        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
-        try:
-            keyboard = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        types.InlineKeyboardButton(
-                            text="🔗 Источник",
-                            url=source_url
-                        )
-                    ]
-                ]
-            )
-            logger.info(f"[BOT] Sending message with keyboard")
-            # Удаляем сообщение "Обрабатываю..." и отправляем результат
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text, reply_markup=keyboard)
-        except Exception as e:
-            logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text)
-    else:
-        logger.info(f"[BOT] No source_url, sending message without link")
-        # Удаляем сообщение "Обрабатываю..." и отправляем результат
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer(text)
+    meal_id = meal.get("id")
+    reply_markup = (
+        build_meal_keyboard(meal_id=meal_id, day=today, source_url=source_url)
+        if meal_id
+        else None
+    )
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+    await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("eatout"))
@@ -908,88 +1056,30 @@ async def cmd_eatout(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
     
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал: {description}"
-    macros_text = (
-        f"\n\nКБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г\n"
-        f"Точность: {accuracy_level}"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
-    
-    if notes:
-        macros_text += f"\nПримечание: {notes}"
-    
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-    
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
-    
-    # Добавляем ссылку на источник в кнопку, если есть
-    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
-    if source_url and str(source_url).strip():
-        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
-        # Проверяем, что это валидный URL
-        if not (source_url.startswith("http://") or source_url.startswith("https://")):
-            # Если URL без протокола, добавляем https://
-            if source_url.startswith("www."):
-                source_url = "https://" + source_url
-            elif not source_url.startswith("http"):
-                source_url = "https://" + source_url
-        
-        logger.info(f"[BOT] Final source_url: {source_url}")
-        
-        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
-        try:
-            keyboard = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        types.InlineKeyboardButton(
-                            text="🔗 Источник",
-                            url=source_url
-                        )
-                    ]
-                ]
-            )
-            logger.info(f"[BOT] Sending message with keyboard")
-            # Удаляем сообщение "Обрабатываю..." и отправляем результат
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text, reply_markup=keyboard)
-        except Exception as e:
-            logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text)
-    else:
-        logger.info(f"[BOT] No source_url, sending message without link")
-        # Удаляем сообщение "Обрабатываю..." и отправляем результат
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer(text)
+
+    meal_id = meal.get("id")
+    reply_markup = (
+        build_meal_keyboard(meal_id=meal_id, day=today, source_url=source_url)
+        if meal_id
+        else None
+    )
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+    await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("eatoutA"))
@@ -1088,89 +1178,30 @@ async def cmd_eatout_a(message: types.Message) -> None:
     # 4) Получаем сводку за день
     summary = await get_day_summary(user_id=user_id, day=today)
     
-    # 5) Формируем ответ пользователю
-    base_text = f"✅ Записал: {description}"
-    macros_text = (
-        f"\n\nКБЖУ:\n"
-        f"• Калории: {calories}\n"
-        f"• Белки: {protein_g} г\n"
-        f"• Жиры: {fat_g} г\n"
-        f"• Углеводы: {carbs_g} г"
+    text = build_meal_response_text(
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+        accuracy_level=accuracy_level,
+        notes=notes,
+        source_url=source_url,
+        summary=summary,
     )
-    
-    if accuracy_level:
-        macros_text += f"\n\nТочность: {accuracy_level}"
-    
-    if notes:
-        macros_text += f"\n\nПримечание: {notes}"
-    
-    summary_text = ""
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        summary_text = (
-            "\n\nСводка за сегодня:\n"
-            f"• Калории: {total_calories}\n"
-            f"• Белки: {total_protein} г\n"
-            f"• Жиры: {total_fat} г\n"
-            f"• Углеводы: {total_carbs} г"
-        )
-    
-    # Формируем финальный текст
-    text = base_text + macros_text + summary_text
-    
-    # Добавляем ссылку на источник в текст и кнопку, если есть
-    logger.info(f"[BOT /eatoutA] Checking source_url: {source_url}, type: {type(source_url)}")
-    if source_url and str(source_url).strip():
-        logger.info(f"[BOT /eatoutA] source_url is not empty, checking if valid URL...")
-        # Проверяем, что это валидный URL
-        if not (source_url.startswith("http://") or source_url.startswith("https://")):
-            # Если URL без протокола, добавляем https://
-            if source_url.startswith("www."):
-                source_url = "https://" + source_url
-            elif not source_url.startswith("http"):
-                source_url = "https://" + source_url
-        
-        logger.info(f"[BOT /eatoutA] Final source_url: {source_url}")
-        
-        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
-        try:
-            keyboard = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        types.InlineKeyboardButton(
-                            text="🔗 Источник",
-                            url=source_url
-                        )
-                    ]
-                ]
-            )
-            logger.info(f"[BOT /eatoutA] Sending message with keyboard")
-            # Удаляем сообщение "Обрабатываю..." и отправляем результат
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text, reply_markup=keyboard)
-        except Exception as e:
-            logger.error(f"[BOT /eatoutA] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст
-            try:
-                await processing_msg.delete()
-            except Exception:
-                pass
-            await message.answer(text)
-    else:
-        logger.info(f"[BOT /eatoutA] No source_url, sending message without link")
-        # Удаляем сообщение "Обрабатываю..." и отправляем результат
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer(text)
+
+    meal_id = meal.get("id")
+    reply_markup = (
+        build_meal_keyboard(meal_id=meal_id, day=today, source_url=source_url)
+        if meal_id
+        else None
+    )
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+    await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("today"))
@@ -1208,7 +1239,8 @@ async def cmd_today(message: types.Message) -> None:
         f"• Углеводы: {total_carbs} г",
     ]
 
-    await message.answer("\n".join(text_lines))
+    reply_markup = build_day_actions_keyboard(day=today)
+    await message.answer("\n".join(text_lines), reply_markup=reply_markup)
 
 @router.message(Command("week"))
 async def cmd_week(message: types.Message) -> None:
@@ -1279,7 +1311,289 @@ async def cmd_week(message: types.Message) -> None:
             f"У {round(summary.get('total_carbs_g', 0), 1)}"
         )
 
-    await message.answer("\n".join(text_lines))
+    days = [day for day, _summary in days_with_data]
+    reply_markup = build_week_days_keyboard(days)
+    await message.answer("\n".join(text_lines), reply_markup=reply_markup)
+
+
+@router.callback_query(F.data.startswith("daylist:"))
+async def handle_daylist(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    # Сбрасываем состояние при входе в список записей
+    await state.clear()
+
+    day_str = query.data.split(":", 1)[1]
+    try:
+        day = date_type.fromisoformat(day_str)
+    except ValueError:
+        await query.message.answer("Не понял дату. Попробуй ещё раз 🙏")
+        return
+
+    tg_id = query.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await query.message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    user_id = user["id"]
+    summary = await get_day_summary(user_id=user_id, day=day)
+    if summary is None:
+        await query.message.answer("За этот день нет записей 🌱")
+        return
+
+    await query.message.answer(build_day_summary_text(summary, day))
+
+    meals = summary.get("meals", [])
+    if not meals:
+        await query.message.answer("Приёмов пищи за этот день нет.")
+        return
+
+    for meal in meals:
+        meal_id = meal.get("id")
+        reply_markup = (
+            build_meal_keyboard(meal_id=meal_id, day=day) if meal_id else None
+        )
+        await query.message.answer(
+            format_meal_entry(meal), reply_markup=reply_markup
+        )
+
+
+@router.callback_query(F.data.startswith("meal_edit:"))
+async def handle_meal_edit(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+
+    parts = query.data.split(":", 2)
+    if len(parts) < 3:
+        await query.message.answer("Не удалось открыть редактирование.")
+        return
+
+    try:
+        meal_id = int(parts[1])
+        day_str = parts[2]
+    except ValueError:
+        await query.message.answer("Не удалось прочитать данные для редактирования.")
+        return
+
+    await state.update_data(meal_id=meal_id, day=day_str)
+    await state.set_state(MealEditState.waiting_for_choice)
+
+    try:
+        day = date_type.fromisoformat(day_str)
+    except ValueError:
+        await query.message.answer("Не удалось прочитать дату записи.")
+        return
+
+    reply_markup = build_edit_choice_keyboard(meal_id=meal_id, day=day)
+    await query.message.answer(
+        "Что хочешь отредактировать?", reply_markup=reply_markup
+    )
+
+
+@router.callback_query(F.data.startswith("meal_edit_field:"))
+async def handle_meal_edit_field(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+
+    parts = query.data.split(":", 3)
+    if len(parts) < 4:
+        await query.message.answer("Не удалось выбрать тип редактирования.")
+        return
+
+    field = parts[1]
+    try:
+        meal_id = int(parts[2])
+        day_str = parts[3]
+    except ValueError:
+        await query.message.answer("Не удалось прочитать данные для редактирования.")
+        return
+
+    if field == "cancel":
+        await state.clear()
+        await query.message.answer("Ок, отменил редактирование.")
+        return
+
+    await state.update_data(meal_id=meal_id, day=day_str, field=field)
+
+    if field == "name":
+        await state.set_state(MealEditState.waiting_for_name)
+        await query.message.answer("Напиши новое название блюда.")
+    elif field == "macros":
+        await state.set_state(MealEditState.waiting_for_macros)
+        await query.message.answer(
+            "Введи КБЖУ в формате к/б/ж/у.\n"
+            "Пример: 350/25/10/40"
+        )
+    else:
+        await query.message.answer("Не понял, что редактировать.")
+
+
+async def finalize_meal_update(
+    message: types.Message,
+    state: FSMContext,
+    *,
+    description: Optional[str] = None,
+    calories: Optional[float] = None,
+    protein_g: Optional[float] = None,
+    fat_g: Optional[float] = None,
+    carbs_g: Optional[float] = None,
+) -> None:
+    data = await state.get_data()
+    meal_id = data.get("meal_id")
+    day_str = data.get("day")
+
+    if not meal_id:
+        await state.clear()
+        await message.answer("Не удалось найти запись для редактирования.")
+        return
+
+    updated = await update_meal(
+        meal_id=meal_id,
+        description=description,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+    )
+    if updated is None:
+        await message.answer("Не получилось обновить запись. Попробуй позже 🙏")
+        return
+
+    await state.clear()
+    await message.answer("✅ Обновил запись.")
+
+    reply_markup = None
+    if day_str:
+        try:
+            day = date_type.fromisoformat(day_str)
+        except ValueError:
+            day = None
+        if day:
+            reply_markup = build_meal_keyboard(meal_id=meal_id, day=day)
+
+    await message.answer(format_meal_entry(updated), reply_markup=reply_markup)
+
+    if day_str:
+        try:
+            day = date_type.fromisoformat(day_str)
+        except ValueError:
+            return
+
+        user = await ensure_user(message.from_user.id)
+        if user is None:
+            return
+
+        summary = await get_day_summary(user_id=user["id"], day=day)
+        if summary:
+            await message.answer(build_day_summary_text(summary, day))
+
+
+@router.message(MealEditState.waiting_for_name)
+async def handle_meal_edit_name(message: types.Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Название не должно быть пустым. Напиши ещё раз.")
+        return
+
+    await finalize_meal_update(message, state, description=text)
+
+
+@router.message(MealEditState.waiting_for_macros)
+async def handle_meal_edit_macros(message: types.Message, state: FSMContext) -> None:
+    text = message.text or ""
+    parsed = parse_macros_input(text)
+    if parsed is None:
+        await message.answer(
+            "Не понял формат. Введи КБЖУ как к/б/ж/у.\n"
+            "Пример: 350/25/10/40"
+        )
+        return
+
+    calories, protein_g, fat_g, carbs_g = parsed
+    await finalize_meal_update(
+        message,
+        state,
+        calories=calories,
+        protein_g=protein_g,
+        fat_g=fat_g,
+        carbs_g=carbs_g,
+    )
+
+
+@router.callback_query(F.data.startswith("meal_delete:"))
+async def handle_meal_delete(query: types.CallbackQuery) -> None:
+    await query.answer()
+
+    parts = query.data.split(":", 2)
+    if len(parts) < 3:
+        await query.message.answer("Не удалось открыть удаление.")
+        return
+
+    try:
+        meal_id = int(parts[1])
+        day_str = parts[2]
+    except ValueError:
+        await query.message.answer("Не удалось прочитать данные для удаления.")
+        return
+
+    confirm_keyboard = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="✅ Да",
+                    callback_data=f"meal_delete_confirm:{meal_id}:{day_str}",
+                ),
+                types.InlineKeyboardButton(
+                    text="❌ Нет",
+                    callback_data=f"meal_delete_cancel:{meal_id}:{day_str}",
+                ),
+            ]
+        ]
+    )
+
+    await query.message.answer("Удалить запись?", reply_markup=confirm_keyboard)
+
+
+@router.callback_query(F.data.startswith("meal_delete_confirm:"))
+async def handle_meal_delete_confirm(query: types.CallbackQuery) -> None:
+    await query.answer()
+
+    parts = query.data.split(":", 2)
+    if len(parts) < 3:
+        await query.message.answer("Не удалось удалить запись.")
+        return
+
+    try:
+        meal_id = int(parts[1])
+        day_str = parts[2]
+    except ValueError:
+        await query.message.answer("Не удалось прочитать данные для удаления.")
+        return
+
+    ok = await delete_meal(meal_id)
+    if not ok:
+        await query.message.answer("Не получилось удалить запись. Попробуй позже 🙏")
+        return
+
+    await query.message.answer("✅ Запись удалена.")
+
+    try:
+        day = date_type.fromisoformat(day_str)
+    except ValueError:
+        return
+
+    user = await ensure_user(query.from_user.id)
+    if user is None:
+        return
+
+    summary = await get_day_summary(user_id=user["id"], day=day)
+    if summary:
+        await query.message.answer(build_day_summary_text(summary, day))
+    else:
+        await query.message.answer("За этот день больше нет записей 🌱")
+
+
+@router.callback_query(F.data.startswith("meal_delete_cancel:"))
+async def handle_meal_delete_cancel(query: types.CallbackQuery) -> None:
+    await query.answer("Удаление отменено")
 
 
 @router.message(F.voice)
@@ -1320,126 +1634,68 @@ async def handle_voice(message: types.Message) -> None:
         await message.answer("Не удалось обработать голос. Попробуй ещё раз 🙏")
         return
 
-    transcript = parsed.get("transcript", "")
-    description = parsed.get("description", "") or "Описание не указано"
-    calories = float(parsed.get("calories", 0) or 0)
-    protein_g = float(parsed.get("protein_g", 0) or 0)
-    fat_g = float(parsed.get("fat_g", 0) or 0)
-    carbs_g = float(parsed.get("carbs_g", 0) or 0)
-    
-    # Извлекаем accuracy_level и source_provider из ответа
-    raw_accuracy = parsed.get("accuracy_level", "ESTIMATE")
-    accuracy_level = str(raw_accuracy or "ESTIMATE").upper()
-    source_provider = parsed.get("source_provider") or "LLM_ESTIMATE"
-    source_url = parsed.get("source_url")
-    
-    notes = parsed.get("notes", "") or ""
-    
-    # Добавляем source_provider в notes, если он есть и отличается от LLM_ESTIMATE
-    if source_provider and source_provider != "LLM_ESTIMATE":
-        if notes:
-            notes = f"[{source_provider}] {notes}"
-        else:
-            notes = f"[{source_provider}]"
-
-    # Округляем значения для отображения
-    calories = round(calories)
-    protein_g = round(protein_g, 1)
-    fat_g = round(fat_g, 1)
-    carbs_g = round(carbs_g, 1)
-
-    # 5) Логируем приём пищи
-    today = date_type.today()
-    meal = await create_meal(
-        user_id=user_id,
-        day=today,
-        description=description,
-        calories=calories,
-        protein_g=protein_g,
-        fat_g=fat_g,
-        carbs_g=carbs_g,
-        accuracy_level=accuracy_level,
-    )
-
-    if meal is None:
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+    transcript = (parsed.get("transcript", "") or "").strip()
+    if not transcript:
+        await message.answer("Не удалось распознать речь. Попробуй ещё раз 🙏")
         return
 
-    # 6) Получаем сводку за день
-    summary = await get_day_summary(user_id=user_id, day=today)
+    processing_msg = await message.answer("⏳ Обрабатываю распознанный текст...")
 
-    # 7) Формируем ответ пользователю
-    lines = [
-        "✅ Записал приём пищи по голосу.",
-    ]
-    if transcript.strip():
-        lines += ["", f"Распознал: \"{transcript.strip()}\""]
-    lines += [
-        "",
-        f"• {description}",
-        f"• Калории: {calories}",
-        f"• Белки: {protein_g} г",
-        f"• Жиры: {fat_g} г",
-        f"• Углеводы: {carbs_g} г",
-        "",
-        f"Точность: {accuracy_level}",
-    ]
-    if notes:
-        lines += ["", f"Примечание: {notes}"]
-    if summary:
-        # Округляем значения сводки
-        total_calories = round(summary.get('total_calories', 0))
-        total_protein = round(summary.get('total_protein_g', 0), 1)
-        total_fat = round(summary.get('total_fat_g', 0), 1)
-        total_carbs = round(summary.get('total_carbs_g', 0), 1)
-        
-        lines += [
-            "",
-            "Сводка за сегодня:",
-            f"• Калории: {total_calories}",
-            f"• Белки: {total_protein} г",
-            f"• Жиры: {total_fat} г",
-            f"• Углеводы: {total_carbs} г",
-        ]
-
-    # Формируем финальный текст
-    text = "\n".join(lines)
-    
-    # Добавляем ссылку на источник в кнопку, если есть
-    logger.info(f"[BOT] Checking source_url: {source_url}, type: {type(source_url)}")
-    if source_url and str(source_url).strip():
-        logger.info(f"[BOT] source_url is not empty, checking if valid URL...")
-        # Проверяем, что это валидный URL
-        if not (source_url.startswith("http://") or source_url.startswith("https://")):
-            # Если URL без протокола, добавляем https://
-            if source_url.startswith("www."):
-                source_url = "https://" + source_url
-            elif not source_url.startswith("http"):
-                source_url = "https://" + source_url
-        
-        logger.info(f"[BOT] Final source_url: {source_url}")
-        
-        # Добавляем кнопку для удобства (ссылка только в кнопке, не в тексте)
+    try:
+        result = await agent_run_workflow(
+            telegram_id=str(message.from_user.id),
+            text=transcript,
+        )
+    except Exception as e:
+        logger.error(f"[VOICE] Error running agent workflow: {e}", exc_info=True)
         try:
-            keyboard = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        types.InlineKeyboardButton(
-                            text="🔗 Источник",
-                            url=source_url
-                        )
-                    ]
-                ]
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    if result is None:
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    intent = result.get("intent", "unknown")
+    message_text = result.get("message_text", "Ошибка обработки")
+    source_url = result.get("source_url")
+    has_source_url = source_url is not None and source_url != ""
+
+    reply_markup = None
+    if intent in {"log_meal", "product", "eatout", "barcode"}:
+        meal_id = await get_latest_meal_id_for_today(message.from_user.id)
+        if meal_id:
+            reply_markup = build_meal_keyboard(
+                meal_id=meal_id,
+                day=date_type.today(),
+                source_url=source_url,
             )
-            logger.info(f"[BOT] Sending message with keyboard")
-            await message.answer(text, reply_markup=keyboard)
-        except Exception as e:
-            logger.error(f"[BOT] Error creating keyboard: {e}")
-            # Если ошибка с кнопкой, отправляем хотя бы текст
-            await message.answer(text)
-    else:
-        logger.info(f"[BOT] No source_url, sending message without link")
-        await message.answer(text)
+
+    if reply_markup is None and has_source_url:
+        reply_markup = types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [types.InlineKeyboardButton(text="Источник", url=source_url)]
+            ]
+        )
+
+    response_text = message_text
+    if intent in {"log_meal", "product", "eatout", "barcode"}:
+        response_text = build_meal_response_from_agent(result)
+
+    await message.answer(f"Распознал: \"{transcript}\"")
+    await message.answer(response_text, reply_markup=reply_markup)
 
 
 @router.message(Command("agent"))
@@ -1506,21 +1762,30 @@ async def cmd_agent(message: types.Message) -> None:
         except Exception:
             pass
         
-        # Build reply with optional source URL button
+        # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if has_source_url:
-            try:
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                reply_markup = InlineKeyboardMarkup(
-                    inline_keyboard=[[InlineKeyboardButton(text="Источник", url=source_url)]]
+        if intent in {"log_meal", "product", "eatout", "barcode"}:
+            meal_id = await get_latest_meal_id_for_today(message.from_user.id)
+            if meal_id:
+                reply_markup = build_meal_keyboard(
+                    meal_id=meal_id,
+                    day=date_type.today(),
+                    source_url=source_url,
                 )
-            except Exception as e:
-                logger.error(f"[BOT /agent] Error creating reply_markup: {e}", exc_info=True)
-                # Continue without button if there's an error
+
+        if reply_markup is None and has_source_url:
+            reply_markup = types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [types.InlineKeyboardButton(text="Источник", url=source_url)]
+                ]
+            )
         
         # Send the message
         try:
-            await message.answer(message_text, reply_markup=reply_markup)
+            response_text = message_text
+            if intent in {"log_meal", "product", "eatout", "barcode"}:
+                response_text = build_meal_response_from_agent(result)
+            await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
         except Exception as send_error:
             logger.error(
@@ -1620,21 +1885,30 @@ async def handle_plain_text(message: types.Message) -> None:
         except Exception:
             pass
         
-        # Build reply with optional source URL button
+        # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if has_source_url:
-            try:
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                reply_markup = InlineKeyboardMarkup(
-                    inline_keyboard=[[InlineKeyboardButton(text="Источник", url=source_url)]]
+        if intent in {"log_meal", "product", "eatout", "barcode"}:
+            meal_id = await get_latest_meal_id_for_today(message.from_user.id)
+            if meal_id:
+                reply_markup = build_meal_keyboard(
+                    meal_id=meal_id,
+                    day=date_type.today(),
+                    source_url=source_url,
                 )
-            except Exception as e:
-                logger.error(f"[BOT plain_text] Error creating reply_markup: {e}", exc_info=True)
-                # Continue without button if there's an error
+
+        if reply_markup is None and has_source_url:
+            reply_markup = types.InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [types.InlineKeyboardButton(text="Источник", url=source_url)]
+                ]
+            )
         
         # Send the message
         try:
-            await message.answer(message_text, reply_markup=reply_markup)
+            response_text = message_text
+            if intent in {"log_meal", "product", "eatout", "barcode"}:
+                response_text = build_meal_response_from_agent(result)
+            await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")
         except Exception as send_error:
             logger.error(
@@ -1664,6 +1938,9 @@ async def main() -> None:
     bot = Bot(token=settings.telegram_bot_token)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+    
+    # Важно: onboarding_router должен быть первым для приоритета обработки меню
+    dp.include_router(onboarding_router)
     dp.include_router(router)
 
     await dp.start_polling(bot)

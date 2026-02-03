@@ -15,8 +15,8 @@ from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
-from app.schemas.user import UserCreate, UserRead
-from app.schemas.meal import MealCreate, MealRead, DaySummary
+from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.meal import MealCreate, MealRead, MealUpdate, DaySummary
 
 from app.services.llm_client import chat_completion
 from app.services.meal_parser import parse_meal_text
@@ -1222,6 +1222,92 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     return user
 
 
+@app.get("/users/{telegram_id}", response_model=UserRead)
+def get_user_by_telegram_id(telegram_id: str, db: Session = Depends(get_db)):
+    """
+    Получить пользователя по telegram_id.
+    """
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@app.patch("/users/{telegram_id}", response_model=UserRead)
+def update_user_profile(telegram_id: str, user_update: UserUpdate, db: Session = Depends(get_db)):
+    """
+    Обновить профиль пользователя (онбординг, цели КБЖУ и т.д.)
+    """
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Обновляем только переданные поля
+    update_data = user_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.get("/users/{telegram_id}/export")
+def export_user_meals(telegram_id: str, db: Session = Depends(get_db)):
+    """
+    Экспорт всех приёмов пищи пользователя в CSV формате.
+    """
+    from fastapi.responses import StreamingResponse
+    import csv
+    import io
+    
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Получаем все приёмы пищи
+    meals = (
+        db.query(MealEntry)
+        .filter(MealEntry.user_id == user.id)
+        .order_by(MealEntry.eaten_at.desc())
+        .all()
+    )
+    
+    # Создаём CSV в памяти
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Заголовок
+    writer.writerow([
+        "date", "time", "description", "calories", 
+        "protein_g", "fat_g", "carbs_g", "accuracy", "source"
+    ])
+    
+    # Данные
+    for meal in meals:
+        writer.writerow([
+            meal.eaten_at.strftime("%Y-%m-%d"),
+            meal.eaten_at.strftime("%H:%M"),
+            meal.description_user,
+            meal.calories,
+            meal.protein_g,
+            meal.fat_g,
+            meal.carbs_g,
+            meal.accuracy_level or "UNKNOWN",
+            meal.uc_type or "UNKNOWN"
+        ])
+    
+    output.seek(0)
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=yumyummy_export_{telegram_id}.csv"
+        }
+    )
+
+
 # ---------- MEALS ----------
 
 
@@ -1290,6 +1376,70 @@ def create_meal(meal_in: MealCreate, db: Session = Depends(get_db)):
     db.refresh(meal)
 
     return meal
+
+
+@app.patch("/meals/{meal_id}", response_model=MealRead)
+def update_meal(
+    meal_id: int,
+    meal_in: MealUpdate,
+    db: Session = Depends(get_db),
+):
+    meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if not meal:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    user_day = db.query(UserDay).filter(UserDay.id == meal.user_day_id).first()
+    if not user_day:
+        raise HTTPException(status_code=404, detail="User day not found")
+
+    old_calories = meal.calories
+    old_protein = meal.protein_g
+    old_fat = meal.fat_g
+    old_carbs = meal.carbs_g
+
+    new_calories = old_calories if meal_in.calories is None else meal_in.calories
+    new_protein = old_protein if meal_in.protein_g is None else meal_in.protein_g
+    new_fat = old_fat if meal_in.fat_g is None else meal_in.fat_g
+    new_carbs = old_carbs if meal_in.carbs_g is None else meal_in.carbs_g
+
+    if meal_in.description_user is not None:
+        meal.description_user = meal_in.description_user
+
+    meal.calories = new_calories
+    meal.protein_g = new_protein
+    meal.fat_g = new_fat
+    meal.carbs_g = new_carbs
+
+    user_day.total_calories += new_calories - old_calories
+    user_day.total_protein_g += new_protein - old_protein
+    user_day.total_fat_g += new_fat - old_fat
+    user_day.total_carbs_g += new_carbs - old_carbs
+
+    db.commit()
+    db.refresh(meal)
+
+    return meal
+
+
+@app.delete("/meals/{meal_id}")
+def delete_meal(meal_id: int, db: Session = Depends(get_db)):
+    meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if not meal:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    user_day = db.query(UserDay).filter(UserDay.id == meal.user_day_id).first()
+    if not user_day:
+        raise HTTPException(status_code=404, detail="User day not found")
+
+    user_day.total_calories -= meal.calories
+    user_day.total_protein_g -= meal.protein_g
+    user_day.total_fat_g -= meal.fat_g
+    user_day.total_carbs_g -= meal.carbs_g
+
+    db.delete(meal)
+    db.commit()
+
+    return {"status": "deleted"}
 
 
 # ---------- DAY SUMMARY ----------

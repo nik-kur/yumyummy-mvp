@@ -1,0 +1,467 @@
+[
+  {
+    "index": 1,
+    "input_text": "Съел омлет из 3 яиц и 2 тоста с маслом",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "Итого: 545 ккал • Б 23г • Ж 37г • У 32г\nОмлет из 3 яиц (без молока), 2 тоста (~60 г хлеба) с 10 г сливочного масла.",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 545.0,
+        "protein_g": 23.0,
+        "fat_g": 37.0,
+        "carbs_g": 32.0
+      },
+      "items": [
+        {
+          "name": "Омлет из 3 яиц",
+          "grams": 150.0,
+          "calories_kcal": 230.0,
+          "protein_g": 18.0,
+          "fat_g": 17.0,
+          "carbs_g": 2.0
+        },
+        {
+          "name": "Тосты (2 ломтика хлеба)",
+          "grams": 60.0,
+          "calories_kcal": 150.0,
+          "protein_g": 5.0,
+          "fat_g": 2.0,
+          "carbs_g": 28.0
+        },
+        {
+          "name": "Сливочное масло, 10 г",
+          "grams": 10.0,
+          "calories_kcal": 90.0,
+          "protein_g": 0.0,
+          "fat_g": 10.0,
+          "carbs_g": 0.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772145",
+    "success": true,
+    "error": null,
+    "duration_ms": 21950.63
+  },
+  {
+    "index": 2,
+    "input_text": "На ужин: гречка 200 г и куриная грудка 180 г",
+    "expected_intent": "log_meal",
+    "actual_intent": "log_meal",
+    "response": {
+      "intent": "log_meal",
+      "message_text": "На ужин: гречка 200 г и куриная грудка 180 г",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 426.0,
+        "protein_g": 49.0,
+        "fat_g": 5.0,
+        "carbs_g": 45.0
+      },
+      "items": [
+        {
+          "name": "Гречка, варёная",
+          "grams": 200.0,
+          "calories_kcal": 210.0,
+          "protein_g": 5.0,
+          "fat_g": 2.0,
+          "carbs_g": 40.0
+        },
+        {
+          "name": "Куриная грудка, отварная, без кожи",
+          "grams": 180.0,
+          "calories_kcal": 216.0,
+          "protein_g": 44.0,
+          "fat_g": 3.0,
+          "carbs_g": 5.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772592",
+    "success": true,
+    "error": null,
+    "duration_ms": 29205.61
+  },
+  {
+    "index": 3,
+    "input_text": "Starbucks Pumpkin Spice Latte grande — сколько кбжу?",
+    "expected_intent": "eatout",
+    "actual_intent": "eatout",
+    "response": {
+      "intent": "eatout",
+      "message_text": "Итого: 440 ккал; Б 15 г; Ж 19 г; У 52 г (Pumpkin Spice Latte, Grande 473 мл, горячий). Оценка: HIGH. Источник: starbucks.com.au",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 440.0,
+        "protein_g": 15.0,
+        "fat_g": 19.0,
+        "carbs_g": 52.0
+      },
+      "items": [
+        {
+          "name": "Starbucks Pumpkin Spice Latte (hot), Grande (473 mL)",
+          "grams": null,
+          "calories_kcal": 440.0,
+          "protein_g": 15.0,
+          "fat_g": 19.0,
+          "carbs_g": 52.0
+        }
+      ],
+      "source_url": "https://www.starbucks.com.au/product/pumpkin-spice-latte/"
+    },
+    "timestamp": "2026-01-31T13:48:26.772684",
+    "success": true,
+    "error": null,
+    "duration_ms": 87824.75
+  },
+  {
+    "index": 4,
+    "input_text": "Кофемания: цезарь с курицей, 1 порция — кбжу",
+    "expected_intent": "eatout",
+    "actual_intent": "eatout",
+    "response": {
+      "intent": "eatout",
+      "message_text": "Итого (Кофемания, «Цезарь салат» с куриным филе), 1 порция (вес в карточке: 190 г): 695 ккал; Б 29 г; Ж 54 г; У 23 г. Оценка: HIGH. Источник: coffeemania.ru",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 695.0,
+        "protein_g": 29.0,
+        "fat_g": 54.0,
+        "carbs_g": 23.0
+      },
+      "items": [
+        {
+          "name": "Кофемания — Цезарь салат (с куриным филе), 1 порция",
+          "grams": 190.0,
+          "calories_kcal": 695.0,
+          "protein_g": 29.0,
+          "fat_g": 54.0,
+          "carbs_g": 23.0
+        }
+      ],
+      "source_url": "https://coffeemania.ru/menu/salat-cezar-210g"
+    },
+    "timestamp": "2026-01-31T13:48:26.772686",
+    "success": true,
+    "error": null,
+    "duration_ms": 73487.49
+  },
+  {
+    "index": 5,
+    "input_text": "Coca-Cola Zero 330 мл — кбжу на банку",
+    "expected_intent": "product",
+    "actual_intent": "nutrition_facts",
+    "response": {
+      "intent": "nutrition_facts",
+      "message_text": "Coca‑Cola Zero Sugar (по данным официальной страницы Coca‑Cola, значения указаны **на 100 мл**): 0.3 ккал, Б/Ж/У = 0/0/0. Для вашей банки **330 мл** умножаю на 3.3.\n\nИтого на 330 мл: **≈ 1 ккал**, **Б 0 г / Ж 0 г / У 0 г**.\n\nПримечание: нутриция может немного отличаться по стране/рынку и версии продукта, но для Coca‑Cola Zero Sugar обычно это ~0–1 ккал на банку 330 мл.",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 1.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [
+        {
+          "name": "Coca-Cola Zero Sugar",
+          "grams": 330.0,
+          "calories_kcal": 1.0,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 0.0
+        }
+      ],
+      "source_url": "https://www.coca-cola.com/gb/en/brands/coca-cola-zero-sugar"
+    },
+    "timestamp": "2026-01-31T13:48:26.772688",
+    "success": true,
+    "error": null,
+    "duration_ms": 109242.98
+  },
+  {
+    "index": 6,
+    "input_text": "Exponenta cherry yogurt 150 г — кбжу",
+    "expected_intent": "product",
+    "actual_intent": "nutrition_facts",
+    "response": {
+      "intent": "nutrition_facts",
+      "message_text": "Exponenta (если речь про продукт Exponenta High‑Pro «вишня‑пломбир», данные ВкусВилл):\n\nПорция: 150 г\n- Калории: 93 ккал\n- Белки: 18.8 г\n- Жиры: 0.0 г\n- Углеводы: 4.5 г\n\nПримечание: на упаковке этого продукта указано на 100 г: 62 ккал, Б 12.5 г, Ж 0 г, У 3 г; я пересчитал на 150 г (×1.5). Если у вас другой йогурт Exponenta «вишня» (не High‑Pro/другая масса), пришлите фото таблицы КБЖУ — пересчитаю точно.",
+      "confidence": "HIGH",
+      "totals": {
+        "calories_kcal": 93.0,
+        "protein_g": 18.8,
+        "fat_g": 0.0,
+        "carbs_g": 4.5
+      },
+      "items": [
+        {
+          "name": "Exponenta High-Pro (вишня-пломбир)",
+          "grams": 150.0,
+          "calories_kcal": 93.0,
+          "protein_g": 18.8,
+          "fat_g": 0.0,
+          "carbs_g": 4.5
+        }
+      ],
+      "source_url": "https://vkusvill.ru/goods/produkt-kislomolochnyy-exponenta-high-pro-so-vkusom-vishnya-plombir-obezzhirennyy-160-g-99950.html"
+    },
+    "timestamp": "2026-01-31T13:48:26.772689",
+    "success": true,
+    "error": null,
+    "duration_ms": 163687.06
+  },
+  {
+    "index": 7,
+    "input_text": "4601234567890",
+    "expected_intent": "barcode",
+    "actual_intent": "barcode",
+    "response": {
+      "intent": "barcode",
+      "message_text": "Не нашёл данные по штрихкоду 4601234567890. Пришли название продукта или фото этикетки (таблица КБЖУ), и я посчитаю. Порция по умолчанию: 100 г (или 100 мл, если это напиток — тогда 1 мл≈1 г).",
+      "confidence": null,
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772691",
+    "success": true,
+    "error": null,
+    "duration_ms": 39325.57
+  },
+  {
+    "index": 8,
+    "input_text": "штрихкод 4820001234567, найди кбжу",
+    "expected_intent": "barcode",
+    "actual_intent": "barcode",
+    "response": {
+      "intent": "barcode",
+      "message_text": "Не нашёл данные по штрихкоду 4820001234567. Пришли название продукта или фото этикетки (таблица КБЖУ), и я посчитаю.",
+      "confidence": null,
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772692",
+    "success": true,
+    "error": null,
+    "duration_ms": 21764.79
+  },
+  {
+    "index": 9,
+    "input_text": "Я в кафе, что лучше взять чтобы похудеть?",
+    "expected_intent": "food_advice",
+    "actual_intent": "eatout",
+    "response": {
+      "intent": "eatout",
+      "message_text": "Чтобы похудеть, в кафе обычно лучше брать: напиток без сахара (американо/чай) + блюдо «белок + овощи» (салат с курицей/рыбой), соус/масло попроси отдельно. Ниже — пример заказа с примерной оценкой. Если пришлёшь название кафе или фото меню/блюда — посчитаю КБЖУ точнее.\nИтого (пример): 380 ккал; Б 30 г; Ж 14 г; У 30 г. Оценка: ESTIMATE.",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 380.0,
+        "protein_g": 30.0,
+        "fat_g": 14.0,
+        "carbs_g": 30.0
+      },
+      "items": [
+        {
+          "name": "Американо без сахара (≈200 мл)",
+          "grams": 200.0,
+          "calories_kcal": 5.0,
+          "protein_g": 0.2,
+          "fat_g": 0.1,
+          "carbs_g": 0.8
+        },
+        {
+          "name": "Салат с курицей-гриль, соус отдельно (≈1 порция)",
+          "grams": 300.0,
+          "calories_kcal": 375.0,
+          "protein_g": 29.8,
+          "fat_g": 13.9,
+          "carbs_g": 29.2
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772694",
+    "success": true,
+    "error": null,
+    "duration_ms": 102503.41
+  },
+  {
+    "index": 10,
+    "input_text": "В меню есть: паста, стейк с овощами, салат с курицей — посоветуй лучший вариант",
+    "expected_intent": "food_advice",
+    "actual_intent": "eatout",
+    "response": {
+      "intent": "eatout",
+      "message_text": "Если выбирать «лучший» по балансу (сытность/белок/умеренные углеводы) — стейк с овощами. Если цель — минимизировать калории, тогда салат с курицей (лучше с лёгкой заправкой/соус отдельно). Паста чаще всего самая калорийная и углеводная. Итого (для рекомендованного стейка, оценка порции ресторана): ~450 ккал; Б/Ж/У ~40/25/15. Оценка: ESTIMATE.",
+      "confidence": "ESTIMATE",
+      "totals": {
+        "calories_kcal": 450.0,
+        "protein_g": 40.0,
+        "fat_g": 25.0,
+        "carbs_g": 15.0
+      },
+      "items": [
+        {
+          "name": "Стейк с овощами (порция ~300–400 г, оценка)",
+          "grams": null,
+          "calories_kcal": 450.0,
+          "protein_g": 40.0,
+          "fat_g": 25.0,
+          "carbs_g": 15.0
+        },
+        {
+          "name": "Салат с курицей (порция ~250–300 г, оценка)",
+          "grams": null,
+          "calories_kcal": 330.0,
+          "protein_g": 30.0,
+          "fat_g": 15.0,
+          "carbs_g": 20.0
+        },
+        {
+          "name": "Паста (порция ~300–400 г, оценка)",
+          "grams": null,
+          "calories_kcal": 600.0,
+          "protein_g": 35.0,
+          "fat_g": 20.0,
+          "carbs_g": 75.0
+        }
+      ],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772695",
+    "success": true,
+    "error": null,
+    "duration_ms": 146563.46
+  },
+  {
+    "index": 11,
+    "input_text": "Что ты умеешь? Как пользоваться ботом?",
+    "expected_intent": "help",
+    "actual_intent": "help",
+    "response": {
+      "intent": "help",
+      "message_text": "YumYummy — это бот для просмотра калорийности и состава блюд и продуктов. Просто напишите, что и сколько вы съели, чтобы получить подробную информацию о белках, жирах, углеводах и калориях.\n\nПримеры запросов:\n1. «Пицца Маргарита 200 г»\n2. «3 яйца и 2 помидора»\n3. «Сколько калорий в 100 г куриной грудки?»",
+      "confidence": null,
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772696",
+    "success": true,
+    "error": null,
+    "duration_ms": 8394.62
+  },
+  {
+    "index": 12,
+    "input_text": "/start что дальше делать?",
+    "expected_intent": "help",
+    "actual_intent": "help",
+    "response": {
+      "intent": "help",
+      "message_text": "YumYummy — бот для расчета калорий, белков, жиров и углеводов в еде. Просто напишите название продукта или блюда и укажите количество. Например: 200 г гречки или Яичница из 2 яиц и 30 г масла. Я покажу вам калорийность и БЖУ!",
+      "confidence": null,
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772697",
+    "success": true,
+    "error": null,
+    "duration_ms": 8756.31
+  },
+  {
+    "index": 13,
+    "input_text": "Сводка за сегодня: сколько ккал и бжу?",
+    "expected_intent": "day_summary",
+    "actual_intent": "day_summary",
+    "response": {
+      "intent": "day_summary",
+      "message_text": "Сводка за сегодня: сколько ккал и бжу?",
+      "confidence": null,
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772699",
+    "success": true,
+    "error": null,
+    "duration_ms": 9587.92
+  },
+  {
+    "index": 14,
+    "input_text": "Сводка за неделю по калориям",
+    "expected_intent": "week_summary",
+    "actual_intent": "week_summary",
+    "response": {
+      "intent": "week_summary",
+      "message_text": "YumYummy — это сервис для расчёта и анализа калорийности и пищевой ценности продуктов и блюд. Просто задайте интересующий вас продукт, блюдо или период, и получите сводку. Примеры запросов: 1) 'Куриная грудка 150 г калории'; 2) 'Пицца маргарита на 2 порции белки, жиры, углеводы'; 3) 'Рассчитай сводку по калориям за неделю'.",
+      "confidence": null,
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772700",
+    "success": true,
+    "error": null,
+    "duration_ms": 8008.64
+  },
+  {
+    "index": 15,
+    "input_text": "Покажи погоду на завтра",
+    "expected_intent": "unknown",
+    "actual_intent": "unknown",
+    "response": {
+      "intent": "unknown",
+      "message_text": "YumYummy — это сервис для быстрого расчёта калорий, белков, жиров и углеводов в продуктах и блюдах. Просто напишите, что и сколько вы съели, и сервис выдаст вам всю информацию! Примеры запросов:\n1. «100 г куриной грудки и 2 яйца»\n2. «Что, если я выпью стакан молока и съем яблоко?»\n3. «Пицца Маргарита, 1 кусок и салат Цезарь, половина порции»",
+      "confidence": null,
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null
+    },
+    "timestamp": "2026-01-31T13:48:26.772701",
+    "success": true,
+    "error": null,
+    "duration_ms": 14252.57
+  }
+]

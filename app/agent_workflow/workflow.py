@@ -479,7 +479,7 @@ async def run_workflow(workflow_input: WorkflowInput):
       input=[
         *conversation_history
       ],
-      run_config=RunConfig(trace_metadata=trace_metadata)
+      run_config=RunConfig(trace_metadata=get_trace_metadata())
     )
 
     conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])

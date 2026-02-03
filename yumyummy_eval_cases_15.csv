@@ -1,0 +1,16 @@
+input_as_text,expected_intent
+Съел омлет из 3 яиц и 2 тоста с маслом,log_meal
+На ужин: гречка 200 г и куриная грудка 180 г,log_meal
+Starbucks Pumpkin Spice Latte grande — сколько кбжу?,eatout
+"Кофемания: цезарь с курицей, 1 порция — кбжу",eatout
+Coca-Cola Zero 330 мл — кбжу на банку,product
+Exponenta cherry yogurt 150 г — кбжу,product
+4601234567890,barcode
+"штрихкод 4820001234567, найди кбжу",barcode
+"Я в кафе, что лучше взять чтобы похудеть?",food_advice
+"В меню есть: паста, стейк с овощами, салат с курицей — посоветуй лучший вариант",food_advice
+Что ты умеешь? Как пользоваться ботом?,help
+/start что дальше делать?,help
+Сводка за сегодня: сколько ккал и бжу?,day_summary
+Сводка за неделю по калориям,week_summary
+Покажи погоду на завтра,unknown

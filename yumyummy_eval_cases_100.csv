@@ -1,0 +1,101 @@
+input_as_text,expected_intent
+Съел омлет из 3 яиц и 2 тоста с маслом,log_meal
+На ужин: гречка 200 г и куриная грудка 180 г,log_meal
+Пельмени 250 г + сметана 1 ст.л.,log_meal
+"Салат: помидоры, огурцы, фета, оливковое масло (1 порция)",log_meal
+2 банана и протеиновый батончик,log_meal
+Йогурт натуральный 200 г и мюсли 50 г,log_meal
+Пицца 2 кусочка и кола без сахара 330 мл,log_meal
+Съел борщ 400 мл и хлеб 2 кусочка,log_meal
+Суши: 8 роллов калифорния,log_meal
+"Каша овсяная на молоке, 1 тарелка",log_meal
+Выпил латте 300 мл и съел круассан,log_meal
+Говядина тушеная 200 г + картофель 150 г,log_meal
+"Паста карбонара, 1 порция",log_meal
+Творог 5% 200 г + мед 10 г,log_meal
+Рис 180 г и лосось 150 г,log_meal
+Greek yogurt 170g + blueberries 100g,log_meal
+Had 2 protein shakes and an apple,log_meal
+"Chicken salad bowl, about 350 g",log_meal
+Steak 250 g + green beans 150 g,log_meal
+1 glass of orange juice + 2 cookies,log_meal
+Съел шаурму (стандартная) и айран 300 мл,log_meal
+Кефир 1% стакан 250 мл и 30 г орехов,log_meal
+Starbucks Pumpkin Spice Latte grande — сколько кбжу?,eatout
+Joe & The Juice Tunacado — посчитай кбжу,eatout
+"Кофемания: кесадилья с курицей, 1 порция — кбжу",eatout
+McDonald's Big Mac и средняя картошка — кбжу,eatout
+KFC Zinger burger — nutrition?,eatout
+Subway Italian B.M.T. footlong — calories and macros,eatout
+Paul: Cherry yogurt в Ереване — кбжу,eatout
+Costa Coffee cappuccino medium — кбжу,eatout
+Burger King Whopper — кбжу,eatout
+Теремок: блины с творогом — кбжу,eatout
+Тануки: ролл Филадельфия 8 шт — кбжу,eatout
+Shokoladnitsa: сырники 1 порция — кбжу,eatout
+IL Patio: паста болоньезе — кбжу,eatout
+Додо Пицца: пепперони 25 см — кбжу,eatout
+Starbucks: iced americano venti — calories?,eatout
+Joe & The Juice: Green Shield сок — кбжу,eatout
+Кофемания: цезарь с курицей — кбжу,eatout
+Prime (кафе): салат с тунцом — кбжу,eatout
+Gyros в Greek House (кафе) — кбжу,eatout
+В Surf Coffee: раф ванильный 300 мл — кбжу,eatout
+Coca-Cola Zero 330 мл — кбжу на банку,product
+Snickers батончик 50 г — кбжу,product
+Lay's Classic 140 г — сколько ккал и бжу?,product
+Activia йогурт клубника 150 г — кбжу,product
+Exponenta cherry yogurt 150 г — кбжу,product
+Danone Actimel 100 мл — кбжу,product
+Protein bar Bombbar 60 г — кбжу,product
+Milka шоколад 100 г — кбжу,product
+Red Bull 250 мл — кбжу,product
+Pepsi Max 0.5 л — кбжу,product
+Nutella 15 г (1 ст.л.) — кбжу,product
+Овсянка быстрого приготовления Nordic 50 г — кбжу,product
+Творожок Danissimo 130 г — кбжу,product
+Чипсы Pringles 165 г — кбжу,product
+Haribo Goldbears 100 г — кбжу,product
+Ben & Jerry’s 465 мл — кбжу на всю банку,product
+Greek feta cheese 100 g — macros?,product
+Chicken breast deli slices (brand: TurkeyPro) 80 g — macros,product
+Салат готовый Азбука Вкуса «Цезарь» 250 г — кбжу,product
+Готовая еда ВкусВилл: боул с курицей 320 г — кбжу,product
+4601234567890,barcode
+"штрихкод 4820001234567, найди кбжу",barcode
+EAN: 5901234123457,barcode
+код 8001234567890 — что за продукт и кбжу?,barcode
+Barcode 737628064502,barcode
+8901234567890,barcode
+5900951301234,barcode
+12345678,barcode
+4006381333931,barcode
+9780201379624,barcode
+"Я в кафе, что лучше взять чтобы похудеть?",food_advice
+"Что заказать на ужин, чтобы было много белка и мало калорий?",food_advice
+Выбираю между: 1) Цезарь 2) Бургер 3) Суп том-ям — что лучше?,food_advice
+"В меню есть: паста, стейк с овощами, салат с курицей — посоветуй лучший вариант",food_advice
+Что взять в Азбуке Вкуса на обед и ужин на выходные (похудение)?,food_advice
+Мне нужен перекус в магазине: что выбрать из полезного?,food_advice
+"У меня тренировка вечером — что поесть перед, чтобы не тяжело?",food_advice
+Что лучше: раф или американо с молоком? Хочу меньше калорий,food_advice
+Вот варианты: роллы с лососем / поке / пицца / буррито — что выбрать?,food_advice
+Хочу на сушку: какие общие правила выбора еды в ресторанах?,food_advice
+"Я на диете, но хочу сладкое — что выбрать менее вредное?",food_advice
+Сейчас в фудкорте: KFC или Subway — где выбрать более диетично?,food_advice
+"Если я хочу снизить вес, что лучше: суп + салат или паста?",food_advice
+Выбор завтрака: омлет / сырники / круассан — что лучше?,food_advice
+"Можешь помочь составить комбинацию из 2-3 блюд на день, чтобы было сытно и не жирно?",food_advice
+Что ты умеешь? Как пользоваться ботом?,help
+Какие команды есть? Примеры запросов дай,help
+help,help
+/start что дальше делать?,help
+Объясни как логировать еду и получать отчеты,help
+Сводка за сегодня: сколько ккал и бжу?,day_summary
+"Итого за день, что я съел сегодня?",day_summary
+Сделай summary за сегодня,day_summary
+Сводка за неделю по калориям,week_summary
+Week summary please,week_summary
+Сколько сейчас времени в Ереване?,unknown
+Покажи погоду на завтра,unknown
+Какой курс доллара сегодня?,unknown
