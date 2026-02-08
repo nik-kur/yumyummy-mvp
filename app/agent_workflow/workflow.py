@@ -43,21 +43,21 @@ class MealParserSchema__Totals(BaseModel):
 
 class MealParserSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: Optional[str]
 
 
 class MealParserSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: Optional[str]
   totals: MealParserSchema__Totals
   items: List[MealParserSchema__ItemsItem]
-  source_url: object
+  source_url: Optional[str]
 
 
 class HelpAgentSchema__Totals(BaseModel):
@@ -69,7 +69,7 @@ class HelpAgentSchema__Totals(BaseModel):
 
 class HelpAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -79,10 +79,10 @@ class HelpAgentSchema__ItemsItem(BaseModel):
 class HelpAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: Optional[str]
   totals: HelpAgentSchema__Totals
   items: List[HelpAgentSchema__ItemsItem]
-  source_url: object
+  source_url: Optional[str]
 
 
 class EatoutAgentSchema__Totals(BaseModel):
@@ -94,21 +94,21 @@ class EatoutAgentSchema__Totals(BaseModel):
 
 class EatoutAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: Optional[str]
 
 
 class EatoutAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: Optional[str]
   totals: EatoutAgentSchema__Totals
   items: List[EatoutAgentSchema__ItemsItem]
-  source_url: object
+  source_url: Optional[str]
 
 
 class ProductAgentSchema__Totals(BaseModel):
@@ -120,21 +120,21 @@ class ProductAgentSchema__Totals(BaseModel):
 
 class ProductAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: Optional[str]
 
 
 class ProductAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: Optional[str]
   totals: ProductAgentSchema__Totals
   items: List[ProductAgentSchema__ItemsItem]
-  source_url: object
+  source_url: Optional[str]
 
 
 class BarcodeAgentSchema__Totals(BaseModel):
@@ -146,21 +146,21 @@ class BarcodeAgentSchema__Totals(BaseModel):
 
 class BarcodeAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: Optional[str]
 
 
 class BarcodeAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: Optional[str]
   totals: BarcodeAgentSchema__Totals
   items: List[BarcodeAgentSchema__ItemsItem]
-  source_url: object
+  source_url: Optional[str]
 
 
 class NutritionAdvisorSchema__Totals(BaseModel):
@@ -172,7 +172,7 @@ class NutritionAdvisorSchema__Totals(BaseModel):
 
 class NutritionAdvisorSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -182,10 +182,10 @@ class NutritionAdvisorSchema__ItemsItem(BaseModel):
 class NutritionAdvisorSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: Optional[str]
   totals: NutritionAdvisorSchema__Totals
   items: List[NutritionAdvisorSchema__ItemsItem]
-  source_url: object
+  source_url: Optional[str]
 
 
 router = Agent(
