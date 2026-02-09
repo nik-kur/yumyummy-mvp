@@ -4,18 +4,21 @@ from agents import set_default_openai_client
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 from openai.types.shared.reasoning import Reasoning
-from typing import Optional, List
+from typing import Optional
 
-# 1) Disable tracing to avoid SSL handshake timeouts in local dev
+# ---------- Infrastructure for Render deployment ----------
+# Disable tracing to avoid SSL handshake timeouts
 os.environ.setdefault("OPENAI_AGENTS_DISABLE_TRACING", "1")
 
-# 2) Use a longer OpenAI timeout because WebSearch can be slow
+# Longer OpenAI timeout because WebSearch can be slow
 _openai_timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "180"))
 _client = AsyncOpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     timeout=_openai_timeout,
 )
 set_default_openai_client(_client)
+
+# ---------- User's agent code below (only object → Optional[float]/Optional[str]) ----------
 
 # Tool definitions
 web_search_preview = WebSearchTool(
@@ -43,21 +46,21 @@ class MealParserSchema__Totals(BaseModel):
 
 class MealParserSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float]
+  grams: Optional[float] = None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str]
+  source_url: Optional[str] = None
 
 
 class MealParserSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str]
+  confidence: Optional[str] = None
   totals: MealParserSchema__Totals
-  items: List[MealParserSchema__ItemsItem]
-  source_url: Optional[str]
+  items: list[MealParserSchema__ItemsItem]
+  source_url: Optional[str] = None
 
 
 class HelpAgentSchema__Totals(BaseModel):
@@ -69,7 +72,7 @@ class HelpAgentSchema__Totals(BaseModel):
 
 class HelpAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float]
+  grams: Optional[float] = None
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -79,10 +82,10 @@ class HelpAgentSchema__ItemsItem(BaseModel):
 class HelpAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str]
+  confidence: Optional[str] = None
   totals: HelpAgentSchema__Totals
-  items: List[HelpAgentSchema__ItemsItem]
-  source_url: Optional[str]
+  items: list[HelpAgentSchema__ItemsItem]
+  source_url: Optional[str] = None
 
 
 class EatoutAgentSchema__Totals(BaseModel):
@@ -94,21 +97,21 @@ class EatoutAgentSchema__Totals(BaseModel):
 
 class EatoutAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float]
+  grams: Optional[float] = None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str]
+  source_url: Optional[str] = None
 
 
 class EatoutAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str]
+  confidence: Optional[str] = None
   totals: EatoutAgentSchema__Totals
-  items: List[EatoutAgentSchema__ItemsItem]
-  source_url: Optional[str]
+  items: list[EatoutAgentSchema__ItemsItem]
+  source_url: Optional[str] = None
 
 
 class ProductAgentSchema__Totals(BaseModel):
@@ -120,21 +123,21 @@ class ProductAgentSchema__Totals(BaseModel):
 
 class ProductAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float]
+  grams: Optional[float] = None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str]
+  source_url: Optional[str] = None
 
 
 class ProductAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str]
+  confidence: Optional[str] = None
   totals: ProductAgentSchema__Totals
-  items: List[ProductAgentSchema__ItemsItem]
-  source_url: Optional[str]
+  items: list[ProductAgentSchema__ItemsItem]
+  source_url: Optional[str] = None
 
 
 class BarcodeAgentSchema__Totals(BaseModel):
@@ -146,21 +149,21 @@ class BarcodeAgentSchema__Totals(BaseModel):
 
 class BarcodeAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float]
+  grams: Optional[float] = None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str]
+  source_url: Optional[str] = None
 
 
 class BarcodeAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str]
+  confidence: Optional[str] = None
   totals: BarcodeAgentSchema__Totals
-  items: List[BarcodeAgentSchema__ItemsItem]
-  source_url: Optional[str]
+  items: list[BarcodeAgentSchema__ItemsItem]
+  source_url: Optional[str] = None
 
 
 class NutritionAdvisorSchema__Totals(BaseModel):
@@ -172,7 +175,7 @@ class NutritionAdvisorSchema__Totals(BaseModel):
 
 class NutritionAdvisorSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float]
+  grams: Optional[float] = None
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -182,10 +185,10 @@ class NutritionAdvisorSchema__ItemsItem(BaseModel):
 class NutritionAdvisorSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str]
+  confidence: Optional[str] = None
   totals: NutritionAdvisorSchema__Totals
-  items: List[NutritionAdvisorSchema__ItemsItem]
-  source_url: Optional[str]
+  items: list[NutritionAdvisorSchema__ItemsItem]
+  source_url: Optional[str] = None
 
 
 router = Agent(
@@ -605,19 +608,7 @@ async def run_workflow(workflow_input: WorkflowInput):
       "telegram_id": None
     }
     workflow = workflow_input.model_dump()
-    telegram_id = workflow.get("telegram_id")
-    
-    # Helper function to build trace_metadata with telegram_id
-    def get_trace_metadata() -> dict:
-        metadata = {
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        }
-        if telegram_id:
-            metadata["telegram_id"] = telegram_id
-        return metadata
-    
-    conversation_history: List[TResponseInputItem] = [
+    conversation_history: list[TResponseInputItem] = [
       {
         "role": "user",
         "content": [
@@ -633,13 +624,13 @@ async def run_workflow(workflow_input: WorkflowInput):
       input=[
         *conversation_history
       ],
-      run_config=RunConfig(trace_metadata=get_trace_metadata())
+      run_config=RunConfig(trace_metadata={
+        "__trace_source__": "agent-builder",
+        "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+      })
     )
 
     conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])
-
-    if router_result_temp.final_output is None:
-      raise ValueError("Router agent did not produce final_output")
 
     router_result = {
       "output_text": router_result_temp.final_output.json(),
@@ -647,26 +638,17 @@ async def run_workflow(workflow_input: WorkflowInput):
     }
     state["intent"] = router_result["output_parsed"]["intent"]
     state["user_text_clean"] = router_result["output_parsed"]["user_text_clean"]
-    state["dish_or_product"] = router_result["output_parsed"].get("dish_or_product")
-    state["grams"] = router_result["output_parsed"].get("grams")
-    state["gram"] = router_result["output_parsed"].get("grams")
-    state["date_hint"] = router_result["output_parsed"].get("date_hint")
-    state["language"] = router_result["output_parsed"].get("language")
-    state["serving_hint"] = router_result["output_parsed"].get("serving_hint")
-
     if state["intent"] == 'log_meal':
       meal_parser_result_temp = await Runner.run(
         meal_parser,
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata=get_trace_metadata()),
-        context=MealParserContext(
-          state_user_text_clean=state["user_text_clean"],
-          state_serving_hint=state["serving_hint"],
-          state_gram=state["gram"],
-          state_date_hint=state["date_hint"]
-        )
+        run_config=RunConfig(trace_metadata={
+          "__trace_source__": "agent-builder",
+          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+        }),
+        context=MealParserContext(state_user_text_clean=state["user_text_clean"], state_serving_hint=state["serving_hint"], state_gram=state["gram"], state_date_hint=state["date_hint"])
       )
 
       conversation_history.extend([item.to_input_item() for item in meal_parser_result_temp.new_items])
@@ -676,17 +658,17 @@ async def run_workflow(workflow_input: WorkflowInput):
         "output_parsed": meal_parser_result_temp.final_output.model_dump()
       }
       return meal_parser_result["output_parsed"]
-
     elif state["intent"] == 'eatout':
       eatout_agent_result_temp = await Runner.run(
         eatout_agent,
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata=get_trace_metadata()),
-        context=EatoutAgentContext(
-          state_user_text_clean=state["user_text_clean"]
-        )
+        run_config=RunConfig(trace_metadata={
+          "__trace_source__": "agent-builder",
+          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+        }),
+        context=EatoutAgentContext(state_user_text_clean=state["user_text_clean"])
       )
 
       conversation_history.extend([item.to_input_item() for item in eatout_agent_result_temp.new_items])
@@ -696,21 +678,17 @@ async def run_workflow(workflow_input: WorkflowInput):
         "output_parsed": eatout_agent_result_temp.final_output.model_dump()
       }
       return eatout_agent_result["output_parsed"]
-
     elif state["intent"] == 'product':
       product_agent_result_temp = await Runner.run(
         product_agent,
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata=get_trace_metadata()),
-        context=ProductAgentContext(
-          state_user_text_clean=state["user_text_clean"],
-          state_dish_or_product=state["dish_or_product"],
-          state_gram=state["gram"],
-          state_serving_hint=state["serving_hint"],
-          state_language=state["language"]
-        )
+        run_config=RunConfig(trace_metadata={
+          "__trace_source__": "agent-builder",
+          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+        }),
+        context=ProductAgentContext(state_user_text_clean=state["user_text_clean"], state_dish_or_product=state["dish_or_product"], state_gram=state["gram"], state_serving_hint=state["serving_hint"], state_language=state["language"])
       )
 
       conversation_history.extend([item.to_input_item() for item in product_agent_result_temp.new_items])
@@ -720,19 +698,17 @@ async def run_workflow(workflow_input: WorkflowInput):
         "output_parsed": product_agent_result_temp.final_output.model_dump()
       }
       return product_agent_result["output_parsed"]
-
     elif state["intent"] == 'barcode':
       barcode_agent_result_temp = await Runner.run(
         barcode_agent,
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata=get_trace_metadata()),
-        context=BarcodeAgentContext(
-          state_gram=state["gram"],
-          state_serving_hint=state["serving_hint"],
-          state_language=state["language"]
-        )
+        run_config=RunConfig(trace_metadata={
+          "__trace_source__": "agent-builder",
+          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+        }),
+        context=BarcodeAgentContext(state_gram=state["gram"], state_serving_hint=state["serving_hint"], state_language=state["language"])
       )
 
       conversation_history.extend([item.to_input_item() for item in barcode_agent_result_temp.new_items])
@@ -742,17 +718,17 @@ async def run_workflow(workflow_input: WorkflowInput):
         "output_parsed": barcode_agent_result_temp.final_output.model_dump()
       }
       return barcode_agent_result["output_parsed"]
-
     elif state["intent"] == "food_advice":
       nutrition_advisor_result_temp = await Runner.run(
         nutrition_advisor,
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata=get_trace_metadata()),
-        context=NutritionAdvisorContext(
-          state_user_text_clean=state["user_text_clean"]
-        )
+        run_config=RunConfig(trace_metadata={
+          "__trace_source__": "agent-builder",
+          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+        }),
+        context=NutritionAdvisorContext(state_user_text_clean=state["user_text_clean"])
       )
 
       conversation_history.extend([item.to_input_item() for item in nutrition_advisor_result_temp.new_items])
@@ -762,14 +738,16 @@ async def run_workflow(workflow_input: WorkflowInput):
         "output_parsed": nutrition_advisor_result_temp.final_output.model_dump()
       }
       return nutrition_advisor_result["output_parsed"]
-
     else:
       help_agent_result_temp = await Runner.run(
         help_agent,
         input=[
           *conversation_history
         ],
-        run_config=RunConfig(trace_metadata=get_trace_metadata())
+        run_config=RunConfig(trace_metadata={
+          "__trace_source__": "agent-builder",
+          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+        })
       )
 
       conversation_history.extend([item.to_input_item() for item in help_agent_result_temp.new_items])
@@ -781,17 +759,12 @@ async def run_workflow(workflow_input: WorkflowInput):
       return help_agent_result["output_parsed"]
 
 
-# Module-level helper function
+# ---------- Helper for agent_runner.py ----------
+
 async def run_text(text: str, telegram_id: Optional[str] = None) -> dict:
   """
   Helper function that calls run_workflow with WorkflowInput.
-  
-  Args:
-    text: User input text
-    telegram_id: Optional Telegram user ID (for agent tools context)
-    
-  Returns:
-    Dict with the workflow result
+  Called by agent_runner.py -> run_yumyummy_workflow().
   """
   workflow_input = WorkflowInput(input_as_text=text, telegram_id=telegram_id)
   return await run_workflow(workflow_input)
