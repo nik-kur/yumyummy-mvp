@@ -18,7 +18,7 @@ _client = AsyncOpenAI(
 )
 set_default_openai_client(_client)
 
-# ---------- User's agent code below (only object → Optional[float]/Optional[str]) ----------
+# ---------- Exported agent code (object → Optional fixes for OpenAI API) ----------
 
 # Tool definitions
 web_search_preview = WebSearchTool(
@@ -30,11 +30,11 @@ web_search_preview = WebSearchTool(
 class RouterSchema(BaseModel):
   intent: str
   user_text_clean: str
-  dish_or_product: str
-  grams: str
-  date_hint: str
-  language: str
-  serving_hint: str
+  dish_or_product: Optional[str] = None
+  grams: Optional[str] = None
+  date_hint: Optional[str] = None
+  language: Optional[str] = None
+  serving_hint: Optional[str] = None
 
 
 class MealParserSchema__Totals(BaseModel):
@@ -188,6 +188,32 @@ class NutritionAdvisorSchema(BaseModel):
   confidence: Optional[str] = None
   totals: NutritionAdvisorSchema__Totals
   items: list[NutritionAdvisorSchema__ItemsItem]
+  source_url: Optional[str] = None
+
+
+class FinalAgentSchema__Totals(BaseModel):
+  calories_kcal: float
+  protein_g: float
+  fat_g: float
+  carbs_g: float
+
+
+class FinalAgentSchema__ItemsItem(BaseModel):
+  name: str
+  grams: Optional[float] = None
+  calories_kcal: float
+  protein_g: float
+  fat_g: float
+  carbs_g: float
+  source_url: Optional[str] = None
+
+
+class FinalAgentSchema(BaseModel):
+  intent: str
+  message_text: str
+  confidence: Optional[str] = None
+  totals: FinalAgentSchema__Totals
+  items: list[FinalAgentSchema__ItemsItem]
   source_url: Optional[str] = None
 
 
@@ -588,6 +614,22 @@ nutrition_advisor = Agent(
 )
 
 
+final_agent = Agent(
+  name="Final agent",
+  instructions="""You receive a JSON object from upstream (either Meal Parser, Eatout Agent, Product Agent, Barcode Agent, Nutrition Advisor, or Help Agent).
+Return ONLY the same object, unchanged, matching the provided schema exactly.
+Do not add or remove fields. Do not modify any values. Just pass the data through.""",
+  model="gpt-4.1",
+  output_type=FinalAgentSchema,
+  model_settings=ModelSettings(
+    temperature=1,
+    top_p=1,
+    max_tokens=2048,
+    store=True
+  )
+)
+
+
 class WorkflowInput(BaseModel):
   input_as_text: str
   telegram_id: Optional[str] = None
@@ -619,15 +661,16 @@ async def run_workflow(workflow_input: WorkflowInput):
         ]
       }
     ]
+
+    _trace_cfg = RunConfig(trace_metadata={
+      "__trace_source__": "agent-builder",
+      "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
+    })
+
     router_result_temp = await Runner.run(
       router,
-      input=[
-        *conversation_history
-      ],
-      run_config=RunConfig(trace_metadata={
-        "__trace_source__": "agent-builder",
-        "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-      })
+      input=[*conversation_history],
+      run_config=_trace_cfg,
     )
 
     conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])
@@ -636,127 +679,102 @@ async def run_workflow(workflow_input: WorkflowInput):
       "output_text": router_result_temp.final_output.json(),
       "output_parsed": router_result_temp.final_output.model_dump()
     }
-    state["intent"] = router_result["output_parsed"]["intent"]
-    state["user_text_clean"] = router_result["output_parsed"]["user_text_clean"]
+
+    # ---------- Populate state from router (infra fix) ----------
+    rp = router_result["output_parsed"]
+    state["intent"] = rp["intent"]
+    state["user_text_clean"] = rp["user_text_clean"]
+    state["dish_or_product"] = rp.get("dish_or_product")
+    state["grams"] = rp.get("grams")
+    state["date_hint"] = rp.get("date_hint")
+    state["language"] = rp.get("language") or "ru"
+    state["serving_hint"] = rp.get("serving_hint")
+    state["gram"] = str(rp["grams"]) if rp.get("grams") else None
+
     if state["intent"] == 'log_meal':
       meal_parser_result_temp = await Runner.run(
         meal_parser,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        }),
-        context=MealParserContext(state_user_text_clean=state["user_text_clean"], state_serving_hint=state["serving_hint"], state_gram=state["gram"], state_date_hint=state["date_hint"])
+        input=[*conversation_history],
+        run_config=_trace_cfg,
+        context=MealParserContext(
+          state_user_text_clean=state["user_text_clean"],
+          state_serving_hint=str(state["serving_hint"] or ""),
+          state_gram=str(state["gram"] or ""),
+          state_date_hint=str(state["date_hint"] or ""),
+        )
       )
-
       conversation_history.extend([item.to_input_item() for item in meal_parser_result_temp.new_items])
 
-      meal_parser_result = {
-        "output_text": meal_parser_result_temp.final_output.json(),
-        "output_parsed": meal_parser_result_temp.final_output.model_dump()
-      }
-      return meal_parser_result["output_parsed"]
     elif state["intent"] == 'eatout':
       eatout_agent_result_temp = await Runner.run(
         eatout_agent,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        }),
+        input=[*conversation_history],
+        run_config=_trace_cfg,
         context=EatoutAgentContext(state_user_text_clean=state["user_text_clean"])
       )
-
       conversation_history.extend([item.to_input_item() for item in eatout_agent_result_temp.new_items])
 
-      eatout_agent_result = {
-        "output_text": eatout_agent_result_temp.final_output.json(),
-        "output_parsed": eatout_agent_result_temp.final_output.model_dump()
-      }
-      return eatout_agent_result["output_parsed"]
     elif state["intent"] == 'product':
       product_agent_result_temp = await Runner.run(
         product_agent,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        }),
-        context=ProductAgentContext(state_user_text_clean=state["user_text_clean"], state_dish_or_product=state["dish_or_product"], state_gram=state["gram"], state_serving_hint=state["serving_hint"], state_language=state["language"])
+        input=[*conversation_history],
+        run_config=_trace_cfg,
+        context=ProductAgentContext(
+          state_user_text_clean=state["user_text_clean"],
+          state_dish_or_product=str(state["dish_or_product"] or ""),
+          state_gram=str(state["gram"] or ""),
+          state_serving_hint=str(state["serving_hint"] or ""),
+          state_language=str(state["language"] or "ru"),
+        )
       )
-
       conversation_history.extend([item.to_input_item() for item in product_agent_result_temp.new_items])
 
-      product_agent_result = {
-        "output_text": product_agent_result_temp.final_output.json(),
-        "output_parsed": product_agent_result_temp.final_output.model_dump()
-      }
-      return product_agent_result["output_parsed"]
     elif state["intent"] == 'barcode':
       barcode_agent_result_temp = await Runner.run(
         barcode_agent,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        }),
-        context=BarcodeAgentContext(state_gram=state["gram"], state_serving_hint=state["serving_hint"], state_language=state["language"])
+        input=[*conversation_history],
+        run_config=_trace_cfg,
+        context=BarcodeAgentContext(
+          state_gram=str(state["gram"] or ""),
+          state_serving_hint=str(state["serving_hint"] or ""),
+          state_language=str(state["language"] or "ru"),
+        )
       )
-
       conversation_history.extend([item.to_input_item() for item in barcode_agent_result_temp.new_items])
 
-      barcode_agent_result = {
-        "output_text": barcode_agent_result_temp.final_output.json(),
-        "output_parsed": barcode_agent_result_temp.final_output.model_dump()
-      }
-      return barcode_agent_result["output_parsed"]
     elif state["intent"] == "food_advice":
       nutrition_advisor_result_temp = await Runner.run(
         nutrition_advisor,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        }),
+        input=[*conversation_history],
+        run_config=_trace_cfg,
         context=NutritionAdvisorContext(state_user_text_clean=state["user_text_clean"])
       )
-
       conversation_history.extend([item.to_input_item() for item in nutrition_advisor_result_temp.new_items])
 
-      nutrition_advisor_result = {
-        "output_text": nutrition_advisor_result_temp.final_output.json(),
-        "output_parsed": nutrition_advisor_result_temp.final_output.model_dump()
-      }
-      return nutrition_advisor_result["output_parsed"]
     else:
       help_agent_result_temp = await Runner.run(
         help_agent,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
-        })
+        input=[*conversation_history],
+        run_config=_trace_cfg,
       )
-
       conversation_history.extend([item.to_input_item() for item in help_agent_result_temp.new_items])
 
-      help_agent_result = {
-        "output_text": help_agent_result_temp.final_output.json(),
-        "output_parsed": help_agent_result_temp.final_output.model_dump()
-      }
-      return help_agent_result["output_parsed"]
+    # ---- Final Agent: standardizes JSON output for all branches ----
+    final_agent_result_temp = await Runner.run(
+      final_agent,
+      input=[*conversation_history],
+      run_config=_trace_cfg,
+    )
+    conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
+
+    if final_agent_result_temp.final_output is None:
+      raise ValueError(f"Final agent did not produce final_output for intent={state['intent']}")
+
+    final_agent_result = {
+      "output_text": final_agent_result_temp.final_output.json(),
+      "output_parsed": final_agent_result_temp.final_output.model_dump()
+    }
+    return final_agent_result["output_parsed"]
 
 
 # ---------- Helper for agent_runner.py ----------
