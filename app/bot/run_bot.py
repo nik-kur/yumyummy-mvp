@@ -151,36 +151,52 @@ def build_meal_response_from_agent(
     ):
         return message_text
 
+    # Derive top-level accuracy/source from items when available
+    valid_items = [it for it in items if isinstance(it, dict)]
+    items_with_source = [it for it in valid_items if it.get("source_url")]
+    if valid_items and len(items_with_source) == len(valid_items):
+        # All items have sources -> overall accuracy is HIGH
+        derived_accuracy = "HIGH"
+        # For single item, use its source; for multiple, use top-level or first item's
+        derived_source = result.get("source_url") or items_with_source[0].get("source_url")
+    elif items_with_source:
+        # Some items have sources -> mixed
+        derived_accuracy = result.get("confidence") or "ESTIMATE"
+        derived_source = result.get("source_url")
+    else:
+        derived_accuracy = result.get("confidence")
+        derived_source = result.get("source_url")
+
     base_text = build_meal_response_text(
         description=description,
         calories=calories,
         protein_g=protein_g,
         fat_g=fat_g,
         carbs_g=carbs_g,
-        accuracy_level=result.get("confidence"),
-        source_url=result.get("source_url"),
+        accuracy_level=derived_accuracy,
+        source_url=derived_source,
         summary=summary,
     )
-    if len(items) <= 1:
+    if len(valid_items) <= 1:
         return base_text
 
-    accuracy_label = format_accuracy_label(result.get("confidence")) or "ESTIMATE"
-    source_label = format_source_label(result.get("source_url"))
     lines = [base_text, "", "По блюдам:"]
-    for item in items:
-        if not isinstance(item, dict):
-            continue
+    for item in valid_items:
         item_name = item.get("name") or "Блюдо"
         item_calories = round(float(item.get("calories_kcal") or 0))
         item_protein = round(float(item.get("protein_g") or 0), 1)
         item_fat = round(float(item.get("fat_g") or 0), 1)
         item_carbs = round(float(item.get("carbs_g") or 0), 1)
+        # Per-item: use item's own source_url if available
+        item_source_url = item.get("source_url")
+        item_accuracy = "HIGH" if item_source_url else (format_accuracy_label(result.get("confidence")) or "ESTIMATE")
+        item_source_label = format_source_label(item_source_url) if item_source_url else format_source_label(result.get("source_url"))
         lines.extend(
             [
                 f"{item_name}:",
                 f"{item_calories} ккал · Б {item_protein} г · Ж {item_fat} г · У {item_carbs} г",
-                f"Оценка точности: {accuracy_label}",
-                f"Источник: {source_label}",
+                f"Оценка точности: {item_accuracy}",
+                f"Источник: {item_source_label}",
                 "",
             ]
         )
@@ -193,6 +209,7 @@ def build_meal_keyboard(
     meal_id: int,
     day: date_type,
     source_url: Optional[str] = None,
+    items: Optional[list] = None,
 ) -> types.InlineKeyboardMarkup:
     rows = [
         [
@@ -207,9 +224,23 @@ def build_meal_keyboard(
         ]
     ]
 
-    url = normalize_source_url(source_url)
-    if url:
-        rows.append([types.InlineKeyboardButton(text="🔗 Источник", url=url)])
+    # Per-item source buttons
+    if items:
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_url = normalize_source_url(item.get("source_url"))
+            if item_url:
+                item_name = item.get("name") or "Продукт"
+                # Truncate long names for button text
+                label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+                rows.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=item_url)])
+
+    # Fallback: single top-level source button if no per-item sources were added
+    if len(rows) == 1:
+        url = normalize_source_url(source_url)
+        if url:
+            rows.append([types.InlineKeyboardButton(text="🔗 Источник", url=url)])
 
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -1671,7 +1702,9 @@ async def handle_voice(message: types.Message) -> None:
     intent = result.get("intent", "unknown")
     message_text = result.get("message_text", "Ошибка обработки")
     source_url = result.get("source_url")
+    agent_items = result.get("items") or []
     has_source_url = source_url is not None and source_url != ""
+    has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
 
     reply_markup = None
     if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
@@ -1681,14 +1714,20 @@ async def handle_voice(message: types.Message) -> None:
                 meal_id=meal_id,
                 day=date_type.today(),
                 source_url=source_url,
+                items=agent_items,
             )
 
-    if reply_markup is None and has_source_url:
-        reply_markup = types.InlineKeyboardMarkup(
-            inline_keyboard=[
-                [types.InlineKeyboardButton(text="Источник", url=source_url)]
-            ]
-        )
+    if reply_markup is None and (has_source_url or has_item_sources):
+        source_buttons = []
+        for it in agent_items:
+            if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
+                item_name = it.get("name") or "Продукт"
+                label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+        if not source_buttons and has_source_url:
+            source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+        if source_buttons:
+            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
 
     response_text = message_text
     if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
@@ -1738,7 +1777,9 @@ async def cmd_agent(message: types.Message) -> None:
         message_text = result.get("message_text", "Ошибка обработки")
         confidence = result.get("confidence")
         source_url = result.get("source_url")
+        agent_items = result.get("items") or []
         has_source_url = source_url is not None and source_url != ""
+        has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
         
         # Log result
         logger.info(
@@ -1752,7 +1793,7 @@ async def cmd_agent(message: types.Message) -> None:
             logger.info(
                 f"[BOT /agent] eatout result details: "
                 f"totals={result.get('totals')}, "
-                f"items_count={len(result.get('items', []))}, "
+                f"items_count={len(agent_items)}, "
                 f"source_url={source_url}"
             )
         
@@ -1771,14 +1812,20 @@ async def cmd_agent(message: types.Message) -> None:
                     meal_id=meal_id,
                     day=date_type.today(),
                     source_url=source_url,
+                    items=agent_items,
                 )
 
-        if reply_markup is None and has_source_url:
-            reply_markup = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [types.InlineKeyboardButton(text="Источник", url=source_url)]
-                ]
-            )
+        if reply_markup is None and (has_source_url or has_item_sources):
+            source_buttons = []
+            for it in agent_items:
+                if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
+                    item_name = it.get("name") or "Продукт"
+                    label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+                    source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+            if not source_buttons and has_source_url:
+                source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+            if source_buttons:
+                reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
         
         # Send the message
         try:
@@ -1861,7 +1908,9 @@ async def handle_plain_text(message: types.Message) -> None:
         message_text = result.get("message_text", "Ошибка обработки")
         confidence = result.get("confidence")
         source_url = result.get("source_url")
+        agent_items = result.get("items") or []
         has_source_url = source_url is not None and source_url != ""
+        has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
         
         # Log result
         logger.info(
@@ -1875,7 +1924,7 @@ async def handle_plain_text(message: types.Message) -> None:
             logger.info(
                 f"[BOT plain_text] eatout result details: "
                 f"totals={result.get('totals')}, "
-                f"items_count={len(result.get('items', []))}, "
+                f"items_count={len(agent_items)}, "
                 f"source_url={source_url}"
             )
         
@@ -1894,14 +1943,20 @@ async def handle_plain_text(message: types.Message) -> None:
                     meal_id=meal_id,
                     day=date_type.today(),
                     source_url=source_url,
+                    items=agent_items,
                 )
 
-        if reply_markup is None and has_source_url:
-            reply_markup = types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [types.InlineKeyboardButton(text="Источник", url=source_url)]
-                ]
-            )
+        if reply_markup is None and (has_source_url or has_item_sources):
+            source_buttons = []
+            for it in agent_items:
+                if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
+                    item_name = it.get("name") or "Продукт"
+                    label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+                    source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+            if not source_buttons and has_source_url:
+                source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+            if source_buttons:
+                reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
         
         # Send the message
         try:
