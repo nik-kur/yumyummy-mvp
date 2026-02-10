@@ -1674,7 +1674,7 @@ async def handle_voice(message: types.Message) -> None:
     has_source_url = source_url is not None and source_url != ""
 
     reply_markup = None
-    if intent in {"log_meal", "product", "eatout", "barcode"}:
+    if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
         meal_id = await get_latest_meal_id_for_today(message.from_user.id)
         if meal_id:
             reply_markup = build_meal_keyboard(
@@ -1691,7 +1691,7 @@ async def handle_voice(message: types.Message) -> None:
         )
 
     response_text = message_text
-    if intent in {"log_meal", "product", "eatout", "barcode"}:
+    if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
         response_text = build_meal_response_from_agent(result)
 
     await message.answer(f"Распознал: \"{transcript}\"")
@@ -1764,7 +1764,7 @@ async def cmd_agent(message: types.Message) -> None:
         
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if intent in {"log_meal", "product", "eatout", "barcode"}:
+        if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
             meal_id = await get_latest_meal_id_for_today(message.from_user.id)
             if meal_id:
                 reply_markup = build_meal_keyboard(
@@ -1783,7 +1783,7 @@ async def cmd_agent(message: types.Message) -> None:
         # Send the message
         try:
             response_text = message_text
-            if intent in {"log_meal", "product", "eatout", "barcode"}:
+            if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
@@ -1887,7 +1887,7 @@ async def handle_plain_text(message: types.Message) -> None:
         
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if intent in {"log_meal", "product", "eatout", "barcode"}:
+        if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
             meal_id = await get_latest_meal_id_for_today(message.from_user.id)
             if meal_id:
                 reply_markup = build_meal_keyboard(
@@ -1906,7 +1906,7 @@ async def handle_plain_text(message: types.Message) -> None:
         # Send the message
         try:
             response_text = message_text
-            if intent in {"log_meal", "product", "eatout", "barcode"}:
+            if intent in {"log_meal", "product", "eatout", "barcode", "food_advice"}:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")
