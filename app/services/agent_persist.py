@@ -3,9 +3,10 @@ Adapter to persist agent workflow results to database.
 Converts agent_result (from /agent/run) to existing DB schema (User, MealEntry, UserDay).
 """
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, Any
 
+import pytz
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
@@ -72,8 +73,14 @@ def persist_agent_result(db: Session, telegram_id: str, agent_result: Dict[str, 
         # Get or create user
         user = _get_or_create_user(db, telegram_id)
         
-        # Use current date (server timezone)
-        today = date.today()
+        # Use current date in user's timezone (or server timezone as fallback)
+        user_tz_name = user.timezone or "Europe/Moscow"
+        try:
+            user_tz = pytz.timezone(user_tz_name)
+        except pytz.exceptions.UnknownTimeZoneError:
+            user_tz = pytz.timezone("Europe/Moscow")
+        now_local = datetime.now(user_tz)
+        today = now_local.date()
         
         # Find or create UserDay for today
         user_day = (
@@ -118,10 +125,11 @@ def persist_agent_result(db: Session, telegram_id: str, agent_result: Dict[str, 
             accuracy_level = "ESTIMATE"
         # If confidence is None, keep ESTIMATE as default
         
-        # Create meal entry
+        # Create meal entry with user's local time
         meal = MealEntry(
             user_id=user.id,
             user_day_id=user_day.id,
+            eaten_at=now_local,
             description_user=description,
             calories=calories_kcal,
             protein_g=protein_g,

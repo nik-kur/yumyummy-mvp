@@ -104,6 +104,7 @@ async def update_meal(
     protein_g: Optional[float] = None,
     fat_g: Optional[float] = None,
     carbs_g: Optional[float] = None,
+    eaten_at: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Обновляем приём пищи через PATCH /meals/{meal_id}.
@@ -120,6 +121,8 @@ async def update_meal(
         payload["fat_g"] = fat_g
     if carbs_g is not None:
         payload["carbs_g"] = carbs_g
+    if eaten_at is not None:
+        payload["eaten_at"] = eaten_at
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:

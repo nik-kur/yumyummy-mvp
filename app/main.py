@@ -1405,6 +1405,9 @@ def update_meal(
     if meal_in.description_user is not None:
         meal.description_user = meal_in.description_user
 
+    if meal_in.eaten_at is not None:
+        meal.eaten_at = meal_in.eaten_at
+
     meal.calories = new_calories
     meal.protein_g = new_protein
     meal.fat_g = new_fat

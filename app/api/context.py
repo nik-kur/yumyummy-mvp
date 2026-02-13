@@ -20,8 +20,8 @@ from app.schemas.ai import ContextDayResponse, ContextDayTotals, ContextDayItem,
 
 logger = logging.getLogger(__name__)
 
-# Europe/Berlin timezone
-BERLIN_TZ = pytz.timezone("Europe/Berlin")
+# Default timezone (fallback)
+DEFAULT_TZ = pytz.timezone("Europe/Moscow")
 
 router = APIRouter(tags=["context"])
 
@@ -47,9 +47,15 @@ async def get_context_day(
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         else:
-            # Use today in Europe/Berlin timezone
-            berlin_now = datetime.now(BERLIN_TZ)
-            target_date = berlin_now.date()
+            # Find user to determine timezone
+            _user_for_tz = db.query(User).filter(User.telegram_id == telegram_id).first()
+            user_tz_name = (_user_for_tz.timezone if _user_for_tz and _user_for_tz.timezone else None)
+            try:
+                user_tz = pytz.timezone(user_tz_name) if user_tz_name else DEFAULT_TZ
+            except pytz.exceptions.UnknownTimeZoneError:
+                user_tz = DEFAULT_TZ
+            now_local = datetime.now(user_tz)
+            target_date = now_local.date()
             date_str = target_date.strftime("%Y-%m-%d")
         
         # Find user by telegram_id

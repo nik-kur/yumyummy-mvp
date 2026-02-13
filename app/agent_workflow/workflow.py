@@ -18,7 +18,7 @@ _client = AsyncOpenAI(
 )
 set_default_openai_client(_client)
 
-# ---------- Exported agent code (object → Optional fixes for OpenAI API) ----------
+# ---------- Exported agent code (from platform) ----------
 
 # Tool definitions
 web_search_preview = WebSearchTool(
@@ -30,11 +30,11 @@ web_search_preview = WebSearchTool(
 class RouterSchema(BaseModel):
   intent: str
   user_text_clean: str
-  dish_or_product: Optional[str] = None
-  grams: Optional[str] = None
-  date_hint: Optional[str] = None
-  language: Optional[str] = None
-  serving_hint: Optional[str] = None
+  dish_or_product: str
+  grams: str
+  date_hint: str
+  language: str
+  serving_hint: str
 
 
 class MealParserSchema__Totals(BaseModel):
@@ -46,21 +46,21 @@ class MealParserSchema__Totals(BaseModel):
 
 class MealParserSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float] = None
+  grams: object
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class MealParserSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str] = None
+  confidence: object
   totals: MealParserSchema__Totals
   items: list[MealParserSchema__ItemsItem]
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class HelpAgentSchema__Totals(BaseModel):
@@ -72,7 +72,7 @@ class HelpAgentSchema__Totals(BaseModel):
 
 class HelpAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float] = None
+  grams: object
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -82,10 +82,10 @@ class HelpAgentSchema__ItemsItem(BaseModel):
 class HelpAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str] = None
+  confidence: object
   totals: HelpAgentSchema__Totals
   items: list[HelpAgentSchema__ItemsItem]
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class EatoutAgentSchema__Totals(BaseModel):
@@ -97,21 +97,21 @@ class EatoutAgentSchema__Totals(BaseModel):
 
 class EatoutAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float] = None
+  grams: object
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class EatoutAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str] = None
+  confidence: object
   totals: EatoutAgentSchema__Totals
   items: list[EatoutAgentSchema__ItemsItem]
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class ProductAgentSchema__Totals(BaseModel):
@@ -123,21 +123,21 @@ class ProductAgentSchema__Totals(BaseModel):
 
 class ProductAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float] = None
+  grams: object
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class ProductAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str] = None
+  confidence: object
   totals: ProductAgentSchema__Totals
   items: list[ProductAgentSchema__ItemsItem]
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class BarcodeAgentSchema__Totals(BaseModel):
@@ -149,21 +149,21 @@ class BarcodeAgentSchema__Totals(BaseModel):
 
 class BarcodeAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float] = None
+  grams: object
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class BarcodeAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str] = None
+  confidence: object
   totals: BarcodeAgentSchema__Totals
   items: list[BarcodeAgentSchema__ItemsItem]
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class NutritionAdvisorSchema__Totals(BaseModel):
@@ -175,7 +175,7 @@ class NutritionAdvisorSchema__Totals(BaseModel):
 
 class NutritionAdvisorSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float] = None
+  grams: object
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -185,10 +185,10 @@ class NutritionAdvisorSchema__ItemsItem(BaseModel):
 class NutritionAdvisorSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str] = None
+  confidence: object
   totals: NutritionAdvisorSchema__Totals
   items: list[NutritionAdvisorSchema__ItemsItem]
-  source_url: Optional[str] = None
+  source_url: object
 
 
 class FinalAgentSchema__Totals(BaseModel):
@@ -200,26 +200,26 @@ class FinalAgentSchema__Totals(BaseModel):
 
 class FinalAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: Optional[float] = None
+  grams: float | None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: Optional[str] = None
+  source_url: str | None
 
 
 class FinalAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: Optional[str] = None
+  confidence: str | None
   totals: FinalAgentSchema__Totals
   items: list[FinalAgentSchema__ItemsItem]
-  source_url: Optional[str] = None
+  source_url: str | None
 
 
 router = Agent(
   name="Router",
-  instructions="""You are YumYummy Router. Your job: classify the user message into an intent and extract routing fields. 
+  instructions="""You are YumYummy Router. Your job: classify the user message into an intent and extract routing fields.
 Do NOT calculate nutrition here. Do NOT search the web here.
 
 Return STRICT JSON matching the provided schema.
@@ -236,6 +236,7 @@ Intents:
 Rules:
 - If message mentions a restaurant/cafe/brand menu item (e.g., Starbucks, Joe & The Juice, Coffeemania), choose eatout (even if grams are mentioned).
 - If message mentions a packaged product brand menu item (e.g., Fanta, Danone, ФрутоНяня, Азбука Вкуса, Carrefour, etc.), choose product (even if grams are mentioned).
+- If the message contains BOTH branded items (with known brand/store) AND generic/homemade items without a brand — choose intent 'product' (or 'eatout' if restaurant). The downstream agent will handle the mix.
 - If message contains a long number that looks like barcode (8-14 digits), choose barcode.
 - If user asks what to order / choose a dish / \"что взять\" / \"что заказать\" / \"посоветуй\" / \"что лучше выбрать\" / \"здоровый выбор\" / \"похудеть\" / \"сушка\" / \"набор массы\" AND does NOT ask for nutrition facts of a specific known item -> choose food_advice.
 - If the message includes a list of menu options (e.g., separated by commas, bullets, \"1)\", \"2)\", \"или\") -> still choose food_advice.
@@ -295,7 +296,7 @@ Task:
 Rules:
 - Since web search is not used here, source_url must be null.
 - Use confidence=\"HIGH\" only if user provided clear portion sizes/grams and meal is unambiguous; otherwise \"ESTIMATE\".
-- totals must be numeric (never null).
+- totals must be numeric
 - items must be a short list (1-6 items) and totals must be the sum.
 
 The final response must include:
@@ -375,6 +376,7 @@ def eatout_agent_instructions(run_context: RunContextWrapper[EatoutAgentContext]
    - для Starbucks: site:starbucks.com + \"nutrition\"
    (если домен неизвестен — сначала найди официальный домен запросом \"официальный сайт <бренд> меню калории\", потом делай site: по найденному домену)
 6) Делай запросы RU+EN (даже если user_text_clean на русском).
+7) If the user's message contains multiple items and some have known brands while others don't: (1) For branded items — use web search to find exact KBJU and set source_url per item. (2) For generic/unbranded items — estimate KBJU yourself without web search, set source_url=null for those items and their confidence to 'ESTIMATE'. (3) In message_text, clearly indicate which items have verified data (with source) and which are AI estimates.
 
 ФОРМАТ ОТВЕТА (только JSON по схеме):
 - intent: \"eatout\"
@@ -426,11 +428,13 @@ def product_agent_instructions(run_context: RunContextWrapper[ProductAgentContex
 - gram: {state_gram}
 - serving_hint: {state_serving_hint}
 - language: {state_language}
+
 ВАЖНО ПРО ВХОД:
 - Если dish_or_product пустой/не задан, ты обязан сам извлечь из user_text_clean:
   (a) restaurant/brand (например: Starbucks, Кофемания, Теремок)
   (b) dish/drink (например: Pumpkin Spice Latte, кесадилья)
   Дальше в поисковых запросах используй restaurant + dish.
+- If the user's message contains multiple items and some have known brands while others don't: (1) For branded items — use web search to find exact KBJU and set source_url per item. (2) For generic/unbranded items — estimate KBJU yourself without web search, set source_url=null for those items and their confidence to 'ESTIMATE'. (3) In message_text, clearly indicate which items have verified data (with source) and which are AI estimates.
 
 Цель: вернуть КБЖУ продукта НА ПОРЦИЮ, которую пользователь реально съел/выпил.
 
@@ -587,14 +591,10 @@ B) Если пользователь НЕ дал варианты:
 - intent: \"food_advice\"
 - confidence: \"ESTIMATE\"
 - source_url: null
-- items: список 1–3 рекомендованных вариантов (name=название, grams=null, макросы и калории можно поставить разумной оценкой; если не уверен — поставь приблизительно, но НЕ нули)
+- items: ВСЕГДА возвращай ровно 3 варианта (если вариантов у пользователя меньше — дополни своими рекомендациями). Первый item — приоритетный (лучший выбор), остальные — альтернативы. Для каждого item укажи name, примерные calories_kcal, protein_g, fat_g, carbs_g. totals = сумма лучшего варианта (первого item).
 - totals: используй как оценку для лучшего варианта (первого в списке). Числа должны быть > 0.
 - message_text (по-русски):
-  1) \"Лучший выбор: ...\"
-  2) \"Топ-2/Топ-3: ...\"
-  3) \"Почему: ...\" (коротко)
-  4) \"Как улучшить заказ: ...\" (2–3 хака)
-  5) Если нет вариантов из меню — в конце попроси прислать 3–6 вариантов.
+В message_text: (1) 'Лучший выбор: ...' с объяснением (2) 'Альтернатива 1: ...' (3) 'Альтернатива 2: ...' (4) 'Как улучшить заказ: ...' (2-3 хака). Не пиши 'Записал' — это только рекомендация, юзер сам решит залогировать.
 
 Важно:
 - Не пиши ничего кроме JSON.
@@ -681,7 +681,7 @@ async def run_workflow(workflow_input: WorkflowInput):
       "output_parsed": router_result_temp.final_output.model_dump()
     }
 
-    # ---------- Populate state from router (infra fix) ----------
+    # ---------- Populate state from router ----------
     rp = router_result["output_parsed"]
     state["intent"] = rp["intent"]
     state["user_text_clean"] = rp["user_text_clean"]
