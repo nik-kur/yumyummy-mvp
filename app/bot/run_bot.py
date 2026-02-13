@@ -478,7 +478,8 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         await message.answer(
             "Привет! Я YumYummy 🧃\n\n"
             "Похоже, сейчас не могу связаться с сервером.\n"
-            "Попробуй, пожалуйста, чуть позже 🙏"
+            "Попробуй, пожалуйста, чуть позже 🙏",
+            reply_markup=get_main_menu_keyboard(),
         )
         return
 

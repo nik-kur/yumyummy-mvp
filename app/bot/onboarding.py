@@ -412,7 +412,6 @@ async def check_onboarding_completed(message: types.Message) -> bool:
     if not user or not user.get("onboarding_completed", False):
         await message.answer(
             "Сначала нужно пройти настройку! Нажми /start",
-            reply_markup=types.ReplyKeyboardRemove()
         )
         return False
     return True
