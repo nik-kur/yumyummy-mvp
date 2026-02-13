@@ -46,21 +46,21 @@ class MealParserSchema__Totals(BaseModel):
 
 class MealParserSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: float | None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: str | None
 
 
 class MealParserSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: str | None
   totals: MealParserSchema__Totals
   items: list[MealParserSchema__ItemsItem]
-  source_url: object
+  source_url: str | None
 
 
 class HelpAgentSchema__Totals(BaseModel):
@@ -72,7 +72,7 @@ class HelpAgentSchema__Totals(BaseModel):
 
 class HelpAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: float | None
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -82,10 +82,10 @@ class HelpAgentSchema__ItemsItem(BaseModel):
 class HelpAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: str | None
   totals: HelpAgentSchema__Totals
   items: list[HelpAgentSchema__ItemsItem]
-  source_url: object
+  source_url: str | None
 
 
 class EatoutAgentSchema__Totals(BaseModel):
@@ -97,21 +97,21 @@ class EatoutAgentSchema__Totals(BaseModel):
 
 class EatoutAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: float | None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: str | None
 
 
 class EatoutAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: str | None
   totals: EatoutAgentSchema__Totals
   items: list[EatoutAgentSchema__ItemsItem]
-  source_url: object
+  source_url: str | None
 
 
 class ProductAgentSchema__Totals(BaseModel):
@@ -123,21 +123,21 @@ class ProductAgentSchema__Totals(BaseModel):
 
 class ProductAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: float | None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: str | None
 
 
 class ProductAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: str | None
   totals: ProductAgentSchema__Totals
   items: list[ProductAgentSchema__ItemsItem]
-  source_url: object
+  source_url: str | None
 
 
 class BarcodeAgentSchema__Totals(BaseModel):
@@ -149,21 +149,21 @@ class BarcodeAgentSchema__Totals(BaseModel):
 
 class BarcodeAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: float | None
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: object
+  source_url: str | None
 
 
 class BarcodeAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: str | None
   totals: BarcodeAgentSchema__Totals
   items: list[BarcodeAgentSchema__ItemsItem]
-  source_url: object
+  source_url: str | None
 
 
 class NutritionAdvisorSchema__Totals(BaseModel):
@@ -175,7 +175,7 @@ class NutritionAdvisorSchema__Totals(BaseModel):
 
 class NutritionAdvisorSchema__ItemsItem(BaseModel):
   name: str
-  grams: object
+  grams: float | None
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -185,10 +185,10 @@ class NutritionAdvisorSchema__ItemsItem(BaseModel):
 class NutritionAdvisorSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: object
+  confidence: str | None
   totals: NutritionAdvisorSchema__Totals
   items: list[NutritionAdvisorSchema__ItemsItem]
-  source_url: object
+  source_url: str | None
 
 
 class FinalAgentSchema__Totals(BaseModel):
