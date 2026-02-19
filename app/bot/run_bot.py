@@ -117,9 +117,9 @@ def build_meal_response_text(
     if all_zero:
         lines.append("ℹ️ КБЖУ не удалось определить")
     else:
-        lines.append(f"🔥 {calories} ккал · 🥩 Б {protein_g} г · 🥑 Ж {fat_g} г · 🍞 У {carbs_g} г")
+        lines.append(f"{calories} ккал · Б {protein_g} г · Ж {fat_g} г · У {carbs_g} г")
         lines.append("")
-        lines.append(f"📊 Точность: {accuracy_label}")
+        lines.append(f"Оценка точности: {accuracy_label}")
     if notes:
         lines.append("")
         lines.append(f"Примечание: {notes}")
@@ -193,8 +193,8 @@ def build_meal_response_from_agent(
     if len(valid_items) <= 1:
         return base_text
 
-    lines = [base_text, "", "───────────────", "По блюдам:"]
-    for idx, item in enumerate(valid_items, 1):
+    lines = [base_text, "", "По блюдам:"]
+    for item in valid_items:
         item_name = item.get("name") or "Блюдо"
         item_calories = round(float(item.get("calories_kcal") or 0))
         item_protein = round(float(item.get("protein_g") or 0), 1)
@@ -206,17 +206,21 @@ def build_meal_response_from_agent(
         item_accuracy = "HIGH" if item_source_url else (format_accuracy_label(result.get("confidence")) or "ESTIMATE")
         item_source_label = format_source_label(item_source_url) if item_source_url else format_source_label(None)
         item_source_line = f"🔗 Источник: {item_source_label}" if normalize_source_url(item_source_url) else f"💡 {item_source_label}"
-        number_emoji = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣"]
-        num = number_emoji[idx - 1] if idx <= len(number_emoji) else f"{idx}."
-        item_lines = [f"{num} {item_name}"]
         if item_all_zero:
-            item_lines.append("   ℹ️ КБЖУ не удалось определить")
+            lines.extend([
+                f"{item_name}:",
+                "ℹ️ КБЖУ не удалось определить",
+                item_source_line,
+                "",
+            ])
         else:
-            item_lines.append(f"   🔥 {item_calories} ккал · 🥩 Б {item_protein} г · 🥑 Ж {item_fat} г · 🍞 У {item_carbs} г")
-            item_lines.append(f"   📊 Точность: {item_accuracy}")
-        item_lines.append(f"   {item_source_line}")
-        item_lines.append("")
-        lines.extend(item_lines)
+            lines.extend([
+                f"{item_name}:",
+                f"{item_calories} ккал · Б {item_protein} г · Ж {item_fat} г · У {item_carbs} г",
+                f"Оценка точности: {item_accuracy}",
+                item_source_line,
+                "",
+            ])
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines)
@@ -232,7 +236,7 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
     
     lines = ["🤔 Рекомендация:", ""]
     
-    labels = ["🥇 Лучший выбор", "🥈 Альтернатива 1", "🥉 Альтернатива 2"]
+    labels = ["Лучший выбор", "Альтернатива 1", "Альтернатива 2"]
     for idx, item in enumerate(items[:3]):
         item_name = item.get("name") or "Блюдо"
         item_cal = round(float(item.get("calories_kcal") or 0))
@@ -240,23 +244,20 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
         item_fat = round(float(item.get("fat_g") or 0), 1)
         item_carbs = round(float(item.get("carbs_g") or 0), 1)
         label = labels[idx] if idx < len(labels) else f"Вариант {idx + 1}"
-        lines.append(f"{label}: {item_name}")
+        lines.append(f"{idx + 1}. {label}: {item_name}")
         if item_cal > 0:
-            lines.append(f"   🔥 {item_cal} ккал · 🥩 Б {item_prot} г · 🥑 Ж {item_fat} г · 🍞 У {item_carbs} г")
+            lines.append(f"   {item_cal} ккал · Б {item_prot} г · Ж {item_fat} г · У {item_carbs} г")
         lines.append("")
     
-    # Add tips from message_text if it contains "Как улучшить" or similar
     if message_text:
-        # Extract tips section if present
         for keyword in ["Как улучшить", "Хак", "Совет", "Лайфхак"]:
             if keyword.lower() in message_text.lower():
                 tip_start = message_text.lower().index(keyword.lower())
-                lines.append("───────────────")
                 lines.append("💡 " + message_text[tip_start:].strip())
                 break
     
     lines.append("")
-    lines.append("👆 Нажми кнопку, чтобы записать выбранный вариант")
+    lines.append("Нажми кнопку ниже, чтобы записать выбранный вариант")
     
     while lines and lines[-1] == "":
         lines.pop()

@@ -418,12 +418,12 @@ async def check_onboarding_completed(message: types.Message) -> bool:
 
 
 def build_progress_bar(current: float, target: float, width: int = 15) -> str:
-    """Строит прогресс-бар с процентом и цветовым индикатором"""
+    """Строит прогресс-бар с процентом"""
     if target <= 0:
         return "░" * width + " 0%"
     
     pct = current / target * 100
-    ratio = min(current / target, 1.5)  # Максимум 150%
+    ratio = min(current / target, 1.5)
     filled = int(ratio * width)
     filled = min(filled, width + 5)
     
@@ -432,17 +432,7 @@ def build_progress_bar(current: float, target: float, width: int = 15) -> str:
     else:
         bar = "█" * width + "🔴" * min(filled - width, 5)
     
-    # Цветовой индикатор
-    if pct == 0:
-        emoji = "⚪"
-    elif pct < 90:
-        emoji = "🟡"
-    elif pct <= 110:
-        emoji = "🟢"
-    else:
-        emoji = "🔴"
-    
-    return f"{bar} {emoji} {pct:.0f}%"
+    return f"{bar} {pct:.0f}%"
 
 
 def format_remaining(current: float, target: float, unit: str = "ккал") -> str:
@@ -848,24 +838,19 @@ async def on_menu_today(message: types.Message, state: FSMContext) -> None:
     
     text = f"""📊 Сегодня, {today.strftime('%d.%m.%Y')}
 
-🔥 Калории: {current_cal:.0f} / {target_cal:.0f} ккал
-{bar_cal}
-↳ {rem_cal}
+Калории: {current_cal:.0f} / {target_cal:.0f} ккал
+{bar_cal}  ({rem_cal})
 
-🥩 Белки: {current_prot:.0f} / {target_prot:.0f} г
-{bar_prot}
-↳ {rem_prot}
+Белки: {current_prot:.0f} / {target_prot:.0f} г
+{bar_prot}  ({rem_prot})
 
-🥑 Жиры: {current_fat:.0f} / {target_fat:.0f} г
-{bar_fat}
-↳ {rem_fat}
+Жиры: {current_fat:.0f} / {target_fat:.0f} г
+{bar_fat}  ({rem_fat})
 
-🍞 Углеводы: {current_carbs:.0f} / {target_carbs:.0f} г
-{bar_carbs}
-↳ {rem_carbs}
+Углеводы: {current_carbs:.0f} / {target_carbs:.0f} г
+{bar_carbs}  ({rem_carbs})
 
-━━━━━━━━━━━━━━━━━━
-📋 Приёмов пищи: {meals_count}"""
+Приёмов пищи: {meals_count}"""
     
     await message.answer(text, reply_markup=get_day_actions_keyboard(today.isoformat(), from_today=True))
 
@@ -924,7 +909,7 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
                     best_day_diff = diff
                     best_day = day
             
-            # Светофор по калориям
+            # Статус по калориям
             if cal == 0:
                 status = "⚪"
             elif cal < target_cal * 0.9:
@@ -934,39 +919,24 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
             else:
                 status = "🟢"
             
-            # Мини-бар калорий (5 символов)
-            mini_bar_width = 5
-            if target_cal > 0:
-                ratio = min(cal / target_cal, 1.5)
-                filled = int(ratio * mini_bar_width)
-                filled = min(filled, mini_bar_width)
-                mini_bar = "▓" * filled + "░" * (mini_bar_width - filled)
-            else:
-                mini_bar = "░" * mini_bar_width
-            
-            cal_pct = (cal / target_cal * 100) if target_cal > 0 else 0
-            
             day_name = day_names[day.weekday()]
             marker = "📍" if day == today else "  "
-            week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d} {mini_bar} {cal:.0f} ({cal_pct:.0f}%)")
+            week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: {cal:.0f} ккал")
         else:
             day_name = day_names[day.weekday()]
             marker = "📍" if day == today else "  "
-            week_data.append(f"{marker}⚪ {day_name} {day.day:02d}.{day.month:02d} ░░░░░ —")
+            week_data.append(f"{marker}⚪ {day_name} {day.day:02d}.{day.month:02d}: —")
     
     avg_cal = total_cal / max(days_with_data, 1)
     avg_prot = total_prot / max(days_with_data, 1)
     avg_fat = total_fat / max(days_with_data, 1)
     avg_carbs = total_carbs / max(days_with_data, 1)
     
-    # Легенда
-    legend = "🟢 в норме (90-110%) · 🟡 недобор · 🔴 перебор · ⚪ нет данных"
-    
     # Лучший день
     best_day_line = ""
     if best_day:
         best_day_name = day_names[best_day.weekday()]
-        best_day_line = f"\n🏆 Лучший день: {best_day_name} {best_day.day:02d}.{best_day.month:02d}"
+        best_day_line = f"\nЛучший день: {best_day_name} {best_day.day:02d}.{best_day.month:02d}"
     
     # Тренд: сравнение первой и второй половины недели
     trend_line = ""
@@ -989,24 +959,25 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
             avg_first = first_half_cal / first_half_days
             avg_second = second_half_cal / second_half_days
             if avg_second < avg_first * 0.95:
-                trend_line = "\n📉 Тренд: потребление снижается"
+                trend_line = "\nТренд: потребление снижается ↓"
             elif avg_second > avg_first * 1.05:
-                trend_line = "\n📈 Тренд: потребление растёт"
+                trend_line = "\nТренд: потребление растёт ↑"
             else:
-                trend_line = "\n➡️ Тренд: стабильно"
+                trend_line = "\nТренд: стабильно →"
     
+    legend = "🟢 норма · 🟡 недобор · 🔴 перебор"
+
     text = f"""📈 Статистика за неделю
 
 {chr(10).join(week_data)}
 
 {legend}
 
-━━━━━━━━━━━━━━━━━━
-📊 Среднее за день ({days_with_data} дн. с данными):
-🔥 Калории: {avg_cal:.0f} / {target_cal:.0f} ккал
-🥩 Белки: {avg_prot:.0f} / {target_prot:.0f} г
-🥑 Жиры: {avg_fat:.0f} / {target_fat:.0f} г
-🍞 Углеводы: {avg_carbs:.0f} / {target_carbs:.0f} г{best_day_line}{trend_line}
+Среднее за день ({days_with_data} дн.):
+• Калории: {avg_cal:.0f} / {target_cal:.0f} ккал
+• Белки: {avg_prot:.0f} / {target_prot:.0f} г
+• Жиры: {avg_fat:.0f} / {target_fat:.0f} г
+• Углеводы: {avg_carbs:.0f} / {target_carbs:.0f} г{best_day_line}{trend_line}
 
 Нажми на день, чтобы посмотреть детали:"""
     
