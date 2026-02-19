@@ -107,7 +107,6 @@ def build_meal_response_text(
     source_url: Optional[str] = None,
     summary: Optional[Dict[str, Any]] = None,
 ) -> str:
-    accuracy_label = format_accuracy_label(accuracy_level) or "ESTIMATE"
     source_label = format_source_label(source_url)
     all_zero = calories == 0 and protein_g == 0 and fat_g == 0 and carbs_g == 0
     lines = [
@@ -118,8 +117,6 @@ def build_meal_response_text(
         lines.append("ℹ️ КБЖУ не удалось определить")
     else:
         lines.append(f"{calories} ккал · Б {protein_g} г · Ж {fat_g} г · У {carbs_g} г")
-        lines.append("")
-        lines.append(f"Оценка точности: {accuracy_label}")
     if notes:
         lines.append("")
         lines.append(f"Примечание: {notes}")
@@ -128,7 +125,7 @@ def build_meal_response_text(
     if normalized_url:
         lines.append(f"🔗 Источник: {source_label}")
     else:
-        lines.append(f"💡 {source_label}")
+        lines.append(f"💡 Источник: {source_label}")
     if summary:
         lines.append("")
         lines.extend(build_summary_lines(summary))
@@ -193,7 +190,7 @@ def build_meal_response_from_agent(
     if len(valid_items) <= 1:
         return base_text
 
-    lines = [base_text, "", "По блюдам:"]
+    lines = [base_text, "", "———", "", "По блюдам:", ""]
     for item in valid_items:
         item_name = item.get("name") or "Блюдо"
         item_calories = round(float(item.get("calories_kcal") or 0))
@@ -201,23 +198,20 @@ def build_meal_response_from_agent(
         item_fat = round(float(item.get("fat_g") or 0), 1)
         item_carbs = round(float(item.get("carbs_g") or 0), 1)
         item_all_zero = item_calories == 0 and item_protein == 0 and item_fat == 0 and item_carbs == 0
-        # Per-item: use item's own source_url if available
         item_source_url = item.get("source_url")
-        item_accuracy = "HIGH" if item_source_url else (format_accuracy_label(result.get("confidence")) or "ESTIMATE")
         item_source_label = format_source_label(item_source_url) if item_source_url else format_source_label(None)
-        item_source_line = f"🔗 Источник: {item_source_label}" if normalize_source_url(item_source_url) else f"💡 {item_source_label}"
+        item_source_line = f"🔗 Источник: {item_source_label}" if normalize_source_url(item_source_url) else f"💡 Источник: {item_source_label}"
         if item_all_zero:
             lines.extend([
-                f"{item_name}:",
+                f"📝 {item_name}:",
                 "ℹ️ КБЖУ не удалось определить",
                 item_source_line,
                 "",
             ])
         else:
             lines.extend([
-                f"{item_name}:",
+                f"📝 {item_name}:",
                 f"{item_calories} ккал · Б {item_protein} г · Ж {item_fat} г · У {item_carbs} г",
-                f"Оценка точности: {item_accuracy}",
                 item_source_line,
                 "",
             ])

@@ -839,20 +839,24 @@ async def on_menu_today(message: types.Message, state: FSMContext) -> None:
     text = f"""📊 Сегодня, {today.strftime('%d.%m.%Y')}
 
 Калории: {current_cal:.0f} / {target_cal:.0f} ккал
-{bar_cal}  ({rem_cal})
+{bar_cal}
+<i>{rem_cal}</i>
 
 Белки: {current_prot:.0f} / {target_prot:.0f} г
-{bar_prot}  ({rem_prot})
+{bar_prot}
+<i>{rem_prot}</i>
 
 Жиры: {current_fat:.0f} / {target_fat:.0f} г
-{bar_fat}  ({rem_fat})
+{bar_fat}
+<i>{rem_fat}</i>
 
 Углеводы: {current_carbs:.0f} / {target_carbs:.0f} г
-{bar_carbs}  ({rem_carbs})
+{bar_carbs}
+<i>{rem_carbs}</i>
 
 Приёмов пищи: {meals_count}"""
     
-    await message.answer(text, reply_markup=get_day_actions_keyboard(today.isoformat(), from_today=True))
+    await message.answer(text, parse_mode="HTML", reply_markup=get_day_actions_keyboard(today.isoformat(), from_today=True))
 
 
 @router.message(F.text == "📈 Неделя")
@@ -883,14 +887,15 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
     total_fat = 0
     total_carbs = 0
     days_with_data = 0
-    best_day = None
-    best_day_diff = float('inf')
     
     day_names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
     
     for i in range(7):
         day = today - timedelta(days=6-i)
         day_summary = await get_day_summary(user["id"], day)
+        
+        day_name = day_names[day.weekday()]
+        marker = "📍" if day == today else "  "
         
         if day_summary:
             cal = day_summary.get("total_calories", 0)
@@ -903,28 +908,15 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
             total_carbs += carbs
             if cal > 0:
                 days_with_data += 1
-                # Лучший день — ближе всего к цели по калориям
-                diff = abs(cal - target_cal)
-                if diff < best_day_diff:
-                    best_day_diff = diff
-                    best_day = day
             
-            # Статус по калориям
             if cal == 0:
                 status = "⚪"
-            elif cal < target_cal * 0.9:
-                status = "🟡"
-            elif cal > target_cal * 1.1:
-                status = "🔴"
+                week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: —")
             else:
-                status = "🟢"
-            
-            day_name = day_names[day.weekday()]
-            marker = "📍" if day == today else "  "
-            week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: {cal:.0f} ккал")
+                pct = cal / target_cal * 100 if target_cal > 0 else 0
+                status = "🟢" if cal <= target_cal else "🟡"
+                week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: {cal:.0f} ккал ({pct:.0f}%)")
         else:
-            day_name = day_names[day.weekday()]
-            marker = "📍" if day == today else "  "
             week_data.append(f"{marker}⚪ {day_name} {day.day:02d}.{day.month:02d}: —")
     
     avg_cal = total_cal / max(days_with_data, 1)
@@ -932,40 +924,7 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
     avg_fat = total_fat / max(days_with_data, 1)
     avg_carbs = total_carbs / max(days_with_data, 1)
     
-    # Лучший день
-    best_day_line = ""
-    if best_day:
-        best_day_name = day_names[best_day.weekday()]
-        best_day_line = f"\nЛучший день: {best_day_name} {best_day.day:02d}.{best_day.month:02d}"
-    
-    # Тренд: сравнение первой и второй половины недели
-    trend_line = ""
-    if days_with_data >= 4:
-        first_half_cal = 0
-        first_half_days = 0
-        second_half_cal = 0
-        second_half_days = 0
-        for i in range(7):
-            day = today - timedelta(days=6-i)
-            ds = await get_day_summary(user["id"], day)
-            if ds and ds.get("total_calories", 0) > 0:
-                if i < 4:
-                    first_half_cal += ds.get("total_calories", 0)
-                    first_half_days += 1
-                else:
-                    second_half_cal += ds.get("total_calories", 0)
-                    second_half_days += 1
-        if first_half_days > 0 and second_half_days > 0:
-            avg_first = first_half_cal / first_half_days
-            avg_second = second_half_cal / second_half_days
-            if avg_second < avg_first * 0.95:
-                trend_line = "\nТренд: потребление снижается ↓"
-            elif avg_second > avg_first * 1.05:
-                trend_line = "\nТренд: потребление растёт ↑"
-            else:
-                trend_line = "\nТренд: стабильно →"
-    
-    legend = "🟢 норма · 🟡 недобор · 🔴 перебор"
+    legend = "🟢 в норме · 🟡 перебор"
 
     text = f"""📈 Статистика за неделю
 
@@ -977,7 +936,7 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
 • Калории: {avg_cal:.0f} / {target_cal:.0f} ккал
 • Белки: {avg_prot:.0f} / {target_prot:.0f} г
 • Жиры: {avg_fat:.0f} / {target_fat:.0f} г
-• Углеводы: {avg_carbs:.0f} / {target_carbs:.0f} г{best_day_line}{trend_line}
+• Углеводы: {avg_carbs:.0f} / {target_carbs:.0f} г
 
 Нажми на день, чтобы посмотреть детали:"""
     
