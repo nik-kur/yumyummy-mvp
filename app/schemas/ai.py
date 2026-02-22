@@ -80,6 +80,7 @@ class WorkflowItem(BaseModel):
     protein_g: float
     fat_g: float
     carbs_g: float
+    source_url: Optional[str] = None
 
 
 class WorkflowRunResponse(BaseModel):

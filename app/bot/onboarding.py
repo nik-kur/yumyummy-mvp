@@ -44,6 +44,8 @@ class OnboardingStates(StatesGroup):
     waiting_for_activity = State()
     waiting_for_goals_confirmation = State()
     waiting_for_manual_kbju = State()
+    waiting_for_timezone = State()
+    waiting_for_timezone_text = State()
     tutorial_step_1 = State()
     tutorial_step_2 = State()
 
@@ -299,6 +301,23 @@ def get_goal_confirmation_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def get_timezone_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора часового пояса"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🇷🇺 Москва (UTC+3)", callback_data="tz:Europe/Moscow")],
+            [InlineKeyboardButton(text="🇷🇺 Екатеринбург (UTC+5)", callback_data="tz:Asia/Yekaterinburg")],
+            [InlineKeyboardButton(text="🇷🇺 Новосибирск (UTC+7)", callback_data="tz:Asia/Novosibirsk")],
+            [InlineKeyboardButton(text="🇷🇺 Владивосток (UTC+10)", callback_data="tz:Asia/Vladivostok")],
+            [InlineKeyboardButton(text="🇪🇺 Берлин (UTC+1)", callback_data="tz:Europe/Berlin")],
+            [InlineKeyboardButton(text="🇬🇧 Лондон (UTC+0)", callback_data="tz:Europe/London")],
+            [InlineKeyboardButton(text="🇺🇸 Нью-Йорк (UTC-5)", callback_data="tz:America/New_York")],
+            [InlineKeyboardButton(text="🇦🇪 Дубай (UTC+4)", callback_data="tz:Asia/Dubai")],
+            [InlineKeyboardButton(text="🌍 Другой...", callback_data="tz:other")],
+        ]
+    )
+
+
 def get_tutorial_next_keyboard() -> InlineKeyboardMarkup:
     """Кнопка продолжения туториала"""
     return InlineKeyboardMarkup(
@@ -327,11 +346,12 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def get_day_actions_keyboard(day_str: str) -> InlineKeyboardMarkup:
+def get_day_actions_keyboard(day_str: str, from_today: bool = False) -> InlineKeyboardMarkup:
     """Клавиатура для просмотра приёмов пищи за день"""
+    suffix = ":from_today" if from_today else ""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🍽 Посмотреть приёмы пищи", callback_data=f"daylist:{day_str}")]
+            [InlineKeyboardButton(text="🍽 Посмотреть приёмы пищи", callback_data=f"daylist:{day_str}{suffix}")]
         ]
     )
 
@@ -392,28 +412,38 @@ async def check_onboarding_completed(message: types.Message) -> bool:
     if not user or not user.get("onboarding_completed", False):
         await message.answer(
             "Сначала нужно пройти настройку! Нажми /start",
-            reply_markup=types.ReplyKeyboardRemove()
         )
         return False
     return True
 
 
-def build_progress_bar(current: float, target: float, width: int = 10) -> str:
-    """Строит прогресс-бар"""
+def build_progress_bar(current: float, target: float, width: int = 15) -> str:
+    """Строит прогресс-бар с процентом"""
     if target <= 0:
-        return "░" * width
+        return "░" * width + " 0%"
     
-    ratio = min(current / target, 1.5)  # Максимум 150%
+    pct = current / target * 100
+    ratio = min(current / target, 1.5)
     filled = int(ratio * width)
-    filled = min(filled, width + 5)  # Не больше 15 символов
+    filled = min(filled, width + 5)
     
     if ratio <= 1.0:
         bar = "█" * filled + "░" * (width - filled)
     else:
-        # Превышение — красный индикатор
-        bar = "█" * width + "🔴" * (filled - width)
+        bar = "█" * width + "🔴" * min(filled - width, 5)
     
-    return bar
+    return f"{bar} {pct:.0f}%"
+
+
+def format_remaining(current: float, target: float, unit: str = "ккал") -> str:
+    """Форматирует остаток: 'осталось X' или 'перебор на X'"""
+    diff = target - current
+    if diff > 0:
+        return f"осталось {diff:.0f} {unit}"
+    elif diff < 0:
+        return f"перебор на {abs(diff):.0f} {unit}"
+    else:
+        return f"точно в цели!"
 
 
 # ============ Onboarding Handlers ============
@@ -576,12 +606,12 @@ async def on_goals_confirmed(callback: types.CallbackQuery, state: FSMContext) -
         await callback.message.answer("Произошла ошибка при сохранении. Попробуй ещё раз позже.")
         return
     
-    # Переходим к туториалу
+    # Переходим к выбору часового пояса
     await callback.message.answer(
-        TUTORIAL_STEP1_TEXT,
-        reply_markup=get_tutorial_next_keyboard()
+        "🌍 Выбери свой часовой пояс:",
+        reply_markup=get_timezone_keyboard()
     )
-    await state.set_state(OnboardingStates.tutorial_step_1)
+    await state.set_state(OnboardingStates.waiting_for_timezone)
 
 
 @router.callback_query(F.data == "goals_manual")
@@ -664,7 +694,61 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
         await message.answer("Произошла ошибка при сохранении. Попробуй ещё раз позже.")
         return
     
+    # Переходим к выбору часового пояса
+    await message.answer(
+        "🌍 Выбери свой часовой пояс:",
+        reply_markup=get_timezone_keyboard()
+    )
+    await state.set_state(OnboardingStates.waiting_for_timezone)
+
+
+@router.callback_query(F.data.startswith("tz:"))
+async def on_timezone_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Обработка выбора часового пояса"""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    
+    tz_value = callback.data.split(":", 1)[1]
+    
+    if tz_value == "other":
+        await callback.message.answer(
+            "Введи свой часовой пояс в формате IANA, например:\n"
+            "Asia/Dubai, Asia/Tokyo, Europe/Paris, America/Los_Angeles\n\n"
+            "Полный список: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+        )
+        await state.set_state(OnboardingStates.waiting_for_timezone_text)
+        return
+    
+    # Save timezone
+    telegram_id = callback.from_user.id
+    await update_user(telegram_id, timezone=tz_value)
+    
     # Переходим к туториалу
+    await callback.message.answer(
+        TUTORIAL_STEP1_TEXT,
+        reply_markup=get_tutorial_next_keyboard()
+    )
+    await state.set_state(OnboardingStates.tutorial_step_1)
+
+
+@router.message(OnboardingStates.waiting_for_timezone_text)
+async def on_timezone_text_received(message: types.Message, state: FSMContext) -> None:
+    """Обработка ручного ввода часового пояса"""
+    import pytz
+    tz_text = message.text.strip()
+    
+    try:
+        pytz.timezone(tz_text)
+    except pytz.exceptions.UnknownTimeZoneError:
+        await message.answer(
+            f"Не удалось распознать часовой пояс '{tz_text}'.\n"
+            "Попробуй ещё раз, например: Asia/Dubai, Europe/Paris"
+        )
+        return
+    
+    telegram_id = message.from_user.id
+    await update_user(telegram_id, timezone=tz_text)
+    
     await message.answer(
         TUTORIAL_STEP1_TEXT,
         reply_markup=get_tutorial_next_keyboard()
@@ -737,33 +821,42 @@ async def on_menu_today(message: types.Message, state: FSMContext) -> None:
     else:
         current_cal = current_prot = current_fat = current_carbs = 0
     
-    # Остаток
-    remaining_cal = target_cal - current_cal
-    remaining_prot = target_prot - current_prot
-    remaining_fat = target_fat - current_fat
-    remaining_carbs = target_carbs - current_carbs
-    
     # Прогресс-бары
     bar_cal = build_progress_bar(current_cal, target_cal)
     bar_prot = build_progress_bar(current_prot, target_prot)
     bar_fat = build_progress_bar(current_fat, target_fat)
     bar_carbs = build_progress_bar(current_carbs, target_carbs)
     
+    # Остаток в читаемом формате
+    rem_cal = format_remaining(current_cal, target_cal, "ккал")
+    rem_prot = format_remaining(current_prot, target_prot, "г")
+    rem_fat = format_remaining(current_fat, target_fat, "г")
+    rem_carbs = format_remaining(current_carbs, target_carbs, "г")
+    
+    # Число приёмов пищи
+    meals_count = len(day_summary.get("meals", [])) if day_summary else 0
+    
     text = f"""📊 Сегодня, {today.strftime('%d.%m.%Y')}
 
-🔥 Калории: {current_cal:.0f} / {target_cal:.0f} ккал
-{bar_cal} ({remaining_cal:+.0f})
+Калории: {current_cal:.0f} / {target_cal:.0f} ккал
+{bar_cal}
+<i>{rem_cal}</i>
 
-🥩 Белки: {current_prot:.0f} / {target_prot:.0f} г
-{bar_prot} ({remaining_prot:+.0f})
+Белки: {current_prot:.0f} / {target_prot:.0f} г
+{bar_prot}
+<i>{rem_prot}</i>
 
-🥑 Жиры: {current_fat:.0f} / {target_fat:.0f} г
-{bar_fat} ({remaining_fat:+.0f})
+Жиры: {current_fat:.0f} / {target_fat:.0f} г
+{bar_fat}
+<i>{rem_fat}</i>
 
-🍞 Углеводы: {current_carbs:.0f} / {target_carbs:.0f} г
-{bar_carbs} ({remaining_carbs:+.0f})"""
+Углеводы: {current_carbs:.0f} / {target_carbs:.0f} г
+{bar_carbs}
+<i>{rem_carbs}</i>
+
+Приёмов пищи: {meals_count}"""
     
-    await message.answer(text, reply_markup=get_day_actions_keyboard(today.isoformat()))
+    await message.answer(text, parse_mode="HTML", reply_markup=get_day_actions_keyboard(today.isoformat(), from_today=True))
 
 
 @router.message(F.text == "📈 Неделя")
@@ -784,11 +877,15 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
     # Целевые значения
     target_cal = user.get("target_calories") or 2000
     target_prot = user.get("target_protein_g") or 150
+    target_fat = user.get("target_fat_g") or 65
+    target_carbs = user.get("target_carbs_g") or 200
     
     today = date_type.today()
     week_data = []
     total_cal = 0
     total_prot = 0
+    total_fat = 0
+    total_carbs = 0
     days_with_data = 0
     
     day_names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -797,42 +894,49 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
         day = today - timedelta(days=6-i)
         day_summary = await get_day_summary(user["id"], day)
         
+        day_name = day_names[day.weekday()]
+        marker = "📍" if day == today else "  "
+        
         if day_summary:
             cal = day_summary.get("total_calories", 0)
             prot = day_summary.get("total_protein_g", 0)
+            fat = day_summary.get("total_fat_g", 0)
+            carbs = day_summary.get("total_carbs_g", 0)
             total_cal += cal
             total_prot += prot
+            total_fat += fat
+            total_carbs += carbs
             if cal > 0:
                 days_with_data += 1
             
-            # Эмодзи статуса
             if cal == 0:
                 status = "⚪"
-            elif cal < target_cal * 0.9:
-                status = "🟡"  # Недобор
-            elif cal > target_cal * 1.1:
-                status = "🔴"  # Перебор
+                week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: —")
             else:
-                status = "🟢"  # В норме
-            
-            day_name = day_names[day.weekday()]
-            marker = "📍" if day == today else ""
-            week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: {cal:.0f} ккал")
+                pct = cal / target_cal * 100 if target_cal > 0 else 0
+                status = "🟢" if cal <= target_cal else "🟡"
+                week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: {cal:.0f} ккал ({pct:.0f}%)")
         else:
-            day_name = day_names[day.weekday()]
-            marker = "📍" if day == today else ""
             week_data.append(f"{marker}⚪ {day_name} {day.day:02d}.{day.month:02d}: —")
     
     avg_cal = total_cal / max(days_with_data, 1)
     avg_prot = total_prot / max(days_with_data, 1)
+    avg_fat = total_fat / max(days_with_data, 1)
+    avg_carbs = total_carbs / max(days_with_data, 1)
     
+    legend = "🟢 в норме · 🟡 перебор"
+
     text = f"""📈 Статистика за неделю
 
 {chr(10).join(week_data)}
 
-📊 Средние показатели:
+{legend}
+
+Среднее за день ({days_with_data} дн.):
 • Калории: {avg_cal:.0f} / {target_cal:.0f} ккал
 • Белки: {avg_prot:.0f} / {target_prot:.0f} г
+• Жиры: {avg_fat:.0f} / {target_fat:.0f} г
+• Углеводы: {avg_carbs:.0f} / {target_carbs:.0f} г
 
 Нажми на день, чтобы посмотреть детали:"""
     

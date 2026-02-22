@@ -26,6 +26,9 @@ class User(Base):
     target_fat_g = Column(Float, nullable=True)
     target_carbs_g = Column(Float, nullable=True)
 
+    # Часовой пояс пользователя
+    timezone = Column(String, nullable=True)  # e.g. 'Europe/Moscow', 'America/New_York'
+
     # Статус онбординга
     onboarding_completed = Column(Boolean, default=False, nullable=False)
 

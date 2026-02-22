@@ -21,6 +21,7 @@ class MealUpdate(BaseModel):
     protein_g: Optional[float] = None
     fat_g: Optional[float] = None
     carbs_g: Optional[float] = None
+    eaten_at: Optional[datetime] = None
 
 
 class MealRead(BaseModel):

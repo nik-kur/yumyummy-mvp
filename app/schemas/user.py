@@ -23,6 +23,7 @@ class UserUpdate(BaseModel):
     target_fat_g: Optional[float] = None
     target_carbs_g: Optional[float] = None
     onboarding_completed: Optional[bool] = None
+    timezone: Optional[str] = None
 
 
 class UserRead(UserBase):
@@ -38,5 +39,6 @@ class UserRead(UserBase):
     target_fat_g: Optional[float] = None
     target_carbs_g: Optional[float] = None
     onboarding_completed: bool = False
+    timezone: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -51,6 +51,24 @@ except ImportError:
 
 app = FastAPI(title="YumYummy API")
 
+
+@app.on_event("startup")
+def run_migrations():
+    """Auto-apply Alembic migrations on startup."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode == 0:
+            logger.info(f"[STARTUP] Alembic migrations applied successfully: {result.stdout.strip()}")
+        else:
+            logger.error(f"[STARTUP] Alembic migration failed: {result.stderr.strip()}")
+    except Exception as e:
+        logger.error(f"[STARTUP] Alembic migration error: {e}")
+
+
 # Include context API router for agent tools
 from app.api.context import router as context_router
 app.include_router(context_router)
@@ -1404,6 +1422,9 @@ def update_meal(
 
     if meal_in.description_user is not None:
         meal.description_user = meal_in.description_user
+
+    if meal_in.eaten_at is not None:
+        meal.eaten_at = meal_in.eaten_at
 
     meal.calories = new_calories
     meal.protein_g = new_protein
