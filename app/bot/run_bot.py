@@ -221,6 +221,11 @@ def build_meal_response_from_agent(
     return "\n".join(lines)
 
 
+def _strip_markdown_bold(text: str) -> str:
+    """Remove **bold** markers that Telegram plain-text mode can't render."""
+    return text.replace("**", "")
+
+
 def _extract_message_text_block(message_text: str, start_keywords: list, stop_keywords: list) -> Optional[str]:
     """Extract a block from message_text starting at one of start_keywords and ending before stop_keywords."""
     text_lower = message_text.lower()
@@ -245,7 +250,7 @@ def _extract_message_text_block(message_text: str, start_keywords: list, stop_ke
 def build_food_advice_response(result: Dict[str, Any]) -> str:
     """Format food advice as a recommendation (NOT a logged meal)."""
     items = result.get("items") or []
-    message_text = (result.get("message_text") or "").strip()
+    message_text = _strip_markdown_bold((result.get("message_text") or "").strip())
 
     if not items:
         return message_text or "Не удалось сформировать рекомендацию."
@@ -254,7 +259,7 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
 
     labels = ["Лучший выбор", "Альтернатива 1", "Альтернатива 2"]
     for idx, item in enumerate(items[:3]):
-        item_name = item.get("name") or "Блюдо"
+        item_name = _strip_markdown_bold(item.get("name") or "Блюдо")
         item_cal = round(float(item.get("calories_kcal") or 0))
         item_prot = round(float(item.get("protein_g") or 0), 1)
         item_fat = round(float(item.get("fat_g") or 0), 1)
@@ -1851,6 +1856,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
     protein_g = float(chosen_item.get("protein_g", 0))
     fat_g = float(chosen_item.get("fat_g", 0))
     carbs_g = float(chosen_item.get("carbs_g", 0))
+    item_source_url = chosen_item.get("source_url") or advice_result.get("source_url")
 
     # Create meal via API
     tg_id = query.from_user.id
@@ -1868,6 +1874,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
         protein_g=protein_g,
         fat_g=fat_g,
         carbs_g=carbs_g,
+        accuracy_level="ESTIMATE",
     )
     if result is None:
         await query.message.answer("Не удалось записать приём пищи. Попробуй позже 🙏")
@@ -1882,8 +1889,16 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
         fat_g=fat_g,
         carbs_g=carbs_g,
         accuracy_level="ESTIMATE",
+        source_url=item_source_url,
     )
-    await query.message.answer(response_text)
+
+    reply_markup = None
+    if normalize_source_url(item_source_url):
+        reply_markup = types.InlineKeyboardMarkup(inline_keyboard=[[
+            types.InlineKeyboardButton(text="🔗 Источник", url=normalize_source_url(item_source_url)),
+        ]])
+
+    await query.message.answer(response_text, reply_markup=reply_markup)
 
 
 # ---------- Food Advice Input Handlers (waiting_for_input state) ----------
@@ -1901,7 +1916,7 @@ async def _process_food_advice_input(
 
     await state.clear()
 
-    processing_msg = await message.answer("🤔 Думаю, что тебе посоветовать...")
+    processing_msg = await message.answer("🤔 Думаю, что тебе посоветовать — вернусь через 1–2 минуты!")
 
     try:
         result = await agent_run_workflow(
@@ -2164,7 +2179,7 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
     # Use caption as text, or a default prompt
     text = (message.caption or "").strip() or "Определи что на фото и посчитай КБЖУ"
 
-    processing_msg = await message.answer("📸 Анализирую фото...")
+    processing_msg = await message.answer("📸 Анализирую фото — вернусь через 1–2 минуты!")
 
     try:
         result = await agent_run_workflow(
