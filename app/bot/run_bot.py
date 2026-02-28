@@ -221,16 +221,37 @@ def build_meal_response_from_agent(
     return "\n".join(lines)
 
 
+def _extract_message_text_block(message_text: str, start_keywords: list, stop_keywords: list) -> Optional[str]:
+    """Extract a block from message_text starting at one of start_keywords and ending before stop_keywords."""
+    text_lower = message_text.lower()
+    start_pos = None
+    for kw in start_keywords:
+        idx = text_lower.find(kw.lower())
+        if idx != -1:
+            start_pos = idx
+            break
+    if start_pos is None:
+        return None
+
+    end_pos = len(message_text)
+    for kw in stop_keywords:
+        idx = text_lower.find(kw.lower(), start_pos + 1)
+        if idx != -1 and idx < end_pos:
+            end_pos = idx
+
+    return message_text[start_pos:end_pos].strip()
+
+
 def build_food_advice_response(result: Dict[str, Any]) -> str:
     """Format food advice as a recommendation (NOT a logged meal)."""
     items = result.get("items") or []
     message_text = (result.get("message_text") or "").strip()
-    
+
     if not items:
         return message_text or "Не удалось сформировать рекомендацию."
-    
+
     lines = ["🤔 Рекомендация:", ""]
-    
+
     labels = ["Лучший выбор", "Альтернатива 1", "Альтернатива 2"]
     for idx, item in enumerate(items[:3]):
         item_name = item.get("name") or "Блюдо"
@@ -243,24 +264,35 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
         if item_cal > 0:
             lines.append(f"   {item_cal} ккал · Б {item_prot} г · Ж {item_fat} г · У {item_carbs} г")
         lines.append("")
-    
+
     if message_text:
-        for keyword in ["Как улучшить", "Хак", "Совет", "Лайфхак"]:
-            if keyword.lower() in message_text.lower():
-                tip_start = message_text.lower().index(keyword.lower())
-                lines.append("💡 " + message_text[tip_start:].strip())
-                break
-    
-    lines.append("")
+        reasoning = _extract_message_text_block(
+            message_text,
+            ["Почему эти варианты"],
+            ["Как улучшить", "Хак", "Совет", "Лайфхак"],
+        )
+        if reasoning:
+            lines.append("💬 " + reasoning)
+            lines.append("")
+
+        tip = _extract_message_text_block(
+            message_text,
+            ["Как улучшить", "Хак", "Совет", "Лайфхак"],
+            [],
+        )
+        if tip:
+            lines.append("💡 " + tip)
+            lines.append("")
+
     lines.append("Нажми кнопку ниже, чтобы записать выбранный вариант")
-    
+
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines)
 
 
-def build_food_advice_keyboard(items: list) -> types.InlineKeyboardMarkup:
-    """Build keyboard with 'Log variant N' buttons for food advice."""
+def build_food_advice_keyboard(items: list, source_url: Optional[str] = None) -> types.InlineKeyboardMarkup:
+    """Build keyboard with 'Log variant N' buttons and optional source links for food advice."""
     rows = []
     labels = ["✅ Записать вариант 1", "✅ Записать вариант 2", "✅ Записать вариант 3"]
     for idx in range(min(len(items), 3)):
@@ -270,6 +302,23 @@ def build_food_advice_keyboard(items: list) -> types.InlineKeyboardMarkup:
             text=f"{labels[idx]} ({short_name})",
             callback_data=f"advice_log:{idx}",
         )])
+
+    source_buttons = []
+    for item in items[:3]:
+        if isinstance(item, dict) and normalize_source_url(item.get("source_url")):
+            item_name = item.get("name") or "Блюдо"
+            label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+            source_buttons.append([types.InlineKeyboardButton(
+                text=f"🔗 Источник: {label}",
+                url=normalize_source_url(item["source_url"]),
+            )])
+    if not source_buttons and normalize_source_url(source_url):
+        source_buttons.append([types.InlineKeyboardButton(
+            text="🔗 Источник",
+            url=normalize_source_url(source_url),
+        )])
+    rows.extend(source_buttons)
+
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -1881,8 +1930,9 @@ async def _process_food_advice_input(
         return
 
     agent_items = result.get("items") or []
+    source_url = result.get("source_url")
     response_text = build_food_advice_response(result)
-    reply_markup = build_food_advice_keyboard(agent_items) if agent_items else get_main_menu_keyboard()
+    reply_markup = build_food_advice_keyboard(agent_items, source_url=source_url) if agent_items else get_main_menu_keyboard()
 
     try:
         await message.answer(response_text, reply_markup=reply_markup)
