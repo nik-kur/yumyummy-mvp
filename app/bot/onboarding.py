@@ -23,6 +23,7 @@ from app.bot.api_client import (
     update_user,
     get_user_export_url,
     get_day_summary,
+    get_saved_meals,
 )
 
 logger = logging.getLogger(__name__)
@@ -240,12 +241,13 @@ MANUAL_KBJU_TEXT = """✏️ Введи свои цели КБЖУ в форма
 # ============ Keyboards ============
 
 def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
-    """Главное меню с 5 кнопками"""
+    """Главное меню"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📊 Сегодня"), KeyboardButton(text="📈 Неделя")],
-            [KeyboardButton(text="🤔 Что съесть?"), KeyboardButton(text="👤 Профиль")],
-            [KeyboardButton(text="📤 Экспорт"), KeyboardButton(text="💬 Поддержка")],
+            [KeyboardButton(text="🍽 Моё меню"), KeyboardButton(text="🤔 Что съесть?")],
+            [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="📤 Экспорт")],
+            [KeyboardButton(text="💬 Поддержка")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Напиши что съел или выбери действие...",
@@ -947,6 +949,59 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
 Нажми на день, чтобы посмотреть детали:"""
     
     await message.answer(text, reply_markup=get_week_days_keyboard())
+
+
+@router.message(F.text == "🍽 Моё меню")
+async def on_menu_my_meals(message: types.Message, state: FSMContext) -> None:
+    """Обработчик кнопки 'Моё меню'"""
+    await state.clear()
+
+    if not await check_onboarding_completed(message):
+        return
+
+    tg_id = message.from_user.id
+    data = await get_saved_meals(tg_id, page=1, per_page=20)
+
+    if not data or not data.get("items"):
+        await message.answer(
+            "🍽 Моё меню пока пустое.\n\n"
+            "Ты можешь сохранить любой приём пищи — просто нажми "
+            "«💾 В Моё меню» после записи."
+        )
+        return
+
+    meals = data["items"]
+    total = data["total"]
+    page = data["page"]
+    per_page = data["per_page"]
+
+    rows = []
+    for m in meals:
+        name = m.get("name", "Блюдо")
+        cal = round(m.get("total_calories", 0))
+        label = f"✅ {name} ({cal} ккал)"
+        if len(label) > 50:
+            label = f"✅ {name[:40]}… ({cal})"
+        rows.append([InlineKeyboardButton(
+            text=label, callback_data=f"my_menu_log:{m['id']}"
+        )])
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    if total_pages > 1:
+        nav = []
+        if page > 1:
+            nav.append(InlineKeyboardButton(text="← Назад", callback_data=f"my_menu_page:{page - 1}"))
+        if page < total_pages:
+            nav.append(InlineKeyboardButton(text="Вперёд →", callback_data=f"my_menu_page:{page + 1}"))
+        if nav:
+            rows.append(nav)
+
+    rows.append([InlineKeyboardButton(
+        text="⚙️ Редактировать Моё меню", callback_data="my_menu_edit"
+    )])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
+    await message.answer("🍽 Моё меню:", reply_markup=keyboard)
 
 
 @router.message(F.text == "🤔 Что съесть?")

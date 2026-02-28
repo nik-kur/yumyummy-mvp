@@ -32,6 +32,13 @@ from app.bot.api_client import (
     restaurant_parse_text_openai,
     agent_query,
     agent_run_workflow,
+    get_meal_by_id,
+    create_saved_meal,
+    get_saved_meals,
+    get_saved_meal,
+    update_saved_meal,
+    delete_saved_meal,
+    use_saved_meal,
 )
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 
@@ -50,6 +57,14 @@ class MealEditState(StatesGroup):
     waiting_for_name = State()
     waiting_for_macros = State()
     waiting_for_time = State()
+
+
+class SavedMealStates(StatesGroup):
+    waiting_for_save_name = State()
+    waiting_for_add_name = State()
+    waiting_for_add_macros = State()
+    waiting_for_edit_name = State()
+    waiting_for_edit_macros = State()
 
 
 
@@ -369,6 +384,11 @@ def build_meal_keyboard(
         url = normalize_source_url(source_url)
         if url:
             rows.append([types.InlineKeyboardButton(text="🔗 Источник", url=url)])
+
+    rows.append([types.InlineKeyboardButton(
+        text="💾 В Моё меню",
+        callback_data=f"save_meal:{meal_id}",
+    )])
 
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -2131,6 +2151,8 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
                 source_url=source_url,
                 items=agent_items,
             )
+            if agent_items:
+                await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
     if reply_markup is None and (has_source_url or has_item_sources):
         source_buttons = []
@@ -2232,6 +2254,8 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
                 source_url=source_url,
                 items=agent_items,
             )
+            if agent_items:
+                await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
     if reply_markup is None and (has_source_url or has_item_sources):
         source_buttons = []
@@ -2329,6 +2353,8 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
                     source_url=source_url,
                     items=agent_items,
                 )
+                if agent_items:
+                    await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
         if reply_markup is None and (has_source_url or has_item_sources):
             source_buttons = []
@@ -2460,6 +2486,8 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
                     source_url=source_url,
                     items=agent_items,
                 )
+                if agent_items:
+                    await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
         if reply_markup is None and (has_source_url or has_item_sources):
             source_buttons = []
@@ -2502,6 +2530,534 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
             await message.answer("Сервис временно недоступен, попробуй позже.")
         except Exception:
             pass
+
+
+# ============ Saved Meals ("Моё меню") handlers ============
+
+SAVED_MEALS_PER_PAGE = 20
+
+
+def _build_my_menu_keyboard(
+    meals: list, page: int, total: int, per_page: int = SAVED_MEALS_PER_PAGE
+) -> types.InlineKeyboardMarkup:
+    rows = []
+    for m in meals:
+        name = m.get("name", "Блюдо")
+        cal = round(m.get("total_calories", 0))
+        label = f"✅ {name} ({cal} ккал)"
+        if len(label) > 50:
+            label = f"✅ {name[:40]}… ({cal})"
+        rows.append([types.InlineKeyboardButton(
+            text=label, callback_data=f"my_menu_log:{m['id']}"
+        )])
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    if total_pages > 1:
+        nav = []
+        if page > 1:
+            nav.append(types.InlineKeyboardButton(text="← Назад", callback_data=f"my_menu_page:{page - 1}"))
+        if page < total_pages:
+            nav.append(types.InlineKeyboardButton(text="Вперёд →", callback_data=f"my_menu_page:{page + 1}"))
+        if nav:
+            rows.append(nav)
+
+    rows.append([types.InlineKeyboardButton(
+        text="⚙️ Редактировать Моё меню", callback_data="my_menu_edit"
+    )])
+    return types.InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# --- Save meal from logged entry ---
+
+@router.callback_query(F.data.startswith("save_meal:"))
+async def handle_save_meal(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    if len(parts) < 2:
+        await query.message.answer("Не удалось сохранить.")
+        return
+
+    try:
+        meal_id = int(parts[1])
+    except ValueError:
+        await query.message.answer("Не удалось прочитать данные.")
+        return
+
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        await query.message.answer("Запись не найдена.")
+        return
+
+    suggested_name = meal.get("description_user", "Блюдо")
+    await state.update_data(save_meal_id=meal_id, save_suggested_name=suggested_name)
+    await state.set_state(SavedMealStates.waiting_for_save_name)
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text=f"✅ Сохранить как «{suggested_name[:35]}»",
+            callback_data=f"save_confirm:{meal_id}",
+        )],
+    ])
+    await query.message.answer(
+        f"Под каким названием сохранить в Моё меню?\n\n"
+        f"Нажми кнопку ниже или напиши своё название:",
+        reply_markup=keyboard,
+    )
+
+
+@router.callback_query(F.data.startswith("save_confirm:"))
+async def handle_save_confirm(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    data = await state.get_data()
+    meal_id = data.get("save_meal_id")
+    name = data.get("save_suggested_name", "Блюдо")
+    await state.set_state(None)
+    await _do_save_meal(query.message, state, meal_id, name)
+
+
+@router.message(SavedMealStates.waiting_for_save_name)
+async def handle_save_name_input(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+
+    data = await state.get_data()
+    meal_id = data.get("save_meal_id")
+    await state.set_state(None)
+    await _do_save_meal(message, state, meal_id, name)
+
+
+async def _do_save_meal(
+    message: types.Message, state: FSMContext, meal_id: int, name: str
+) -> None:
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        await message.answer("Запись не найдена.")
+        return
+
+    user = await ensure_user(message.chat.id)
+    if not user:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    data = await state.get_data()
+    raw_items = data.get(f"meal_items_{meal_id}", [])
+
+    items_payload = []
+    if raw_items:
+        for it in raw_items:
+            if not isinstance(it, dict):
+                continue
+            items_payload.append({
+                "name": it.get("name", "Блюдо"),
+                "grams": it.get("grams"),
+                "calories_kcal": float(it.get("calories_kcal", 0)),
+                "protein_g": float(it.get("protein_g", 0)),
+                "fat_g": float(it.get("fat_g", 0)),
+                "carbs_g": float(it.get("carbs_g", 0)),
+                "source_url": it.get("source_url"),
+            })
+    else:
+        items_payload.append({
+            "name": meal.get("description_user", name),
+            "grams": None,
+            "calories_kcal": float(meal.get("calories", 0)),
+            "protein_g": float(meal.get("protein_g", 0)),
+            "fat_g": float(meal.get("fat_g", 0)),
+            "carbs_g": float(meal.get("carbs_g", 0)),
+            "source_url": None,
+        })
+
+    result = await create_saved_meal(
+        user_id=user["id"],
+        name=name,
+        total_calories=float(meal.get("calories", 0)),
+        total_protein_g=float(meal.get("protein_g", 0)),
+        total_fat_g=float(meal.get("fat_g", 0)),
+        total_carbs_g=float(meal.get("carbs_g", 0)),
+        items=items_payload,
+    )
+
+    if result:
+        await message.answer(f"✅ «{name}» сохранено в Моё меню!")
+    else:
+        await message.answer("Не удалось сохранить. Попробуй позже.")
+
+
+# --- Quick log from My Menu ---
+
+@router.callback_query(F.data.startswith("my_menu_log:"))
+async def handle_my_menu_log(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    if len(parts) < 2:
+        await query.message.answer("Ошибка.")
+        return
+
+    try:
+        saved_meal_id = int(parts[1])
+    except ValueError:
+        await query.message.answer("Ошибка данных.")
+        return
+
+    saved = await get_saved_meal(saved_meal_id)
+    if not saved:
+        await query.message.answer("Сохранённое блюдо не найдено.")
+        return
+
+    tg_id = query.from_user.id
+    user = await ensure_user(tg_id)
+    if not user:
+        await query.message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    today = date_type.today()
+    meal_result = await create_meal(
+        user_id=user["id"],
+        day=today,
+        description=saved["name"],
+        calories=saved["total_calories"],
+        protein_g=saved["total_protein_g"],
+        fat_g=saved["total_fat_g"],
+        carbs_g=saved["total_carbs_g"],
+        accuracy_level="EXACT",
+    )
+    if not meal_result:
+        await query.message.answer("Не удалось записать приём пищи. Попробуй позже.")
+        return
+
+    await use_saved_meal(saved_meal_id)
+
+    cal = round(saved["total_calories"])
+    prot = round(saved["total_protein_g"], 1)
+    fat = round(saved["total_fat_g"], 1)
+    carbs = round(saved["total_carbs_g"], 1)
+
+    lines = [f"✅ Записал «{saved['name']}»", ""]
+    lines.append(f"{cal} ккал · Б {prot} г · Ж {fat} г · У {carbs} г")
+
+    saved_items = saved.get("items", [])
+    if len(saved_items) > 1:
+        lines.extend(["", "———", "", "По блюдам:", ""])
+        for si in saved_items:
+            si_name = si.get("name", "Блюдо")
+            si_cal = round(float(si.get("calories_kcal", 0)))
+            si_p = round(float(si.get("protein_g", 0)), 1)
+            si_f = round(float(si.get("fat_g", 0)), 1)
+            si_c = round(float(si.get("carbs_g", 0)), 1)
+            lines.append(f"📝 {si_name}:")
+            lines.append(f"{si_cal} ккал · Б {si_p} г · Ж {si_f} г · У {si_c} г")
+            lines.append("")
+
+    summary = await get_day_summary(user_id=user["id"], day=today)
+    if summary:
+        lines.append("")
+        lines.extend(build_summary_lines(summary))
+
+    meal_id = meal_result.get("id")
+    reply_markup = None
+    if meal_id:
+        reply_markup = build_meal_keyboard(meal_id=meal_id, day=today)
+
+    await query.message.answer("\n".join(lines), reply_markup=reply_markup)
+
+
+# --- My Menu pagination ---
+
+@router.callback_query(F.data.startswith("my_menu_page:"))
+async def handle_my_menu_page(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        page = int(parts[1])
+    except (IndexError, ValueError):
+        page = 1
+
+    tg_id = query.from_user.id
+    data = await get_saved_meals(tg_id, page=page, per_page=SAVED_MEALS_PER_PAGE)
+    if not data or not data.get("items"):
+        await query.message.answer("Моё меню пусто.")
+        return
+
+    keyboard = _build_my_menu_keyboard(
+        data["items"], data["page"], data["total"], data["per_page"]
+    )
+    try:
+        await query.message.edit_reply_markup(reply_markup=keyboard)
+    except Exception:
+        await query.message.answer("🍽 Моё меню:", reply_markup=keyboard)
+
+
+# --- Edit My Menu ---
+
+@router.callback_query(F.data == "my_menu_edit")
+async def handle_my_menu_edit(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    data = await get_saved_meals(tg_id, page=1, per_page=100)
+
+    rows = [[types.InlineKeyboardButton(
+        text="➕ Добавить новое блюдо", callback_data="my_menu_add"
+    )]]
+
+    if data and data.get("items"):
+        for m in data["items"]:
+            name = m.get("name", "Блюдо")
+            label = name if len(name) <= 45 else name[:42] + "..."
+            rows.append([types.InlineKeyboardButton(
+                text=label, callback_data=f"sme_item:{m['id']}"
+            )])
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=rows)
+    await query.message.answer("⚙️ Редактирование Моего меню:", reply_markup=keyboard)
+
+
+# --- Add new saved meal manually ---
+
+@router.callback_query(F.data == "my_menu_add")
+async def handle_my_menu_add(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    await state.set_state(SavedMealStates.waiting_for_add_name)
+    await query.message.answer("Введи название блюда/приёма пищи:")
+
+
+@router.message(SavedMealStates.waiting_for_add_name)
+async def handle_add_name(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+    await state.update_data(add_name=name)
+    await state.set_state(SavedMealStates.waiting_for_add_macros)
+    await message.answer(
+        "Теперь введи КБЖУ в формате: калории белки жиры углеводы\n"
+        "Пример: 350 25 10 40"
+    )
+
+
+@router.message(SavedMealStates.waiting_for_add_macros)
+async def handle_add_macros(message: types.Message, state: FSMContext) -> None:
+    parsed = parse_macros_input(message.text or "")
+    if not parsed:
+        await message.answer(
+            "Не понял формат. Введи 4 числа через пробел или /:\n"
+            "Пример: 350 25 10 40"
+        )
+        return
+
+    calories, protein, fat, carbs = parsed
+    data = await state.get_data()
+    name = data.get("add_name", "Блюдо")
+    await state.clear()
+
+    user = await ensure_user(message.from_user.id)
+    if not user:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    result = await create_saved_meal(
+        user_id=user["id"],
+        name=name,
+        total_calories=calories,
+        total_protein_g=protein,
+        total_fat_g=fat,
+        total_carbs_g=carbs,
+        items=[{
+            "name": name,
+            "grams": None,
+            "calories_kcal": calories,
+            "protein_g": protein,
+            "fat_g": fat,
+            "carbs_g": carbs,
+            "source_url": None,
+        }],
+    )
+
+    if result:
+        await message.answer(
+            f"✅ «{name}» добавлено в Моё меню!\n"
+            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+        )
+    else:
+        await message.answer("Не удалось сохранить. Попробуй позже.")
+
+
+# --- Edit specific saved meal ---
+
+@router.callback_query(F.data.startswith("sme_item:"))
+async def handle_sme_item(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    saved = await get_saved_meal(saved_id)
+    if not saved:
+        await query.message.answer("Блюдо не найдено.")
+        return
+
+    name = saved.get("name", "Блюдо")
+    cal = round(saved.get("total_calories", 0))
+    prot = round(saved.get("total_protein_g", 0), 1)
+    fat = round(saved.get("total_fat_g", 0), 1)
+    carbs = round(saved.get("total_carbs_g", 0), 1)
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text="✏️ Изменить название", callback_data=f"sme_name:{saved_id}"
+        )],
+        [types.InlineKeyboardButton(
+            text="📊 Изменить КБЖУ", callback_data=f"sme_macros:{saved_id}"
+        )],
+        [types.InlineKeyboardButton(
+            text="🗑 Удалить", callback_data=f"sme_del:{saved_id}"
+        )],
+        [types.InlineKeyboardButton(
+            text="← Назад", callback_data="my_menu_edit"
+        )],
+    ])
+
+    await query.message.answer(
+        f"«{name}»\n{cal} ккал · Б {prot} г · Ж {fat} г · У {carbs} г",
+        reply_markup=keyboard,
+    )
+
+
+# --- Edit name ---
+
+@router.callback_query(F.data.startswith("sme_name:"))
+async def handle_sme_name(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    await state.update_data(edit_saved_id=saved_id)
+    await state.set_state(SavedMealStates.waiting_for_edit_name)
+    await query.message.answer("Введи новое название:")
+
+
+@router.message(SavedMealStates.waiting_for_edit_name)
+async def handle_edit_name_input(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+
+    data = await state.get_data()
+    saved_id = data.get("edit_saved_id")
+    await state.clear()
+
+    result = await update_saved_meal(saved_id, name=name)
+    if result:
+        await message.answer(f"✅ Название обновлено на «{name}»")
+    else:
+        await message.answer("Не удалось обновить. Попробуй позже.")
+
+
+# --- Edit macros ---
+
+@router.callback_query(F.data.startswith("sme_macros:"))
+async def handle_sme_macros(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    await state.update_data(edit_saved_id=saved_id)
+    await state.set_state(SavedMealStates.waiting_for_edit_macros)
+    await query.message.answer(
+        "Введи новые КБЖУ в формате: калории белки жиры углеводы\n"
+        "Пример: 350 25 10 40"
+    )
+
+
+@router.message(SavedMealStates.waiting_for_edit_macros)
+async def handle_edit_macros_input(message: types.Message, state: FSMContext) -> None:
+    parsed = parse_macros_input(message.text or "")
+    if not parsed:
+        await message.answer(
+            "Не понял формат. Введи 4 числа через пробел или /:\n"
+            "Пример: 350 25 10 40"
+        )
+        return
+
+    calories, protein, fat, carbs = parsed
+    data = await state.get_data()
+    saved_id = data.get("edit_saved_id")
+    await state.clear()
+
+    result = await update_saved_meal(
+        saved_id,
+        total_calories=calories,
+        total_protein_g=protein,
+        total_fat_g=fat,
+        total_carbs_g=carbs,
+    )
+    if result:
+        await message.answer(
+            f"✅ КБЖУ обновлено:\n"
+            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+        )
+    else:
+        await message.answer("Не удалось обновить. Попробуй позже.")
+
+
+# --- Delete saved meal ---
+
+@router.callback_query(F.data.startswith("sme_del:"))
+async def handle_sme_delete(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    saved = await get_saved_meal(saved_id)
+    name = saved.get("name", "Блюдо") if saved else "Блюдо"
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [
+            types.InlineKeyboardButton(
+                text="✅ Да", callback_data=f"sme_del_yes:{saved_id}"
+            ),
+            types.InlineKeyboardButton(
+                text="❌ Нет", callback_data="my_menu_edit"
+            ),
+        ]
+    ])
+    await query.message.answer(
+        f"Удалить «{name}» из Моего меню?", reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data.startswith("sme_del_yes:"))
+async def handle_sme_delete_confirm(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    ok = await delete_saved_meal(saved_id)
+    if ok:
+        await query.message.answer("✅ Блюдо удалено из Моего меню.")
+    else:
+        await query.message.answer("Не удалось удалить. Попробуй позже.")
 
 
 async def main() -> None:

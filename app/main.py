@@ -17,6 +17,15 @@ from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.meal import MealCreate, MealRead, MealUpdate, DaySummary
+from app.models.saved_meal import SavedMeal
+from app.models.saved_meal_item import SavedMealItem
+from app.schemas.saved_meal import (
+    SavedMealCreate,
+    SavedMealRead,
+    SavedMealListRead,
+    SavedMealUpdate,
+    SavedMealsListResponse,
+)
 
 from app.services.llm_client import chat_completion
 from app.services.meal_parser import parse_meal_text
@@ -1335,6 +1344,14 @@ def export_user_meals(telegram_id: str, db: Session = Depends(get_db)):
 # ---------- MEALS ----------
 
 
+@app.get("/meals/{meal_id}", response_model=MealRead)
+def get_meal(meal_id: int, db: Session = Depends(get_db)):
+    meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if not meal:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    return meal
+
+
 @app.post("/meals", response_model=MealRead)
 def create_meal(meal_in: MealCreate, db: Session = Depends(get_db)):
     """
@@ -1507,3 +1524,120 @@ def get_day_summary(
         total_carbs_g=user_day.total_carbs_g,
         meals=meals,
     )
+
+
+# ---------- SAVED MEALS ("Моё меню") ----------
+
+
+@app.post("/saved-meals", response_model=SavedMealRead)
+def create_saved_meal(payload: SavedMealCreate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    saved = SavedMeal(
+        user_id=user.id,
+        name=payload.name,
+        total_calories=payload.total_calories,
+        total_protein_g=payload.total_protein_g,
+        total_fat_g=payload.total_fat_g,
+        total_carbs_g=payload.total_carbs_g,
+    )
+    db.add(saved)
+    db.flush()
+
+    for item in payload.items:
+        db.add(SavedMealItem(
+            saved_meal_id=saved.id,
+            name=item.name,
+            grams=item.grams,
+            calories_kcal=item.calories_kcal,
+            protein_g=item.protein_g,
+            fat_g=item.fat_g,
+            carbs_g=item.carbs_g,
+            source_url=item.source_url,
+        ))
+
+    db.commit()
+    db.refresh(saved)
+    return saved
+
+
+@app.get("/saved-meals/by-user/{telegram_id}", response_model=SavedMealsListResponse)
+def list_saved_meals(
+    telegram_id: str,
+    page: int = 1,
+    per_page: int = 20,
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    query = db.query(SavedMeal).filter(SavedMeal.user_id == user.id)
+    total = query.count()
+    meals = (
+        query
+        .order_by(SavedMeal.use_count.desc(), SavedMeal.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+    return SavedMealsListResponse(items=meals, total=total, page=page, per_page=per_page)
+
+
+@app.get("/saved-meals/{saved_meal_id}", response_model=SavedMealRead)
+def get_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
+    saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+    return saved
+
+
+@app.patch("/saved-meals/{saved_meal_id}", response_model=SavedMealRead)
+def update_saved_meal(
+    saved_meal_id: int,
+    payload: SavedMealUpdate,
+    db: Session = Depends(get_db),
+):
+    saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+
+    if payload.name is not None:
+        saved.name = payload.name
+    if payload.total_calories is not None:
+        saved.total_calories = payload.total_calories
+    if payload.total_protein_g is not None:
+        saved.total_protein_g = payload.total_protein_g
+    if payload.total_fat_g is not None:
+        saved.total_fat_g = payload.total_fat_g
+    if payload.total_carbs_g is not None:
+        saved.total_carbs_g = payload.total_carbs_g
+
+    db.commit()
+    db.refresh(saved)
+    return saved
+
+
+@app.delete("/saved-meals/{saved_meal_id}")
+def delete_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
+    saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+
+    db.delete(saved)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@app.post("/saved-meals/{saved_meal_id}/use", response_model=SavedMealRead)
+def use_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
+    saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+
+    saved.use_count = (saved.use_count or 0) + 1
+    db.commit()
+    db.refresh(saved)
+    return saved
