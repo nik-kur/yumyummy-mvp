@@ -277,7 +277,7 @@ Return STRICT JSON matching the provided schema.
 === CRITICAL: IMAGE DETECTION (check FIRST) ===
 BEFORE choosing any intent, check if the message contains an image/photo.
 If an image IS present:
-  - If the image shows prepared food/dishes on a plate/table WITHOUT a clear packaged product brand -> intent = \"photo_meal\". Do NOT choose log_meal or food_advice.
+  - If the image shows prepared food/dishes on a plate/table WITHOUT a clear packaged product brand -> intent = \"photo_meal\". Do NOT choose log_meal.
   - If the image shows a packaged product with a clearly visible brand name/logo -> intent = \"product\".
   - If the image shows a nutrition facts table/label (таблица пищевой ценности) -> intent = \"nutrition_label\".
   - If the image doesn't show specific brands or nutrition labels, choose \"photo_meal\".
@@ -297,6 +297,7 @@ Intents (for TEXT-ONLY messages or after image rules have been applied):
 - nutrition_label: user sent a PHOTO of a nutrition facts table / label / этикетка with KBJU values printed on it.
 
 Rules:
+- Never give back intent food_advice. Food advice is handled externally.
 - If message mentions a restaurant/cafe/brand menu item (e.g., Starbucks, Joe & The Juice, Coffeemania), choose eatout (even if grams are mentioned).
 - If message mentions a packaged product brand menu item (e.g., Fanta, Danone, ФрутоНяня, Азбука Вкуса, Carrefour, etc.), choose product (even if grams are mentioned).
 - If the message contains BOTH branded items (with known brand/store) AND generic/homemade items without a brand — choose intent 'product' (or 'eatout' if restaurant). The downstream agent will handle the mix.
@@ -631,14 +632,18 @@ barcode_agent = Agent(
 
 
 class NutritionAdvisorContext:
-  def __init__(self, state_user_text_clean: str):
+  def __init__(self, state_user_text_clean: str, nutrition_context: Optional[str] = None):
     self.state_user_text_clean = state_user_text_clean
+    self.nutrition_context = nutrition_context
 def nutrition_advisor_instructions(run_context: RunContextWrapper[NutritionAdvisorContext], _agent: Agent[NutritionAdvisorContext]):
   state_user_text_clean = run_context.context.state_user_text_clean
+  nutrition_context = run_context.context.nutrition_context
   return f"""Ты YumYummy Nutrition Advisor (советник по выбору еды).
 
 ВХОД (из global variables/state):
 - user_text_clean: {state_user_text_clean}
+- nutrition_context: {nutrition_context}
+  (JSON с данными КБЖУ пользователя за сегодня: target_calories, target_protein_g, target_fat_g, target_carbs_g — цели на день; eaten_calories, eaten_protein_g, eaten_fat_g, eaten_carbs_g — уже съедено; remaining_calories, remaining_protein_g, remaining_fat_g, remaining_carbs_g — осталось)
 
 Задача:
 Пользователь находится в кафе/ресторане/магазине и просит посоветовать, что выбрать.
@@ -646,10 +651,15 @@ def nutrition_advisor_instructions(run_context: RunContextWrapper[NutritionAdvis
 Цель: помочь выбрать наиболее "здоровый" вариант для weight management (контроль калорий, больше сытости, белок/клетчатка).
 
 Общее правило выбора (внутренне):
-1) Приоритет: белок + овощи/клетчатка (рыба/курица/говядина/яйца/творог/бобовые + салат/овощи).
-2) Лучше способы готовки: гриль/запекание/варка/тушение.
-3) Осторожно: фритюр, сливочные соусы, много сыра/майонеза, сладкие напитки/десерты, большие порции пасты/пиццы/выпечки.
-4) "Хаки": соус отдельно, двойные овощи, половина гарнира, без сахара в напитках.
+1) Используй данные из nutrition_context как основу для рекомендации:
+   - Учитывай сколько КБЖУ осталось у пользователя на сегодня
+   - Приоритизируй варианты, которые лучше вписываются в оставшийся бюджет
+   - Если у пользователя мало осталось калорий — рекомендуй легкие варианты
+   - Если не хватает белка — приоритизируй белковые блюда
+2) Приоритет: белок + овощи/клетчатка (рыба/курица/говядина/яйца/творог/бобовые + салат/овощи).
+3) Лучше способы готовки: гриль/запекание/варка/тушение.
+4) Осторожно: фритюр, сливочные соусы, много сыра/майонеза, сладкие напитки/десерты, большие порции пасты/пиццы/выпечки.
+5) "Хаки": соус отдельно, двойные овощи, половина гарнира, без сахара в напитках.
 
 Как отвечать:
 A) Если пользователь дал список вариантов (через запятые/буллеты/"или"/нумерацию):
@@ -658,6 +668,7 @@ A) Если пользователь дал список вариантов (ч�
 B) Если пользователь НЕ дал варианты:
    - Дай 3 универсальных рекомендации "что обычно брать".
    - И задай ОДИН короткий вопрос: "Скинь 3–6 вариантов из меню (текстом), и я выберу лучшие."
+C) Если пользователь прислал фото (это может быть меню с перечнем доступных блюд или фото реальных блюд, из которых он сейчас выбирает или что-то еще) - выбери из тех опций, которые есть на фото
 
 Формат ответа: верни ТОЛЬКО JSON по схеме YumYummyResponse.
 
@@ -666,13 +677,12 @@ B) Если пользователь НЕ дал варианты:
 - confidence: \"ESTIMATE\"
 - source_url: null
 - items: ВСЕГДА возвращай ровно 3 варианта (если вариантов у пользователя меньше — дополни своими рекомендациями). Первый item — приоритетный (лучший выбор), остальные — альтернативы. Для каждого item укажи name, примерные calories_kcal, protein_g, fat_g, carbs_g. totals = сумма лучшего варианта (первого item).
-- totals: используй как оценку для лучшего варианта (первого в списке). Числа должны быть > 0.
-- message_text (по-русски):
+- totals: используй как оценку для лучшего варианта (первого в списке).
+- message_text:
 В message_text: (1) 'Лучший выбор: ...' с объяснением (2) 'Альтернатива 1: ...' (3) 'Альтернатива 2: ...' (4) 'Как улучшить заказ: ...' (2-3 хака). Не пиши 'Записал' — это только рекомендация, юзер сам решит залогировать.
 
 Важно:
 - Не пиши ничего кроме JSON.
-- Не задавай больше 1 вопроса.
 """
 nutrition_advisor = Agent(
   name="Nutrition advisor",
@@ -760,6 +770,8 @@ class WorkflowInput(BaseModel):
   input_as_text: str
   image_url: Optional[str] = None
   telegram_id: Optional[str] = None
+  force_intent: Optional[str] = None
+  nutrition_context: Optional[str] = None
 
 
 # Main code entrypoint
@@ -804,29 +816,37 @@ async def run_workflow(workflow_input: WorkflowInput):
       "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
     })
 
-    router_result_temp = await Runner.run(
-      router,
-      input=[*conversation_history],
-      run_config=_trace_cfg,
-    )
+    force_intent = workflow.get("force_intent")
+    nutrition_context = workflow.get("nutrition_context")
 
-    conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])
+    if force_intent == "food_advice":
+      state["intent"] = "food_advice"
+      state["user_text_clean"] = workflow["input_as_text"]
+      state["language"] = "ru"
+    else:
+      router_result_temp = await Runner.run(
+        router,
+        input=[*conversation_history],
+        run_config=_trace_cfg,
+      )
 
-    router_result = {
-      "output_text": router_result_temp.final_output.json(),
-      "output_parsed": router_result_temp.final_output.model_dump()
-    }
+      conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])
 
-    # ---------- Populate state from router ----------
-    rp = router_result["output_parsed"]
-    state["intent"] = rp["intent"]
-    state["user_text_clean"] = rp["user_text_clean"]
-    state["dish_or_product"] = rp.get("dish_or_product")
-    state["grams"] = rp.get("grams")
-    state["date_hint"] = rp.get("date_hint")
-    state["language"] = rp.get("language") or "ru"
-    state["serving_hint"] = rp.get("serving_hint")
-    state["gram"] = str(rp["grams"]) if rp.get("grams") else None
+      router_result = {
+        "output_text": router_result_temp.final_output.json(),
+        "output_parsed": router_result_temp.final_output.model_dump()
+      }
+
+      # ---------- Populate state from router ----------
+      rp = router_result["output_parsed"]
+      state["intent"] = rp["intent"]
+      state["user_text_clean"] = rp["user_text_clean"]
+      state["dish_or_product"] = rp.get("dish_or_product")
+      state["grams"] = rp.get("grams")
+      state["date_hint"] = rp.get("date_hint")
+      state["language"] = rp.get("language") or "ru"
+      state["serving_hint"] = rp.get("serving_hint")
+      state["gram"] = str(rp["grams"]) if rp.get("grams") else None
 
     if state["intent"] == 'log_meal':
       meal_parser_result_temp = await Runner.run(
@@ -884,7 +904,10 @@ async def run_workflow(workflow_input: WorkflowInput):
         nutrition_advisor,
         input=[*conversation_history],
         run_config=_trace_cfg,
-        context=NutritionAdvisorContext(state_user_text_clean=state["user_text_clean"])
+        context=NutritionAdvisorContext(
+          state_user_text_clean=state["user_text_clean"],
+          nutrition_context=nutrition_context,
+        )
       )
       conversation_history.extend([item.to_input_item() for item in nutrition_advisor_result_temp.new_items])
 
@@ -942,10 +965,14 @@ async def run_workflow(workflow_input: WorkflowInput):
 
 # ---------- Helper for agent_runner.py ----------
 
-async def run_text(text: str, telegram_id: Optional[str] = None, image_url: Optional[str] = None) -> dict:
+async def run_text(text: str, telegram_id: Optional[str] = None, image_url: Optional[str] = None,
+                   force_intent: Optional[str] = None, nutrition_context: Optional[str] = None) -> dict:
   """
   Helper function that calls run_workflow with WorkflowInput.
   Called by agent_runner.py -> run_yumyummy_workflow().
   """
-  workflow_input = WorkflowInput(input_as_text=text, telegram_id=telegram_id, image_url=image_url)
+  workflow_input = WorkflowInput(
+    input_as_text=text, telegram_id=telegram_id, image_url=image_url,
+    force_intent=force_intent, nutrition_context=nutrition_context,
+  )
   return await run_workflow(workflow_input)

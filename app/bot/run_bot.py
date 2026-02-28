@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import logging
 from datetime import date as date_type, datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
@@ -32,7 +33,7 @@ from app.bot.api_client import (
     agent_query,
     agent_run_workflow,
 )
-from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard
+from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 
 
 router = Router()
@@ -50,9 +51,6 @@ class MealEditState(StatesGroup):
     waiting_for_macros = State()
     waiting_for_time = State()
 
-
-class FoodAdviceState(StatesGroup):
-    waiting_for_choice = State()
 
 
 def normalize_source_url(source_url: Optional[str]) -> Optional[str]:
@@ -1839,6 +1837,138 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
     await query.message.answer(response_text)
 
 
+# ---------- Food Advice Input Handlers (waiting_for_input state) ----------
+
+async def _process_food_advice_input(
+    message: types.Message,
+    state: FSMContext,
+    text: str,
+    image_url: Optional[str] = None,
+) -> None:
+    """Common logic for processing user input in food advice mode."""
+    data = await state.get_data()
+    nutrition_context = data.get("nutrition_context")
+    tg_id = str(message.from_user.id)
+
+    await state.clear()
+
+    processing_msg = await message.answer("🤔 Думаю, что тебе посоветовать...")
+
+    try:
+        result = await agent_run_workflow(
+            telegram_id=tg_id,
+            text=text,
+            image_url=image_url,
+            force_intent="food_advice",
+            nutrition_context=nutrition_context,
+        )
+    except Exception as e:
+        logger.error(f"[FOOD_ADVICE] Error running agent workflow: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    if result is None:
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    agent_items = result.get("items") or []
+    response_text = build_food_advice_response(result)
+    reply_markup = build_food_advice_keyboard(agent_items) if agent_items else get_main_menu_keyboard()
+
+    try:
+        await message.answer(response_text, reply_markup=reply_markup)
+        if agent_items:
+            await state.update_data(advice_result=result)
+            await state.set_state(FoodAdviceState.waiting_for_choice)
+        logger.info(f"[FOOD_ADVICE] Sent food_advice for telegram_id={tg_id}")
+    except Exception as send_error:
+        logger.error(f"[FOOD_ADVICE] Error sending response: {send_error}", exc_info=True)
+        await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
+
+
+@router.message(FoodAdviceState.waiting_for_input, F.text)
+async def handle_food_advice_text(message: types.Message, state: FSMContext) -> None:
+    """Handle text input in food advice mode."""
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Пожалуйста, отправь текст с вариантами или фото меню.")
+        return
+    await _process_food_advice_input(message, state, text=text)
+
+
+@router.message(FoodAdviceState.waiting_for_input, F.photo)
+async def handle_food_advice_photo(message: types.Message, state: FSMContext) -> None:
+    """Handle photo input in food advice mode (e.g., menu photo)."""
+    try:
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        photo_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[FOOD_ADVICE] Error downloading photo: {e}")
+        await message.answer("Не удалось скачать фото. Попробуй ещё раз.")
+        return
+
+    if not photo_bytes:
+        await message.answer("Фото пустое. Попробуй ещё раз.")
+        return
+
+    b64 = base64.b64encode(photo_bytes).decode("utf-8")
+    image_data_uri = f"data:image/jpeg;base64,{b64}"
+    text = (message.caption or "").strip() or "Посоветуй что выбрать из вариантов на фото"
+
+    await _process_food_advice_input(message, state, text=text, image_url=image_data_uri)
+
+
+@router.message(FoodAdviceState.waiting_for_input, F.voice)
+async def handle_food_advice_voice(message: types.Message, state: FSMContext) -> None:
+    """Handle voice input in food advice mode."""
+    try:
+        file = await message.bot.get_file(message.voice.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        audio_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[FOOD_ADVICE] Error downloading voice: {e}")
+        await message.answer("Не удалось скачать голосовое. Попробуй ещё раз.")
+        return
+
+    if not audio_bytes:
+        await message.answer("Голосовое пустое. Попробуй ещё раз.")
+        return
+
+    await message.answer("🎙 Секунду, распознаю голос...")
+    parsed = await voice_parse_meal(audio_bytes)
+    if parsed is None:
+        await message.answer("Не удалось обработать голос. Попробуй ещё раз.")
+        return
+
+    transcript = (parsed.get("transcript", "") or "").strip()
+    if not transcript:
+        await message.answer("Не удалось распознать речь. Попробуй ещё раз.")
+        return
+
+    await message.answer(f"Распознал: \"{transcript}\"")
+    await _process_food_advice_input(message, state, text=transcript)
+
+
+@router.message(FoodAdviceState.waiting_for_input)
+async def handle_food_advice_other(message: types.Message, state: FSMContext) -> None:
+    """Handle unsupported input types in food advice mode."""
+    await message.answer("Отправь текст с вариантами, фото меню или голосовое сообщение.")
+
+
+# ---------- End Food Advice Input Handlers ----------
+
+
 @router.message(F.voice)
 async def handle_voice(message: types.Message, state: FSMContext) -> None:
     """
@@ -1919,16 +2049,6 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
     has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
 
     await message.answer(f"Распознал: \"{transcript}\"")
-
-    # Food advice: separate flow (no auto-logging)
-    if intent == "food_advice":
-        response_text = build_food_advice_response(result)
-        reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
-        await message.answer(response_text, reply_markup=reply_markup)
-        if agent_items:
-            await state.update_data(advice_result=result)
-            await state.set_state(FoodAdviceState.waiting_for_choice)
-        return
 
     reply_markup = None
     if intent in MEAL_LOGGING_INTENTS:
@@ -2031,16 +2151,6 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
     has_source_url = source_url is not None and source_url != ""
     has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
 
-    # Food advice: separate flow (no auto-logging)
-    if intent == "food_advice":
-        response_text = build_food_advice_response(result)
-        reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
-        await message.answer(response_text, reply_markup=reply_markup)
-        if agent_items:
-            await state.update_data(advice_result=result)
-            await state.set_state(FoodAdviceState.waiting_for_choice)
-        return
-
     reply_markup = None
     if intent in MEAL_LOGGING_INTENTS:
         meal_id = await get_latest_meal_id_for_today(message.from_user.id)
@@ -2137,21 +2247,6 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         except Exception:
             pass
         
-        # Food advice: separate flow (no auto-logging)
-        if intent == "food_advice":
-            response_text = build_food_advice_response(result)
-            reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
-            try:
-                await message.answer(response_text, reply_markup=reply_markup)
-                if agent_items:
-                    await state.update_data(advice_result=result)
-                    await state.set_state(FoodAdviceState.waiting_for_choice)
-                logger.info(f"[BOT /agent] Sent food_advice for telegram_id={tg_id}")
-            except Exception as send_error:
-                logger.error(f"[BOT /agent] Error sending food_advice: {send_error}", exc_info=True)
-                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
-            return
-
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
         if intent in MEAL_LOGGING_INTENTS:
@@ -2283,21 +2378,6 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         except Exception:
             pass
         
-        # Food advice: separate flow (no auto-logging)
-        if intent == "food_advice":
-            response_text = build_food_advice_response(result)
-            reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
-            try:
-                await message.answer(response_text, reply_markup=reply_markup)
-                if agent_items:
-                    await state.update_data(advice_result=result)
-                    await state.set_state(FoodAdviceState.waiting_for_choice)
-                logger.info(f"[BOT plain_text] Sent food_advice for telegram_id={tg_id}")
-            except Exception as send_error:
-                logger.error(f"[BOT plain_text] Error sending food_advice: {send_error}", exc_info=True)
-                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
-            return
-
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
         if intent in MEAL_LOGGING_INTENTS:

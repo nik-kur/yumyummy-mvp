@@ -63,6 +63,8 @@ class WorkflowRunRequest(BaseModel):
     telegram_id: str
     text: str
     image_url: Optional[str] = None
+    force_intent: Optional[str] = None
+    nutrition_context: Optional[str] = None
 
 
 class WorkflowTotals(BaseModel):
