@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 from datetime import date as date_type, datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
@@ -35,6 +36,8 @@ from app.bot.onboarding import router as onboarding_router, start_onboarding, ge
 
 
 router = Router()
+
+MEAL_LOGGING_INTENTS = {"log_meal", "product", "eatout", "barcode", "photo_meal", "nutrition_label"}
 
 # FSM States for agent clarification
 class AgentClarification(StatesGroup):
@@ -509,7 +512,9 @@ async def cmd_help(message: types.Message) -> None:
         "1️⃣ Логирование еды:\n"
         "• Просто напиши что съел: \"2 яйца и тост\"\n"
         "• Или отправь голосовое сообщение\n"
-        "• Сфотографируй штрих-код продукта\n"
+        "• 📸 Отправь фото еды — бот оценит КБЖУ\n"
+        "• 📸 Сфотографируй этикетку с КБЖУ\n"
+        "• 📸 Сфотографируй продукт с брендом\n"
         "• Укажи место: \"капучино в Старбаксе\"\n\n"
         "2️⃣ Кнопки меню:\n"
         "📊 Сегодня — прогресс за день\n"
@@ -1926,7 +1931,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         return
 
     reply_markup = None
-    if intent in {"log_meal", "product", "eatout", "barcode"}:
+    if intent in MEAL_LOGGING_INTENTS:
         meal_id = await get_latest_meal_id_for_today(message.from_user.id)
         if meal_id:
             reply_markup = build_meal_keyboard(
@@ -1949,7 +1954,118 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
             reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
 
     response_text = message_text
-    if intent in {"log_meal", "product", "eatout", "barcode"}:
+    if intent in MEAL_LOGGING_INTENTS:
+        response_text = build_meal_response_from_agent(result)
+
+    await message.answer(response_text, reply_markup=reply_markup)
+
+
+@router.message(F.photo)
+async def handle_photo(message: types.Message, state: FSMContext) -> None:
+    """
+    Handle photo messages. Downloads the photo, base64-encodes it,
+    and sends it through the agent workflow for food recognition.
+    """
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    # Download the largest resolution photo
+    try:
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        photo_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[PHOTO] Error downloading photo: {e}")
+        await message.answer("Не удалось скачать фото. Попробуй ещё раз 🙏")
+        return
+
+    if not photo_bytes:
+        await message.answer("Фото пустое. Попробуй ещё раз 🙏")
+        return
+
+    # Base64-encode as data URI
+    b64 = base64.b64encode(photo_bytes).decode("utf-8")
+    image_data_uri = f"data:image/jpeg;base64,{b64}"
+
+    # Use caption as text, or a default prompt
+    text = (message.caption or "").strip() or "Определи что на фото и посчитай КБЖУ"
+
+    processing_msg = await message.answer("📸 Анализирую фото...")
+
+    try:
+        result = await agent_run_workflow(
+            telegram_id=str(tg_id),
+            text=text,
+            image_url=image_data_uri,
+        )
+    except Exception as e:
+        logger.error(f"[PHOTO] Error running agent workflow: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    if result is None:
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    intent = result.get("intent", "unknown")
+    message_text = result.get("message_text", "Ошибка обработки")
+    source_url = result.get("source_url")
+    agent_items = result.get("items") or []
+    has_source_url = source_url is not None and source_url != ""
+    has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
+
+    # Food advice: separate flow (no auto-logging)
+    if intent == "food_advice":
+        response_text = build_food_advice_response(result)
+        reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
+        await message.answer(response_text, reply_markup=reply_markup)
+        if agent_items:
+            await state.update_data(advice_result=result)
+            await state.set_state(FoodAdviceState.waiting_for_choice)
+        return
+
+    reply_markup = None
+    if intent in MEAL_LOGGING_INTENTS:
+        meal_id = await get_latest_meal_id_for_today(message.from_user.id)
+        if meal_id:
+            reply_markup = build_meal_keyboard(
+                meal_id=meal_id,
+                day=date_type.today(),
+                source_url=source_url,
+                items=agent_items,
+            )
+
+    if reply_markup is None and (has_source_url or has_item_sources):
+        source_buttons = []
+        for it in agent_items:
+            if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
+                item_name = it.get("name") or "Продукт"
+                label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+        if not source_buttons and has_source_url:
+            source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+        if source_buttons:
+            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
+
+    response_text = message_text
+    if intent in MEAL_LOGGING_INTENTS:
         response_text = build_meal_response_from_agent(result)
 
     await message.answer(response_text, reply_markup=reply_markup)
@@ -2038,7 +2154,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
 
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if intent in {"log_meal", "product", "eatout", "barcode"}:
+        if intent in MEAL_LOGGING_INTENTS:
             meal_id = await get_latest_meal_id_for_today(message.from_user.id)
             if meal_id:
                 reply_markup = build_meal_keyboard(
@@ -2063,7 +2179,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         # Send the message
         try:
             response_text = message_text
-            if intent in {"log_meal", "product", "eatout", "barcode"}:
+            if intent in MEAL_LOGGING_INTENTS:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
@@ -2184,7 +2300,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
 
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if intent in {"log_meal", "product", "eatout", "barcode"}:
+        if intent in MEAL_LOGGING_INTENTS:
             meal_id = await get_latest_meal_id_for_today(message.from_user.id)
             if meal_id:
                 reply_markup = build_meal_keyboard(
@@ -2209,7 +2325,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         # Send the message
         try:
             response_text = message_text
-            if intent in {"log_meal", "product", "eatout", "barcode"}:
+            if intent in MEAL_LOGGING_INTENTS:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")

@@ -48,8 +48,8 @@ def persist_agent_result(db: Session, telegram_id: str, agent_result: Dict[str, 
     """
     intent = agent_result.get("intent", "")
     
-    # Only persist log_meal, product, eatout, barcode intents
-    if intent not in ["log_meal", "product", "eatout", "barcode"]:
+    # Only persist meal-logging intents
+    if intent not in ["log_meal", "product", "eatout", "barcode", "photo_meal", "nutrition_label"]:
         logger.debug(f"[PERSIST] Skipping intent={intent}, not a meal logging intent")
         return
     

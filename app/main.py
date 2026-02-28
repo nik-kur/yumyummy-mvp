@@ -1060,10 +1060,11 @@ async def agent_run(payload: WorkflowRunRequest):
     request_id = str(uuid.uuid4())[:8]
     telegram_id = payload.telegram_id
     user_text = payload.text
+    image_url = payload.image_url
     
     try:
         # Run the workflow WITHOUT DB connection
-        result = await run_yumyummy_workflow(user_text=user_text, telegram_id=telegram_id)
+        result = await run_yumyummy_workflow(user_text=user_text, telegram_id=telegram_id, image_url=image_url)
         
         # Extract values for logging
         intent = result.get("intent", "unknown")

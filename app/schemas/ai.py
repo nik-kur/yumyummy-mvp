@@ -62,6 +62,7 @@ class WorkflowRunRequest(BaseModel):
     """Запрос на запуск workflow."""
     telegram_id: str
     text: str
+    image_url: Optional[str] = None
 
 
 class WorkflowTotals(BaseModel):

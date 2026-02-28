@@ -338,7 +338,7 @@ async def agent_query(user_id: int, text: str, date: Optional[str] = None, conve
         return None
 
 
-async def agent_run_workflow(telegram_id: str, text: str) -> Optional[Dict[str, Any]]:
+async def agent_run_workflow(telegram_id: str, text: str, image_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Вызывает POST /agent/run в backend.
     Возвращает dict с полями:
@@ -350,6 +350,8 @@ async def agent_run_workflow(telegram_id: str, text: str) -> Optional[Dict[str, 
         "telegram_id": str(telegram_id),
         "text": text,
     }
+    if image_url:
+        payload["image_url"] = image_url
     
     # Увеличенный таймаут для агентных ответов (до 180 секунд для web search)
     timeout = httpx.Timeout(180.0)
