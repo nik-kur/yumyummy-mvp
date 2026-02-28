@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import json
 import logging
 from datetime import date as date_type, datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
@@ -30,11 +32,20 @@ from app.bot.api_client import (
     restaurant_parse_text_openai,
     agent_query,
     agent_run_workflow,
+    get_meal_by_id,
+    create_saved_meal,
+    get_saved_meals,
+    get_saved_meal,
+    update_saved_meal,
+    delete_saved_meal,
+    use_saved_meal,
 )
-from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard
+from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 
 
 router = Router()
+
+MEAL_LOGGING_INTENTS = {"log_meal", "product", "eatout", "barcode", "photo_meal", "nutrition_label"}
 
 # FSM States for agent clarification
 class AgentClarification(StatesGroup):
@@ -48,8 +59,13 @@ class MealEditState(StatesGroup):
     waiting_for_time = State()
 
 
-class FoodAdviceState(StatesGroup):
-    waiting_for_choice = State()
+class SavedMealStates(StatesGroup):
+    waiting_for_save_name = State()
+    waiting_for_add_name = State()
+    waiting_for_add_macros = State()
+    waiting_for_edit_name = State()
+    waiting_for_edit_macros = State()
+
 
 
 def normalize_source_url(source_url: Optional[str]) -> Optional[str]:
@@ -220,19 +236,45 @@ def build_meal_response_from_agent(
     return "\n".join(lines)
 
 
+def _strip_markdown_bold(text: str) -> str:
+    """Remove **bold** markers that Telegram plain-text mode can't render."""
+    return text.replace("**", "")
+
+
+def _extract_message_text_block(message_text: str, start_keywords: list, stop_keywords: list) -> Optional[str]:
+    """Extract a block from message_text starting at one of start_keywords and ending before stop_keywords."""
+    text_lower = message_text.lower()
+    start_pos = None
+    for kw in start_keywords:
+        idx = text_lower.find(kw.lower())
+        if idx != -1:
+            start_pos = idx
+            break
+    if start_pos is None:
+        return None
+
+    end_pos = len(message_text)
+    for kw in stop_keywords:
+        idx = text_lower.find(kw.lower(), start_pos + 1)
+        if idx != -1 and idx < end_pos:
+            end_pos = idx
+
+    return message_text[start_pos:end_pos].strip()
+
+
 def build_food_advice_response(result: Dict[str, Any]) -> str:
     """Format food advice as a recommendation (NOT a logged meal)."""
     items = result.get("items") or []
-    message_text = (result.get("message_text") or "").strip()
-    
+    message_text = _strip_markdown_bold((result.get("message_text") or "").strip())
+
     if not items:
         return message_text or "Не удалось сформировать рекомендацию."
-    
+
     lines = ["🤔 Рекомендация:", ""]
-    
+
     labels = ["Лучший выбор", "Альтернатива 1", "Альтернатива 2"]
     for idx, item in enumerate(items[:3]):
-        item_name = item.get("name") or "Блюдо"
+        item_name = _strip_markdown_bold(item.get("name") or "Блюдо")
         item_cal = round(float(item.get("calories_kcal") or 0))
         item_prot = round(float(item.get("protein_g") or 0), 1)
         item_fat = round(float(item.get("fat_g") or 0), 1)
@@ -242,24 +284,43 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
         if item_cal > 0:
             lines.append(f"   {item_cal} ккал · Б {item_prot} г · Ж {item_fat} г · У {item_carbs} г")
         lines.append("")
-    
+
     if message_text:
-        for keyword in ["Как улучшить", "Хак", "Совет", "Лайфхак"]:
-            if keyword.lower() in message_text.lower():
-                tip_start = message_text.lower().index(keyword.lower())
-                lines.append("💡 " + message_text[tip_start:].strip())
-                break
-    
-    lines.append("")
+        reasoning = _extract_message_text_block(
+            message_text,
+            ["Почему эти варианты"],
+            ["Как улучшить", "Хак", "Совет", "Лайфхак"],
+        )
+        if reasoning:
+            heading, _, body = reasoning.partition(":")
+            lines.append(f"💬 {heading.strip()}:")
+            body = body.strip()
+            if body:
+                lines.append(body[0].upper() + body[1:])
+            lines.append("")
+
+        tip = _extract_message_text_block(
+            message_text,
+            ["Как улучшить", "Хак", "Совет", "Лайфхак"],
+            [],
+        )
+        if tip:
+            heading, _, body = tip.partition(":")
+            lines.append(f"💡 {heading.strip()}:")
+            body = body.strip()
+            if body:
+                lines.append(body[0].upper() + body[1:])
+            lines.append("")
+
     lines.append("Нажми кнопку ниже, чтобы записать выбранный вариант")
-    
+
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines)
 
 
-def build_food_advice_keyboard(items: list) -> types.InlineKeyboardMarkup:
-    """Build keyboard with 'Log variant N' buttons for food advice."""
+def build_food_advice_keyboard(items: list, source_url: Optional[str] = None) -> types.InlineKeyboardMarkup:
+    """Build keyboard with 'Log variant N' buttons and optional source links for food advice."""
     rows = []
     labels = ["✅ Записать вариант 1", "✅ Записать вариант 2", "✅ Записать вариант 3"]
     for idx in range(min(len(items), 3)):
@@ -269,6 +330,21 @@ def build_food_advice_keyboard(items: list) -> types.InlineKeyboardMarkup:
             text=f"{labels[idx]} ({short_name})",
             callback_data=f"advice_log:{idx}",
         )])
+
+    source_buttons = []
+    for item in items[:3]:
+        if not isinstance(item, dict):
+            continue
+        item_url = normalize_source_url(item.get("source_url")) or normalize_source_url(source_url)
+        if item_url:
+            item_name = _strip_markdown_bold(item.get("name") or "Блюдо")
+            label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+            source_buttons.append([types.InlineKeyboardButton(
+                text=f"🔗 Источник: {label}",
+                url=item_url,
+            )])
+    rows.extend(source_buttons)
+
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -308,6 +384,11 @@ def build_meal_keyboard(
         url = normalize_source_url(source_url)
         if url:
             rows.append([types.InlineKeyboardButton(text="🔗 Источник", url=url)])
+
+    rows.append([types.InlineKeyboardButton(
+        text="💾 В Моё меню",
+        callback_data=f"save_meal:{meal_id}",
+    )])
 
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -509,7 +590,9 @@ async def cmd_help(message: types.Message) -> None:
         "1️⃣ Логирование еды:\n"
         "• Просто напиши что съел: \"2 яйца и тост\"\n"
         "• Или отправь голосовое сообщение\n"
-        "• Сфотографируй штрих-код продукта\n"
+        "• 📸 Отправь фото еды — бот оценит КБЖУ\n"
+        "• 📸 Сфотографируй этикетку с КБЖУ\n"
+        "• 📸 Сфотографируй продукт с брендом\n"
         "• Укажи место: \"капучино в Старбаксе\"\n\n"
         "2️⃣ Кнопки меню:\n"
         "📊 Сегодня — прогресс за день\n"
@@ -1799,6 +1882,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
     protein_g = float(chosen_item.get("protein_g", 0))
     fat_g = float(chosen_item.get("fat_g", 0))
     carbs_g = float(chosen_item.get("carbs_g", 0))
+    item_source_url = chosen_item.get("source_url") or advice_result.get("source_url")
 
     # Create meal via API
     tg_id = query.from_user.id
@@ -1816,6 +1900,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
         protein_g=protein_g,
         fat_g=fat_g,
         carbs_g=carbs_g,
+        accuracy_level="ESTIMATE",
     )
     if result is None:
         await query.message.answer("Не удалось записать приём пищи. Попробуй позже 🙏")
@@ -1830,8 +1915,334 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
         fat_g=fat_g,
         carbs_g=carbs_g,
         accuracy_level="ESTIMATE",
+        source_url=item_source_url,
     )
-    await query.message.answer(response_text)
+
+    reply_markup = None
+    if normalize_source_url(item_source_url):
+        reply_markup = types.InlineKeyboardMarkup(inline_keyboard=[[
+            types.InlineKeyboardButton(text="🔗 Источник", url=normalize_source_url(item_source_url)),
+        ]])
+
+    await query.message.answer(response_text, reply_markup=reply_markup)
+
+
+# ---------- Food Advice Input Handlers (waiting_for_input state) ----------
+
+async def _process_food_advice_input(
+    message: types.Message,
+    state: FSMContext,
+    text: str,
+    image_url: Optional[str] = None,
+) -> None:
+    """Common logic for processing user input in food advice mode."""
+    data = await state.get_data()
+    nutrition_context = data.get("nutrition_context")
+    tg_id = str(message.from_user.id)
+
+    await state.clear()
+
+    processing_msg = await message.answer("🤔 Думаю, что тебе посоветовать — вернусь через 1–2 минуты!")
+
+    try:
+        result = await agent_run_workflow(
+            telegram_id=tg_id,
+            text=text,
+            image_url=image_url,
+            force_intent="food_advice",
+            nutrition_context=nutrition_context,
+        )
+    except Exception as e:
+        logger.error(f"[FOOD_ADVICE] Error running agent workflow: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    if result is None:
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    agent_items = result.get("items") or []
+    source_url = result.get("source_url")
+    response_text = build_food_advice_response(result)
+    reply_markup = build_food_advice_keyboard(agent_items, source_url=source_url) if agent_items else get_main_menu_keyboard()
+
+    try:
+        await message.answer(response_text, reply_markup=reply_markup)
+        if agent_items:
+            await state.update_data(advice_result=result)
+            await state.set_state(FoodAdviceState.waiting_for_choice)
+        logger.info(f"[FOOD_ADVICE] Sent food_advice for telegram_id={tg_id}")
+    except Exception as send_error:
+        logger.error(f"[FOOD_ADVICE] Error sending response: {send_error}", exc_info=True)
+        await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
+
+
+@router.message(FoodAdviceState.waiting_for_input, F.text)
+async def handle_food_advice_text(message: types.Message, state: FSMContext) -> None:
+    """Handle text input in food advice mode."""
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Пожалуйста, отправь текст с вариантами или фото меню.")
+        return
+    await _process_food_advice_input(message, state, text=text)
+
+
+@router.message(FoodAdviceState.waiting_for_input, F.photo)
+async def handle_food_advice_photo(message: types.Message, state: FSMContext) -> None:
+    """Handle photo input in food advice mode (e.g., menu photo)."""
+    try:
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        photo_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[FOOD_ADVICE] Error downloading photo: {e}")
+        await message.answer("Не удалось скачать фото. Попробуй ещё раз.")
+        return
+
+    if not photo_bytes:
+        await message.answer("Фото пустое. Попробуй ещё раз.")
+        return
+
+    b64 = base64.b64encode(photo_bytes).decode("utf-8")
+    image_data_uri = f"data:image/jpeg;base64,{b64}"
+    text = (message.caption or "").strip() or "Посоветуй что выбрать из вариантов на фото"
+
+    await _process_food_advice_input(message, state, text=text, image_url=image_data_uri)
+
+
+@router.message(FoodAdviceState.waiting_for_input, F.voice)
+async def handle_food_advice_voice(message: types.Message, state: FSMContext) -> None:
+    """Handle voice input in food advice mode."""
+    try:
+        file = await message.bot.get_file(message.voice.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        audio_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[FOOD_ADVICE] Error downloading voice: {e}")
+        await message.answer("Не удалось скачать голосовое. Попробуй ещё раз.")
+        return
+
+    if not audio_bytes:
+        await message.answer("Голосовое пустое. Попробуй ещё раз.")
+        return
+
+    await message.answer("🎙 Секунду, распознаю голос...")
+    parsed = await voice_parse_meal(audio_bytes)
+    if parsed is None:
+        await message.answer("Не удалось обработать голос. Попробуй ещё раз.")
+        return
+
+    transcript = (parsed.get("transcript", "") or "").strip()
+    if not transcript:
+        await message.answer("Не удалось распознать речь. Попробуй ещё раз.")
+        return
+
+    await message.answer(f"Распознал: \"{transcript}\"")
+    await _process_food_advice_input(message, state, text=transcript)
+
+
+@router.message(FoodAdviceState.waiting_for_input)
+async def handle_food_advice_other(message: types.Message, state: FSMContext) -> None:
+    """Handle unsupported input types in food advice mode."""
+    await message.answer("Отправь текст с вариантами, фото меню или голосовое сообщение.")
+
+
+# ---------- End Food Advice Input Handlers ----------
+
+
+# ============ Saved Meals FSM text handlers (MUST be before catch-all F.text/F.voice/F.photo) ============
+
+async def _do_save_meal(
+    message: types.Message, state: FSMContext, meal_id: int, name: str
+) -> None:
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        await message.answer("Запись не найдена.")
+        return
+
+    user = await ensure_user(message.chat.id)
+    if not user:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    data = await state.get_data()
+    raw_items = data.get(f"meal_items_{meal_id}", [])
+
+    items_payload = []
+    if raw_items:
+        for it in raw_items:
+            if not isinstance(it, dict):
+                continue
+            items_payload.append({
+                "name": it.get("name", "Блюдо"),
+                "grams": it.get("grams"),
+                "calories_kcal": float(it.get("calories_kcal", 0)),
+                "protein_g": float(it.get("protein_g", 0)),
+                "fat_g": float(it.get("fat_g", 0)),
+                "carbs_g": float(it.get("carbs_g", 0)),
+                "source_url": it.get("source_url"),
+            })
+    else:
+        items_payload.append({
+            "name": meal.get("description_user", name),
+            "grams": None,
+            "calories_kcal": float(meal.get("calories", 0)),
+            "protein_g": float(meal.get("protein_g", 0)),
+            "fat_g": float(meal.get("fat_g", 0)),
+            "carbs_g": float(meal.get("carbs_g", 0)),
+            "source_url": None,
+        })
+
+    result = await create_saved_meal(
+        user_id=user["id"],
+        name=name,
+        total_calories=float(meal.get("calories", 0)),
+        total_protein_g=float(meal.get("protein_g", 0)),
+        total_fat_g=float(meal.get("fat_g", 0)),
+        total_carbs_g=float(meal.get("carbs_g", 0)),
+        items=items_payload,
+    )
+
+    if result:
+        await message.answer(f"✅ «{name}» сохранено в Моё меню!")
+    else:
+        await message.answer("Не удалось сохранить. Попробуй позже.")
+
+
+@router.message(SavedMealStates.waiting_for_save_name)
+async def handle_save_name_input(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+
+    data = await state.get_data()
+    meal_id = data.get("save_meal_id")
+    await state.set_state(None)
+    await _do_save_meal(message, state, meal_id, name)
+
+
+@router.message(SavedMealStates.waiting_for_add_name)
+async def handle_add_name(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+    await state.update_data(add_name=name)
+    await state.set_state(SavedMealStates.waiting_for_add_macros)
+    await message.answer(
+        "Теперь введи КБЖУ в формате: калории белки жиры углеводы\n"
+        "Пример: 350 25 10 40"
+    )
+
+
+@router.message(SavedMealStates.waiting_for_add_macros)
+async def handle_add_macros(message: types.Message, state: FSMContext) -> None:
+    parsed = parse_macros_input(message.text or "")
+    if not parsed:
+        await message.answer(
+            "Не понял формат. Введи 4 числа через пробел или /:\n"
+            "Пример: 350 25 10 40"
+        )
+        return
+
+    calories, protein, fat, carbs = parsed
+    data = await state.get_data()
+    name = data.get("add_name", "Блюдо")
+    await state.clear()
+
+    user = await ensure_user(message.from_user.id)
+    if not user:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    result = await create_saved_meal(
+        user_id=user["id"],
+        name=name,
+        total_calories=calories,
+        total_protein_g=protein,
+        total_fat_g=fat,
+        total_carbs_g=carbs,
+        items=[{
+            "name": name,
+            "grams": None,
+            "calories_kcal": calories,
+            "protein_g": protein,
+            "fat_g": fat,
+            "carbs_g": carbs,
+            "source_url": None,
+        }],
+    )
+
+    if result:
+        await message.answer(
+            f"✅ «{name}» добавлено в Моё меню!\n"
+            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+        )
+    else:
+        await message.answer("Не удалось сохранить. Попробуй позже.")
+
+
+@router.message(SavedMealStates.waiting_for_edit_name)
+async def handle_edit_name_input(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+
+    data = await state.get_data()
+    saved_id = data.get("edit_saved_id")
+    await state.clear()
+
+    result = await update_saved_meal(saved_id, name=name)
+    if result:
+        await message.answer(f"✅ Название обновлено на «{name}»")
+    else:
+        await message.answer("Не удалось обновить. Попробуй позже.")
+
+
+@router.message(SavedMealStates.waiting_for_edit_macros)
+async def handle_edit_macros_input(message: types.Message, state: FSMContext) -> None:
+    parsed = parse_macros_input(message.text or "")
+    if not parsed:
+        await message.answer(
+            "Не понял формат. Введи 4 числа через пробел или /:\n"
+            "Пример: 350 25 10 40"
+        )
+        return
+
+    calories, protein, fat, carbs = parsed
+    data = await state.get_data()
+    saved_id = data.get("edit_saved_id")
+    await state.clear()
+
+    result = await update_saved_meal(
+        saved_id,
+        total_calories=calories,
+        total_protein_g=protein,
+        total_fat_g=fat,
+        total_carbs_g=carbs,
+    )
+    if result:
+        await message.answer(
+            f"✅ КБЖУ обновлено:\n"
+            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+        )
+    else:
+        await message.answer("Не удалось обновить. Попробуй позже.")
+
+
+# ============ End Saved Meals FSM text handlers ============
 
 
 @router.message(F.voice)
@@ -1915,18 +2326,8 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
 
     await message.answer(f"Распознал: \"{transcript}\"")
 
-    # Food advice: separate flow (no auto-logging)
-    if intent == "food_advice":
-        response_text = build_food_advice_response(result)
-        reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
-        await message.answer(response_text, reply_markup=reply_markup)
-        if agent_items:
-            await state.update_data(advice_result=result)
-            await state.set_state(FoodAdviceState.waiting_for_choice)
-        return
-
     reply_markup = None
-    if intent in {"log_meal", "product", "eatout", "barcode"}:
+    if intent in MEAL_LOGGING_INTENTS:
         meal_id = await get_latest_meal_id_for_today(message.from_user.id)
         if meal_id:
             reply_markup = build_meal_keyboard(
@@ -1935,6 +2336,8 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
                 source_url=source_url,
                 items=agent_items,
             )
+            if agent_items:
+                await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
     if reply_markup is None and (has_source_url or has_item_sources):
         source_buttons = []
@@ -1949,7 +2352,110 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
             reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
 
     response_text = message_text
-    if intent in {"log_meal", "product", "eatout", "barcode"}:
+    if intent in MEAL_LOGGING_INTENTS:
+        response_text = build_meal_response_from_agent(result)
+
+    await message.answer(response_text, reply_markup=reply_markup)
+
+
+@router.message(F.photo)
+async def handle_photo(message: types.Message, state: FSMContext) -> None:
+    """
+    Handle photo messages. Downloads the photo, base64-encodes it,
+    and sends it through the agent workflow for food recognition.
+    """
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        return
+
+    # Download the largest resolution photo
+    try:
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        photo_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[PHOTO] Error downloading photo: {e}")
+        await message.answer("Не удалось скачать фото. Попробуй ещё раз 🙏")
+        return
+
+    if not photo_bytes:
+        await message.answer("Фото пустое. Попробуй ещё раз 🙏")
+        return
+
+    # Base64-encode as data URI
+    b64 = base64.b64encode(photo_bytes).decode("utf-8")
+    image_data_uri = f"data:image/jpeg;base64,{b64}"
+
+    # Use caption as text, or a default prompt
+    text = (message.caption or "").strip() or "Определи что на фото и посчитай КБЖУ"
+
+    processing_msg = await message.answer("📸 Анализирую фото — вернусь через 1–2 минуты!")
+
+    try:
+        result = await agent_run_workflow(
+            telegram_id=str(tg_id),
+            text=text,
+            image_url=image_data_uri,
+        )
+    except Exception as e:
+        logger.error(f"[PHOTO] Error running agent workflow: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    if result is None:
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Сервис временно недоступен, попробуй позже.")
+        return
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    intent = result.get("intent", "unknown")
+    message_text = result.get("message_text", "Ошибка обработки")
+    source_url = result.get("source_url")
+    agent_items = result.get("items") or []
+    has_source_url = source_url is not None and source_url != ""
+    has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
+
+    reply_markup = None
+    if intent in MEAL_LOGGING_INTENTS:
+        meal_id = await get_latest_meal_id_for_today(message.from_user.id)
+        if meal_id:
+            reply_markup = build_meal_keyboard(
+                meal_id=meal_id,
+                day=date_type.today(),
+                source_url=source_url,
+                items=agent_items,
+            )
+            if agent_items:
+                await state.update_data(**{f"meal_items_{meal_id}": agent_items})
+
+    if reply_markup is None and (has_source_url or has_item_sources):
+        source_buttons = []
+        for it in agent_items:
+            if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
+                item_name = it.get("name") or "Продукт"
+                label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+        if not source_buttons and has_source_url:
+            source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+        if source_buttons:
+            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
+
+    response_text = message_text
+    if intent in MEAL_LOGGING_INTENTS:
         response_text = build_meal_response_from_agent(result)
 
     await message.answer(response_text, reply_markup=reply_markup)
@@ -2021,24 +2527,9 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         except Exception:
             pass
         
-        # Food advice: separate flow (no auto-logging)
-        if intent == "food_advice":
-            response_text = build_food_advice_response(result)
-            reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
-            try:
-                await message.answer(response_text, reply_markup=reply_markup)
-                if agent_items:
-                    await state.update_data(advice_result=result)
-                    await state.set_state(FoodAdviceState.waiting_for_choice)
-                logger.info(f"[BOT /agent] Sent food_advice for telegram_id={tg_id}")
-            except Exception as send_error:
-                logger.error(f"[BOT /agent] Error sending food_advice: {send_error}", exc_info=True)
-                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
-            return
-
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if intent in {"log_meal", "product", "eatout", "barcode"}:
+        if intent in MEAL_LOGGING_INTENTS:
             meal_id = await get_latest_meal_id_for_today(message.from_user.id)
             if meal_id:
                 reply_markup = build_meal_keyboard(
@@ -2047,6 +2538,8 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
                     source_url=source_url,
                     items=agent_items,
                 )
+                if agent_items:
+                    await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
         if reply_markup is None and (has_source_url or has_item_sources):
             source_buttons = []
@@ -2063,7 +2556,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         # Send the message
         try:
             response_text = message_text
-            if intent in {"log_meal", "product", "eatout", "barcode"}:
+            if intent in MEAL_LOGGING_INTENTS:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
@@ -2167,24 +2660,9 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         except Exception:
             pass
         
-        # Food advice: separate flow (no auto-logging)
-        if intent == "food_advice":
-            response_text = build_food_advice_response(result)
-            reply_markup = build_food_advice_keyboard(agent_items) if agent_items else None
-            try:
-                await message.answer(response_text, reply_markup=reply_markup)
-                if agent_items:
-                    await state.update_data(advice_result=result)
-                    await state.set_state(FoodAdviceState.waiting_for_choice)
-                logger.info(f"[BOT plain_text] Sent food_advice for telegram_id={tg_id}")
-            except Exception as send_error:
-                logger.error(f"[BOT plain_text] Error sending food_advice: {send_error}", exc_info=True)
-                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
-            return
-
         # Build reply with edit/delete buttons when meal is logged
         reply_markup = None
-        if intent in {"log_meal", "product", "eatout", "barcode"}:
+        if intent in MEAL_LOGGING_INTENTS:
             meal_id = await get_latest_meal_id_for_today(message.from_user.id)
             if meal_id:
                 reply_markup = build_meal_keyboard(
@@ -2193,6 +2671,8 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
                     source_url=source_url,
                     items=agent_items,
                 )
+                if agent_items:
+                    await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
         if reply_markup is None and (has_source_url or has_item_sources):
             source_buttons = []
@@ -2209,7 +2689,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         # Send the message
         try:
             response_text = message_text
-            if intent in {"log_meal", "product", "eatout", "barcode"}:
+            if intent in MEAL_LOGGING_INTENTS:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")
@@ -2235,6 +2715,362 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
             await message.answer("Сервис временно недоступен, попробуй позже.")
         except Exception:
             pass
+
+
+# ============ Saved Meals ("Моё меню") handlers ============
+
+SAVED_MEALS_PER_PAGE = 20
+
+
+def _build_my_menu_keyboard(
+    meals: list, page: int, total: int, per_page: int = SAVED_MEALS_PER_PAGE
+) -> types.InlineKeyboardMarkup:
+    rows = []
+    for m in meals:
+        name = m.get("name", "Блюдо")
+        cal = round(m.get("total_calories", 0))
+        label = f"✅ {name} ({cal} ккал)"
+        if len(label) > 50:
+            label = f"✅ {name[:40]}… ({cal})"
+        rows.append([types.InlineKeyboardButton(
+            text=label, callback_data=f"my_menu_log:{m['id']}"
+        )])
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    if total_pages > 1:
+        nav = []
+        if page > 1:
+            nav.append(types.InlineKeyboardButton(text="← Назад", callback_data=f"my_menu_page:{page - 1}"))
+        if page < total_pages:
+            nav.append(types.InlineKeyboardButton(text="Вперёд →", callback_data=f"my_menu_page:{page + 1}"))
+        if nav:
+            rows.append(nav)
+
+    rows.append([types.InlineKeyboardButton(
+        text="⚙️ Редактировать Моё меню", callback_data="my_menu_edit"
+    )])
+    return types.InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# --- Save meal from logged entry ---
+
+@router.callback_query(F.data.startswith("save_meal:"))
+async def handle_save_meal(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    if len(parts) < 2:
+        await query.message.answer("Не удалось сохранить.")
+        return
+
+    try:
+        meal_id = int(parts[1])
+    except ValueError:
+        await query.message.answer("Не удалось прочитать данные.")
+        return
+
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        await query.message.answer("Запись не найдена.")
+        return
+
+    suggested_name = meal.get("description_user", "Блюдо")
+    await state.update_data(save_meal_id=meal_id, save_suggested_name=suggested_name)
+    await state.set_state(SavedMealStates.waiting_for_save_name)
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text=f"✅ Сохранить как «{suggested_name[:35]}»",
+            callback_data=f"save_confirm:{meal_id}",
+        )],
+    ])
+    await query.message.answer(
+        f"Под каким названием сохранить в Моё меню?\n\n"
+        f"Нажми кнопку ниже или напиши своё название:",
+        reply_markup=keyboard,
+    )
+
+
+@router.callback_query(F.data.startswith("save_confirm:"))
+async def handle_save_confirm(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    data = await state.get_data()
+    meal_id = data.get("save_meal_id")
+    name = data.get("save_suggested_name", "Блюдо")
+    await state.set_state(None)
+    await _do_save_meal(query.message, state, meal_id, name)
+
+
+# --- Quick log from My Menu ---
+
+@router.callback_query(F.data.startswith("my_menu_log:"))
+async def handle_my_menu_log(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    if len(parts) < 2:
+        await query.message.answer("Ошибка.")
+        return
+
+    try:
+        saved_meal_id = int(parts[1])
+    except ValueError:
+        await query.message.answer("Ошибка данных.")
+        return
+
+    saved = await get_saved_meal(saved_meal_id)
+    if not saved:
+        await query.message.answer("Сохранённое блюдо не найдено.")
+        return
+
+    tg_id = query.from_user.id
+    user = await ensure_user(tg_id)
+    if not user:
+        await query.message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    today = date_type.today()
+    meal_result = await create_meal(
+        user_id=user["id"],
+        day=today,
+        description=saved["name"],
+        calories=saved["total_calories"],
+        protein_g=saved["total_protein_g"],
+        fat_g=saved["total_fat_g"],
+        carbs_g=saved["total_carbs_g"],
+        accuracy_level="EXACT",
+    )
+    if not meal_result:
+        await query.message.answer("Не удалось записать приём пищи. Попробуй позже.")
+        return
+
+    await use_saved_meal(saved_meal_id)
+
+    cal = round(saved["total_calories"])
+    prot = round(saved["total_protein_g"], 1)
+    fat = round(saved["total_fat_g"], 1)
+    carbs = round(saved["total_carbs_g"], 1)
+
+    lines = [f"✅ Записал «{saved['name']}»", ""]
+    lines.append(f"{cal} ккал · Б {prot} г · Ж {fat} г · У {carbs} г")
+
+    saved_items = saved.get("items", [])
+    if len(saved_items) > 1:
+        lines.extend(["", "———", "", "По блюдам:", ""])
+        for si in saved_items:
+            si_name = si.get("name", "Блюдо")
+            si_cal = round(float(si.get("calories_kcal", 0)))
+            si_p = round(float(si.get("protein_g", 0)), 1)
+            si_f = round(float(si.get("fat_g", 0)), 1)
+            si_c = round(float(si.get("carbs_g", 0)), 1)
+            lines.append(f"📝 {si_name}:")
+            lines.append(f"{si_cal} ккал · Б {si_p} г · Ж {si_f} г · У {si_c} г")
+            lines.append("")
+
+    summary = await get_day_summary(user_id=user["id"], day=today)
+    if summary:
+        lines.append("")
+        lines.extend(build_summary_lines(summary))
+
+    meal_id = meal_result.get("id")
+    reply_markup = None
+    if meal_id:
+        reply_markup = build_meal_keyboard(meal_id=meal_id, day=today)
+
+    await query.message.answer("\n".join(lines), reply_markup=reply_markup)
+
+
+# --- My Menu pagination ---
+
+@router.callback_query(F.data.startswith("my_menu_page:"))
+async def handle_my_menu_page(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        page = int(parts[1])
+    except (IndexError, ValueError):
+        page = 1
+
+    tg_id = query.from_user.id
+    data = await get_saved_meals(tg_id, page=page, per_page=SAVED_MEALS_PER_PAGE)
+    if not data or not data.get("items"):
+        await query.message.answer("Моё меню пусто.")
+        return
+
+    keyboard = _build_my_menu_keyboard(
+        data["items"], data["page"], data["total"], data["per_page"]
+    )
+    try:
+        await query.message.edit_reply_markup(reply_markup=keyboard)
+    except Exception:
+        await query.message.answer(
+            "🍽 Моё меню\n\n"
+            "Нажми на блюдо, чтобы сразу записать его в дневник:",
+            reply_markup=keyboard,
+        )
+
+
+# --- Edit My Menu ---
+
+@router.callback_query(F.data == "my_menu_edit")
+async def handle_my_menu_edit(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    data = await get_saved_meals(tg_id, page=1, per_page=100)
+
+    rows = [[types.InlineKeyboardButton(
+        text="➕ Добавить новое блюдо", callback_data="my_menu_add"
+    )]]
+
+    if data and data.get("items"):
+        for m in data["items"]:
+            name = m.get("name", "Блюдо")
+            label = name if len(name) <= 45 else name[:42] + "..."
+            rows.append([types.InlineKeyboardButton(
+                text=label, callback_data=f"sme_item:{m['id']}"
+            )])
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=rows)
+    await query.message.answer(
+        "⚙️ Редактирование Моего меню\n\n"
+        "Нажми на блюдо, чтобы изменить его или удалить:",
+        reply_markup=keyboard,
+    )
+
+
+# --- Add new saved meal manually ---
+
+@router.callback_query(F.data == "my_menu_add")
+async def handle_my_menu_add(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    await state.set_state(SavedMealStates.waiting_for_add_name)
+    await query.message.answer("Введи название блюда/приёма пищи:")
+
+
+# --- Edit specific saved meal ---
+
+@router.callback_query(F.data.startswith("sme_item:"))
+async def handle_sme_item(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    saved = await get_saved_meal(saved_id)
+    if not saved:
+        await query.message.answer("Блюдо не найдено.")
+        return
+
+    name = saved.get("name", "Блюдо")
+    cal = round(saved.get("total_calories", 0))
+    prot = round(saved.get("total_protein_g", 0), 1)
+    fat = round(saved.get("total_fat_g", 0), 1)
+    carbs = round(saved.get("total_carbs_g", 0), 1)
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text="✏️ Изменить название", callback_data=f"sme_name:{saved_id}"
+        )],
+        [types.InlineKeyboardButton(
+            text="📊 Изменить КБЖУ", callback_data=f"sme_macros:{saved_id}"
+        )],
+        [types.InlineKeyboardButton(
+            text="🗑 Удалить", callback_data=f"sme_del:{saved_id}"
+        )],
+        [types.InlineKeyboardButton(
+            text="← Назад", callback_data="my_menu_edit"
+        )],
+    ])
+
+    await query.message.answer(
+        f"«{name}»\n{cal} ккал · Б {prot} г · Ж {fat} г · У {carbs} г",
+        reply_markup=keyboard,
+    )
+
+
+# --- Edit name ---
+
+@router.callback_query(F.data.startswith("sme_name:"))
+async def handle_sme_name(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    await state.update_data(edit_saved_id=saved_id)
+    await state.set_state(SavedMealStates.waiting_for_edit_name)
+    await query.message.answer("Введи новое название:")
+
+
+# --- Edit macros ---
+
+@router.callback_query(F.data.startswith("sme_macros:"))
+async def handle_sme_macros(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    await state.update_data(edit_saved_id=saved_id)
+    await state.set_state(SavedMealStates.waiting_for_edit_macros)
+    await query.message.answer(
+        "Введи новые КБЖУ в формате: калории белки жиры углеводы\n"
+        "Пример: 350 25 10 40"
+    )
+
+
+# --- Delete saved meal ---
+
+@router.callback_query(F.data.startswith("sme_del:"))
+async def handle_sme_delete(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    saved = await get_saved_meal(saved_id)
+    name = saved.get("name", "Блюдо") if saved else "Блюдо"
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [
+            types.InlineKeyboardButton(
+                text="✅ Да", callback_data=f"sme_del_yes:{saved_id}"
+            ),
+            types.InlineKeyboardButton(
+                text="❌ Нет", callback_data="my_menu_edit"
+            ),
+        ]
+    ])
+    await query.message.answer(
+        f"Удалить «{name}» из Моего меню?", reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data.startswith("sme_del_yes:"))
+async def handle_sme_delete_confirm(query: types.CallbackQuery) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    try:
+        saved_id = int(parts[1])
+    except (IndexError, ValueError):
+        await query.message.answer("Ошибка данных.")
+        return
+
+    ok = await delete_saved_meal(saved_id)
+    if ok:
+        await query.message.answer("✅ Блюдо удалено из Моего меню.")
+    else:
+        await query.message.answer("Не удалось удалить. Попробуй позже.")
 
 
 async def main() -> None:

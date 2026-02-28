@@ -35,3 +35,4 @@ class User(Base):
     # Связи
     days = relationship("UserDay", back_populates="user")
     meals = relationship("MealEntry", back_populates="user")
+    saved_meals = relationship("SavedMeal", back_populates="user")

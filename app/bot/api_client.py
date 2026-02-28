@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 import logging
@@ -130,6 +130,20 @@ async def update_meal(
             resp.raise_for_status()
             return resp.json()
     except Exception:
+        return None
+
+
+async def get_meal_by_id(meal_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/meals/{meal_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_meal_by_id error: {e}")
         return None
 
 
@@ -338,7 +352,13 @@ async def agent_query(user_id: int, text: str, date: Optional[str] = None, conve
         return None
 
 
-async def agent_run_workflow(telegram_id: str, text: str) -> Optional[Dict[str, Any]]:
+async def agent_run_workflow(
+    telegram_id: str,
+    text: str,
+    image_url: Optional[str] = None,
+    force_intent: Optional[str] = None,
+    nutrition_context: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     """
     Вызывает POST /agent/run в backend.
     Возвращает dict с полями:
@@ -350,6 +370,12 @@ async def agent_run_workflow(telegram_id: str, text: str) -> Optional[Dict[str, 
         "telegram_id": str(telegram_id),
         "text": text,
     }
+    if image_url:
+        payload["image_url"] = image_url
+    if force_intent:
+        payload["force_intent"] = force_intent
+    if nutrition_context:
+        payload["nutrition_context"] = nutrition_context
     
     # Увеличенный таймаут для агентных ответов (до 180 секунд для web search)
     timeout = httpx.Timeout(180.0)
@@ -436,3 +462,103 @@ async def get_user_export_url(telegram_id: int) -> str:
     Получить URL для скачивания экспорта данных пользователя.
     """
     return f"{settings.backend_base_url}/users/{telegram_id}/export"
+
+
+# ============ Saved Meals ("Моё меню") ============
+
+
+async def create_saved_meal(
+    user_id: int,
+    name: str,
+    total_calories: float = 0,
+    total_protein_g: float = 0,
+    total_fat_g: float = 0,
+    total_carbs_g: float = 0,
+    items: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/saved-meals"
+    payload: Dict[str, Any] = {
+        "user_id": user_id,
+        "name": name,
+        "total_calories": total_calories,
+        "total_protein_g": total_protein_g,
+        "total_fat_g": total_fat_g,
+        "total_carbs_g": total_carbs_g,
+        "items": items or [],
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] create_saved_meal error: {e}")
+        return None
+
+
+async def get_saved_meals(
+    telegram_id: int, page: int = 1, per_page: int = 20
+) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/saved-meals/by-user/{telegram_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url, params={"page": page, "per_page": per_page})
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_saved_meals error: {e}")
+        return None
+
+
+async def get_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_saved_meal error: {e}")
+        return None
+
+
+async def update_saved_meal(saved_meal_id: int, **kwargs) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.patch(url, json=kwargs)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] update_saved_meal error: {e}")
+        return None
+
+
+async def delete_saved_meal(saved_meal_id: int) -> bool:
+    url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.delete(url)
+            if resp.status_code == 404:
+                return False
+            resp.raise_for_status()
+            return True
+    except Exception as e:
+        logger.error(f"[API] delete_saved_meal error: {e}")
+        return False
+
+
+async def use_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}/use"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] use_saved_meal error: {e}")
+        return None

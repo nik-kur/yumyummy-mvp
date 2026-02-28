@@ -2,6 +2,7 @@
 Модуль онбординга и главного меню для Telegram бота.
 Содержит FSM состояния, обработчики и клавиатуры.
 """
+import json
 import re
 import logging
 from datetime import date as date_type, timedelta
@@ -22,7 +23,7 @@ from app.bot.api_client import (
     update_user,
     get_user_export_url,
     get_day_summary,
-    agent_run_workflow,
+    get_saved_meals,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,12 @@ class OnboardingStates(StatesGroup):
 class ProfileStates(StatesGroup):
     """Состояния для редактирования профиля"""
     waiting_for_manual_kbju = State()
+
+
+class FoodAdviceState(StatesGroup):
+    """Состояния для режима food advice"""
+    waiting_for_choice = State()
+    waiting_for_input = State()
 
 
 # ============ KBJU Calculation (Mifflin-St Jeor) ============
@@ -234,12 +241,13 @@ MANUAL_KBJU_TEXT = """✏️ Введи свои цели КБЖУ в форма
 # ============ Keyboards ============
 
 def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
-    """Главное меню с 5 кнопками"""
+    """Главное меню"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📊 Сегодня"), KeyboardButton(text="📈 Неделя")],
-            [KeyboardButton(text="🤔 Что съесть?"), KeyboardButton(text="👤 Профиль")],
-            [KeyboardButton(text="📤 Экспорт"), KeyboardButton(text="💬 Поддержка")],
+            [KeyboardButton(text="🍽 Моё меню"), KeyboardButton(text="🤔 Что съесть?")],
+            [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="📤 Экспорт")],
+            [KeyboardButton(text="💬 Поддержка")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Напиши что съел или выбери действие...",
@@ -943,30 +951,86 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
     await message.answer(text, reply_markup=get_week_days_keyboard())
 
 
-@router.message(F.text == "🤔 Что съесть?")
-async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Что съесть?'"""
+@router.message(F.text == "🍽 Моё меню")
+async def on_menu_my_meals(message: types.Message, state: FSMContext) -> None:
+    """Обработчик кнопки 'Моё меню'"""
     await state.clear()
-    
+
     if not await check_onboarding_completed(message):
         return
-    
+
+    tg_id = message.from_user.id
+    data = await get_saved_meals(tg_id, page=1, per_page=20)
+
+    if not data or not data.get("items"):
+        await message.answer(
+            "🍽 Моё меню пока пустое.\n\n"
+            "Ты можешь сохранить любой приём пищи — просто нажми "
+            "«💾 В Моё меню» после записи."
+        )
+        return
+
+    meals = data["items"]
+    total = data["total"]
+    page = data["page"]
+    per_page = data["per_page"]
+
+    rows = []
+    for m in meals:
+        name = m.get("name", "Блюдо")
+        cal = round(m.get("total_calories", 0))
+        label = f"✅ {name} ({cal} ккал)"
+        if len(label) > 50:
+            label = f"✅ {name[:40]}… ({cal})"
+        rows.append([InlineKeyboardButton(
+            text=label, callback_data=f"my_menu_log:{m['id']}"
+        )])
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    if total_pages > 1:
+        nav = []
+        if page > 1:
+            nav.append(InlineKeyboardButton(text="← Назад", callback_data=f"my_menu_page:{page - 1}"))
+        if page < total_pages:
+            nav.append(InlineKeyboardButton(text="Вперёд →", callback_data=f"my_menu_page:{page + 1}"))
+        if nav:
+            rows.append(nav)
+
+    rows.append([InlineKeyboardButton(
+        text="⚙️ Редактировать Моё меню", callback_data="my_menu_edit"
+    )])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
+    await message.answer(
+        "🍽 Моё меню\n\n"
+        "Нажми на блюдо, чтобы сразу записать его в дневник:",
+        reply_markup=keyboard,
+    )
+
+
+@router.message(F.text == "🤔 Что съесть?")
+async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
+    """Обработчик кнопки 'Что съесть?' -- входит в режим food advice на один запрос."""
+    await state.clear()
+
+    if not await check_onboarding_completed(message):
+        return
+
     telegram_id = message.from_user.id
-    
+
     user = await get_user(telegram_id)
     if not user:
         await message.answer("Не удалось найти твой профиль. Попробуй /start")
         return
-    
+
     today = date_type.today()
     day_summary = await get_day_summary(user["id"], today)
-    
-    # Целевые значения
+
     target_cal = user.get("target_calories") or 2000
     target_prot = user.get("target_protein_g") or 150
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
-    
+
     if day_summary:
         current_cal = day_summary.get("total_calories", 0)
         current_prot = day_summary.get("total_protein_g", 0)
@@ -974,50 +1038,41 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
         current_carbs = day_summary.get("total_carbs_g", 0)
     else:
         current_cal = current_prot = current_fat = current_carbs = 0
-    
+
     remaining_cal = max(0, target_cal - current_cal)
     remaining_prot = max(0, target_prot - current_prot)
     remaining_fat = max(0, target_fat - current_fat)
     remaining_carbs = max(0, target_carbs - current_carbs)
-    
-    # Формируем запрос к AI
-    thinking_msg = await message.answer("🤔 Думаю, что тебе посоветовать...")
-    
-    advice_prompt = f"Посоветуй что съесть. Осталось: {remaining_cal:.0f} ккал, {remaining_prot:.0f}г белка, {remaining_fat:.0f}г жиров, {remaining_carbs:.0f}г углеводов."
-    
-    result = await agent_run_workflow(
-        user_id=user["id"],
-        date_str=today.isoformat(),
-        text=advice_prompt,
+
+    nutrition_context = json.dumps({
+        "target_calories": target_cal,
+        "target_protein_g": target_prot,
+        "target_fat_g": target_fat,
+        "target_carbs_g": target_carbs,
+        "eaten_calories": current_cal,
+        "eaten_protein_g": current_prot,
+        "eaten_fat_g": current_fat,
+        "eaten_carbs_g": current_carbs,
+        "remaining_calories": remaining_cal,
+        "remaining_protein_g": remaining_prot,
+        "remaining_fat_g": remaining_fat,
+        "remaining_carbs_g": remaining_carbs,
+    }, ensure_ascii=False)
+
+    await state.update_data(nutrition_context=nutrition_context)
+    await state.set_state(FoodAdviceState.waiting_for_input)
+
+    prompt = (
+        f"🤔 Что съесть?\n\n"
+        f"📊 Осталось на сегодня:\n"
+        f"• 🔥 {remaining_cal:.0f} ккал\n"
+        f"• 🥩 {remaining_prot:.0f} г белка\n"
+        f"• 🥑 {remaining_fat:.0f} г жиров\n"
+        f"• 🍞 {remaining_carbs:.0f} г углеводов\n\n"
+        f"Скинь варианты из меню (текстом, фото или голосовым), "
+        f"и я подскажу, что лучше выбрать!"
     )
-    
-    await thinking_msg.delete()
-    
-    if result and result.get("message_text"):
-        advice_text = result["message_text"]
-    else:
-        advice_text = """Вот несколько идей:
-
-• Если нужен белок — курица, рыба, творог, яйца
-• Мало углеводов — каша, цельнозерновой хлеб, фрукты
-• Нужны жиры — орехи, авокадо, оливковое масло
-• Легкий перекус — овощи, йогурт, протеиновый батончик
-
-Напиши конкретнее — где ты и какие есть варианты, и я помогу выбрать лучший!"""
-    
-    header = f"""🤔 Что съесть?
-
-📊 Осталось на сегодня:
-• 🔥 {remaining_cal:.0f} ккал
-• 🥩 {remaining_prot:.0f} г белка
-• 🥑 {remaining_fat:.0f} г жиров
-• 🍞 {remaining_carbs:.0f} г углеводов
-
-💡 Мой совет:
-
-"""
-    
-    await message.answer(header + advice_text, reply_markup=get_main_menu_keyboard())
+    await message.answer(prompt)
 
 
 @router.message(F.text == "👤 Профиль")
