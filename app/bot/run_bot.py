@@ -277,7 +277,10 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
             ["Как улучшить", "Хак", "Совет", "Лайфхак"],
         )
         if reasoning:
-            lines.append("💬 " + reasoning)
+            heading, _, body = reasoning.partition(":")
+            lines.append(f"💬 {heading.strip()}:")
+            if body.strip():
+                lines.append(body.strip())
             lines.append("")
 
         tip = _extract_message_text_block(
@@ -286,7 +289,10 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
             [],
         )
         if tip:
-            lines.append("💡 " + tip)
+            heading, _, body = tip.partition(":")
+            lines.append(f"💡 {heading.strip()}:")
+            if body.strip():
+                lines.append(body.strip())
             lines.append("")
 
     lines.append("Нажми кнопку ниже, чтобы записать выбранный вариант")
@@ -310,18 +316,16 @@ def build_food_advice_keyboard(items: list, source_url: Optional[str] = None) ->
 
     source_buttons = []
     for item in items[:3]:
-        if isinstance(item, dict) and normalize_source_url(item.get("source_url")):
-            item_name = item.get("name") or "Блюдо"
+        if not isinstance(item, dict):
+            continue
+        item_url = normalize_source_url(item.get("source_url")) or normalize_source_url(source_url)
+        if item_url:
+            item_name = _strip_markdown_bold(item.get("name") or "Блюдо")
             label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
             source_buttons.append([types.InlineKeyboardButton(
                 text=f"🔗 Источник: {label}",
-                url=normalize_source_url(item["source_url"]),
+                url=item_url,
             )])
-    if not source_buttons and normalize_source_url(source_url):
-        source_buttons.append([types.InlineKeyboardButton(
-            text="🔗 Источник",
-            url=normalize_source_url(source_url),
-        )])
     rows.extend(source_buttons)
 
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
