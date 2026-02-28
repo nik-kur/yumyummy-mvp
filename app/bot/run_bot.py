@@ -279,8 +279,9 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
         if reasoning:
             heading, _, body = reasoning.partition(":")
             lines.append(f"💬 {heading.strip()}:")
-            if body.strip():
-                lines.append(body.strip())
+            body = body.strip()
+            if body:
+                lines.append(body[0].upper() + body[1:])
             lines.append("")
 
         tip = _extract_message_text_block(
@@ -291,8 +292,9 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
         if tip:
             heading, _, body = tip.partition(":")
             lines.append(f"💡 {heading.strip()}:")
-            if body.strip():
-                lines.append(body.strip())
+            body = body.strip()
+            if body:
+                lines.append(body[0].upper() + body[1:])
             lines.append("")
 
     lines.append("Нажми кнопку ниже, чтобы записать выбранный вариант")
