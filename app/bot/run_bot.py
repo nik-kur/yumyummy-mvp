@@ -2060,6 +2060,191 @@ async def handle_food_advice_other(message: types.Message, state: FSMContext) ->
 # ---------- End Food Advice Input Handlers ----------
 
 
+# ============ Saved Meals FSM text handlers (MUST be before catch-all F.text/F.voice/F.photo) ============
+
+async def _do_save_meal(
+    message: types.Message, state: FSMContext, meal_id: int, name: str
+) -> None:
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        await message.answer("Запись не найдена.")
+        return
+
+    user = await ensure_user(message.chat.id)
+    if not user:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    data = await state.get_data()
+    raw_items = data.get(f"meal_items_{meal_id}", [])
+
+    items_payload = []
+    if raw_items:
+        for it in raw_items:
+            if not isinstance(it, dict):
+                continue
+            items_payload.append({
+                "name": it.get("name", "Блюдо"),
+                "grams": it.get("grams"),
+                "calories_kcal": float(it.get("calories_kcal", 0)),
+                "protein_g": float(it.get("protein_g", 0)),
+                "fat_g": float(it.get("fat_g", 0)),
+                "carbs_g": float(it.get("carbs_g", 0)),
+                "source_url": it.get("source_url"),
+            })
+    else:
+        items_payload.append({
+            "name": meal.get("description_user", name),
+            "grams": None,
+            "calories_kcal": float(meal.get("calories", 0)),
+            "protein_g": float(meal.get("protein_g", 0)),
+            "fat_g": float(meal.get("fat_g", 0)),
+            "carbs_g": float(meal.get("carbs_g", 0)),
+            "source_url": None,
+        })
+
+    result = await create_saved_meal(
+        user_id=user["id"],
+        name=name,
+        total_calories=float(meal.get("calories", 0)),
+        total_protein_g=float(meal.get("protein_g", 0)),
+        total_fat_g=float(meal.get("fat_g", 0)),
+        total_carbs_g=float(meal.get("carbs_g", 0)),
+        items=items_payload,
+    )
+
+    if result:
+        await message.answer(f"✅ «{name}» сохранено в Моё меню!")
+    else:
+        await message.answer("Не удалось сохранить. Попробуй позже.")
+
+
+@router.message(SavedMealStates.waiting_for_save_name)
+async def handle_save_name_input(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+
+    data = await state.get_data()
+    meal_id = data.get("save_meal_id")
+    await state.set_state(None)
+    await _do_save_meal(message, state, meal_id, name)
+
+
+@router.message(SavedMealStates.waiting_for_add_name)
+async def handle_add_name(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+    await state.update_data(add_name=name)
+    await state.set_state(SavedMealStates.waiting_for_add_macros)
+    await message.answer(
+        "Теперь введи КБЖУ в формате: калории белки жиры углеводы\n"
+        "Пример: 350 25 10 40"
+    )
+
+
+@router.message(SavedMealStates.waiting_for_add_macros)
+async def handle_add_macros(message: types.Message, state: FSMContext) -> None:
+    parsed = parse_macros_input(message.text or "")
+    if not parsed:
+        await message.answer(
+            "Не понял формат. Введи 4 числа через пробел или /:\n"
+            "Пример: 350 25 10 40"
+        )
+        return
+
+    calories, protein, fat, carbs = parsed
+    data = await state.get_data()
+    name = data.get("add_name", "Блюдо")
+    await state.clear()
+
+    user = await ensure_user(message.from_user.id)
+    if not user:
+        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        return
+
+    result = await create_saved_meal(
+        user_id=user["id"],
+        name=name,
+        total_calories=calories,
+        total_protein_g=protein,
+        total_fat_g=fat,
+        total_carbs_g=carbs,
+        items=[{
+            "name": name,
+            "grams": None,
+            "calories_kcal": calories,
+            "protein_g": protein,
+            "fat_g": fat,
+            "carbs_g": carbs,
+            "source_url": None,
+        }],
+    )
+
+    if result:
+        await message.answer(
+            f"✅ «{name}» добавлено в Моё меню!\n"
+            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+        )
+    else:
+        await message.answer("Не удалось сохранить. Попробуй позже.")
+
+
+@router.message(SavedMealStates.waiting_for_edit_name)
+async def handle_edit_name_input(message: types.Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not name:
+        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        return
+
+    data = await state.get_data()
+    saved_id = data.get("edit_saved_id")
+    await state.clear()
+
+    result = await update_saved_meal(saved_id, name=name)
+    if result:
+        await message.answer(f"✅ Название обновлено на «{name}»")
+    else:
+        await message.answer("Не удалось обновить. Попробуй позже.")
+
+
+@router.message(SavedMealStates.waiting_for_edit_macros)
+async def handle_edit_macros_input(message: types.Message, state: FSMContext) -> None:
+    parsed = parse_macros_input(message.text or "")
+    if not parsed:
+        await message.answer(
+            "Не понял формат. Введи 4 числа через пробел или /:\n"
+            "Пример: 350 25 10 40"
+        )
+        return
+
+    calories, protein, fat, carbs = parsed
+    data = await state.get_data()
+    saved_id = data.get("edit_saved_id")
+    await state.clear()
+
+    result = await update_saved_meal(
+        saved_id,
+        total_calories=calories,
+        total_protein_g=protein,
+        total_fat_g=fat,
+        total_carbs_g=carbs,
+    )
+    if result:
+        await message.answer(
+            f"✅ КБЖУ обновлено:\n"
+            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+        )
+    else:
+        await message.answer("Не удалось обновить. Попробуй позже.")
+
+
+# ============ End Saved Meals FSM text handlers ============
+
+
 @router.message(F.voice)
 async def handle_voice(message: types.Message, state: FSMContext) -> None:
     """
@@ -2615,76 +2800,6 @@ async def handle_save_confirm(query: types.CallbackQuery, state: FSMContext) -> 
     await _do_save_meal(query.message, state, meal_id, name)
 
 
-@router.message(SavedMealStates.waiting_for_save_name)
-async def handle_save_name_input(message: types.Message, state: FSMContext) -> None:
-    name = (message.text or "").strip()
-    if not name:
-        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
-        return
-
-    data = await state.get_data()
-    meal_id = data.get("save_meal_id")
-    await state.set_state(None)
-    await _do_save_meal(message, state, meal_id, name)
-
-
-async def _do_save_meal(
-    message: types.Message, state: FSMContext, meal_id: int, name: str
-) -> None:
-    meal = await get_meal_by_id(meal_id)
-    if not meal:
-        await message.answer("Запись не найдена.")
-        return
-
-    user = await ensure_user(message.chat.id)
-    if not user:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
-        return
-
-    data = await state.get_data()
-    raw_items = data.get(f"meal_items_{meal_id}", [])
-
-    items_payload = []
-    if raw_items:
-        for it in raw_items:
-            if not isinstance(it, dict):
-                continue
-            items_payload.append({
-                "name": it.get("name", "Блюдо"),
-                "grams": it.get("grams"),
-                "calories_kcal": float(it.get("calories_kcal", 0)),
-                "protein_g": float(it.get("protein_g", 0)),
-                "fat_g": float(it.get("fat_g", 0)),
-                "carbs_g": float(it.get("carbs_g", 0)),
-                "source_url": it.get("source_url"),
-            })
-    else:
-        items_payload.append({
-            "name": meal.get("description_user", name),
-            "grams": None,
-            "calories_kcal": float(meal.get("calories", 0)),
-            "protein_g": float(meal.get("protein_g", 0)),
-            "fat_g": float(meal.get("fat_g", 0)),
-            "carbs_g": float(meal.get("carbs_g", 0)),
-            "source_url": None,
-        })
-
-    result = await create_saved_meal(
-        user_id=user["id"],
-        name=name,
-        total_calories=float(meal.get("calories", 0)),
-        total_protein_g=float(meal.get("protein_g", 0)),
-        total_fat_g=float(meal.get("fat_g", 0)),
-        total_carbs_g=float(meal.get("carbs_g", 0)),
-        items=items_payload,
-    )
-
-    if result:
-        await message.answer(f"✅ «{name}» сохранено в Моё меню!")
-    else:
-        await message.answer("Не удалось сохранить. Попробуй позже.")
-
-
 # --- Quick log from My Menu ---
 
 @router.callback_query(F.data.startswith("my_menu_log:"))
@@ -2786,7 +2901,11 @@ async def handle_my_menu_page(query: types.CallbackQuery) -> None:
     try:
         await query.message.edit_reply_markup(reply_markup=keyboard)
     except Exception:
-        await query.message.answer("🍽 Моё меню:", reply_markup=keyboard)
+        await query.message.answer(
+            "🍽 Моё меню\n\n"
+            "Нажми на блюдо, чтобы сразу записать его в дневник:",
+            reply_markup=keyboard,
+        )
 
 
 # --- Edit My Menu ---
@@ -2810,7 +2929,11 @@ async def handle_my_menu_edit(query: types.CallbackQuery) -> None:
             )])
 
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=rows)
-    await query.message.answer("⚙️ Редактирование Моего меню:", reply_markup=keyboard)
+    await query.message.answer(
+        "⚙️ Редактирование Моего меню\n\n"
+        "Нажми на блюдо, чтобы изменить его или удалить:",
+        reply_markup=keyboard,
+    )
 
 
 # --- Add new saved meal manually ---
@@ -2820,67 +2943,6 @@ async def handle_my_menu_add(query: types.CallbackQuery, state: FSMContext) -> N
     await query.answer()
     await state.set_state(SavedMealStates.waiting_for_add_name)
     await query.message.answer("Введи название блюда/приёма пищи:")
-
-
-@router.message(SavedMealStates.waiting_for_add_name)
-async def handle_add_name(message: types.Message, state: FSMContext) -> None:
-    name = (message.text or "").strip()
-    if not name:
-        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
-        return
-    await state.update_data(add_name=name)
-    await state.set_state(SavedMealStates.waiting_for_add_macros)
-    await message.answer(
-        "Теперь введи КБЖУ в формате: калории белки жиры углеводы\n"
-        "Пример: 350 25 10 40"
-    )
-
-
-@router.message(SavedMealStates.waiting_for_add_macros)
-async def handle_add_macros(message: types.Message, state: FSMContext) -> None:
-    parsed = parse_macros_input(message.text or "")
-    if not parsed:
-        await message.answer(
-            "Не понял формат. Введи 4 числа через пробел или /:\n"
-            "Пример: 350 25 10 40"
-        )
-        return
-
-    calories, protein, fat, carbs = parsed
-    data = await state.get_data()
-    name = data.get("add_name", "Блюдо")
-    await state.clear()
-
-    user = await ensure_user(message.from_user.id)
-    if not user:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
-        return
-
-    result = await create_saved_meal(
-        user_id=user["id"],
-        name=name,
-        total_calories=calories,
-        total_protein_g=protein,
-        total_fat_g=fat,
-        total_carbs_g=carbs,
-        items=[{
-            "name": name,
-            "grams": None,
-            "calories_kcal": calories,
-            "protein_g": protein,
-            "fat_g": fat,
-            "carbs_g": carbs,
-            "source_url": None,
-        }],
-    )
-
-    if result:
-        await message.answer(
-            f"✅ «{name}» добавлено в Моё меню!\n"
-            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
-        )
-    else:
-        await message.answer("Не удалось сохранить. Попробуй позже.")
 
 
 # --- Edit specific saved meal ---
@@ -2944,24 +3006,6 @@ async def handle_sme_name(query: types.CallbackQuery, state: FSMContext) -> None
     await query.message.answer("Введи новое название:")
 
 
-@router.message(SavedMealStates.waiting_for_edit_name)
-async def handle_edit_name_input(message: types.Message, state: FSMContext) -> None:
-    name = (message.text or "").strip()
-    if not name:
-        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
-        return
-
-    data = await state.get_data()
-    saved_id = data.get("edit_saved_id")
-    await state.clear()
-
-    result = await update_saved_meal(saved_id, name=name)
-    if result:
-        await message.answer(f"✅ Название обновлено на «{name}»")
-    else:
-        await message.answer("Не удалось обновить. Попробуй позже.")
-
-
 # --- Edit macros ---
 
 @router.callback_query(F.data.startswith("sme_macros:"))
@@ -2980,37 +3024,6 @@ async def handle_sme_macros(query: types.CallbackQuery, state: FSMContext) -> No
         "Введи новые КБЖУ в формате: калории белки жиры углеводы\n"
         "Пример: 350 25 10 40"
     )
-
-
-@router.message(SavedMealStates.waiting_for_edit_macros)
-async def handle_edit_macros_input(message: types.Message, state: FSMContext) -> None:
-    parsed = parse_macros_input(message.text or "")
-    if not parsed:
-        await message.answer(
-            "Не понял формат. Введи 4 числа через пробел или /:\n"
-            "Пример: 350 25 10 40"
-        )
-        return
-
-    calories, protein, fat, carbs = parsed
-    data = await state.get_data()
-    saved_id = data.get("edit_saved_id")
-    await state.clear()
-
-    result = await update_saved_meal(
-        saved_id,
-        total_calories=calories,
-        total_protein_g=protein,
-        total_fat_g=fat,
-        total_carbs_g=carbs,
-    )
-    if result:
-        await message.answer(
-            f"✅ КБЖУ обновлено:\n"
-            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
-        )
-    else:
-        await message.answer("Не удалось обновить. Попробуй позже.")
 
 
 # --- Delete saved meal ---

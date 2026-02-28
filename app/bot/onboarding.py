@@ -1001,7 +1001,11 @@ async def on_menu_my_meals(message: types.Message, state: FSMContext) -> None:
     )])
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
-    await message.answer("🍽 Моё меню:", reply_markup=keyboard)
+    await message.answer(
+        "🍽 Моё меню\n\n"
+        "Нажми на блюдо, чтобы сразу записать его в дневник:",
+        reply_markup=keyboard,
+    )
 
 
 @router.message(F.text == "🤔 Что съесть?")
