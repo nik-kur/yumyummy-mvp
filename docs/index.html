@@ -3,11 +3,256 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YumYummy — Legal</title>
+  <title>YumYummy — AI Calorie Tracker in Telegram</title>
+  <meta name="description" content="Track your calories and nutrition effortlessly. Just tell YumYummy what you ate — by text, voice, or barcode photo. No spreadsheets, no manual counting." />
   <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    /* ── Landing-specific styles ── */
+
+    /* Nav override for landing */
+    header {
+      padding: 16px 32px;
+      position: sticky;
+      top: 0;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+    }
+    .nav-cta {
+      background: var(--accent);
+      color: #fff !important;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background .15s, transform .1s;
+    }
+    .nav-cta:hover {
+      background: #4338ca;
+      text-decoration: none !important;
+      transform: translateY(-1px);
+    }
+
+    /* Hero */
+    .hero-section {
+      text-align: center;
+      padding: 88px 24px 80px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      letter-spacing: .02em;
+    }
+    .hero-section h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      line-height: 1.2;
+      margin: 0 0 20px;
+      letter-spacing: -.02em;
+    }
+    .hero-section h1 span {
+      color: var(--accent);
+    }
+    .hero-section .subtitle {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 500px;
+      margin: 0 auto 36px;
+      line-height: 1.6;
+    }
+    .cta-group {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      transition: background .15s, transform .1s, box-shadow .15s;
+      box-shadow: 0 4px 14px rgba(79,70,229,.35);
+    }
+    .btn-primary:hover {
+      background: #4338ca;
+      text-decoration: none;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79,70,229,.4);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      color: var(--muted);
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-weight: 500;
+      font-size: 0.95rem;
+      border: 1px solid var(--border);
+      transition: border-color .15s, color .15s;
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .tg-icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Social proof strip */
+    .proof-strip {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 24px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      background: #fafafa;
+    }
+
+    /* Features */
+    .features-section {
+      max-width: 900px;
+      margin: 72px auto;
+      padding: 0 24px;
+    }
+    .section-label {
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .section-title {
+      text-align: center;
+      font-size: clamp(1.4rem, 3vw, 1.9rem);
+      font-weight: 700;
+      margin: 0 0 48px;
+      letter-spacing: -.02em;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .feature-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 20px rgba(79,70,229,.08);
+    }
+    .feature-icon {
+      font-size: 1.8rem;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .feature-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+    .feature-card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    /* How it works */
+    .how-section {
+      background: #f9fafb;
+      padding: 72px 24px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .how-inner {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .step {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-top: 2px;
+    }
+    .step-body h3 { margin: 0 0 4px; font-size: 1rem; }
+    .step-body p  { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+    /* Bottom CTA */
+    .bottom-cta {
+      text-align: center;
+      padding: 80px 24px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .bottom-cta h2 {
+      font-size: clamp(1.5rem, 3vw, 2.1rem);
+      font-weight: 700;
+      margin: 0 0 14px;
+      letter-spacing: -.02em;
+    }
+    .bottom-cta p {
+      color: var(--muted);
+      margin: 0 0 32px;
+    }
+
+    /* Legal links row in footer */
+    .legal-links {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .legal-links a { color: var(--muted); font-size: 0.8rem; }
+  </style>
 </head>
 <body>
 
+<!-- ── Navigation ── -->
 <header>
   <a href="index.html" class="brand">YumYummy</a>
   <nav>
@@ -15,38 +260,139 @@
     <a href="privacy.html">Privacy</a>
     <a href="refunds.html">Refunds</a>
     <a href="support.html">Support</a>
+    <a href="https://t.me/YumYummy_bot" target="_blank" rel="noopener noreferrer" class="nav-cta">
+      Open in Telegram
+    </a>
   </nav>
 </header>
 
-<div class="hero">
-  <h1>YumYummy Legal</h1>
-  <p>All the legal information and policies for the YumYummy Telegram bot service.</p>
-  <div class="links-grid">
-    <a href="terms.html" class="link-card">
-      <div class="icon">📄</div>
-      <div class="title">Terms &amp; Conditions</div>
-    </a>
-    <a href="privacy.html" class="link-card">
-      <div class="icon">🔒</div>
-      <div class="title">Privacy Policy</div>
-    </a>
-    <a href="refunds.html" class="link-card">
-      <div class="icon">↩️</div>
-      <div class="title">Refund Policy</div>
-    </a>
-    <a href="support.html" class="link-card">
-      <div class="icon">💬</div>
-      <div class="title">Support &amp; Contact</div>
-    </a>
+<!-- ── Hero ── -->
+<section>
+  <div class="hero-section">
+    <span class="hero-badge">AI-powered nutrition tracker</span>
+    <h1>Track calories by <span>just telling</span> what you ate</h1>
+    <p class="subtitle">
+      No more spreadsheets. No weighing food. Just text, voice, or a barcode photo —
+      YumYummy figures out the rest instantly.
+    </p>
+    <div class="cta-group">
+      <a href="https://t.me/YumYummy_bot" target="_blank" rel="noopener noreferrer" class="btn-primary">
+        <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/>
+        </svg>
+        Start for free in Telegram
+      </a>
+      <a href="#how-it-works" class="btn-secondary">See how it works ↓</a>
+    </div>
   </div>
+</section>
+
+<!-- ── Social proof strip ── -->
+<div class="proof-strip">
+  Works directly inside Telegram &nbsp;·&nbsp; No app download needed &nbsp;·&nbsp; Available 24/7 &nbsp;·&nbsp; Supports text, voice &amp; barcodes
 </div>
 
+<!-- ── Features ── -->
+<section class="features-section">
+  <p class="section-label">Why YumYummy</p>
+  <h2 class="section-title">Everything you need to eat better — nothing you don't</h2>
+  <div class="features-grid">
+
+    <div class="feature-card">
+      <span class="feature-icon">⚡</span>
+      <h3>Log meals in seconds</h3>
+      <p>Type, record a voice message, or snap a barcode. YumYummy understands natural language — "had a bowl of oatmeal with banana" works perfectly.</p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feature-icon">🧠</span>
+      <h3>Understands real food</h3>
+      <p>"Cappuccino at Starbucks" or "Chicken shawarma from the corner place" — YumYummy looks up official restaurant and product data to give you accurate numbers.</p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feature-icon">🎯</span>
+      <h3>Personalised daily goals</h3>
+      <p>Set your calorie and macro targets once during a quick onboarding. YumYummy tracks your progress and shows you exactly what's left for the day.</p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feature-icon">🤔</span>
+      <h3>"What should I eat?" advisor</h3>
+      <p>Tell YumYummy where you are — a restaurant, a supermarket — and it will suggest the best option that fits your remaining daily budget.</p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feature-icon">📊</span>
+      <h3>Daily &amp; weekly stats</h3>
+      <p>A clean progress view for today and a 7-day summary. See your trends at a glance without leaving Telegram.</p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feature-icon">📤</span>
+      <h3>Export your data</h3>
+      <p>Download all your meal logs as a CSV file anytime — compatible with Excel, Google Sheets, or any nutrition app.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── How it works ── -->
+<section class="how-section" id="how-it-works">
+  <div class="how-inner">
+    <p class="section-label">How it works</p>
+    <h2 class="section-title">Three steps to start</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Open the bot in Telegram</h3>
+          <p>Search for @YumYummy_bot or click the button on this page. No registration, no email — your Telegram account is enough.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Set your goal in 30 seconds</h3>
+          <p>Tell the bot your goal (lose / maintain / gain), your stats, and activity level. It calculates your personalised calorie and macro targets instantly.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Start logging — your way</h3>
+          <p>Text "had pasta carbonara at Vapiano", send a voice message, or scan a barcode. YumYummy handles everything else and keeps your daily totals up to date.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Bottom CTA ── -->
+<section>
+  <div class="bottom-cta">
+    <h2>Ready to stop guessing what you eat?</h2>
+    <p>Start tracking in under a minute — right inside Telegram.</p>
+    <div class="cta-group">
+      <a href="https://t.me/YumYummy_bot" target="_blank" rel="noopener noreferrer" class="btn-primary">
+        <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/>
+        </svg>
+        Open YumYummy on Telegram
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
 <footer>
-  &copy; 2026 YumYummy. All rights reserved. &nbsp;|&nbsp;
-  <a href="terms.html">Terms</a> &nbsp;|&nbsp;
-  <a href="privacy.html">Privacy</a> &nbsp;|&nbsp;
-  <a href="refunds.html">Refunds</a> &nbsp;|&nbsp;
-  <a href="support.html">Support</a>
+  <div class="legal-links">
+    <a href="terms.html">Terms &amp; Conditions</a>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="refunds.html">Refund Policy</a>
+    <a href="support.html">Support &amp; Contact</a>
+  </div>
+  <div>&copy; 2026 YumYummy. All rights reserved.</div>
 </footer>
 
 </body>
