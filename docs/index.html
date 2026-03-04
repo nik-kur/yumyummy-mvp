@@ -450,6 +450,124 @@
       color: var(--text-muted);
     }
 
+    /* ── Accuracy section ── */
+    .accuracy-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: start;
+    }
+    @media (max-width: 840px) {
+      .accuracy-layout { grid-template-columns: 1fr; }
+    }
+    .accuracy-text .section-title { text-align: left; }
+    .accuracy-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 32px;
+    }
+    .acc-step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .acc-num {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: .82rem;
+      margin-top: 2px;
+      box-shadow: 0 3px 10px var(--accent-glow);
+    }
+    .acc-step strong {
+      display: block;
+      font-size: .92rem;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .acc-step p {
+      font-size: .84rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .accuracy-examples {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .acc-example {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      background: var(--bg);
+      transition: all .2s;
+    }
+    .acc-example:hover {
+      border-color: var(--accent);
+      box-shadow: 0 6px 24px rgba(108,92,231,.08);
+    }
+    .acc-example-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .acc-example-icon { font-size: 1.2rem; }
+    .acc-example-type {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent);
+    }
+    .acc-example-query {
+      font-size: .95rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 14px;
+      font-style: italic;
+    }
+    .acc-example-result {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .acc-row {
+      text-align: center;
+      font-size: .78rem;
+    }
+    .acc-row span {
+      display: block;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 2px;
+    }
+    .acc-row strong {
+      font-weight: 700;
+      color: var(--text);
+      font-size: .88rem;
+    }
+    .acc-source {
+      grid-column: 1 / -1;
+      margin-top: 10px;
+      font-size: .74rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 640px) {
       .nav { padding: 0 16px; }
@@ -488,12 +606,13 @@
       AI-powered nutrition tracking
     </div>
     <h1>
-      Ate something? <br/>
-      <span class="gradient">Just say it. Done.</span>
+      Effortless logging.<br/>
+      <span class="gradient">Precision you can trust.</span>
     </h1>
     <p class="hero-sub">
-      Stop counting. Stop googling calories. Just text or voice what you ate
-      and YumYummy instantly logs everything &mdash; macros, calories, progress.
+      Most trackers make you choose: easy or accurate. YumYummy gives you both.
+      Just say what you ate &mdash; we search official sources in real time
+      and return verified calories and macros in seconds.
     </p>
     <div class="hero-actions">
       <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
@@ -503,9 +622,9 @@
       <a href="#how-it-works" class="btn btn-ghost">How it works</a>
     </div>
     <div class="hero-proof">
-      <span><span class="proof-icon">💬</span> Works in Telegram</span>
-      <span><span class="proof-icon">📱</span> No app to download</span>
-      <span><span class="proof-icon">⚡</span> Results in seconds</span>
+      <span><span class="proof-icon">🔍</span> Real data from official sources</span>
+      <span><span class="proof-icon">⚡</span> Log a meal in 5 seconds</span>
+      <span><span class="proof-icon">💬</span> Right inside Telegram</span>
     </div>
   </div>
 </section>
@@ -530,6 +649,88 @@
     </div>
   </div>
 </div>
+
+<!-- ── Accuracy Section ── -->
+<section class="section" id="accuracy">
+  <div class="accuracy-layout">
+    <div class="accuracy-text">
+      <div class="section-tag">Why it's different</div>
+      <h2 class="section-title">Not another AI guess.<br/>Real data. Real sources.</h2>
+      <p class="section-subtitle" style="text-align:left;">
+        Most calorie apps give you a generic LLM estimate and call it a day.
+        YumYummy goes further &mdash; it <strong>actively searches the internet</strong> for
+        official nutrition data before giving you a number.
+      </p>
+      <div class="accuracy-steps">
+        <div class="acc-step">
+          <div class="acc-num">1</div>
+          <div>
+            <strong>You describe your meal</strong>
+            <p>"Cappuccino and croissant at Starbucks" or "Epica yoghurt 6% from the supermarket"</p>
+          </div>
+        </div>
+        <div class="acc-step">
+          <div class="acc-num">2</div>
+          <div>
+            <strong>YumYummy searches official sources</strong>
+            <p>Restaurant menus, manufacturer websites, product databases, delivery platforms &mdash; verified, public data</p>
+          </div>
+        </div>
+        <div class="acc-step">
+          <div class="acc-num">3</div>
+          <div>
+            <strong>You get precise numbers with a source link</strong>
+            <p>Calories, protein, fat, carbs &mdash; plus a clickable reference so you can verify it yourself</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="accuracy-examples">
+      <div class="acc-example">
+        <div class="acc-example-header">
+          <span class="acc-example-icon">🏪</span>
+          <span class="acc-example-type">Restaurant</span>
+        </div>
+        <div class="acc-example-query">"Tom yam at Tanuki"</div>
+        <div class="acc-example-result">
+          <div class="acc-row"><span>Calories</span><strong>320 kcal</strong></div>
+          <div class="acc-row"><span>Protein</span><strong>18 g</strong></div>
+          <div class="acc-row"><span>Fat</span><strong>14 g</strong></div>
+          <div class="acc-row"><span>Carbs</span><strong>28 g</strong></div>
+          <div class="acc-source">Source: tanuki.ru official menu</div>
+        </div>
+      </div>
+      <div class="acc-example">
+        <div class="acc-example-header">
+          <span class="acc-example-icon">🛒</span>
+          <span class="acc-example-type">Product</span>
+        </div>
+        <div class="acc-example-query">"Epica yoghurt 6%"</div>
+        <div class="acc-example-result">
+          <div class="acc-row"><span>Calories</span><strong>82 kcal</strong></div>
+          <div class="acc-row"><span>Protein</span><strong>6 g</strong></div>
+          <div class="acc-row"><span>Fat</span><strong>4.2 g</strong></div>
+          <div class="acc-row"><span>Carbs</span><strong>5.3 g</strong></div>
+          <div class="acc-source">Source: manufacturer's data via web</div>
+        </div>
+      </div>
+      <div class="acc-example">
+        <div class="acc-example-header">
+          <span class="acc-example-icon">☕</span>
+          <span class="acc-example-type">Cafe chain</span>
+        </div>
+        <div class="acc-example-query">"Flat white at Starbucks"</div>
+        <div class="acc-example-result">
+          <div class="acc-row"><span>Calories</span><strong>170 kcal</strong></div>
+          <div class="acc-row"><span>Protein</span><strong>10 g</strong></div>
+          <div class="acc-row"><span>Fat</span><strong>9 g</strong></div>
+          <div class="acc-row"><span>Carbs</span><strong>13 g</strong></div>
+          <div class="acc-source">Source: starbucks.com nutrition</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ── Features ── -->
 <section class="section-alt" id="features">
