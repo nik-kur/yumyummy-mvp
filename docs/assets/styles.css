@@ -1,0 +1,115 @@
+/* YumYummy Legal Pages — minimal, clean */
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --accent: #4f46e5;
+  --accent-light: #ede9fe;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --bg: #ffffff;
+  --max: 760px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Header ── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header .brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text);
+  text-decoration: none;
+}
+nav { display: flex; gap: 20px; margin-left: auto; flex-wrap: wrap; }
+nav a { font-size: 0.875rem; color: var(--muted); }
+nav a:hover, nav a.active { color: var(--accent); text-decoration: none; }
+
+/* ── Main content ── */
+main {
+  max-width: var(--max);
+  margin: 48px auto 80px;
+  padding: 0 24px;
+}
+
+h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 6px; }
+.meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 36px; }
+
+h2 { font-size: 1.15rem; font-weight: 600; margin: 36px 0 8px; }
+h3 { font-size: 1rem; font-weight: 600; margin: 24px 0 6px; }
+
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 22px; }
+li { margin-bottom: 4px; }
+
+/* Paddle callout */
+.callout {
+  background: var(--accent-light);
+  border-left: 4px solid var(--accent);
+  padding: 14px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin: 24px 0;
+}
+
+/* Support card */
+.contact-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.contact-card p { margin: 0 0 6px; }
+
+/* Index hero */
+.hero {
+  text-align: center;
+  padding: 60px 24px 48px;
+}
+.hero h1 { font-size: 2rem; }
+.hero p { color: var(--muted); max-width: 520px; margin: 8px auto 32px; }
+.links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.link-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 16px;
+  text-align: center;
+  color: var(--text);
+  transition: border-color .15s;
+}
+.link-card:hover { border-color: var(--accent); text-decoration: none; }
+.link-card .icon { font-size: 1.6rem; margin-bottom: 8px; }
+.link-card .title { font-weight: 600; font-size: 0.95rem; }
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 20px 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+footer a { color: var(--muted); }
