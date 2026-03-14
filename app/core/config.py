@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     # Internal API token for agent tools
     internal_api_token: Optional[str] = None
 
+    # Billing / Telegram Stars
+    billing_trial_days: int = 3
+    billing_monthly_price_xtr: int = 350
+    billing_weekly_price_xtr: int = 100
+    billing_yearly_price_xtr: int = 2500
+    billing_enable_weekly: bool = False
+    billing_enable_yearly: bool = False
+    billing_paywall_enabled: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

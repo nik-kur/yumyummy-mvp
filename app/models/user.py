@@ -32,7 +32,17 @@ class User(Base):
     # Статус онбординга
     onboarding_completed = Column(Boolean, default=False, nullable=False)
 
+    # Billing / Subscription
+    trial_started_at = Column(DateTime(timezone=True), nullable=True)
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_plan_id = Column(String, nullable=True)
+    subscription_started_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_auto_renew = Column(Boolean, default=True, nullable=True)
+    subscription_telegram_charge_id = Column(String, nullable=True)
+
     # Связи
     days = relationship("UserDay", back_populates="user")
     meals = relationship("MealEntry", back_populates="user")
     saved_meals = relationship("SavedMeal", back_populates="user")
+    payment_events = relationship("PaymentEvent", back_populates="user")
