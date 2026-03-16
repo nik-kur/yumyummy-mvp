@@ -135,7 +135,7 @@ def record_payment_success(payload: PaymentSuccessRequest, db: Session = Depends
         user.subscription_started_at = now
     user.subscription_plan_id = payload.plan_id
     user.subscription_ends_at = sub_ends
-    user.subscription_auto_renew = True
+    user.subscription_auto_renew = plan.is_recurring
     user.subscription_telegram_charge_id = payload.telegram_payment_charge_id
 
     db.commit()

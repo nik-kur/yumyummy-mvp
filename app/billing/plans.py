@@ -14,20 +14,13 @@ class Plan:
     period_days: int
     subscription_period_seconds: Optional[int]
     is_active: bool
+    is_recurring: bool
 
 
 def get_plans() -> Dict[str, Plan]:
     from app.core.config import settings
 
     return {
-        "weekly": Plan(
-            id="weekly",
-            name_ru="Недельный",
-            price_xtr=settings.billing_weekly_price_xtr,
-            period_days=7,
-            subscription_period_seconds=None,
-            is_active=settings.billing_enable_weekly,
-        ),
         "monthly": Plan(
             id="monthly",
             name_ru="Месячный",
@@ -35,6 +28,7 @@ def get_plans() -> Dict[str, Plan]:
             period_days=30,
             subscription_period_seconds=SUBSCRIPTION_PERIOD_SECONDS,
             is_active=True,
+            is_recurring=True,
         ),
         "yearly": Plan(
             id="yearly",
@@ -42,7 +36,8 @@ def get_plans() -> Dict[str, Plan]:
             price_xtr=settings.billing_yearly_price_xtr,
             period_days=365,
             subscription_period_seconds=None,
-            is_active=settings.billing_enable_yearly,
+            is_active=True,
+            is_recurring=False,
         ),
     }
 

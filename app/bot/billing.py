@@ -51,14 +51,40 @@ def _build_plans_text() -> str:
     plans = get_plans()
     lines = []
     for plan in plans.values():
-        if plan.is_active:
+        if plan.is_recurring:
             lines.append(f"⭐ <b>{plan.name_ru}</b> — {plan.price_xtr} Stars/мес")
         else:
-            lines.append(f"📅 {plan.name_ru} — <i>скоро</i>")
+            lines.append(f"⭐ <b>{plan.name_ru}</b> — {plan.price_xtr} Stars")
     return "\n".join(lines)
 
 
-def _build_paywall_keyboard(show_trial: bool) -> types.InlineKeyboardMarkup:
+async def _create_plan_button(bot, plan, tg_id: int) -> types.InlineKeyboardButton:
+    """Create an invoice-link button for a plan (one-click payment)."""
+    payload = f"sub:{plan.id}:{tg_id}"
+
+    kwargs = dict(
+        title=f"YumYummy — {plan.name_ru}",
+        description=(
+            f"Подписка на {plan.period_days} дней с автопродлением"
+            if plan.is_recurring
+            else f"Доступ на {plan.period_days} дней"
+        ),
+        payload=payload,
+        currency="XTR",
+        prices=[LabeledPrice(label=plan.name_ru, amount=plan.price_xtr)],
+    )
+    if plan.subscription_period_seconds:
+        kwargs["subscription_period"] = plan.subscription_period_seconds
+
+    invoice_link = await bot.create_invoice_link(**kwargs)
+
+    label = f"⭐ {plan.name_ru} — {plan.price_xtr} Stars"
+    return types.InlineKeyboardButton(text=label, url=invoice_link)
+
+
+async def _build_paywall_keyboard(
+    bot, tg_id: int, show_trial: bool,
+) -> types.InlineKeyboardMarkup:
     buttons = []
     if show_trial:
         buttons.append([
@@ -71,12 +97,8 @@ def _build_paywall_keyboard(show_trial: bool) -> types.InlineKeyboardMarkup:
     plans = get_plans()
     for plan in plans.values():
         if plan.is_active:
-            buttons.append([
-                types.InlineKeyboardButton(
-                    text=f"⭐ {plan.name_ru} — {plan.price_xtr} Stars",
-                    callback_data=f"billing:pay:{plan.id}",
-                )
-            ])
+            btn = await _create_plan_button(bot, plan, tg_id)
+            buttons.append([btn])
 
     return types.InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -89,13 +111,13 @@ async def show_paywall(message: types.Message, billing: Optional[dict] = None) -
 
     if status == "new":
         text = PAYWALL_TRIAL_TEXT.format(plans_text=plans_text)
-        kb = _build_paywall_keyboard(show_trial=True)
+        kb = await _build_paywall_keyboard(message.bot, message.from_user.id, show_trial=True)
     elif status == "trial_expired":
         text = PAYWALL_EXPIRED_TEXT.format(plans_text=plans_text)
-        kb = _build_paywall_keyboard(show_trial=False)
+        kb = await _build_paywall_keyboard(message.bot, message.from_user.id, show_trial=False)
     else:
         text = PAYWALL_SUB_EXPIRED_TEXT.format(plans_text=plans_text)
-        kb = _build_paywall_keyboard(show_trial=False)
+        kb = await _build_paywall_keyboard(message.bot, message.from_user.id, show_trial=False)
 
     await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
@@ -163,44 +185,6 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Payment: send invoice
-# ---------------------------------------------------------------------------
-
-@router.callback_query(F.data.startswith("billing:pay:"))
-async def handle_pay_plan(query: types.CallbackQuery) -> None:
-    await query.answer()
-    plan_id = query.data.split(":", 2)[2]
-    plan = get_active_plan(plan_id)
-    if not plan:
-        await query.message.answer("Этот тариф пока недоступен.")
-        return
-
-    tg_id = query.from_user.id
-    payload = f"sub:{plan.id}:{tg_id}"
-
-    invoice_link = await query.bot.create_invoice_link(
-        title=f"YumYummy — {plan.name_ru}",
-        description=f"Подписка на {plan.period_days} дней с автопродлением",
-        payload=payload,
-        currency="XTR",
-        prices=[LabeledPrice(label=plan.name_ru, amount=plan.price_xtr)],
-        subscription_period=plan.subscription_period_seconds,
-    )
-
-    kb = types.InlineKeyboardMarkup(inline_keyboard=[[
-        types.InlineKeyboardButton(
-            text=f"⭐ Оплатить {plan.price_xtr} Stars",
-            url=invoice_link,
-        )
-    ]])
-    await query.message.answer(
-        f"Для оформления подписки <b>{plan.name_ru}</b> нажми кнопку ниже:",
-        reply_markup=kb,
-        parse_mode="HTML",
-    )
-
-
-# ---------------------------------------------------------------------------
 # Payment: pre-checkout
 # ---------------------------------------------------------------------------
 
@@ -264,6 +248,7 @@ async def handle_successful_payment(message: types.Message) -> None:
     else:
         ends_str = ""
 
+    plan = get_active_plan(plan_id)
     status = result.get("status", "activated")
     if status == "already_processed":
         await message.answer("Эта оплата уже была обработана ранее. Всё в порядке!")
@@ -274,9 +259,15 @@ async def handle_successful_payment(message: types.Message) -> None:
             parse_mode="HTML",
         )
     else:
+        period_text = (
+            f"Подписка автоматически продлевается каждые 30 дней."
+            if plan and plan.is_recurring
+            else f"Доступ активен до {ends_str}."
+        )
         await message.answer(
             f"✅ <b>Подписка оформлена!</b>\n\n"
             f"У тебя полный доступ к YumYummy до {ends_str}.\n"
+            f"{period_text}\n\n"
             f"Напиши, что ты съел, и я всё запишу!",
             parse_mode="HTML",
         )
@@ -300,7 +291,7 @@ async def cmd_paysupport(message: types.Message) -> None:
     await message.answer(
         "💬 <b>Поддержка по оплате</b>\n\n"
         "Если у тебя возникли вопросы или проблемы с оплатой, "
-        "напиши нам: @yumyummy_support\n\n"
+        "напиши: @nik_kur\n\n"
         "Мы ответим в течение 24 часов.",
         parse_mode="HTML",
     )
@@ -318,9 +309,8 @@ async def cmd_terms(message: types.Message) -> None:
         "2. Подписка оплачивается через Telegram Stars (XTR).\n"
         "3. Месячная подписка автоматически продлевается каждые 30 дней.\n"
         "4. Отменить подписку можно в любой момент в настройках Telegram.\n"
-        "5. После отмены доступ сохраняется до конца оплаченного периода.\n"
-        "6. Возврат средств осуществляется через поддержку: /paysupport\n"
-        "7. Данные о питании хранятся на наших серверах и доступны для экспорта.\n\n"
-        "Продолжая использование, вы соглашаетесь с этими условиями.",
+        "5. После отмены доступ сохраняется до конца оплаченного периода.\n\n"
+        'Подробные политики: <a href="https://yumyummy.ai">yumyummy.ai</a>',
         parse_mode="HTML",
+        disable_web_page_preview=True,
     )
