@@ -178,13 +178,25 @@ async def handle_pay_plan(query: types.CallbackQuery) -> None:
     tg_id = query.from_user.id
     payload = f"sub:{plan.id}:{tg_id}"
 
-    await query.message.answer_invoice(
+    invoice_link = await query.bot.create_invoice_link(
         title=f"YumYummy — {plan.name_ru}",
         description=f"Подписка на {plan.period_days} дней с автопродлением",
         payload=payload,
         currency="XTR",
         prices=[LabeledPrice(label=plan.name_ru, amount=plan.price_xtr)],
         subscription_period=plan.subscription_period_seconds,
+    )
+
+    kb = types.InlineKeyboardMarkup(inline_keyboard=[[
+        types.InlineKeyboardButton(
+            text=f"⭐ Оплатить {plan.price_xtr} Stars",
+            url=invoice_link,
+        )
+    ]])
+    await query.message.answer(
+        f"Для оформления подписки <b>{plan.name_ru}</b> нажми кнопку ниже:",
+        reply_markup=kb,
+        parse_mode="HTML",
     )
 
 
