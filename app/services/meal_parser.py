@@ -53,7 +53,7 @@ async def parse_meal_text(text: str, locale: str = "ru-RU") -> Dict[str, Any]:
 
     # Нормализуем и ставим дефолты
     result: Dict[str, Any] = {
-        "description": data.get("description", "").strip() or "Описание не указано",
+        "description": data.get("description", "").strip() or "No description provided",
         "calories": float(data.get("calories", 0) or 0),
         "protein_g": float(data.get("protein_g", 0) or 0),
         "fat_g": float(data.get("fat_g", 0) or 0),

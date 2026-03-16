@@ -401,7 +401,7 @@ async def agent_run_workflow(
         logger.warning("[API] agent_run_workflow timeout")
         return {
             "intent": "help",
-            "message_text": "Я думаю дольше обычного 😅 Попробуй ещё раз через 10–20 секунд или уточни запрос.",
+            "message_text": "Taking longer than usual 😅 Please try again in 10-20 seconds or rephrase your request.",
             "confidence": None,
             "totals": {"calories_kcal": 0.0, "protein_g": 0.0, "fat_g": 0.0, "carbs_g": 0.0},
             "items": [],

@@ -353,7 +353,7 @@ async def run_agent(
     if not text or not text.strip():
         return {
             "intent": "error",
-            "reply_text": "Пожалуйста, введите запрос.",
+            "reply_text": "Please enter your request.",
             "meal": None,
             "day_summary": None,
             "week_summary": None,
@@ -368,7 +368,7 @@ async def run_agent(
     if not user:
         return {
             "intent": "error",
-            "reply_text": f"Пользователь {user_id} не найден.",
+            "reply_text": f"User {user_id} not found.",
             "meal": None,
             "day_summary": None,
             "week_summary": None,
@@ -566,7 +566,7 @@ async def run_agent(
             "   - Example: if original was 224g with 459 kcal, and user says 350g, then: 459 * (350/224) = ~717 kcal\n"
             "4. Call log_meal tool with the complete, recalculated data\n"
             "5. Return JSON with intent='log_meal' (NOT 'needs_clarification') and complete meal object\n"
-            "6. In reply_text, confirm what was logged (e.g., 'Записал стейк, 350г, 717 ккал')\n\n"
+            "6. In reply_text, confirm what was logged (e.g., 'Logged steak, 350g, 717 kcal')\n\n"
         )
     
     user_prompt_parts.extend([
@@ -818,7 +818,7 @@ async def run_agent(
                             
                             if intent_match:
                                 intent = intent_match.group(1)
-                                reply_text = reply_text_match.group(1) if reply_text_match else "Ошибка парсинга ответа"
+                                reply_text = reply_text_match.group(1) if reply_text_match else "Error parsing response"
                                 
                                 # Try to extract meal data
                                 meal = None
@@ -877,7 +877,7 @@ async def run_agent(
             if meal_logged:
                 final_json = {
                     "intent": "log_meal",
-                    "reply_text": "Приём пищи успешно записан!",
+                    "reply_text": "Meal logged successfully!",
                     "meal": None,
                     "day_summary": None,
                     "week_summary": None,
@@ -885,7 +885,7 @@ async def run_agent(
             elif day_requested:
                 final_json = {
                     "intent": "show_today",
-                    "reply_text": "Сводка за день получена.",
+                    "reply_text": "Daily summary retrieved.",
                     "meal": None,
                     "day_summary": None,
                     "week_summary": None,
@@ -893,7 +893,7 @@ async def run_agent(
             elif week_requested:
                 final_json = {
                     "intent": "show_week",
-                    "reply_text": "Сводка за неделю получена.",
+                    "reply_text": "Weekly summary retrieved.",
                     "meal": None,
                     "day_summary": None,
                     "week_summary": None,
@@ -906,7 +906,7 @@ async def run_agent(
                         logger.info(f"[AGENT] Detected meal-related keywords, but no JSON. Returning needs_clarification with more context.")
                         final_json = {
                             "intent": "needs_clarification",
-                            "reply_text": f"Получен ответ от модели, но не удалось извлечь структурированные данные. Попробуйте переформулировать запрос.\n\nОтвет модели (первые 300 символов): {str(output_content)[:300]}",
+                            "reply_text": f"Received a response from the model, but could not extract structured data. Please try rephrasing your request.\n\nModel response (first 300 chars): {str(output_content)[:300]}",
                             "meal": None,
                             "day_summary": None,
                             "week_summary": None,
@@ -914,7 +914,7 @@ async def run_agent(
                     else:
                         final_json = {
                             "intent": "needs_clarification",
-                            "reply_text": "Не удалось понять ваш запрос. Попробуйте переформулировать.",
+                            "reply_text": "Could not understand your request. Please try rephrasing.",
                             "meal": None,
                             "day_summary": None,
                             "week_summary": None,
@@ -922,7 +922,7 @@ async def run_agent(
                 else:
                     final_json = {
                         "intent": "needs_clarification",
-                        "reply_text": "Не удалось получить ответ от модели. Попробуйте позже.",
+                        "reply_text": "Could not get a response from the model. Please try again later.",
                         "meal": None,
                         "day_summary": None,
                         "week_summary": None,
@@ -932,7 +932,7 @@ async def run_agent(
         if "intent" not in final_json:
             final_json["intent"] = "error"
         if "reply_text" not in final_json:
-            final_json["reply_text"] = "Произошла ошибка при обработке запроса."
+            final_json["reply_text"] = "An error occurred while processing your request."
         if "meal" not in final_json:
             final_json["meal"] = None
         if "day_summary" not in final_json:
@@ -954,7 +954,7 @@ async def run_agent(
                 "carbs_g": 0,
                 "accuracy_level": "ESTIMATE",
                 "source_url": None,
-                "notes": "Не удалось извлечь данные о блюде из ответа модели",
+                "notes": "Could not extract meal data from model response",
             }
         
         # Fallback for products: if meal has all zeros/None and query is a product, try product parsing
@@ -1069,9 +1069,9 @@ async def run_agent(
                         final_json["meal"]["source_url"] = None
                         final_json["meal"]["accuracy_level"] = "ESTIMATE"
                         if final_json["meal"].get("notes"):
-                            final_json["meal"]["notes"] = f"Официальный источник не найден. {final_json['meal']['notes']}"
+                            final_json["meal"]["notes"] = f"Official source not found. {final_json['meal']['notes']}"
                         else:
-                            final_json["meal"]["notes"] = "Официальный источник не найден; оценка."
+                            final_json["meal"]["notes"] = "Official source not found; estimate."
             
             # If source_url is missing but we have meal data, try to extract from reply_text
             if not final_json["meal"].get("source_url") and final_json.get("intent") == "log_meal":
@@ -1101,7 +1101,7 @@ async def run_agent(
         logger.error(f"[AGENT] Responses API not available: {e}")
         return {
             "intent": "error",
-            "reply_text": "Сервис временно недоступен. Попробуйте позже.",
+            "reply_text": "Service is temporarily unavailable. Please try again later.",
             "meal": None,
             "day_summary": None,
             "week_summary": None,
@@ -1110,7 +1110,7 @@ async def run_agent(
         logger.error(f"[AGENT] Unexpected error: {e}", exc_info=True)
         return {
             "intent": "error",
-            "reply_text": f"Произошла ошибка: {str(e)}",
+            "reply_text": f"An error occurred: {str(e)}",
             "meal": None,
             "day_summary": None,
             "week_summary": None,

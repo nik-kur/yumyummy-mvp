@@ -262,17 +262,16 @@ async def _product_parse_logic(payload: ProductMealRequest) -> dict:
         # Если нашли в OpenFoodFacts
         if result.found and result.calories is not None and result.calories > 0:
             # Формируем описание
-            parts = [result.name or payload.name or "Продукт"]
+            parts = [result.name or payload.name or "Product"]
             if result.brand or payload.brand:
-                parts.append(f"бренд: {result.brand or payload.brand}")
+                parts.append(f"brand: {result.brand or payload.brand}")
             if payload.store:
-                parts.append(f"магазин: {payload.store}")
+                parts.append(f"store: {payload.store}")
             description = ", ".join(parts)
             
-            # Формируем notes
-            notes = "Данные из OpenFoodFacts"
+            notes = "Data from OpenFoodFacts"
             if result.portion_grams and result.portion_grams != 100.0:
-                notes += f" (пересчитано на упаковку {result.portion_grams:.0f} г, исходно на 100 г)"
+                notes += f" (recalculated for package {result.portion_grams:.0f}g, originally per 100g)"
             
             # Округляем значения
             calories = round(result.calories or 0.0)
@@ -299,13 +298,13 @@ async def _product_parse_logic(payload: ProductMealRequest) -> dict:
     if payload.name:
         desc_parts.append(payload.name)
     if payload.brand:
-        desc_parts.append(f"бренд {payload.brand}")
+        desc_parts.append(f"brand {payload.brand}")
     if payload.store:
-        desc_parts.append(f"из магазина {payload.store}")
+        desc_parts.append(f"from store {payload.store}")
     if payload.barcode:
-        desc_parts.append(f"штрихкод {payload.barcode}")
+        desc_parts.append(f"barcode {payload.barcode}")
     
-    fallback_text = "упаковочный продукт: " + ", ".join(desc_parts)
+    fallback_text = "packaged product: " + ", ".join(desc_parts)
     
     try:
         parsed = await parse_meal_text(fallback_text)
@@ -341,7 +340,7 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
     if not payload.barcode and not payload.name:
         raise HTTPException(
             status_code=400,
-            detail="Нужно указать либо штрихкод, либо название продукта"
+            detail="Either barcode or product name is required"
         )
     
     return await _product_parse_logic(payload)
@@ -383,8 +382,7 @@ async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
             "source_url": source_url,
         }
     
-    # 2) Fallback на LLM (если web_result is None или calories=0)
-    fallback_text = f"блюдо из ресторана: {payload.dish} в {payload.restaurant}"
+    fallback_text = f"restaurant dish: {payload.dish} at {payload.restaurant}"
     
     try:
         parsed = await parse_meal_text(fallback_text)
@@ -421,32 +419,31 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
     try:
         text = payload.text.strip()
         if not text:
-            raise HTTPException(status_code=400, detail="Текст не может быть пустым")
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
         
-        # 1) LLM парсит текст в JSON: restaurant, dish, city
         parse_prompt = (
-            "Ты ассистент. Тебе дают текст с описанием блюда из ресторана/кафе/доставки. "
-            "Извлеки из текста название ресторана (если есть) и название блюда.\n\n"
-            "Отвечай СТРОГО в формате JSON с полями:\n"
-            "- restaurant: строка или null (название ресторана/кафе/доставки, если указано)\n"
-            "- dish: строка (название блюда, ПОЛНОЕ название со всеми деталями)\n"
-            "- city: строка или null (город, если указан)\n\n"
-            "Правила:\n"
-            "1) Если ресторан не удаётся выделить, restaurant=null, dish=исходный текст (убери только предлоги 'в/из/at/in' если они есть в начале)\n"
-            "2) Если в тексте есть 'в/из/at/in' - это может указывать на ресторан\n"
-            "3) dish должно содержать ПОЛНОЕ название блюда со всеми деталями (например, 'бенедикт с ветчиной', а не просто 'бенедикт')\n"
-            "4) Примеры:\n"
-            "   'сырники из кофемании' -> {\"restaurant\": \"кофемания\", \"dish\": \"сырники\", \"city\": null}\n"
-            "   'бенедикт с ветчиной из Кофемании' -> {\"restaurant\": \"Кофемания\", \"dish\": \"бенедикт с ветчиной\", \"city\": null}\n"
-            "   'паста карбонара в vapiano' -> {\"restaurant\": \"vapiano\", \"dish\": \"паста карбонара\", \"city\": null}\n"
-            "   'бургер' -> {\"restaurant\": null, \"dish\": \"бургер\", \"city\": null}\n\n"
-            "Отвечай ТОЛЬКО JSON, без дополнительного текста."
+            "You are an assistant. You receive text describing a dish from a restaurant/cafe/delivery. "
+            "Extract the restaurant name (if present) and the dish name.\n\n"
+            "Reply STRICTLY in JSON format with fields:\n"
+            "- restaurant: string or null (restaurant/cafe/delivery name, if specified)\n"
+            "- dish: string (dish name, FULL name with all details)\n"
+            "- city: string or null (city, if specified)\n\n"
+            "Rules:\n"
+            "1) If the restaurant cannot be identified, restaurant=null, dish=original text (remove only prepositions 'at/from/in' if at the beginning)\n"
+            "2) If the text contains 'at/from/in' or Russian equivalents 'в/из' - it may indicate a restaurant\n"
+            "3) dish must contain the FULL dish name with all details (e.g., 'eggs benedict with ham', not just 'eggs benedict')\n"
+            "4) Examples:\n"
+            "   'syrniki from Coffeemania' -> {\"restaurant\": \"Coffeemania\", \"dish\": \"syrniki\", \"city\": null}\n"
+            "   'eggs benedict with ham from Coffeemania' -> {\"restaurant\": \"Coffeemania\", \"dish\": \"eggs benedict with ham\", \"city\": null}\n"
+            "   'pasta carbonara at Vapiano' -> {\"restaurant\": \"Vapiano\", \"dish\": \"pasta carbonara\", \"city\": null}\n"
+            "   'burger' -> {\"restaurant\": null, \"dish\": \"burger\", \"city\": null}\n\n"
+            "Reply ONLY with JSON, no additional text."
         )
         
         try:
             parse_messages = [
                 {"role": "system", "content": parse_prompt},
-                {"role": "user", "content": f"Текст: {text}"},
+                {"role": "user", "content": f"Text: {text}"},
             ]
             parse_response = await chat_completion(parse_messages)
             
@@ -512,9 +509,9 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
         
         # 3) Fallback на LLM (если web_result is None или calories=0)
         if restaurant:
-            fallback_text = f"блюдо из ресторана: {dish} в {restaurant}"
+            fallback_text = f"restaurant dish: {dish} at {restaurant}"
         else:
-            fallback_text = f"блюдо: {dish}"
+            fallback_text = f"dish: {dish}"
         
         try:
             parsed = await parse_meal_text(fallback_text)
@@ -523,9 +520,8 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
             raise HTTPException(status_code=500, detail=str(e))
         except Exception as e:
             logger.error(f"[BACKEND] Unexpected error in LLM fallback: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+            raise HTTPException(status_code=500, detail="Error processing request")
         
-        # Округляем значения
         calories = round(parsed.get("calories", 0.0))
         protein_g = round(parsed.get("protein_g", 0.0), 1)
         fat_g = round(parsed.get("fat_g", 0.0), 1)
@@ -543,11 +539,10 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
             "source_url": None,
         }
     except HTTPException:
-        # Пробрасываем HTTPException как есть
         raise
     except Exception as e:
         logger.error(f"[BACKEND] Unexpected error in restaurant_parse_text: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+        raise HTTPException(status_code=500, detail="Error processing request")
 
 
 @app.post("/ai/restaurant_parse_text_openai")
@@ -561,7 +556,7 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
     try:
         text = payload.text.strip()
         if not text:
-            raise HTTPException(status_code=400, detail="Текст не может быть пустым")
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
         
         # Определяем стратегию поиска и domain hints
         text_lower = text.lower()
@@ -1027,7 +1022,7 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
             }
         except Exception as fallback_error:
             logger.error(f"[BACKEND] Fallback parse_meal_text also failed: {fallback_error}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+            raise HTTPException(status_code=500, detail="Error processing request")
 
 
 # ---------- AGENT ----------

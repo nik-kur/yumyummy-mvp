@@ -114,7 +114,7 @@ def persist_agent_result(db: Session, telegram_id: str, agent_result: Dict[str, 
             # Fallback to message_text (shortened)
             message_text = agent_result.get("message_text", "")
             # Take first line or first 100 chars
-            description = message_text.split("\n")[0][:100] if message_text else "Приём пищи"
+            description = message_text.split("\n")[0][:100] if message_text else "Meal"
         
         # Normalize accuracy_level from confidence
         # confidence is "HIGH" or "ESTIMATE" or None
