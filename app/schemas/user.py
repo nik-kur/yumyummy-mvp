@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
@@ -24,6 +25,13 @@ class UserUpdate(BaseModel):
     target_carbs_g: Optional[float] = None
     onboarding_completed: Optional[bool] = None
     timezone: Optional[str] = None
+    trial_started_at: Optional[datetime] = None
+    trial_ends_at: Optional[datetime] = None
+    subscription_plan_id: Optional[str] = None
+    subscription_started_at: Optional[datetime] = None
+    subscription_ends_at: Optional[datetime] = None
+    subscription_auto_renew: Optional[bool] = None
+    subscription_telegram_charge_id: Optional[str] = None
 
 
 class UserRead(UserBase):
@@ -40,5 +48,12 @@ class UserRead(UserBase):
     target_carbs_g: Optional[float] = None
     onboarding_completed: bool = False
     timezone: Optional[str] = None
+    trial_started_at: Optional[datetime] = None
+    trial_ends_at: Optional[datetime] = None
+    subscription_plan_id: Optional[str] = None
+    subscription_started_at: Optional[datetime] = None
+    subscription_ends_at: Optional[datetime] = None
+    subscription_auto_renew: Optional[bool] = None
+    subscription_telegram_charge_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

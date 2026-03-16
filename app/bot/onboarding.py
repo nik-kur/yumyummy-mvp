@@ -24,7 +24,9 @@ from app.bot.api_client import (
     get_user_export_url,
     get_day_summary,
     get_saved_meals,
+    start_trial,
 )
+from app.bot.billing import check_billing_access
 
 logger = logging.getLogger(__name__)
 
@@ -787,9 +789,12 @@ async def on_tutorial_finish(callback: types.CallbackQuery, state: FSMContext) -
     
     # Отмечаем онбординг как завершённый
     await update_user(telegram_id, onboarding_completed=True)
+
+    # Auto-start free trial
+    await start_trial(telegram_id)
     
     await callback.message.answer(
-        FINAL_TEXT,
+        FINAL_TEXT + "\n\n🎉 Пробный период на 3 дня активирован!",
         reply_markup=get_main_menu_keyboard()
     )
     await state.clear()
@@ -803,6 +808,8 @@ async def on_menu_today(message: types.Message, state: FSMContext) -> None:
     await state.clear()
     
     if not await check_onboarding_completed(message):
+        return
+    if not await check_billing_access(message):
         return
     
     telegram_id = message.from_user.id
@@ -873,6 +880,8 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
     await state.clear()
     
     if not await check_onboarding_completed(message):
+        return
+    if not await check_billing_access(message):
         return
     
     telegram_id = message.from_user.id
@@ -958,6 +967,8 @@ async def on_menu_my_meals(message: types.Message, state: FSMContext) -> None:
 
     if not await check_onboarding_completed(message):
         return
+    if not await check_billing_access(message):
+        return
 
     tg_id = message.from_user.id
     data = await get_saved_meals(tg_id, page=1, per_page=20)
@@ -1014,6 +1025,8 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
     await state.clear()
 
     if not await check_onboarding_completed(message):
+        return
+    if not await check_billing_access(message):
         return
 
     telegram_id = message.from_user.id
@@ -1122,6 +1135,35 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
     
+    # Billing status section
+    from app.bot.api_client import get_billing_status as _get_billing
+    from app.billing.access import compute_access_status
+    billing = await _get_billing(telegram_id)
+    billing_section = ""
+    if billing:
+        status = billing.get("access_status", "new")
+        if status == "trial":
+            days_left = billing.get("trial_days_remaining", 0)
+            billing_section = f"\n\n⭐ Подписка: пробный период ({days_left:.0f} дн. осталось)"
+        elif status == "active":
+            ends = billing.get("subscription_ends_at", "")
+            if isinstance(ends, str) and ends:
+                try:
+                    from datetime import datetime as _dt
+                    dt = _dt.fromisoformat(ends.replace("Z", "+00:00"))
+                    ends_str = dt.strftime("%d.%m.%Y")
+                except ValueError:
+                    ends_str = ends
+            else:
+                ends_str = "—"
+            billing_section = f"\n\n⭐ Подписка: активна (до {ends_str})"
+        elif status == "trial_expired":
+            billing_section = "\n\n⭐ Подписка: пробный период закончился\nНажми /subscribe для оформления"
+        elif status == "expired":
+            billing_section = "\n\n⭐ Подписка: закончилась\nНажми /subscribe для продления"
+        else:
+            billing_section = "\n\n⭐ Подписка: нет\nНажми /subscribe для оформления"
+
     text = f"""👤 Твой профиль
 
 📋 Данные:
@@ -1137,7 +1179,7 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
 • 🔥 Калории: {target_cal:.0f} ккал
 • 🥩 Белок: {target_prot:.0f} г
 • 🥑 Жиры: {target_fat:.0f} г
-• 🍞 Углеводы: {target_carbs:.0f} г"""
+• 🍞 Углеводы: {target_carbs:.0f} г{billing_section}"""
     
     await message.answer(text, reply_markup=get_profile_keyboard())
 
@@ -1239,6 +1281,8 @@ async def on_menu_export(message: types.Message, state: FSMContext) -> None:
     await state.clear()
     
     if not await check_onboarding_completed(message):
+        return
+    if not await check_billing_access(message):
         return
     
     telegram_id = message.from_user.id

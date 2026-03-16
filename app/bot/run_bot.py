@@ -41,6 +41,8 @@ from app.bot.api_client import (
     use_saved_meal,
 )
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
+from app.bot.billing import router as billing_router, check_billing_access, show_paywall
+from app.bot.api_client import get_billing_status, start_trial
 
 
 router = Router()
@@ -561,18 +563,49 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 
     # Проверяем, прошёл ли пользователь онбординг
     if not user.get("onboarding_completed", False):
-        # Запускаем онбординг
         await start_onboarding(message, state)
         return
-    
-    # Пользователь уже прошёл онбординг — показываем приветствие с меню
+
+    # Check billing status
+    billing = await get_billing_status(tg_id)
+    access = (billing or {}).get("access_status", "new")
+
+    if access == "new":
+        trial_result = await start_trial(tg_id)
+        if trial_result and not trial_result.get("already_started"):
+            target_cal = user.get('target_calories') or 2000
+            target_prot = user.get('target_protein_g') or 150
+            target_fat = user.get('target_fat_g') or 65
+            target_carbs = user.get('target_carbs_g') or 200
+            text = (
+                f"🎉 Пробный период активирован на 3 дня!\n\n"
+                f"Твои цели на день:\n"
+                f"• 🔥 {target_cal:.0f} ккал\n"
+                f"• 🥩 {target_prot:.0f} г белка\n"
+                f"• 🥑 {target_fat:.0f} г жиров\n"
+                f"• 🍞 {target_carbs:.0f} г углеводов\n\n"
+                f"Напиши или надиктуй, что ты съел, и я всё запишу!"
+            )
+            await message.answer(text, reply_markup=get_main_menu_keyboard())
+            return
+
+    if access in ("trial_expired", "expired"):
+        await show_paywall(message, billing)
+        return
+
+    # Active trial or subscription — normal welcome
     target_cal = user.get('target_calories') or 2000
     target_prot = user.get('target_protein_g') or 150
     target_fat = user.get('target_fat_g') or 65
     target_carbs = user.get('target_carbs_g') or 200
-    
+
+    extra = ""
+    if access == "trial":
+        days_left = billing.get("trial_days_remaining", 0) if billing else 0
+        extra = f"\n⏳ Пробный период: {days_left:.0f} дн. осталось\n"
+
     text = (
-        f"С возвращением! 👋\n\n"
+        f"С возвращением! 👋\n{extra}\n"
         f"Твои цели на день:\n"
         f"• 🔥 {target_cal:.0f} ккал\n"
         f"• 🥩 {target_prot:.0f} г белка\n"
@@ -639,6 +672,8 @@ async def cmd_log(message: types.Message) -> None:
     /log 350 25 10 40 овсянка с бананом
       └─ калории белки жиры углеводы описание...
     """
+    if not await check_billing_access(message):
+        return
     if not message.text:
         await message.answer("Не понял сообщение. Пример: /log 350 овсянка с бананом")
         return
@@ -2251,6 +2286,8 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
     Обработка голосовых сообщений.
     Скачивает voice, отправляет на backend для STT и парсинга, логирует приём пищи.
     """
+    if not await check_billing_access(message):
+        return
     # 1) Гарантируем, что пользователь есть в backend
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
@@ -2364,6 +2401,8 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
     Handle photo messages. Downloads the photo, base64-encodes it,
     and sends it through the agent workflow for food recognition.
     """
+    if not await check_billing_access(message):
+        return
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
@@ -2611,6 +2650,9 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
     
     if not text.strip():
         return  # Skip empty messages
+
+    if not await check_billing_access(message):
+        return
     
     # Send processing message
     processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
@@ -3078,7 +3120,9 @@ async def main() -> None:
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     
-    # Важно: onboarding_router должен быть первым для приоритета обработки меню
+    # billing_router first: handles pre_checkout_query and successful_payment
+    dp.include_router(billing_router)
+    # onboarding_router: menu button handlers during onboarding
     dp.include_router(onboarding_router)
     dp.include_router(router)
 

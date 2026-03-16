@@ -82,6 +82,10 @@ def run_migrations():
 from app.api.context import router as context_router
 app.include_router(context_router)
 
+# Include billing API router
+from app.api.billing import router as billing_router
+app.include_router(billing_router)
+
 
 @app.get("/health")
 async def health_check():

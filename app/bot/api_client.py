@@ -562,3 +562,82 @@ async def use_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"[API] use_saved_meal error: {e}")
         return None
+
+
+# ============ Billing ============
+
+
+async def get_billing_status(telegram_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/status/{telegram_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_billing_status error: {e}")
+        return None
+
+
+async def start_trial(telegram_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/trial/start"
+    payload = {"telegram_id": str(telegram_id)}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] start_trial error: {e}")
+        return None
+
+
+async def record_payment_success(
+    telegram_id: int,
+    telegram_payment_charge_id: str,
+    provider_payment_charge_id: Optional[str],
+    plan_id: str,
+    amount_xtr: int,
+    is_recurring: bool = False,
+    is_first_recurring: bool = False,
+    invoice_payload: Optional[str] = None,
+    raw_payload: Optional[str] = None,
+    subscription_expiration_date: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/payment/telegram/success"
+    data: Dict[str, Any] = {
+        "telegram_id": str(telegram_id),
+        "telegram_payment_charge_id": telegram_payment_charge_id,
+        "provider_payment_charge_id": provider_payment_charge_id,
+        "plan_id": plan_id,
+        "amount_xtr": amount_xtr,
+        "is_recurring": is_recurring,
+        "is_first_recurring": is_first_recurring,
+        "invoice_payload": invoice_payload,
+        "raw_payload": raw_payload,
+    }
+    if subscription_expiration_date is not None:
+        data["subscription_expiration_date"] = subscription_expiration_date
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=data)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] record_payment_success error: {e}")
+        return None
+
+
+async def cancel_subscription(telegram_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/subscription/cancel"
+    payload = {"telegram_id": str(telegram_id)}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] cancel_subscription error: {e}")
+        return None
