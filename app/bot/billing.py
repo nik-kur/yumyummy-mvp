@@ -12,6 +12,7 @@ from aiogram.types import LabeledPrice
 
 from app.core.config import settings
 from app.billing.plans import get_plans, get_active_plan, SUBSCRIPTION_PERIOD_SECONDS
+from app.i18n import DEFAULT_LANG, tr
 from app.bot.api_client import (
     get_billing_status,
     start_trial,
@@ -22,28 +23,22 @@ from app.bot.api_client import (
 logger = logging.getLogger(__name__)
 
 router = Router()
+LANG = DEFAULT_LANG
 
 # ---------------------------------------------------------------------------
 # Paywall display
 # ---------------------------------------------------------------------------
 
 PAYWALL_TRIAL_TEXT = (
-    "🎉 <b>Попробуй YumYummy бесплатно!</b>\n\n"
-    "3 дня полного доступа — без оплаты.\n"
-    "После пробного периода выбери подходящий тариф.\n\n"
-    "{plans_text}"
+    tr("billing.paywall_trial", LANG)
 )
 
 PAYWALL_EXPIRED_TEXT = (
-    "⏰ <b>Пробный период закончился</b>\n\n"
-    "Чтобы продолжить пользоваться YumYummy, оформи подписку:\n\n"
-    "{plans_text}"
+    tr("billing.paywall_trial_expired", LANG)
 )
 
 PAYWALL_SUB_EXPIRED_TEXT = (
-    "⏰ <b>Подписка закончилась</b>\n\n"
-    "Оформи подписку, чтобы продолжить:\n\n"
-    "{plans_text}"
+    tr("billing.paywall_sub_expired", LANG)
 )
 
 
@@ -52,9 +47,9 @@ def _build_plans_text() -> str:
     lines = []
     for plan in plans.values():
         if plan.is_recurring:
-            lines.append(f"⭐ <b>{plan.name_ru}</b> — {plan.price_xtr} Stars/мес")
+            lines.append(f"⭐ <b>{plan.name_en or plan.name_ru}</b> — {plan.price_xtr} {tr('billing.plan_monthly_suffix', LANG)}")
         else:
-            lines.append(f"⭐ <b>{plan.name_ru}</b> — {plan.price_xtr} Stars")
+            lines.append(f"⭐ <b>{plan.name_en or plan.name_ru}</b> — {plan.price_xtr} {tr('billing.plan_once_suffix', LANG)}")
     return "\n".join(lines)
 
 
@@ -63,22 +58,22 @@ async def _create_plan_button(bot, plan, tg_id: int) -> types.InlineKeyboardButt
     payload = f"sub:{plan.id}:{tg_id}"
 
     kwargs = dict(
-        title=f"YumYummy — {plan.name_ru}",
+        title=f"YumYummy — {plan.name_en or plan.name_ru}",
         description=(
-            f"Подписка на {plan.period_days} дней с автопродлением"
+            f"Subscription for {plan.period_days} days with auto-renew"
             if plan.is_recurring
-            else f"Доступ на {plan.period_days} дней"
+            else f"Access for {plan.period_days} days"
         ),
         payload=payload,
         currency="XTR",
-        prices=[LabeledPrice(label=plan.name_ru, amount=plan.price_xtr)],
+        prices=[LabeledPrice(label=plan.name_en or plan.name_ru, amount=plan.price_xtr)],
     )
     if plan.subscription_period_seconds:
         kwargs["subscription_period"] = plan.subscription_period_seconds
 
     invoice_link = await bot.create_invoice_link(**kwargs)
 
-    label = f"⭐ {plan.name_ru} — {plan.price_xtr} Stars"
+    label = f"⭐ {plan.name_en or plan.name_ru} — {plan.price_xtr} Stars"
     return types.InlineKeyboardButton(text=label, url=invoice_link)
 
 
@@ -89,7 +84,7 @@ async def _build_paywall_keyboard(
     if show_trial:
         buttons.append([
             types.InlineKeyboardButton(
-                text="🆓 Начать бесплатно 3 дня",
+                text=tr("billing.start_trial_btn", LANG),
                 callback_data="billing:start_trial",
             )
         ])
@@ -156,7 +151,7 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
     tg_id = query.from_user.id
     result = await start_trial(tg_id)
     if result is None:
-        await query.message.answer("Не удалось активировать пробный период. Попробуй позже.")
+        await query.message.answer(tr("billing.activate_trial_error", LANG))
         return
 
     ends_at = result.get("trial_ends_at", "")
@@ -167,19 +162,16 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
         except ValueError:
             ends_str = ends_at
     else:
-        ends_str = "через 3 дня"
+        ends_str = tr("billing.trial_default_ends", LANG)
 
     if result.get("already_started"):
         await query.message.answer(
-            f"У тебя уже есть пробный период до {ends_str}.\n"
-            "Напиши, что ты съел, и я всё запишу!",
+            tr("billing.trial_already", LANG, ends_str=ends_str),
             parse_mode="HTML",
         )
     else:
         await query.message.answer(
-            f"🎉 <b>Пробный период активирован!</b>\n\n"
-            f"У тебя есть 3 дня полного доступа (до {ends_str}).\n"
-            f"Напиши или надиктуй, что ты съел, и я всё запишу!",
+            tr("billing.trial_started", LANG, ends_str=ends_str),
             parse_mode="HTML",
         )
 
@@ -232,8 +224,7 @@ async def handle_successful_payment(message: types.Message) -> None:
 
     if result is None:
         await message.answer(
-            "⚠️ Оплата прошла, но не удалось обновить подписку. "
-            "Напиши /paysupport — мы разберёмся."
+            tr("billing.payment_record_error", LANG)
         )
         logger.error(f"[BILLING] Backend failed to record payment for tg_id={tg_id}")
         return
@@ -251,24 +242,20 @@ async def handle_successful_payment(message: types.Message) -> None:
     plan = get_active_plan(plan_id)
     status = result.get("status", "activated")
     if status == "already_processed":
-        await message.answer("Эта оплата уже была обработана ранее. Всё в порядке!")
+        await message.answer(tr("billing.payment_already", LANG))
     elif status == "renewed":
         await message.answer(
-            f"🔄 <b>Подписка продлена!</b>\n"
-            f"Следующее продление: {ends_str}",
+            tr("billing.payment_renewed", LANG, ends_str=ends_str),
             parse_mode="HTML",
         )
     else:
         period_text = (
-            f"Подписка автоматически продлевается каждые 30 дней."
+            tr("billing.payment_period_recurring", LANG)
             if plan and plan.is_recurring
-            else f"Доступ активен до {ends_str}."
+            else tr("billing.payment_period_fixed", LANG, ends_str=ends_str)
         )
         await message.answer(
-            f"✅ <b>Подписка оформлена!</b>\n\n"
-            f"У тебя полный доступ к YumYummy до {ends_str}.\n"
-            f"{period_text}\n\n"
-            f"Напиши, что ты съел, и я всё запишу!",
+            tr("billing.payment_activated", LANG, ends_str=ends_str, period_text=period_text),
             parse_mode="HTML",
         )
 
@@ -289,10 +276,7 @@ async def cmd_subscribe(message: types.Message) -> None:
 @router.message(Command("paysupport"))
 async def cmd_paysupport(message: types.Message) -> None:
     await message.answer(
-        "💬 <b>Поддержка по оплате</b>\n\n"
-        "Если у тебя возникли вопросы или проблемы с оплатой, "
-        "напиши: @nik_kur\n\n"
-        "Мы ответим в течение 24 часов.",
+        tr("billing.paysupport", LANG),
         parse_mode="HTML",
     )
 
@@ -304,13 +288,7 @@ async def cmd_paysupport(message: types.Message) -> None:
 @router.message(Command("terms"))
 async def cmd_terms(message: types.Message) -> None:
     await message.answer(
-        "📄 <b>Условия использования</b>\n\n"
-        "1. YumYummy — сервис для трекинга питания и подсчёта КБЖУ.\n"
-        "2. Подписка оплачивается через Telegram Stars (XTR).\n"
-        "3. Месячная подписка автоматически продлевается каждые 30 дней.\n"
-        "4. Отменить подписку можно в любой момент в настройках Telegram.\n"
-        "5. После отмены доступ сохраняется до конца оплаченного периода.\n\n"
-        'Подробные политики: <a href="https://yumyummy.ai">yumyummy.ai</a>',
+        tr("billing.terms", LANG),
         parse_mode="HTML",
         disable_web_page_preview=True,
     )

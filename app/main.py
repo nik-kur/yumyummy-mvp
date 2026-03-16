@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
+from app.i18n import DEFAULT_LANG, tr
 
 logger = logging.getLogger(__name__)
+LANG = DEFAULT_LANG
 from app.deps import get_db
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -102,7 +104,7 @@ async def ai_test():
     """
     messages = [
         {"role": "system", "content": "You are a concise assistant."},
-        {"role": "user", "content": "Ответь одной короткой фразой, что такое проект YumYummy."},
+        {"role": "user", "content": "Reply in one short sentence: what is YumYummy?"},
     ]
     answer = await chat_completion(messages)
     return {"answer": answer}
@@ -134,10 +136,10 @@ async def ai_voice_parse_meal(audio: UploadFile = File(...)):
         file_bytes = await audio.read()
     except Exception as e:
         logger.error(f"[VOICE] Error reading audio file: {e}")
-        raise HTTPException(status_code=400, detail="Не удалось прочитать аудиофайл")
+        raise HTTPException(status_code=400, detail="Could not read audio file")
 
     if not file_bytes:
-        raise HTTPException(status_code=400, detail="Пустой аудиофайл")
+        raise HTTPException(status_code=400, detail="Empty audio file")
 
     try:
         transcript = await transcribe_audio(
@@ -146,10 +148,10 @@ async def ai_voice_parse_meal(audio: UploadFile = File(...)):
         )
     except Exception as e:
         logger.error(f"[VOICE] Error transcribing audio: {e}")
-        raise HTTPException(status_code=500, detail="Не удалось распознать речь")
+        raise HTTPException(status_code=500, detail="Could not recognize speech")
 
     if not transcript.strip():
-        raise HTTPException(status_code=400, detail="Не удалось распознать речь")
+        raise HTTPException(status_code=400, detail="Could not recognize speech")
 
     # Пробуем product pipeline (web-search-first) на основе transcript
     product_result = None
@@ -1050,7 +1052,7 @@ async def ai_agent(payload: AgentRequest, db: Session = Depends(get_db)):
         logger.error(f"[BACKEND] Error in agent endpoint: {e}", exc_info=True)
         return {
             "intent": "error",
-            "reply_text": f"Произошла ошибка: {str(e)}",
+            "reply_text": f"Error: {str(e)}",
             "meal": None,
             "day_summary": None,
             "week_summary": None,
@@ -1149,7 +1151,7 @@ async def agent_run(payload: WorkflowRunRequest):
             # Return friendly error response instead of crashing
             return WorkflowRunResponse(
                 intent="help",
-                message_text="Произошла ошибка при обработке ответа. Попробуйте позже.",
+                message_text=tr("main.workflow_response_error", LANG),
                 confidence=None,
                 totals=WorkflowTotals(
                     calories_kcal=0.0,
@@ -1168,7 +1170,7 @@ async def agent_run(payload: WorkflowRunRequest):
             logger.error(f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} {error_msg}")
             return WorkflowRunResponse(
                 intent="help",
-                message_text="Сервис временно не настроен (нет ключа OpenAI). Сообщите администратору.",
+                message_text=tr("main.workflow_not_configured", LANG),
                 confidence=None,
                 totals=WorkflowTotals(
                     calories_kcal=0.0,
@@ -1184,7 +1186,7 @@ async def agent_run(payload: WorkflowRunRequest):
             # Return friendly JSON saying workflow is not connected
             return WorkflowRunResponse(
                 intent="help",
-                message_text="Сервис временно не подключен. Попробуйте позже.",
+                message_text=tr("main.workflow_not_connected", LANG),
                 confidence=None,
                 totals=WorkflowTotals(
                     calories_kcal=0.0,
@@ -1205,7 +1207,7 @@ async def agent_run(payload: WorkflowRunRequest):
         # Return friendly JSON for quota/rate-limit errors
         return WorkflowRunResponse(
             intent="help",
-            message_text="Сервис перегружен или лимит исчерпан. Попробуй чуть позже.",
+            message_text=tr("main.workflow_overloaded", LANG),
             confidence=None,
             totals=WorkflowTotals(
                 calories_kcal=0.0,
@@ -1226,7 +1228,7 @@ async def agent_run(payload: WorkflowRunRequest):
         # Return friendly JSON for any other error (never crash)
         return WorkflowRunResponse(
             intent="help",
-            message_text="Произошла ошибка при обработке запроса. Попробуйте позже.",
+            message_text=tr("main.workflow_unexpected", LANG),
             confidence=None,
             totals=WorkflowTotals(
                 calories_kcal=0.0,

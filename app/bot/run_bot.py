@@ -43,9 +43,11 @@ from app.bot.api_client import (
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 from app.bot.billing import router as billing_router, check_billing_access, show_paywall
 from app.bot.api_client import get_billing_status, start_trial
+from app.i18n import DEFAULT_LANG, tr
 
 
 router = Router()
+LANG = DEFAULT_LANG
 
 MEAL_LOGGING_INTENTS = {"log_meal", "product", "eatout", "barcode", "photo_meal", "nutrition_label"}
 
@@ -91,7 +93,7 @@ def format_accuracy_label(accuracy_level: Optional[str]) -> Optional[str]:
 def format_source_label(source_url: Optional[str]) -> str:
     normalized = normalize_source_url(source_url)
     if not normalized:
-        return "оценка ИИ на базе средних известных значений для указанных блюд и продуктов"
+        return tr("runbot.default_source", LANG)
     try:
         domain = urlparse(normalized).netloc
     except ValueError:
@@ -105,11 +107,11 @@ def build_summary_lines(summary: Dict[str, Any]) -> list[str]:
     total_fat = round(summary.get("total_fat_g", 0), 1)
     total_carbs = round(summary.get("total_carbs_g", 0), 1)
     return [
-        "Сводка за сегодня:",
-        f"• Калории: {total_calories}",
-        f"• Белки: {total_protein} г",
-        f"• Жиры: {total_fat} г",
-        f"• Углеводы: {total_carbs} г",
+        tr("runbot.summary_today", LANG),
+        f"• Calories: {total_calories}",
+        f"• Protein: {total_protein} g",
+        f"• Fat: {total_fat} g",
+        f"• Carbs: {total_carbs} g",
     ]
 
 
@@ -128,22 +130,22 @@ def build_meal_response_text(
     source_label = format_source_label(source_url)
     all_zero = calories == 0 and protein_g == 0 and fat_g == 0 and carbs_g == 0
     lines = [
-        f"✅ Записал {description}",
+        tr("runbot.logged", LANG, description=description),
         "",
     ]
     if all_zero:
-        lines.append("ℹ️ КБЖУ не удалось определить")
+        lines.append(tr("runbot.macros_unknown", LANG))
     else:
-        lines.append(f"{calories} ккал · Б {protein_g} г · Ж {fat_g} г · У {carbs_g} г")
+        lines.append(f"{calories} kcal · P {protein_g} g · F {fat_g} g · C {carbs_g} g")
     if notes:
         lines.append("")
-        lines.append(f"Примечание: {notes}")
+        lines.append(tr("runbot.note", LANG, notes=notes))
     lines.append("")
     normalized_url = normalize_source_url(source_url)
     if normalized_url:
-        lines.append(f"🔗 Источник: {source_label}")
+        lines.append(tr("runbot.source_link", LANG, source_label=source_label))
     else:
-        lines.append(f"💡 Источник: {source_label}")
+        lines.append(tr("runbot.source_hint", LANG, source_label=source_label))
     if summary:
         lines.append("")
         lines.extend(build_summary_lines(summary))
@@ -167,7 +169,7 @@ def build_meal_response_from_agent(
     description = ", ".join(description_parts).strip()
     message_text = (result.get("message_text") or "").strip()
     if not description:
-        description = message_text or "Без описания"
+        description = message_text or tr("runbot.no_description", LANG)
 
     if (
         not description_parts
@@ -208,9 +210,9 @@ def build_meal_response_from_agent(
     if len(valid_items) <= 1:
         return base_text
 
-    lines = [base_text, "", "———", "", "По блюдам:", ""]
+    lines = [base_text, "", "———", "", tr("runbot.by_items", LANG), ""]
     for item in valid_items:
-        item_name = item.get("name") or "Блюдо"
+        item_name = item.get("name") or tr("runbot.dish", LANG)
         item_calories = round(float(item.get("calories_kcal") or 0))
         item_protein = round(float(item.get("protein_g") or 0), 1)
         item_fat = round(float(item.get("fat_g") or 0), 1)
@@ -218,18 +220,18 @@ def build_meal_response_from_agent(
         item_all_zero = item_calories == 0 and item_protein == 0 and item_fat == 0 and item_carbs == 0
         item_source_url = item.get("source_url")
         item_source_label = format_source_label(item_source_url) if item_source_url else format_source_label(None)
-        item_source_line = f"🔗 Источник: {item_source_label}" if normalize_source_url(item_source_url) else f"💡 Источник: {item_source_label}"
+        item_source_line = tr("runbot.source_link", LANG, source_label=item_source_label) if normalize_source_url(item_source_url) else tr("runbot.source_hint", LANG, source_label=item_source_label)
         if item_all_zero:
             lines.extend([
                 f"📝 {item_name}:",
-                "ℹ️ КБЖУ не удалось определить",
+                tr("runbot.macros_unknown", LANG),
                 item_source_line,
                 "",
             ])
         else:
             lines.extend([
                 f"📝 {item_name}:",
-                f"{item_calories} ккал · Б {item_protein} г · Ж {item_fat} г · У {item_carbs} г",
+                f"{item_calories} kcal · P {item_protein} g · F {item_fat} g · C {item_carbs} g",
                 item_source_line,
                 "",
             ])
@@ -270,28 +272,32 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
     message_text = _strip_markdown_bold((result.get("message_text") or "").strip())
 
     if not items:
-        return message_text or "Не удалось сформировать рекомендацию."
+        return message_text or "Could not generate a recommendation."
 
-    lines = ["🤔 Рекомендация:", ""]
+    lines = [tr("runbot.recommendation_title", LANG), ""]
 
-    labels = ["Лучший выбор", "Альтернатива 1", "Альтернатива 2"]
+    labels = [
+        tr("runbot.recommendation_best", LANG),
+        tr("runbot.recommendation_alt1", LANG),
+        tr("runbot.recommendation_alt2", LANG),
+    ]
     for idx, item in enumerate(items[:3]):
-        item_name = _strip_markdown_bold(item.get("name") or "Блюдо")
+        item_name = _strip_markdown_bold(item.get("name") or tr("runbot.dish", LANG))
         item_cal = round(float(item.get("calories_kcal") or 0))
         item_prot = round(float(item.get("protein_g") or 0), 1)
         item_fat = round(float(item.get("fat_g") or 0), 1)
         item_carbs = round(float(item.get("carbs_g") or 0), 1)
-        label = labels[idx] if idx < len(labels) else f"Вариант {idx + 1}"
+        label = labels[idx] if idx < len(labels) else tr("runbot.recommendation_variant", LANG, n=idx + 1)
         lines.append(f"{idx + 1}. {label}: {item_name}")
         if item_cal > 0:
-            lines.append(f"   {item_cal} ккал · Б {item_prot} г · Ж {item_fat} г · У {item_carbs} г")
+            lines.append(f"   {item_cal} kcal · P {item_prot} g · F {item_fat} g · C {item_carbs} g")
         lines.append("")
 
     if message_text:
         reasoning = _extract_message_text_block(
             message_text,
-            ["Почему эти варианты"],
-            ["Как улучшить", "Хак", "Совет", "Лайфхак"],
+            ["Why these options"],
+            ["How to improve", "Hack", "Tip", "Lifehack"],
         )
         if reasoning:
             heading, _, body = reasoning.partition(":")
@@ -303,7 +309,7 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
 
         tip = _extract_message_text_block(
             message_text,
-            ["Как улучшить", "Хак", "Совет", "Лайфхак"],
+            ["How to improve", "Hack", "Tip", "Lifehack"],
             [],
         )
         if tip:
@@ -314,7 +320,7 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
                 lines.append(body[0].upper() + body[1:])
             lines.append("")
 
-    lines.append("Нажми кнопку ниже, чтобы записать выбранный вариант")
+    lines.append(tr("runbot.save_variant_prompt", LANG))
 
     while lines and lines[-1] == "":
         lines.pop()
@@ -324,9 +330,13 @@ def build_food_advice_response(result: Dict[str, Any]) -> str:
 def build_food_advice_keyboard(items: list, source_url: Optional[str] = None) -> types.InlineKeyboardMarkup:
     """Build keyboard with 'Log variant N' buttons and optional source links for food advice."""
     rows = []
-    labels = ["✅ Записать вариант 1", "✅ Записать вариант 2", "✅ Записать вариант 3"]
+    labels = [
+        tr("runbot.save_variant_btn1", LANG),
+        tr("runbot.save_variant_btn2", LANG),
+        tr("runbot.save_variant_btn3", LANG),
+    ]
     for idx in range(min(len(items), 3)):
-        item_name = items[idx].get("name", "Блюдо") if isinstance(items[idx], dict) else "Блюдо"
+        item_name = items[idx].get("name", tr("runbot.dish", LANG)) if isinstance(items[idx], dict) else tr("runbot.dish", LANG)
         short_name = item_name if len(item_name) <= 20 else item_name[:17] + "..."
         rows.append([types.InlineKeyboardButton(
             text=f"{labels[idx]} ({short_name})",
@@ -339,10 +349,10 @@ def build_food_advice_keyboard(items: list, source_url: Optional[str] = None) ->
             continue
         item_url = normalize_source_url(item.get("source_url")) or normalize_source_url(source_url)
         if item_url:
-            item_name = _strip_markdown_bold(item.get("name") or "Блюдо")
+            item_name = _strip_markdown_bold(item.get("name") or tr("runbot.dish", LANG))
             label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
             source_buttons.append([types.InlineKeyboardButton(
-                text=f"🔗 Источник: {label}",
+                text=tr("runbot.source_link", LANG, source_label=label),
                 url=item_url,
             )])
     rows.extend(source_buttons)
@@ -359,11 +369,11 @@ def build_meal_keyboard(
     rows = [
         [
             types.InlineKeyboardButton(
-                text="✏️ Редактировать",
+                text="✏️ Edit",
                 callback_data=f"meal_edit:{meal_id}:{day.isoformat()}",
             ),
             types.InlineKeyboardButton(
-                text="🗑 Удалить",
+                text="🗑 Delete",
                 callback_data=f"meal_delete:{meal_id}:{day.isoformat()}",
             ),
         ]
@@ -376,19 +386,19 @@ def build_meal_keyboard(
                 continue
             item_url = normalize_source_url(item.get("source_url"))
             if item_url:
-                item_name = item.get("name") or "Продукт"
+                item_name = item.get("name") or "Product"
                 # Truncate long names for button text
                 label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
-                rows.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=item_url)])
+                rows.append([types.InlineKeyboardButton(text=tr("runbot.source_link", LANG, source_label=label), url=item_url)])
 
     # Fallback: single top-level source button if no per-item sources were added
     if len(rows) == 1:
         url = normalize_source_url(source_url)
         if url:
-            rows.append([types.InlineKeyboardButton(text="🔗 Источник", url=url)])
+            rows.append([types.InlineKeyboardButton(text="🔗 Source", url=url)])
 
     rows.append([types.InlineKeyboardButton(
-        text="💾 В Моё меню",
+        text="💾 Save to My Menu",
         callback_data=f"save_meal:{meal_id}",
     )])
 
@@ -400,7 +410,7 @@ def build_day_actions_keyboard(day: date_type) -> types.InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text="🍽 Посмотреть приёмы пищи",
+                    text="🍽 View logged meals",
                     callback_data=f"daylist:{day.isoformat()}",
                 )
             ]
@@ -428,21 +438,21 @@ def build_edit_choice_keyboard(meal_id: int, day: date_type) -> types.InlineKeyb
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text="Название",
+                    text="Name",
                     callback_data=f"meal_edit_field:name:{meal_id}:{day.isoformat()}",
                 ),
                 types.InlineKeyboardButton(
-                    text="КБЖУ",
+                    text="Macros",
                     callback_data=f"meal_edit_field:macros:{meal_id}:{day.isoformat()}",
                 ),
                 types.InlineKeyboardButton(
-                    text="🕐 Время",
+                    text="🕐 Time",
                     callback_data=f"meal_edit_field:time:{meal_id}:{day.isoformat()}",
                 ),
             ],
             [
                 types.InlineKeyboardButton(
-                    text="Отмена",
+                    text="Cancel",
                     callback_data=f"meal_edit_field:cancel:{meal_id}:{day.isoformat()}",
                 )
             ],
@@ -475,17 +485,17 @@ def build_day_summary_text(summary: Dict[str, Any], day: date_type) -> str:
     total_carbs = round(summary.get("total_carbs_g", 0), 1)
     return "\n".join(
         [
-            f"📅 Сводка за день ({date_str}):",
-            f"• Калории: {total_calories}",
-            f"• Белки: {total_protein} г",
-            f"• Жиры: {total_fat} г",
-            f"• Углеводы: {total_carbs} г",
+            f"📅 Daily summary ({date_str}):",
+            f"• Calories: {total_calories}",
+            f"• Protein: {total_protein} g",
+            f"• Fat: {total_fat} g",
+            f"• Carbs: {total_carbs} g",
         ]
     )
 
 
 def format_meal_entry(meal: Dict[str, Any]) -> str:
-    description = meal.get("description_user") or "Без описания"
+    description = meal.get("description_user") or "No description"
     calories = round(meal.get("calories", 0))
     protein_g = round(meal.get("protein_g", 0), 1)
     fat_g = round(meal.get("fat_g", 0), 1)
@@ -503,14 +513,14 @@ def format_meal_entry(meal: Dict[str, Any]) -> str:
 
     lines = [
         f"🍽 {time_str} — {description}",
-        f"• Калории: {calories}",
+        f"• Calories: {calories}",
     ]
     if protein_g or fat_g or carbs_g:
         lines.extend(
             [
-                f"• Белки: {protein_g} г",
-                f"• Жиры: {fat_g} г",
-                f"• Углеводы: {carbs_g} г",
+                f"• Protein: {protein_g} g",
+                f"• Fat: {fat_g} g",
+                f"• Carbs: {carbs_g} g",
             ]
         )
     return "\n".join(lines)
@@ -554,9 +564,9 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 
     if user is None:
         await message.answer(
-            "Привет! Я YumYummy 🧃\n\n"
-            "Похоже, сейчас не могу связаться с сервером.\n"
-            "Попробуй, пожалуйста, чуть позже 🙏",
+            "Hi! I'm YumYummy 🧃\n\n"
+            "Looks like I can't reach the server right now.\n"
+            "Please try again a little later 🙏",
             reply_markup=get_main_menu_keyboard(),
         )
         return
@@ -578,13 +588,13 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             target_fat = user.get('target_fat_g') or 65
             target_carbs = user.get('target_carbs_g') or 200
             text = (
-                f"🎉 Пробный период активирован на 3 дня!\n\n"
-                f"Твои цели на день:\n"
-                f"• 🔥 {target_cal:.0f} ккал\n"
-                f"• 🥩 {target_prot:.0f} г белка\n"
-                f"• 🥑 {target_fat:.0f} г жиров\n"
-                f"• 🍞 {target_carbs:.0f} г углеводов\n\n"
-                f"Напиши или надиктуй, что ты съел, и я всё запишу!"
+                f"🎉 3-day trial activated!\n\n"
+                f"Your daily targets:\n"
+                f"• 🔥 {target_cal:.0f} kcal\n"
+                f"• 🥩 {target_prot:.0f} g protein\n"
+                f"• 🥑 {target_fat:.0f} g fat\n"
+                f"• 🍞 {target_carbs:.0f} g carbs\n\n"
+                f"Type or dictate what you ate, and I'll log it!"
             )
             await message.answer(text, reply_markup=get_main_menu_keyboard())
             return
@@ -602,16 +612,16 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     extra = ""
     if access == "trial":
         days_left = billing.get("trial_days_remaining", 0) if billing else 0
-        extra = f"\n⏳ Пробный период: {days_left:.0f} дн. осталось\n"
+        extra = f"\n⏳ Trial: {days_left:.0f} days left\n"
 
     text = (
-        f"С возвращением! 👋\n{extra}\n"
-        f"Твои цели на день:\n"
-        f"• 🔥 {target_cal:.0f} ккал\n"
-        f"• 🥩 {target_prot:.0f} г белка\n"
-        f"• 🥑 {target_fat:.0f} г жиров\n"
-        f"• 🍞 {target_carbs:.0f} г углеводов\n\n"
-        f"Напиши или надиктуй, что ты съел, и я всё запишу!"
+        f"Welcome back! 👋\n{extra}\n"
+        f"Your daily targets:\n"
+        f"• 🔥 {target_cal:.0f} kcal\n"
+        f"• 🥩 {target_prot:.0f} g protein\n"
+        f"• 🥑 {target_fat:.0f} g fat\n"
+        f"• 🍞 {target_carbs:.0f} g carbs\n\n"
+        f"Type or dictate what you ate, and I'll log it!"
     )
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
@@ -619,25 +629,25 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 @router.message(Command("help"))
 async def cmd_help(message: types.Message) -> None:
     text = (
-        "📝 Как пользоваться ботом:\n\n"
-        "1️⃣ Логирование еды:\n"
-        "• Просто напиши что съел: \"2 яйца и тост\"\n"
-        "• Или отправь голосовое сообщение\n"
-        "• 📸 Отправь фото еды — бот оценит КБЖУ\n"
-        "• 📸 Сфотографируй этикетку с КБЖУ\n"
-        "• 📸 Сфотографируй продукт с брендом\n"
-        "• Укажи место: \"капучино в Старбаксе\"\n\n"
-        "2️⃣ Кнопки меню:\n"
-        "📊 Сегодня — прогресс за день\n"
-        "📈 Неделя — статистика за 7 дней\n"
-        "🤔 Что съесть? — умный совет по питанию\n"
-        "👤 Профиль — твои данные и цели\n"
-        "📤 Экспорт — скачать все записи в CSV\n"
-        "💬 Поддержка — связь с разработчиком\n\n"
-        "3️⃣ Команды:\n"
-        "/start — перезапустить бота\n"
-        "/help — эта справка\n"
-        "/ping — проверить связь с сервером"
+        "📝 How to use the bot:\n\n"
+        "1️⃣ Log food:\n"
+        "• Type what you ate: \"2 eggs and toast\"\n"
+        "• Or send a voice message\n"
+        "• 📸 Send a food photo - bot estimates calories/macros\n"
+        "• 📸 Take a photo of a nutrition label\n"
+        "• 📸 Take a product photo with brand\n"
+        "• Add context: \"cappuccino at Starbucks\"\n\n"
+        "2️⃣ Menu buttons:\n"
+        "📊 Today - daily progress\n"
+        "📈 Week - 7-day statistics\n"
+        "🤔 What should I eat? - smart nutrition advice\n"
+        "👤 Profile - your data and goals\n"
+        "📤 Export - download all logs to CSV\n"
+        "💬 Support - contact developer\n\n"
+        "3️⃣ Commands:\n"
+        "/start - restart bot\n"
+        "/help - this help\n"
+        "/ping - check server connection"
     )
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
@@ -650,14 +660,14 @@ async def cmd_ping(message: types.Message) -> None:
     """
     health = await ping_backend()
     if health is None:
-        await message.answer("❌ Не удалось связаться с сервером YumYummy.")
+        await message.answer("❌ Could not connect to YumYummy server.")
         return
 
     status = health.get("status", "unknown")
     app_name = health.get("app", "unknown")
 
     await message.answer(
-        f"✅ Связь с backend'ом есть.\n"
+        f"✅ Backend connection is healthy.\n"
         f"status: {status}\n"
         f"app: {app_name}"
     )
@@ -675,17 +685,17 @@ async def cmd_log(message: types.Message) -> None:
     if not await check_billing_access(message):
         return
     if not message.text:
-        await message.answer("Не понял сообщение. Пример: /log 350 овсянка с бананом")
+        await message.answer("I couldn't parse your message. Example: /log 350 oatmeal with banana")
         return
 
     # Отделяем команду от аргументов
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         await message.answer(
-            "Нужно передать параметры.\n\n"
-            "Примеры:\n"
-            "/log 350 овсянка с бананом\n"
-            "/log 350 25 10 40 овсянка с бананом"
+            "You need to pass parameters.\n\n"
+            "Examples:\n"
+            "/log 350 oatmeal with banana\n"
+            "/log 350 25 10 40 oatmeal with banana"
         )
         return
 
@@ -694,8 +704,8 @@ async def cmd_log(message: types.Message) -> None:
 
     if not tokens:
         await message.answer(
-            "Не удалось разобрать параметры.\n"
-            "Пример: /log 350 25 10 40 овсянка с бананом"
+            "Couldn't parse parameters.\n"
+            "Example: /log 350 25 10 40 oatmeal with banana"
         )
         return
 
@@ -704,8 +714,8 @@ async def cmd_log(message: types.Message) -> None:
         calories = float(tokens[0])
     except ValueError:
         await message.answer(
-            "Первая цифра после /log должна быть калориями.\n"
-            "Пример: /log 350 овсянка с бананом"
+            "The first number after /log must be calories.\n"
+            "Example: /log 350 oatmeal with banana"
         )
         return
 
@@ -741,13 +751,13 @@ async def cmd_log(message: types.Message) -> None:
     # Всё, что осталось — описание
     description = " ".join(tokens[idx:]).strip()
     if not description:
-        description = "Без описания"
+        description = "No description"
 
     # Гарантируем, что пользователь есть в backend
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
@@ -764,7 +774,7 @@ async def cmd_log(message: types.Message) -> None:
     )
 
     if meal is None:
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        await message.answer("Could not log the meal. Please try again later 🙏")
         return
 
     # Пробуем ещё и сводку за день вытащить
@@ -802,7 +812,7 @@ async def cmd_barcode(message: types.Message) -> None:
     """
     if not message.text:
         await message.answer(
-            "Не понял сообщение. Пример использования:\n"
+            "I couldn't parse your message. Usage example:\n"
             "/barcode 4607025392147"
         )
         return
@@ -810,8 +820,8 @@ async def cmd_barcode(message: types.Message) -> None:
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         await message.answer(
-            "Нужно добавить штрихкод после команды.\n\n"
-            "Пример:\n"
+            "Add a barcode after the command.\n\n"
+            "Example:\n"
             "/barcode 4607025392147"
         )
         return
@@ -819,7 +829,7 @@ async def cmd_barcode(message: types.Message) -> None:
     barcode = parts[1].strip()
     if not barcode:
         await message.answer(
-            "Штрихкод пустой. Пример:\n"
+            "Barcode is empty. Example:\n"
             "/barcode 4607025392147"
         )
         return
@@ -828,13 +838,13 @@ async def cmd_barcode(message: types.Message) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
 
     # 2) Просим backend найти продукт по штрихкоду
     parsed = await product_parse_meal_by_barcode(barcode)
@@ -845,11 +855,11 @@ async def cmd_barcode(message: types.Message) -> None:
         except Exception:
             pass
         await message.answer(
-            "Не удалось связаться с backend'ом. Попробуй позже 🙏"
+            "Could not reach backend. Please try again later 🙏"
         )
         return
 
-    description = parsed.get("description", "Продукт")
+    description = parsed.get("description", "Product")
     calories = float(parsed.get("calories") or 0)
     protein_g = float(parsed.get("protein_g") or 0)
     fat_g = float(parsed.get("fat_g") or 0)
@@ -878,7 +888,7 @@ async def cmd_barcode(message: types.Message) -> None:
     )
 
     if meal is None:
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        await message.answer("Could not log the meal. Please try again later 🙏")
         return
 
     # 4) Получаем сводку за день
@@ -926,25 +936,25 @@ async def cmd_product(message: types.Message) -> None:
     """
     if not message.text:
         await message.answer(
-            "Не понял сообщение. Пример использования:\n"
-            "/product творог Простоквашино 5%"
+            "I couldn't parse your message. Usage example:\n"
+            "/product cottage cheese brand: Epica 6%"
         )
         return
 
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         await message.answer(
-            "Нужно добавить название после команды.\n\n"
-            "Пример:\n"
-            "/product творог Простоквашино 5%"
+            "Add a product name after the command.\n\n"
+            "Example:\n"
+            "/product cottage cheese brand: Epica 6%"
         )
         return
 
     text = parts[1].strip()
     if not text:
         await message.answer(
-            "Название пустое. Пример:\n"
-            "/product творог Простоквашино 5%"
+            "Name is empty. Example:\n"
+            "/product cottage cheese brand: Epica 6%"
         )
         return
 
@@ -953,20 +963,23 @@ async def cmd_product(message: types.Message) -> None:
     brand = None
     store = None
 
-    # Простой парсер: ищем "бренд:" и "магазин:"
-    if "бренд:" in text.lower():
-        parts_brand = text.lower().split("бренд:")
+    # Supports both EN and RU markers for future multilingual support
+    if "brand:" in text.lower() or "бренд:" in text.lower():
+        brand_marker = "brand:" if "brand:" in text.lower() else "бренд:"
+        parts_brand = text.lower().split(brand_marker)
         if len(parts_brand) == 2:
             name = parts_brand[0].strip()
             rest = parts_brand[1].strip()
-            if "магазин:" in rest.lower():
-                parts_store = rest.split("магазин:")
+            if "store:" in rest.lower() or "магазин:" in rest.lower():
+                store_marker = "store:" if "store:" in rest.lower() else "магазин:"
+                parts_store = rest.split(store_marker)
                 brand = parts_store[0].strip()
                 store = parts_store[1].strip() if len(parts_store) > 1 else None
             else:
                 brand = rest
-    elif "магазин:" in text.lower():
-        parts_store = text.lower().split("магазин:")
+    elif "store:" in text.lower() or "магазин:" in text.lower():
+        store_marker = "store:" if "store:" in text.lower() else "магазин:"
+        parts_store = text.lower().split(store_marker)
         if len(parts_store) == 2:
             name = parts_store[0].strip()
             store = parts_store[1].strip()
@@ -975,13 +988,13 @@ async def cmd_product(message: types.Message) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
 
     # 2) Просим backend найти продукт по названию
     parsed = await product_parse_meal_by_name(name, brand=brand, store=store)
@@ -992,11 +1005,11 @@ async def cmd_product(message: types.Message) -> None:
         except Exception:
             pass
         await message.answer(
-            "Не удалось связаться с backend'ом. Попробуй позже 🙏"
+            "Could not reach backend. Please try again later 🙏"
         )
         return
 
-    description = parsed.get("description", "Продукт")
+    description = parsed.get("description", "Product")
     calories = float(parsed.get("calories") or 0)
     protein_g = float(parsed.get("protein_g") or 0)
     fat_g = float(parsed.get("fat_g") or 0)
@@ -1025,7 +1038,7 @@ async def cmd_product(message: types.Message) -> None:
     )
 
     if meal is None:
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        await message.answer("Could not log the meal. Please try again later 🙏")
         return
 
     # 4) Получаем сводку за день
@@ -1072,25 +1085,25 @@ async def cmd_ai_log(message: types.Message) -> None:
     """
     if not message.text:
         await message.answer(
-            "Не понял сообщение. Пример использования:\n"
-            "/ai_log съел тарелку борща, два кусочка чёрного хлеба и чай без сахара"
+            "I couldn't parse your message. Usage example:\n"
+            "/ai_log had a bowl of borscht, two slices of black bread and tea"
         )
         return
 
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         await message.answer(
-            "Нужно добавить описание после команды.\n\n"
-            "Пример:\n"
-            "/ai_log съел тарелку борща, два кусочка чёрного хлеба и чай без сахара"
+            "Add a meal description after the command.\n\n"
+            "Example:\n"
+            "/ai_log had a bowl of borscht, two slices of black bread and tea"
         )
         return
 
     raw_text = parts[1].strip()
     if not raw_text:
         await message.answer(
-            "Описание пустое. Пример:\n"
-            "/ai_log съел тарелку борща, два кусочка чёрного хлеба и чай без сахара"
+            "Description is empty. Example:\n"
+            "/ai_log had a bowl of borscht, two slices of black bread and tea"
         )
         return
 
@@ -1098,13 +1111,13 @@ async def cmd_ai_log(message: types.Message) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
 
     # 2) Просим backend/LLM оценить КБЖУ
     parsed = await ai_parse_meal(raw_text)
@@ -1115,11 +1128,11 @@ async def cmd_ai_log(message: types.Message) -> None:
         except Exception:
             pass
         await message.answer(
-            "Не получилось получить оценку КБЖУ от AI. Попробуй чуть позже 🙏"
+            "Couldn't get an AI nutrition estimate. Please try again shortly 🙏"
         )
         return
 
-    description = parsed.get("description", "").strip() or "Описание не указано"
+    description = parsed.get("description", "").strip() or "No description provided"
     calories = float(parsed.get("calories", 0) or 0)
     protein_g = float(parsed.get("protein_g", 0) or 0)
     fat_g = float(parsed.get("fat_g", 0) or 0)
@@ -1151,7 +1164,7 @@ async def cmd_ai_log(message: types.Message) -> None:
     )
 
     if meal is None:
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        await message.answer("Could not log the meal. Please try again later 🙏")
         return
 
     # 4) Получаем сводку за день
@@ -1196,10 +1209,10 @@ async def cmd_eatout(message: types.Message) -> None:
     
     if len(parts) < 2:
         await message.answer(
-            "Использование: /eatout <описание блюда>\n"
-            "Примеры:\n"
-            "• /eatout сырники из кофемании\n"
-            "• /eatout паста карбонара в vapiano"
+            "Usage: /eatout <dish description>\n"
+            "Examples:\n"
+            "• /eatout syrniki from Coffeemania\n"
+            "• /eatout carbonara pasta at Vapiano"
         )
         return
     
@@ -1207,8 +1220,8 @@ async def cmd_eatout(message: types.Message) -> None:
     
     if not raw_text:
         await message.answer(
-            "Укажи описание блюда:\n"
-            "Пример: /eatout сырники из кофемании"
+            "Provide a dish description:\n"
+            "Example: /eatout syrniki from Coffeemania"
         )
         return
     
@@ -1216,13 +1229,13 @@ async def cmd_eatout(message: types.Message) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
     
     user_id = user["id"]
     
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
     
     # 2) Просим backend найти блюдо из ресторана по свободному тексту
     parsed = await restaurant_parse_text(text=raw_text)
@@ -1233,7 +1246,7 @@ async def cmd_eatout(message: types.Message) -> None:
         except Exception:
             pass
         await message.answer(
-            "Не удалось связаться с backend'ом. Попробуй позже 🙏"
+            "Could not reach backend. Please try again later 🙏"
         )
         return
     
@@ -1271,7 +1284,7 @@ async def cmd_eatout(message: types.Message) -> None:
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        await message.answer("Could not log the meal. Please try again later 🙏")
         return
     
     # 4) Получаем сводку за день
@@ -1316,11 +1329,11 @@ async def cmd_eatout_a(message: types.Message) -> None:
     
     if len(parts) < 2:
         await message.answer(
-            "Использование: /eatoutA <описание блюда>\n"
-            "Примеры:\n"
-            "• /eatoutA сырники из кофемании\n"
-            "• /eatoutA паста карбонара в vapiano\n\n"
-            "⚠️ Это экспериментальная версия через OpenAI web search"
+            "Usage: /eatoutA <dish description>\n"
+            "Examples:\n"
+            "• /eatoutA syrniki from Coffeemania\n"
+            "• /eatoutA carbonara pasta at Vapiano\n\n"
+            "⚠️ This is an experimental version powered by OpenAI web search"
         )
         return
     
@@ -1328,8 +1341,8 @@ async def cmd_eatout_a(message: types.Message) -> None:
     
     if not raw_text:
         await message.answer(
-            "Укажи описание блюда:\n"
-            "Пример: /eatoutA сырники из кофемании"
+            "Provide a dish description:\n"
+            "Example: /eatoutA syrniki from Coffeemania"
         )
         return
     
@@ -1337,13 +1350,13 @@ async def cmd_eatout_a(message: types.Message) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
     
     user_id = user["id"]
     
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
     
     # 2) Просим backend найти блюдо из ресторана через OpenAI web search
     parsed = await restaurant_parse_text_openai(text=raw_text)
@@ -1354,7 +1367,7 @@ async def cmd_eatout_a(message: types.Message) -> None:
         except Exception:
             pass
         await message.answer(
-            "Не удалось связаться с backend'ом. Попробуй позже 🙏"
+            "Could not reach backend. Please try again later 🙏"
         )
         return
     
@@ -1393,7 +1406,7 @@ async def cmd_eatout_a(message: types.Message) -> None:
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Не получилось записать приём пищи. Попробуй позже 🙏")
+        await message.answer("Could not log the meal. Please try again later 🙏")
         return
     
     # 4) Получаем сводку за день
@@ -1433,7 +1446,7 @@ async def cmd_today(message: types.Message) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
@@ -1441,7 +1454,7 @@ async def cmd_today(message: types.Message) -> None:
 
     summary = await get_day_summary(user_id=user_id, day=today)
     if summary is None:
-        await message.answer("За сегодня пока нет записей 🥗")
+        await message.answer("No entries for today yet 🥗")
         return
 
     date_str = today.strftime("%d.%m.%Y")
@@ -1453,11 +1466,11 @@ async def cmd_today(message: types.Message) -> None:
     total_carbs = round(summary.get('total_carbs_g', 0), 1)
     
     text_lines = [
-        f"📅 Сводка за сегодня ({date_str}):",
-        f"• Калории: {total_calories}",
-        f"• Белки: {total_protein} г",
-        f"• Жиры: {total_fat} г",
-        f"• Углеводы: {total_carbs} г",
+        f"📅 Today's summary ({date_str}):",
+        f"• Calories: {total_calories}",
+        f"• Protein: {total_protein} g",
+        f"• Fat: {total_fat} g",
+        f"• Carbs: {total_carbs} g",
     ]
 
     reply_markup = build_day_actions_keyboard(day=today)
@@ -1471,7 +1484,7 @@ async def cmd_week(message: types.Message) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
@@ -1501,7 +1514,7 @@ async def cmd_week(message: types.Message) -> None:
         days_with_data.append((day, summary))
 
     if not days_with_data:
-        await message.answer("За эту неделю записей пока нет 🌱")
+        await message.answer("No entries this week yet 🌱")
         return
 
     start_str = start_date.strftime("%d.%m.%Y")
@@ -1514,22 +1527,22 @@ async def cmd_week(message: types.Message) -> None:
     total_carbs_g = round(total_carbs_g, 1)
     
     text_lines = [
-        f"📊 Сводка за неделю ({start_str} — {end_str}):",
-        f"• Калории: {total_calories}",
-        f"• Белки: {total_protein_g} г",
-        f"• Жиры: {total_fat_g} г",
-        f"• Углеводы: {total_carbs_g} г",
+        f"📊 Weekly summary ({start_str} — {end_str}):",
+        f"• Calories: {total_calories}",
+        f"• Protein: {total_protein_g} g",
+        f"• Fat: {total_fat_g} g",
+        f"• Carbs: {total_carbs_g} g",
         "",
-        "По дням:",
+        "By day:",
     ]
 
     for day, summary in days_with_data:
         d_str = day.strftime("%d.%m")
         text_lines.append(
-            f"{d_str}: {round(summary.get('total_calories', 0))} ккал, "
-            f"Б {round(summary.get('total_protein_g', 0), 1)} / "
-            f"Ж {round(summary.get('total_fat_g', 0), 1)} / "
-            f"У {round(summary.get('total_carbs_g', 0), 1)}"
+            f"{d_str}: {round(summary.get('total_calories', 0))} kcal, "
+            f"P {round(summary.get('total_protein_g', 0), 1)} / "
+            f"F {round(summary.get('total_fat_g', 0), 1)} / "
+            f"C {round(summary.get('total_carbs_g', 0), 1)}"
         )
 
     days = [day for day, _summary in days_with_data]
@@ -1551,19 +1564,19 @@ async def handle_daylist(query: types.CallbackQuery, state: FSMContext) -> None:
     try:
         day = date_type.fromisoformat(day_str)
     except ValueError:
-        await query.message.answer("Не понял дату. Попробуй ещё раз 🙏")
+        await query.message.answer("Could not parse the date. Please try again 🙏")
         return
 
     tg_id = query.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await query.message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await query.message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
     summary = await get_day_summary(user_id=user_id, day=day)
     if summary is None:
-        await query.message.answer("За этот день нет записей 🌱")
+        await query.message.answer("No entries for this day 🌱")
         return
 
     # Показываем сводку только если пришли НЕ из "Сегодня" (чтобы не дублировать)
@@ -1572,7 +1585,7 @@ async def handle_daylist(query: types.CallbackQuery, state: FSMContext) -> None:
 
     meals = summary.get("meals", [])
     if not meals:
-        await query.message.answer("Приёмов пищи за этот день нет.")
+        await query.message.answer("No meals logged for this day.")
         return
 
     for meal in meals:
@@ -1591,14 +1604,14 @@ async def handle_meal_edit(query: types.CallbackQuery, state: FSMContext) -> Non
 
     parts = query.data.split(":", 2)
     if len(parts) < 3:
-        await query.message.answer("Не удалось открыть редактирование.")
+        await query.message.answer("Could not open editing.")
         return
 
     try:
         meal_id = int(parts[1])
         day_str = parts[2]
     except ValueError:
-        await query.message.answer("Не удалось прочитать данные для редактирования.")
+        await query.message.answer("Could not read editing data.")
         return
 
     await state.update_data(meal_id=meal_id, day=day_str)
@@ -1607,12 +1620,12 @@ async def handle_meal_edit(query: types.CallbackQuery, state: FSMContext) -> Non
     try:
         day = date_type.fromisoformat(day_str)
     except ValueError:
-        await query.message.answer("Не удалось прочитать дату записи.")
+        await query.message.answer("Could not read entry date.")
         return
 
     reply_markup = build_edit_choice_keyboard(meal_id=meal_id, day=day)
     await query.message.answer(
-        "Что хочешь отредактировать?", reply_markup=reply_markup
+        "What would you like to edit?", reply_markup=reply_markup
     )
 
 
@@ -1622,7 +1635,7 @@ async def handle_meal_edit_field(query: types.CallbackQuery, state: FSMContext) 
 
     parts = query.data.split(":", 3)
     if len(parts) < 4:
-        await query.message.answer("Не удалось выбрать тип редактирования.")
+        await query.message.answer("Could not select edit type.")
         return
 
     field = parts[1]
@@ -1630,33 +1643,33 @@ async def handle_meal_edit_field(query: types.CallbackQuery, state: FSMContext) 
         meal_id = int(parts[2])
         day_str = parts[3]
     except ValueError:
-        await query.message.answer("Не удалось прочитать данные для редактирования.")
+        await query.message.answer("Could not read editing data.")
         return
 
     if field == "cancel":
         await state.clear()
-        await query.message.answer("Ок, отменил редактирование.")
+        await query.message.answer("Okay, editing canceled.")
         return
 
     await state.update_data(meal_id=meal_id, day=day_str, field=field)
 
     if field == "name":
         await state.set_state(MealEditState.waiting_for_name)
-        await query.message.answer("Напиши новое название блюда.")
+        await query.message.answer("Send a new meal name.")
     elif field == "macros":
         await state.set_state(MealEditState.waiting_for_macros)
         await query.message.answer(
-            "Введи КБЖУ в формате к/б/ж/у.\n"
-            "Пример: 350/25/10/40"
+            "Enter macros in kcal/p/f/c format.\n"
+            "Example: 350/25/10/40"
         )
     elif field == "time":
         await state.set_state(MealEditState.waiting_for_time)
         await query.message.answer(
-            "Введи время приёма пищи в формате ЧЧ:ММ.\n"
-            "Пример: 14:30"
+            "Enter meal time in HH:MM format.\n"
+            "Example: 14:30"
         )
     else:
-        await query.message.answer("Не понял, что редактировать.")
+        await query.message.answer("I couldn't determine what to edit.")
 
 
 async def finalize_meal_update(
@@ -1675,7 +1688,7 @@ async def finalize_meal_update(
 
     if not meal_id:
         await state.clear()
-        await message.answer("Не удалось найти запись для редактирования.")
+        await message.answer("Could not find an entry for editing.")
         return
 
     updated = await update_meal(
@@ -1687,11 +1700,11 @@ async def finalize_meal_update(
         carbs_g=carbs_g,
     )
     if updated is None:
-        await message.answer("Не получилось обновить запись. Попробуй позже 🙏")
+        await message.answer("Could not update the entry. Please try again later 🙏")
         return
 
     await state.clear()
-    await message.answer("✅ Обновил запись.")
+    await message.answer("✅ Entry updated.")
 
     reply_markup = None
     if day_str:
@@ -1723,7 +1736,7 @@ async def finalize_meal_update(
 async def handle_meal_edit_name(message: types.Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
     if not text:
-        await message.answer("Название не должно быть пустым. Напиши ещё раз.")
+        await message.answer("Name cannot be empty. Please send it again.")
         return
 
     await finalize_meal_update(message, state, description=text)
@@ -1735,8 +1748,8 @@ async def handle_meal_edit_macros(message: types.Message, state: FSMContext) -> 
     parsed = parse_macros_input(text)
     if parsed is None:
         await message.answer(
-            "Не понял формат. Введи КБЖУ как к/б/ж/у.\n"
-            "Пример: 350/25/10/40"
+            "Invalid format. Enter macros as kcal/p/f/c.\n"
+            "Example: 350/25/10/40"
         )
         return
 
@@ -1759,14 +1772,14 @@ async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> No
     match = re.match(r"^(\d{1,2}):(\d{2})$", text)
     if not match:
         await message.answer(
-            "Не понял формат. Введи время как ЧЧ:ММ.\n"
-            "Пример: 14:30"
+            "Invalid format. Enter time as HH:MM.\n"
+            "Example: 14:30"
         )
         return
 
     hour, minute = int(match.group(1)), int(match.group(2))
     if hour > 23 or minute > 59:
-        await message.answer("Некорректное время. Часы 0-23, минуты 0-59.")
+        await message.answer("Invalid time. Hours 0-23, minutes 0-59.")
         return
 
     data = await state.get_data()
@@ -1775,14 +1788,14 @@ async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> No
 
     if not meal_id or not day_str:
         await state.clear()
-        await message.answer("Не удалось найти запись для редактирования.")
+        await message.answer("Could not find entry for editing.")
         return
 
     try:
         day = date_type.fromisoformat(day_str)
     except ValueError:
         await state.clear()
-        await message.answer("Не удалось прочитать дату записи.")
+        await message.answer("Could not read entry date.")
         return
 
     # Build datetime with the meal's date and user-specified time
@@ -1799,11 +1812,11 @@ async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> No
 
     updated = await update_meal(meal_id=meal_id, eaten_at=eaten_at_iso)
     if updated is None:
-        await message.answer("Не получилось обновить время. Попробуй позже 🙏")
+        await message.answer("Could not update time. Please try again later 🙏")
         return
 
     await state.clear()
-    await message.answer(f"✅ Обновил время на {hour:02d}:{minute:02d}.")
+    await message.answer(f"✅ Updated time to {hour:02d}:{minute:02d}.")
 
 
 @router.callback_query(F.data.startswith("meal_delete:"))
@@ -1812,32 +1825,32 @@ async def handle_meal_delete(query: types.CallbackQuery) -> None:
 
     parts = query.data.split(":", 2)
     if len(parts) < 3:
-        await query.message.answer("Не удалось открыть удаление.")
+        await query.message.answer("Could not open deletion.")
         return
 
     try:
         meal_id = int(parts[1])
         day_str = parts[2]
     except ValueError:
-        await query.message.answer("Не удалось прочитать данные для удаления.")
+        await query.message.answer("Could not read deletion data.")
         return
 
     confirm_keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text="✅ Да",
+                    text="✅ Yes",
                     callback_data=f"meal_delete_confirm:{meal_id}:{day_str}",
                 ),
                 types.InlineKeyboardButton(
-                    text="❌ Нет",
+                    text="❌ No",
                     callback_data=f"meal_delete_cancel:{meal_id}:{day_str}",
                 ),
             ]
         ]
     )
 
-    await query.message.answer("Удалить запись?", reply_markup=confirm_keyboard)
+    await query.message.answer("Delete this entry?", reply_markup=confirm_keyboard)
 
 
 @router.callback_query(F.data.startswith("meal_delete_confirm:"))
@@ -1846,22 +1859,22 @@ async def handle_meal_delete_confirm(query: types.CallbackQuery) -> None:
 
     parts = query.data.split(":", 2)
     if len(parts) < 3:
-        await query.message.answer("Не удалось удалить запись.")
+        await query.message.answer("Could not delete entry.")
         return
 
     try:
         meal_id = int(parts[1])
         day_str = parts[2]
     except ValueError:
-        await query.message.answer("Не удалось прочитать данные для удаления.")
+        await query.message.answer("Could not read deletion data.")
         return
 
     ok = await delete_meal(meal_id)
     if not ok:
-        await query.message.answer("Не получилось удалить запись. Попробуй позже 🙏")
+        await query.message.answer("Could not delete entry. Please try again later 🙏")
         return
 
-    await query.message.answer("✅ Запись удалена.")
+    await query.message.answer("✅ Entry deleted.")
 
     try:
         day = date_type.fromisoformat(day_str)
@@ -1876,12 +1889,12 @@ async def handle_meal_delete_confirm(query: types.CallbackQuery) -> None:
     if summary:
         await query.message.answer(build_day_summary_text(summary, day))
     else:
-        await query.message.answer("За этот день больше нет записей 🌱")
+        await query.message.answer("No more entries for this day 🌱")
 
 
 @router.callback_query(F.data.startswith("meal_delete_cancel:"))
 async def handle_meal_delete_cancel(query: types.CallbackQuery) -> None:
-    await query.answer("Удаление отменено")
+    await query.answer("Deletion canceled")
 
 
 @router.callback_query(F.data.startswith("advice_log:"))
@@ -1891,28 +1904,28 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
 
     parts = query.data.split(":", 1)
     if len(parts) < 2:
-        await query.message.answer("Не удалось определить выбранный вариант.")
+        await query.message.answer("Could not determine selected option.")
         return
 
     try:
         item_idx = int(parts[1])
     except ValueError:
-        await query.message.answer("Не удалось определить выбранный вариант.")
+        await query.message.answer("Could not determine selected option.")
         return
 
     data = await state.get_data()
     advice_result = data.get("advice_result")
     if not advice_result:
-        await query.message.answer("Данные рекомендации устарели. Попробуй запросить совет заново.")
+        await query.message.answer("Recommendation data is stale. Request advice again.")
         return
 
     items = advice_result.get("items") or []
     if item_idx >= len(items):
-        await query.message.answer("Вариант не найден.")
+        await query.message.answer("Option not found.")
         return
 
     chosen_item = items[item_idx]
-    item_name = chosen_item.get("name", "Блюдо")
+    item_name = chosen_item.get("name", "Dish")
     calories = float(chosen_item.get("calories_kcal", 0))
     protein_g = float(chosen_item.get("protein_g", 0))
     fat_g = float(chosen_item.get("fat_g", 0))
@@ -1923,7 +1936,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
     tg_id = query.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await query.message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await query.message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     today = date_type.today()
@@ -1938,7 +1951,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
         accuracy_level="ESTIMATE",
     )
     if result is None:
-        await query.message.answer("Не удалось записать приём пищи. Попробуй позже 🙏")
+        await query.message.answer("Could not log the meal. Please try again later 🙏")
         return
 
     await state.clear()
@@ -1956,7 +1969,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
     reply_markup = None
     if normalize_source_url(item_source_url):
         reply_markup = types.InlineKeyboardMarkup(inline_keyboard=[[
-            types.InlineKeyboardButton(text="🔗 Источник", url=normalize_source_url(item_source_url)),
+            types.InlineKeyboardButton(text="🔗 Source", url=normalize_source_url(item_source_url)),
         ]])
 
     await query.message.answer(response_text, reply_markup=reply_markup)
@@ -1977,7 +1990,7 @@ async def _process_food_advice_input(
 
     await state.clear()
 
-    processing_msg = await message.answer("🤔 Думаю, что тебе посоветовать — вернусь через 1–2 минуты!")
+    processing_msg = await message.answer("🤔 Thinking about the best recommendation - back in 1-2 minutes!")
 
     try:
         result = await agent_run_workflow(
@@ -1993,7 +2006,7 @@ async def _process_food_advice_input(
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Сервис временно недоступен, попробуй позже.")
+        await message.answer("Service is temporarily unavailable, please try later.")
         return
 
     try:
@@ -2002,7 +2015,7 @@ async def _process_food_advice_input(
         pass
 
     if result is None:
-        await message.answer("Сервис временно недоступен, попробуй позже.")
+        await message.answer("Service is temporarily unavailable, please try later.")
         return
 
     agent_items = result.get("items") or []
@@ -2018,7 +2031,7 @@ async def _process_food_advice_input(
         logger.info(f"[FOOD_ADVICE] Sent food_advice for telegram_id={tg_id}")
     except Exception as send_error:
         logger.error(f"[FOOD_ADVICE] Error sending response: {send_error}", exc_info=True)
-        await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
+        await message.answer("Received a response, but failed to send it. Please try again.")
 
 
 @router.message(FoodAdviceState.waiting_for_input, F.text)
@@ -2026,7 +2039,7 @@ async def handle_food_advice_text(message: types.Message, state: FSMContext) -> 
     """Handle text input in food advice mode."""
     text = (message.text or "").strip()
     if not text:
-        await message.answer("Пожалуйста, отправь текст с вариантами или фото меню.")
+        await message.answer("Please send text options or a menu photo.")
         return
     await _process_food_advice_input(message, state, text=text)
 
@@ -2041,16 +2054,16 @@ async def handle_food_advice_photo(message: types.Message, state: FSMContext) ->
         photo_bytes = bio.read()
     except Exception as e:
         logger.error(f"[FOOD_ADVICE] Error downloading photo: {e}")
-        await message.answer("Не удалось скачать фото. Попробуй ещё раз.")
+        await message.answer("Could not download photo. Please try again.")
         return
 
     if not photo_bytes:
-        await message.answer("Фото пустое. Попробуй ещё раз.")
+        await message.answer("Photo is empty. Please try again.")
         return
 
     b64 = base64.b64encode(photo_bytes).decode("utf-8")
     image_data_uri = f"data:image/jpeg;base64,{b64}"
-    text = (message.caption or "").strip() or "Посоветуй что выбрать из вариантов на фото"
+    text = (message.caption or "").strip() or "Suggest what to choose from options in the photo"
 
     await _process_food_advice_input(message, state, text=text, image_url=image_data_uri)
 
@@ -2064,32 +2077,32 @@ async def handle_food_advice_voice(message: types.Message, state: FSMContext) ->
         audio_bytes = bio.read()
     except Exception as e:
         logger.error(f"[FOOD_ADVICE] Error downloading voice: {e}")
-        await message.answer("Не удалось скачать голосовое. Попробуй ещё раз.")
+        await message.answer("Could not download voice message. Please try again.")
         return
 
     if not audio_bytes:
-        await message.answer("Голосовое пустое. Попробуй ещё раз.")
+        await message.answer("Voice message is empty. Please try again.")
         return
 
-    await message.answer("🎙 Секунду, распознаю голос...")
+    await message.answer("🎙 One second, transcribing voice...")
     parsed = await voice_parse_meal(audio_bytes)
     if parsed is None:
-        await message.answer("Не удалось обработать голос. Попробуй ещё раз.")
+        await message.answer("Could not process voice. Please try again.")
         return
 
     transcript = (parsed.get("transcript", "") or "").strip()
     if not transcript:
-        await message.answer("Не удалось распознать речь. Попробуй ещё раз.")
+        await message.answer("Could not recognize speech. Please try again.")
         return
 
-    await message.answer(f"Распознал: \"{transcript}\"")
+    await message.answer(f"Recognized: \"{transcript}\"")
     await _process_food_advice_input(message, state, text=transcript)
 
 
 @router.message(FoodAdviceState.waiting_for_input)
 async def handle_food_advice_other(message: types.Message, state: FSMContext) -> None:
     """Handle unsupported input types in food advice mode."""
-    await message.answer("Отправь текст с вариантами, фото меню или голосовое сообщение.")
+    await message.answer("Send text options, a menu photo, or a voice message.")
 
 
 # ---------- End Food Advice Input Handlers ----------
@@ -2102,12 +2115,12 @@ async def _do_save_meal(
 ) -> None:
     meal = await get_meal_by_id(meal_id)
     if not meal:
-        await message.answer("Запись не найдена.")
+        await message.answer("Entry not found.")
         return
 
     user = await ensure_user(message.chat.id)
     if not user:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        await message.answer("Could not reach backend. Please try again later.")
         return
 
     data = await state.get_data()
@@ -2119,7 +2132,7 @@ async def _do_save_meal(
             if not isinstance(it, dict):
                 continue
             items_payload.append({
-                "name": it.get("name", "Блюдо"),
+                "name": it.get("name", "Dish"),
                 "grams": it.get("grams"),
                 "calories_kcal": float(it.get("calories_kcal", 0)),
                 "protein_g": float(it.get("protein_g", 0)),
@@ -2149,16 +2162,16 @@ async def _do_save_meal(
     )
 
     if result:
-        await message.answer(f"✅ «{name}» сохранено в Моё меню!")
+        await message.answer(f"✅ " + f"{name}" + " saved to My Menu!")
     else:
-        await message.answer("Не удалось сохранить. Попробуй позже.")
+        await message.answer("Could not save. Please try again later.")
 
 
 @router.message(SavedMealStates.waiting_for_save_name)
 async def handle_save_name_input(message: types.Message, state: FSMContext) -> None:
     name = (message.text or "").strip()
     if not name:
-        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        await message.answer("Name cannot be empty. Please try again.")
         return
 
     data = await state.get_data()
@@ -2171,13 +2184,13 @@ async def handle_save_name_input(message: types.Message, state: FSMContext) -> N
 async def handle_add_name(message: types.Message, state: FSMContext) -> None:
     name = (message.text or "").strip()
     if not name:
-        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        await message.answer("Name cannot be empty. Please try again.")
         return
     await state.update_data(add_name=name)
     await state.set_state(SavedMealStates.waiting_for_add_macros)
     await message.answer(
-        "Теперь введи КБЖУ в формате: калории белки жиры углеводы\n"
-        "Пример: 350 25 10 40"
+        "Now enter macros in format: calories protein fat carbs\n"
+        "Example: 350 25 10 40"
     )
 
 
@@ -2186,19 +2199,19 @@ async def handle_add_macros(message: types.Message, state: FSMContext) -> None:
     parsed = parse_macros_input(message.text or "")
     if not parsed:
         await message.answer(
-            "Не понял формат. Введи 4 числа через пробел или /:\n"
-            "Пример: 350 25 10 40"
+            "Invalid format. Enter 4 numbers separated by spaces or '/':\n"
+            "Example: 350 25 10 40"
         )
         return
 
     calories, protein, fat, carbs = parsed
     data = await state.get_data()
-    name = data.get("add_name", "Блюдо")
+    name = data.get("add_name", "Dish")
     await state.clear()
 
     user = await ensure_user(message.from_user.id)
     if not user:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        await message.answer("Could not reach backend. Please try again later.")
         return
 
     result = await create_saved_meal(
@@ -2221,18 +2234,18 @@ async def handle_add_macros(message: types.Message, state: FSMContext) -> None:
 
     if result:
         await message.answer(
-            f"✅ «{name}» добавлено в Моё меню!\n"
-            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+            f"✅ " + f"{name}" + " added to My Menu!\n"
+            f"{round(calories)} kcal · P {round(protein, 1)} g · F {round(fat, 1)} g · C {round(carbs, 1)} g"
         )
     else:
-        await message.answer("Не удалось сохранить. Попробуй позже.")
+        await message.answer("Could not save. Please try again later.")
 
 
 @router.message(SavedMealStates.waiting_for_edit_name)
 async def handle_edit_name_input(message: types.Message, state: FSMContext) -> None:
     name = (message.text or "").strip()
     if not name:
-        await message.answer("Название не может быть пустым. Попробуй ещё раз.")
+        await message.answer("Name cannot be empty. Please try again.")
         return
 
     data = await state.get_data()
@@ -2241,9 +2254,9 @@ async def handle_edit_name_input(message: types.Message, state: FSMContext) -> N
 
     result = await update_saved_meal(saved_id, name=name)
     if result:
-        await message.answer(f"✅ Название обновлено на «{name}»")
+        await message.answer(f"✅ Name updated to " + f"{name}")
     else:
-        await message.answer("Не удалось обновить. Попробуй позже.")
+        await message.answer("Could not update. Please try again later.")
 
 
 @router.message(SavedMealStates.waiting_for_edit_macros)
@@ -2251,8 +2264,8 @@ async def handle_edit_macros_input(message: types.Message, state: FSMContext) ->
     parsed = parse_macros_input(message.text or "")
     if not parsed:
         await message.answer(
-            "Не понял формат. Введи 4 числа через пробел или /:\n"
-            "Пример: 350 25 10 40"
+            "Invalid format. Enter 4 numbers separated by spaces or '/':\n"
+            "Example: 350 25 10 40"
         )
         return
 
@@ -2270,11 +2283,11 @@ async def handle_edit_macros_input(message: types.Message, state: FSMContext) ->
     )
     if result:
         await message.answer(
-            f"✅ КБЖУ обновлено:\n"
-            f"{round(calories)} ккал · Б {round(protein, 1)} г · Ж {round(fat, 1)} г · У {round(carbs, 1)} г"
+            f"✅ Macros updated:\n"
+            f"{round(calories)} kcal · P {round(protein, 1)} g · F {round(fat, 1)} g · C {round(carbs, 1)} g"
         )
     else:
-        await message.answer("Не удалось обновить. Попробуй позже.")
+        await message.answer("Could not update. Please try again later.")
 
 
 # ============ End Saved Meals FSM text handlers ============
@@ -2292,7 +2305,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     user_id = user["id"]
@@ -2304,28 +2317,28 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         audio_bytes = bio.read()
     except Exception as e:
         logger.error(f"[VOICE] Error downloading voice: {e}")
-        await message.answer("Не удалось скачать голосовое сообщение. Попробуй ещё раз 🙏")
+        await message.answer("Could not download voice message. Please try again 🙏")
         return
 
     if not audio_bytes:
-        await message.answer("Голосовое сообщение пустое. Попробуй ещё раз 🙏")
+        await message.answer("Voice message is empty. Please try again 🙏")
         return
 
     # 3) Отправляем сообщение о начале обработки
-    await message.answer("🎙 Секунду, распознаю голос и считаю КБЖУ...")
+    await message.answer("🎙 One second, transcribing voice and estimating macros...")
 
     # 4) Отправляем на backend для STT и парсинга
     parsed = await voice_parse_meal(audio_bytes)
     if parsed is None:
-        await message.answer("Не удалось обработать голос. Попробуй ещё раз 🙏")
+        await message.answer("Could not process voice. Please try again 🙏")
         return
 
     transcript = (parsed.get("transcript", "") or "").strip()
     if not transcript:
-        await message.answer("Не удалось распознать речь. Попробуй ещё раз 🙏")
+        await message.answer("Could not recognize speech. Please try again 🙏")
         return
 
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
 
     try:
         result = await agent_run_workflow(
@@ -2338,7 +2351,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Сервис временно недоступен, попробуй позже.")
+        await message.answer("Service is temporarily unavailable, please try later.")
         return
 
     if result is None:
@@ -2346,7 +2359,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Сервис временно недоступен, попробуй позже.")
+        await message.answer("Service is temporarily unavailable, please try later.")
         return
 
     try:
@@ -2355,13 +2368,13 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         pass
 
     intent = result.get("intent", "unknown")
-    message_text = result.get("message_text", "Ошибка обработки")
+    message_text = result.get("message_text", "Processing error")
     source_url = result.get("source_url")
     agent_items = result.get("items") or []
     has_source_url = source_url is not None and source_url != ""
     has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
 
-    await message.answer(f"Распознал: \"{transcript}\"")
+    await message.answer(f"Recognized: \"{transcript}\"")
 
     reply_markup = None
     if intent in MEAL_LOGGING_INTENTS:
@@ -2380,11 +2393,11 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         source_buttons = []
         for it in agent_items:
             if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
-                item_name = it.get("name") or "Продукт"
+                item_name = it.get("name") or "Product"
                 label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
-                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Source: {label}", url=normalize_source_url(it["source_url"]))])
         if not source_buttons and has_source_url:
-            source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+            source_buttons.append([types.InlineKeyboardButton(text="🔗 Source", url=source_url)])
         if source_buttons:
             reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
 
@@ -2406,7 +2419,7 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
     tg_id = message.from_user.id
     user = await ensure_user(tg_id)
     if user is None:
-        await message.answer("Не удалось связаться с backend'ом. Попробуй позже 🙏")
+        await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
     # Download the largest resolution photo
@@ -2417,11 +2430,11 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         photo_bytes = bio.read()
     except Exception as e:
         logger.error(f"[PHOTO] Error downloading photo: {e}")
-        await message.answer("Не удалось скачать фото. Попробуй ещё раз 🙏")
+        await message.answer("Could not download photo. Please try again 🙏")
         return
 
     if not photo_bytes:
-        await message.answer("Фото пустое. Попробуй ещё раз 🙏")
+        await message.answer("Photo is empty. Please try again 🙏")
         return
 
     # Base64-encode as data URI
@@ -2429,9 +2442,9 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
     image_data_uri = f"data:image/jpeg;base64,{b64}"
 
     # Use caption as text, or a default prompt
-    text = (message.caption or "").strip() or "Определи что на фото и посчитай КБЖУ"
+    text = (message.caption or "").strip() or "Identify what's in the photo and estimate macros"
 
-    processing_msg = await message.answer("📸 Анализирую фото — вернусь через 1–2 минуты!")
+    processing_msg = await message.answer("📸 Analyzing photo - back in 1-2 minutes!")
 
     try:
         result = await agent_run_workflow(
@@ -2445,7 +2458,7 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Сервис временно недоступен, попробуй позже.")
+        await message.answer("Service is temporarily unavailable, please try later.")
         return
 
     if result is None:
@@ -2453,7 +2466,7 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
             await processing_msg.delete()
         except Exception:
             pass
-        await message.answer("Сервис временно недоступен, попробуй позже.")
+        await message.answer("Service is temporarily unavailable, please try later.")
         return
 
     try:
@@ -2462,7 +2475,7 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         pass
 
     intent = result.get("intent", "unknown")
-    message_text = result.get("message_text", "Ошибка обработки")
+    message_text = result.get("message_text", "Processing error")
     source_url = result.get("source_url")
     agent_items = result.get("items") or []
     has_source_url = source_url is not None and source_url != ""
@@ -2485,11 +2498,11 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         source_buttons = []
         for it in agent_items:
             if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
-                item_name = it.get("name") or "Продукт"
+                item_name = it.get("name") or "Product"
                 label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
-                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Source: {label}", url=normalize_source_url(it["source_url"]))])
         if not source_buttons and has_source_url:
-            source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+            source_buttons.append([types.InlineKeyboardButton(text="🔗 Source", url=source_url)])
         if source_buttons:
             reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
 
@@ -2515,11 +2528,11 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
     
     # If no text, show usage hint
     if not text:
-        await message.answer("Использование: /agent <ваш запрос>\n\nПример: /agent сырники из кофемании")
+        await message.answer("Usage: /agent <your request>\n\nExample: /agent syrniki from Coffeemania")
         return
     
     # Send processing message
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
     
     try:
         # Call agent/run endpoint
@@ -2532,12 +2545,12 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
                 await processing_msg.delete()
             except Exception:
                 pass
-            await message.answer("Сервис временно недоступен, попробуй позже.")
+            await message.answer("Service is temporarily unavailable, please try later.")
             return
         
         # Extract result fields
         intent = result.get("intent", "unknown")
-        message_text = result.get("message_text", "Ошибка обработки")
+        message_text = result.get("message_text", "Processing error")
         confidence = result.get("confidence")
         source_url = result.get("source_url")
         agent_items = result.get("items") or []
@@ -2584,11 +2597,11 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
             source_buttons = []
             for it in agent_items:
                 if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
-                    item_name = it.get("name") or "Продукт"
+                    item_name = it.get("name") or "Product"
                     label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
-                    source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+                    source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Source: {label}", url=normalize_source_url(it["source_url"]))])
             if not source_buttons and has_source_url:
-                source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+                source_buttons.append([types.InlineKeyboardButton(text="🔗 Source", url=source_url)])
             if source_buttons:
                 reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
         
@@ -2607,7 +2620,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
             )
             # Try to send a simpler message
             try:
-                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
+                await message.answer("Received a response, but failed to send it. Please try again.")
             except Exception:
                 pass
         
@@ -2618,7 +2631,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         except Exception:
             pass
         try:
-            await message.answer("Сервис временно недоступен, попробуй позже.")
+            await message.answer("Service is temporarily unavailable, please try later.")
         except Exception:
             pass
 
@@ -2655,7 +2668,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         return
     
     # Send processing message
-    processing_msg = await message.answer("⏳ Обрабатываю запрос — это может занять 1–2 минуты. Пришлю сообщение, как только всё будет готово!")
+    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
     
     try:
         # Call agent/run endpoint
@@ -2668,12 +2681,12 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
                 await processing_msg.delete()
             except Exception:
                 pass
-            await message.answer("Сервис временно недоступен, попробуй позже.")
+            await message.answer("Service is temporarily unavailable, please try later.")
             return
         
         # Extract result fields
         intent = result.get("intent", "unknown")
-        message_text = result.get("message_text", "Ошибка обработки")
+        message_text = result.get("message_text", "Processing error")
         confidence = result.get("confidence")
         source_url = result.get("source_url")
         agent_items = result.get("items") or []
@@ -2720,11 +2733,11 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
             source_buttons = []
             for it in agent_items:
                 if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
-                    item_name = it.get("name") or "Продукт"
+                    item_name = it.get("name") or "Product"
                     label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
-                    source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Источник: {label}", url=normalize_source_url(it["source_url"]))])
+                    source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Source: {label}", url=normalize_source_url(it["source_url"]))])
             if not source_buttons and has_source_url:
-                source_buttons.append([types.InlineKeyboardButton(text="🔗 Источник", url=source_url)])
+                source_buttons.append([types.InlineKeyboardButton(text="🔗 Source", url=source_url)])
             if source_buttons:
                 reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
         
@@ -2743,7 +2756,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
             )
             # Try to send a simpler message
             try:
-                await message.answer("Получен ответ, но возникла ошибка при отправке. Попробуй ещё раз.")
+                await message.answer("Received a response, but failed to send it. Please try again.")
             except Exception:
                 pass
         
@@ -2754,12 +2767,12 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         except Exception:
             pass
         try:
-            await message.answer("Сервис временно недоступен, попробуй позже.")
+            await message.answer("Service is temporarily unavailable, please try later.")
         except Exception:
             pass
 
 
-# ============ Saved Meals ("Моё меню") handlers ============
+# ============ Saved Meals ("My Menu") handlers ============
 
 SAVED_MEALS_PER_PAGE = 20
 
@@ -2769,9 +2782,9 @@ def _build_my_menu_keyboard(
 ) -> types.InlineKeyboardMarkup:
     rows = []
     for m in meals:
-        name = m.get("name", "Блюдо")
+        name = m.get("name", "Dish")
         cal = round(m.get("total_calories", 0))
-        label = f"✅ {name} ({cal} ккал)"
+        label = f"✅ {name} ({cal} kcal)"
         if len(label) > 50:
             label = f"✅ {name[:40]}… ({cal})"
         rows.append([types.InlineKeyboardButton(
@@ -2782,14 +2795,14 @@ def _build_my_menu_keyboard(
     if total_pages > 1:
         nav = []
         if page > 1:
-            nav.append(types.InlineKeyboardButton(text="← Назад", callback_data=f"my_menu_page:{page - 1}"))
+            nav.append(types.InlineKeyboardButton(text="← Back", callback_data=f"my_menu_page:{page - 1}"))
         if page < total_pages:
-            nav.append(types.InlineKeyboardButton(text="Вперёд →", callback_data=f"my_menu_page:{page + 1}"))
+            nav.append(types.InlineKeyboardButton(text="Next →", callback_data=f"my_menu_page:{page + 1}"))
         if nav:
             rows.append(nav)
 
     rows.append([types.InlineKeyboardButton(
-        text="⚙️ Редактировать Моё меню", callback_data="my_menu_edit"
+        text="⚙️ Edit My Menu", callback_data="my_menu_edit"
     )])
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -2801,33 +2814,33 @@ async def handle_save_meal(query: types.CallbackQuery, state: FSMContext) -> Non
     await query.answer()
     parts = query.data.split(":", 1)
     if len(parts) < 2:
-        await query.message.answer("Не удалось сохранить.")
+        await query.message.answer("Could not save.")
         return
 
     try:
         meal_id = int(parts[1])
     except ValueError:
-        await query.message.answer("Не удалось прочитать данные.")
+        await query.message.answer("Could not read data.")
         return
 
     meal = await get_meal_by_id(meal_id)
     if not meal:
-        await query.message.answer("Запись не найдена.")
+        await query.message.answer("Entry not found.")
         return
 
-    suggested_name = meal.get("description_user", "Блюдо")
+    suggested_name = meal.get("description_user", "Dish")
     await state.update_data(save_meal_id=meal_id, save_suggested_name=suggested_name)
     await state.set_state(SavedMealStates.waiting_for_save_name)
 
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(
-            text=f"✅ Сохранить как «{suggested_name[:35]}»",
+            text=f"✅ Save as \"{suggested_name[:35]}\"",
             callback_data=f"save_confirm:{meal_id}",
         )],
     ])
     await query.message.answer(
-        f"Под каким названием сохранить в Моё меню?\n\n"
-        f"Нажми кнопку ниже или напиши своё название:",
+        "What name should I use to save this in My Menu?\n\n"
+        "Tap the button below or type your own name:",
         reply_markup=keyboard,
     )
 
@@ -2837,7 +2850,7 @@ async def handle_save_confirm(query: types.CallbackQuery, state: FSMContext) -> 
     await query.answer()
     data = await state.get_data()
     meal_id = data.get("save_meal_id")
-    name = data.get("save_suggested_name", "Блюдо")
+    name = data.get("save_suggested_name", "Dish")
     await state.set_state(None)
     await _do_save_meal(query.message, state, meal_id, name)
 
@@ -2849,24 +2862,24 @@ async def handle_my_menu_log(query: types.CallbackQuery, state: FSMContext) -> N
     await query.answer()
     parts = query.data.split(":", 1)
     if len(parts) < 2:
-        await query.message.answer("Ошибка.")
+        await query.message.answer("Error.")
         return
 
     try:
         saved_meal_id = int(parts[1])
     except ValueError:
-        await query.message.answer("Ошибка данных.")
+        await query.message.answer("Data error.")
         return
 
     saved = await get_saved_meal(saved_meal_id)
     if not saved:
-        await query.message.answer("Сохранённое блюдо не найдено.")
+        await query.message.answer("Saved meal not found.")
         return
 
     tg_id = query.from_user.id
     user = await ensure_user(tg_id)
     if not user:
-        await query.message.answer("Не удалось связаться с backend'ом. Попробуй позже.")
+        await query.message.answer("Could not reach backend. Please try again later.")
         return
 
     today = date_type.today()
@@ -2881,7 +2894,7 @@ async def handle_my_menu_log(query: types.CallbackQuery, state: FSMContext) -> N
         accuracy_level="EXACT",
     )
     if not meal_result:
-        await query.message.answer("Не удалось записать приём пищи. Попробуй позже.")
+        await query.message.answer("Could not log the meal. Please try again later.")
         return
 
     await use_saved_meal(saved_meal_id)
@@ -2891,20 +2904,20 @@ async def handle_my_menu_log(query: types.CallbackQuery, state: FSMContext) -> N
     fat = round(saved["total_fat_g"], 1)
     carbs = round(saved["total_carbs_g"], 1)
 
-    lines = [f"✅ Записал «{saved['name']}»", ""]
-    lines.append(f"{cal} ккал · Б {prot} г · Ж {fat} г · У {carbs} г")
+    lines = [f"✅ Logged \"{saved['name']}\"", ""]
+    lines.append(f"{cal} kcal · P {prot} g · F {fat} g · C {carbs} g")
 
     saved_items = saved.get("items", [])
     if len(saved_items) > 1:
-        lines.extend(["", "———", "", "По блюдам:", ""])
+        lines.extend(["", "———", "", "By items:", ""])
         for si in saved_items:
-            si_name = si.get("name", "Блюдо")
+            si_name = si.get("name", "Dish")
             si_cal = round(float(si.get("calories_kcal", 0)))
             si_p = round(float(si.get("protein_g", 0)), 1)
             si_f = round(float(si.get("fat_g", 0)), 1)
             si_c = round(float(si.get("carbs_g", 0)), 1)
             lines.append(f"📝 {si_name}:")
-            lines.append(f"{si_cal} ккал · Б {si_p} г · Ж {si_f} г · У {si_c} г")
+            lines.append(f"{si_cal} kcal · P {si_p} g · F {si_f} g · C {si_c} g")
             lines.append("")
 
     summary = await get_day_summary(user_id=user["id"], day=today)
@@ -2934,7 +2947,7 @@ async def handle_my_menu_page(query: types.CallbackQuery) -> None:
     tg_id = query.from_user.id
     data = await get_saved_meals(tg_id, page=page, per_page=SAVED_MEALS_PER_PAGE)
     if not data or not data.get("items"):
-        await query.message.answer("Моё меню пусто.")
+        await query.message.answer("My Menu is empty.")
         return
 
     keyboard = _build_my_menu_keyboard(
@@ -2944,8 +2957,8 @@ async def handle_my_menu_page(query: types.CallbackQuery) -> None:
         await query.message.edit_reply_markup(reply_markup=keyboard)
     except Exception:
         await query.message.answer(
-            "🍽 Моё меню\n\n"
-            "Нажми на блюдо, чтобы сразу записать его в дневник:",
+            "🍽 My Menu\n\n"
+            "Tap a meal to log it instantly:",
             reply_markup=keyboard,
         )
 
@@ -2959,12 +2972,12 @@ async def handle_my_menu_edit(query: types.CallbackQuery) -> None:
     data = await get_saved_meals(tg_id, page=1, per_page=100)
 
     rows = [[types.InlineKeyboardButton(
-        text="➕ Добавить новое блюдо", callback_data="my_menu_add"
+        text="➕ Add new meal", callback_data="my_menu_add"
     )]]
 
     if data and data.get("items"):
         for m in data["items"]:
-            name = m.get("name", "Блюдо")
+            name = m.get("name", "Dish")
             label = name if len(name) <= 45 else name[:42] + "..."
             rows.append([types.InlineKeyboardButton(
                 text=label, callback_data=f"sme_item:{m['id']}"
@@ -2972,8 +2985,8 @@ async def handle_my_menu_edit(query: types.CallbackQuery) -> None:
 
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=rows)
     await query.message.answer(
-        "⚙️ Редактирование Моего меню\n\n"
-        "Нажми на блюдо, чтобы изменить его или удалить:",
+        "⚙️ Edit My Menu\n\n"
+        "Tap a meal to edit or delete it:",
         reply_markup=keyboard,
     )
 
@@ -2984,7 +2997,7 @@ async def handle_my_menu_edit(query: types.CallbackQuery) -> None:
 async def handle_my_menu_add(query: types.CallbackQuery, state: FSMContext) -> None:
     await query.answer()
     await state.set_state(SavedMealStates.waiting_for_add_name)
-    await query.message.answer("Введи название блюда/приёма пищи:")
+    await query.message.answer("Enter meal name:")
 
 
 # --- Edit specific saved meal ---
@@ -2996,15 +3009,15 @@ async def handle_sme_item(query: types.CallbackQuery) -> None:
     try:
         saved_id = int(parts[1])
     except (IndexError, ValueError):
-        await query.message.answer("Ошибка данных.")
+        await query.message.answer("Data error.")
         return
 
     saved = await get_saved_meal(saved_id)
     if not saved:
-        await query.message.answer("Блюдо не найдено.")
+        await query.message.answer("Meal not found.")
         return
 
-    name = saved.get("name", "Блюдо")
+    name = saved.get("name", "Dish")
     cal = round(saved.get("total_calories", 0))
     prot = round(saved.get("total_protein_g", 0), 1)
     fat = round(saved.get("total_fat_g", 0), 1)
@@ -3012,21 +3025,21 @@ async def handle_sme_item(query: types.CallbackQuery) -> None:
 
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(
-            text="✏️ Изменить название", callback_data=f"sme_name:{saved_id}"
+            text="✏️ Edit name", callback_data=f"sme_name:{saved_id}"
         )],
         [types.InlineKeyboardButton(
-            text="📊 Изменить КБЖУ", callback_data=f"sme_macros:{saved_id}"
+            text="📊 Edit macros", callback_data=f"sme_macros:{saved_id}"
         )],
         [types.InlineKeyboardButton(
-            text="🗑 Удалить", callback_data=f"sme_del:{saved_id}"
+            text="🗑 Delete", callback_data=f"sme_del:{saved_id}"
         )],
         [types.InlineKeyboardButton(
-            text="← Назад", callback_data="my_menu_edit"
+            text="← Back", callback_data="my_menu_edit"
         )],
     ])
 
     await query.message.answer(
-        f"«{name}»\n{cal} ккал · Б {prot} г · Ж {fat} г · У {carbs} г",
+        f"\"{name}\"\n{cal} kcal · P {prot} g · F {fat} g · C {carbs} g",
         reply_markup=keyboard,
     )
 
@@ -3040,12 +3053,12 @@ async def handle_sme_name(query: types.CallbackQuery, state: FSMContext) -> None
     try:
         saved_id = int(parts[1])
     except (IndexError, ValueError):
-        await query.message.answer("Ошибка данных.")
+        await query.message.answer("Data error.")
         return
 
     await state.update_data(edit_saved_id=saved_id)
     await state.set_state(SavedMealStates.waiting_for_edit_name)
-    await query.message.answer("Введи новое название:")
+    await query.message.answer("Enter new name:")
 
 
 # --- Edit macros ---
@@ -3057,14 +3070,14 @@ async def handle_sme_macros(query: types.CallbackQuery, state: FSMContext) -> No
     try:
         saved_id = int(parts[1])
     except (IndexError, ValueError):
-        await query.message.answer("Ошибка данных.")
+        await query.message.answer("Data error.")
         return
 
     await state.update_data(edit_saved_id=saved_id)
     await state.set_state(SavedMealStates.waiting_for_edit_macros)
     await query.message.answer(
-        "Введи новые КБЖУ в формате: калории белки жиры углеводы\n"
-        "Пример: 350 25 10 40"
+        "Enter new macros in format: calories protein fat carbs\n"
+        "Example: 350 25 10 40"
     )
 
 
@@ -3077,24 +3090,24 @@ async def handle_sme_delete(query: types.CallbackQuery) -> None:
     try:
         saved_id = int(parts[1])
     except (IndexError, ValueError):
-        await query.message.answer("Ошибка данных.")
+        await query.message.answer("Data error.")
         return
 
     saved = await get_saved_meal(saved_id)
-    name = saved.get("name", "Блюдо") if saved else "Блюдо"
+    name = saved.get("name", "Dish") if saved else "Dish"
 
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
         [
             types.InlineKeyboardButton(
-                text="✅ Да", callback_data=f"sme_del_yes:{saved_id}"
+                text="✅ Yes", callback_data=f"sme_del_yes:{saved_id}"
             ),
             types.InlineKeyboardButton(
-                text="❌ Нет", callback_data="my_menu_edit"
+                text="❌ No", callback_data="my_menu_edit"
             ),
         ]
     ])
     await query.message.answer(
-        f"Удалить «{name}» из Моего меню?", reply_markup=keyboard
+        f"Delete \"{name}\" from My Menu?", reply_markup=keyboard
     )
 
 
@@ -3105,14 +3118,14 @@ async def handle_sme_delete_confirm(query: types.CallbackQuery) -> None:
     try:
         saved_id = int(parts[1])
     except (IndexError, ValueError):
-        await query.message.answer("Ошибка данных.")
+        await query.message.answer("Data error.")
         return
 
     ok = await delete_saved_meal(saved_id)
     if ok:
-        await query.message.answer("✅ Блюдо удалено из Моего меню.")
+        await query.message.answer("✅ Meal deleted from My Menu.")
     else:
-        await query.message.answer("Не удалось удалить. Попробуй позже.")
+        await query.message.answer("Could not delete. Please try again later.")
 
 
 async def main() -> None:
