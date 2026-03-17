@@ -20,7 +20,7 @@
 
 <main>
   <h1>Privacy Policy</h1>
-  <p class="meta">Effective date: 28 February 2026 &nbsp;·&nbsp; Last updated: 28 February 2026</p>
+  <p class="meta">Effective date: 28 February 2026 &nbsp;·&nbsp; Last updated: 17 March 2026</p>
 
   <p>YumYummy ("we", "us", "our") is committed to protecting your privacy. This Privacy Policy explains what personal data we collect, how we use it, with whom we share it, and what rights you have in relation to it. It applies to all users of the YumYummy Telegram bot (@yum_yummybot) (the "Service").</p>
 
@@ -49,10 +49,11 @@
   <h3>2.2 Data Collected Automatically</h3>
   <ul>
     <li><strong>Technical logs</strong> — server-side logs including timestamps and error traces, used for debugging and service monitoring. These logs do not include message content.</li>
+    <li><strong>AI usage metrics</strong> — aggregate counts of AI model tokens consumed and web search queries performed per request. These metrics are linked to your account and used to enforce fair-use limits (see our <a href="terms.html">Terms &amp; Conditions</a>, Section 7) and to monitor service costs. We do not store the content of AI responses in usage records — only numerical token counts and estimated processing costs.</li>
   </ul>
 
   <h3>2.3 Payment Data</h3>
-  <p>We do <strong>not</strong> collect, process, or store your payment card details. All payments are processed directly by our Merchant of Record, <strong>Paddle.com</strong>. We receive only a notification that a subscription has been activated, renewed, or cancelled, along with an anonymised subscription identifier and your email address (provided to Paddle at checkout). Please review <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer">Paddle's Privacy Policy</a> for details of how they handle your payment data.</p>
+  <p>We do <strong>not</strong> collect, process, or store your payment card details. All payments are processed via <strong>Telegram Stars (XTR)</strong> within the Telegram app. We receive only a notification that a subscription has been activated, renewed, or cancelled, along with a Telegram payment charge identifier. Please review <a href="https://telegram.org/privacy" target="_blank" rel="noopener noreferrer">Telegram's Privacy Policy</a> for details of how they handle your payment data.</p>
 
   <h2>3. How We Use Your Data</h2>
   <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
@@ -80,7 +81,11 @@
         <td style="padding:8px 12px;">Legitimate interests</td>
       </tr>
       <tr style="border-bottom:1px solid #e5e7eb;">
-        <td style="padding:8px 12px;">Complying with legal obligations (tax records, dispute resolution with Paddle)</td>
+        <td style="padding:8px 12px;">Enforcing fair-use limits (tracking AI token consumption per billing period)</td>
+        <td style="padding:8px 12px;">Performance of contract</td>
+      </tr>
+      <tr style="border-bottom:1px solid #e5e7eb;">
+        <td style="padding:8px 12px;">Complying with legal obligations (tax records, dispute resolution)</td>
         <td style="padding:8px 12px;">Legal obligation</td>
       </tr>
       <tr>
@@ -94,7 +99,7 @@
   <h2>4. Sub-processors &amp; Third Parties</h2>
   <p>We share data with the following third parties only as necessary to provide the Service:</p>
   <ul>
-    <li><strong>Paddle.com</strong> (payment processing and subscription management) — receives your email address and subscription status. <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
+    <li><strong>Telegram</strong> (payment processing via Telegram Stars and bot platform) — processes subscription payments and bot interactions. <a href="https://telegram.org/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
     <li><strong>OpenAI, L.L.C.</strong> (AI-powered meal parsing, restaurant nutrition lookup, voice transcription) — receives meal description text and transcribed audio content. Data is processed under OpenAI's API data processing agreement; your data is not used to train OpenAI's public models. <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
     <li><strong>Cloud hosting provider</strong> (servers where the Service backend and database are hosted) — processes all data as a data processor on our behalf. We use providers that maintain appropriate security standards.</li>
     <li><strong>Redis Labs / equivalent</strong> (in-memory session storage) — stores temporary bot session state (not permanent personal data); data expires within the session.</li>
@@ -106,6 +111,7 @@
     <li><strong>Voice audio files</strong> — deleted immediately after transcription; we do not store raw audio.</li>
     <li><strong>Barcode images</strong> — deleted immediately after product recognition; we do not store product photos.</li>
     <li><strong>Technical logs</strong> — retained for up to 90 days, then deleted automatically.</li>
+    <li><strong>AI usage records</strong> — aggregate token counts and cost estimates per request, retained for up to 12 months for billing and analytics purposes, then deleted automatically.</li>
     <li><strong>Subscription transaction records</strong> — retained for up to 7 years as required by applicable financial and tax regulations.</li>
   </ul>
 
