@@ -13,6 +13,9 @@ class BillingStatusResponse(BaseModel):
     subscription_plan_id: Optional[str] = None
     subscription_ends_at: Optional[datetime] = None
     subscription_auto_renew: Optional[bool] = None
+    usage_cost_current_period: Optional[float] = None
+    usage_cap_usd: Optional[float] = None
+    usage_exceeded: Optional[bool] = None
 
 
 class TrialStartRequest(BaseModel):

@@ -134,6 +134,15 @@ async def check_billing_access(message: types.Message) -> bool:
         return True  # fail open on backend error
 
     status = billing.get("access_status", "new")
+    usage_exceeded = bool(billing.get("usage_exceeded", False))
+
+    if usage_exceeded and status in ("trial", "active"):
+        await message.answer(
+            tr("billing.usage_cap_reached", LANG),
+            parse_mode="HTML",
+        )
+        return False
+
     if status in ("trial", "active"):
         return True
 

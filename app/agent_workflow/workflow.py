@@ -4,7 +4,7 @@ from agents import set_default_openai_client
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 from openai.types.shared.reasoning import Reasoning
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # ---------- Infrastructure for Render deployment ----------
 os.environ.setdefault("OPENAI_AGENTS_DISABLE_TRACING", "1")
@@ -805,6 +805,107 @@ class WorkflowInput(BaseModel):
   nutrition_context: Optional[str] = None
 
 
+MODEL_RATES_PER_1M: Dict[str, Dict[str, float]] = {
+  "gpt-5.2": {"input": 2.50, "output": 10.00},
+  "gpt-5-mini": {"input": 0.40, "output": 1.60},
+  "gpt-4.1": {"input": 2.00, "output": 8.00},
+  "gpt-5-nano": {"input": 0.10, "output": 0.40},
+}
+WEB_SEARCH_CALL_USD = 0.01
+
+
+def _safe_int(value: Any) -> int:
+  try:
+    return int(value or 0)
+  except (TypeError, ValueError):
+    return 0
+
+
+def _normalize_model_name(model_name: Optional[str]) -> Optional[str]:
+  if not model_name:
+    return None
+  lower = str(model_name).lower()
+  if lower.startswith("gpt-5.2"):
+    return "gpt-5.2"
+  if lower.startswith("gpt-5-mini"):
+    return "gpt-5-mini"
+  if lower.startswith("gpt-4.1"):
+    return "gpt-4.1"
+  if lower.startswith("gpt-5-nano"):
+    return "gpt-5-nano"
+  return str(model_name)
+
+
+def _count_web_search_calls(run_result: Any) -> int:
+  calls = 0
+  for item in getattr(run_result, "new_items", []) or []:
+    item_name = str(getattr(item, "name", "") or "").lower()
+    item_type = str(getattr(item, "type", "") or "").lower()
+    if item_name == "web_search":
+      calls += 1
+      continue
+    if item_type == "tool_call_item" and item_name == "web_search":
+      calls += 1
+      continue
+    # Conservative fallback for SDK object variants.
+    if "web_search" in str(item).lower() and "tool" in str(item).lower():
+      calls += 1
+  return calls
+
+
+def _accumulate_usage(run_result: Any, usage_totals: Dict[str, Any]) -> None:
+  usage = getattr(getattr(run_result, "context_wrapper", None), "usage", None)
+  if usage is None:
+    usage_totals["web_search_calls"] += _count_web_search_calls(run_result)
+    return
+
+  usage_totals["requests"] += _safe_int(getattr(usage, "requests", 0))
+  usage_totals["input_tokens"] += _safe_int(getattr(usage, "input_tokens", 0))
+  usage_totals["output_tokens"] += _safe_int(getattr(usage, "output_tokens", 0))
+  usage_totals["total_tokens"] += _safe_int(getattr(usage, "total_tokens", 0))
+  usage_totals["web_search_calls"] += _count_web_search_calls(run_result)
+
+  entries = getattr(usage, "request_usage_entries", None) or []
+  for entry in entries:
+    raw_name = getattr(entry, "model", None) or getattr(entry, "model_name", None)
+    model_name = _normalize_model_name(raw_name)
+    if not model_name:
+      continue
+    model_bucket = usage_totals["models"].setdefault(model_name, {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "total_tokens": 0,
+    })
+    model_bucket["requests"] += 1
+    model_bucket["input_tokens"] += _safe_int(getattr(entry, "input_tokens", 0))
+    model_bucket["output_tokens"] += _safe_int(getattr(entry, "output_tokens", 0))
+    model_bucket["total_tokens"] += _safe_int(getattr(entry, "total_tokens", 0))
+
+
+def _estimate_cost_usd(usage_totals: Dict[str, Any]) -> Dict[str, Any]:
+  model_costs: Dict[str, float] = {}
+  model_cost_total = 0.0
+  for model_name, model_usage in usage_totals["models"].items():
+    rates = MODEL_RATES_PER_1M.get(model_name)
+    if not rates:
+      continue
+    input_cost = (model_usage.get("input_tokens", 0) / 1_000_000) * rates["input"]
+    output_cost = (model_usage.get("output_tokens", 0) / 1_000_000) * rates["output"]
+    total = input_cost + output_cost
+    model_costs[model_name] = round(total, 6)
+    model_cost_total += total
+
+  web_search_cost = usage_totals["web_search_calls"] * WEB_SEARCH_CALL_USD
+  estimated_total = model_cost_total + web_search_cost
+  return {
+    "model_costs_usd": model_costs,
+    "model_cost_total_usd": round(model_cost_total, 6),
+    "web_search_cost_usd": round(web_search_cost, 6),
+    "estimated_total_cost_usd": round(estimated_total, 6),
+  }
+
+
 # Main code entrypoint
 async def run_workflow(workflow_input: WorkflowInput):
   with trace("YumYummy"):
@@ -846,6 +947,14 @@ async def run_workflow(workflow_input: WorkflowInput):
       "__trace_source__": "agent-builder",
       "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
     })
+    usage_totals: Dict[str, Any] = {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "total_tokens": 0,
+      "web_search_calls": 0,
+      "models": {},
+    }
 
     force_intent = workflow.get("force_intent")
     nutrition_context = workflow.get("nutrition_context")
@@ -862,6 +971,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[*conversation_history],
         run_config=_trace_cfg,
       )
+      _accumulate_usage(router_result_temp, usage_totals)
 
       conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])
 
@@ -893,6 +1003,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_date_hint=str(state["date_hint"] or ""),
         )
       )
+      _accumulate_usage(meal_parser_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in meal_parser_result_temp.new_items])
 
     elif state["intent"] == 'eatout':
@@ -902,6 +1013,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         run_config=_trace_cfg,
         context=EatoutAgentContext(state_user_text_clean=state["user_text_clean"])
       )
+      _accumulate_usage(eatout_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in eatout_agent_result_temp.new_items])
 
     elif state["intent"] == 'product':
@@ -917,6 +1029,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_language=str(state["language"] or "ru"),
         )
       )
+      _accumulate_usage(product_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in product_agent_result_temp.new_items])
 
     elif state["intent"] == 'barcode':
@@ -930,6 +1043,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_language=str(state["language"] or "ru"),
         )
       )
+      _accumulate_usage(barcode_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in barcode_agent_result_temp.new_items])
 
     elif state["intent"] == "food_advice":
@@ -942,6 +1056,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           nutrition_context=nutrition_context,
         )
       )
+      _accumulate_usage(nutrition_advisor_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in nutrition_advisor_result_temp.new_items])
 
     elif state["intent"] == "photo_meal":
@@ -955,6 +1070,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_gram=str(state["gram"] or ""),
         )
       )
+      _accumulate_usage(photo_meal_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in photo_meal_agent_result_temp.new_items])
 
     elif state["intent"] == "nutrition_label":
@@ -968,6 +1084,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_serving_hint=str(state["serving_hint"] or ""),
         )
       )
+      _accumulate_usage(nutrition_label_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in nutrition_label_agent_result_temp.new_items])
 
     else:
@@ -976,6 +1093,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[*conversation_history],
         run_config=_trace_cfg,
       )
+      _accumulate_usage(help_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in help_agent_result_temp.new_items])
 
     # ---- Final Agent: standardizes JSON output for all branches ----
@@ -984,6 +1102,7 @@ async def run_workflow(workflow_input: WorkflowInput):
       input=[*conversation_history],
       run_config=_trace_cfg,
     )
+    _accumulate_usage(final_agent_result_temp, usage_totals)
     conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
 
     if final_agent_result_temp.final_output is None:
@@ -993,7 +1112,18 @@ async def run_workflow(workflow_input: WorkflowInput):
       "output_text": final_agent_result_temp.final_output.json(),
       "output_parsed": final_agent_result_temp.final_output.model_dump()
     }
-    return final_agent_result["output_parsed"]
+    usage_summary = {
+      "requests": usage_totals["requests"],
+      "input_tokens": usage_totals["input_tokens"],
+      "output_tokens": usage_totals["output_tokens"],
+      "total_tokens": usage_totals["total_tokens"],
+      "web_search_calls": usage_totals["web_search_calls"],
+      "models": usage_totals["models"],
+      "cost": _estimate_cost_usd(usage_totals),
+    }
+    final_output = final_agent_result["output_parsed"]
+    final_output["_usage"] = usage_summary
+    return final_output
 
 
 # ---------- Helper for agent_runner.py ----------

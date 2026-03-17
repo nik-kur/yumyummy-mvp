@@ -39,6 +39,7 @@ from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, Res
 from app.services.agent_runner import run_agent
 from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.services.agent_persist import persist_agent_result
+from app.services.usage_guardrails import record_usage_for_telegram_user
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
@@ -1080,6 +1081,7 @@ async def agent_run(payload: WorkflowRunRequest):
             user_text=user_text, telegram_id=telegram_id, image_url=image_url,
             force_intent=force_intent, nutrition_context=nutrition_context,
         )
+        usage_data = result.pop("_usage", None)
         
         # Extract values for logging
         intent = result.get("intent", "unknown")
@@ -1098,6 +1100,13 @@ async def agent_run(payload: WorkflowRunRequest):
         try:
             db2 = SessionLocal()
             try:
+                if usage_data:
+                    record_usage_for_telegram_user(
+                        db=db2,
+                        telegram_id=telegram_id,
+                        usage_data=usage_data,
+                        intent=intent,
+                    )
                 persist_agent_result(db=db2, telegram_id=telegram_id, agent_result=result)
             finally:
                 db2.close()
@@ -1109,6 +1118,13 @@ async def agent_run(payload: WorkflowRunRequest):
             )
             db3 = SessionLocal()
             try:
+                if usage_data:
+                    record_usage_for_telegram_user(
+                        db=db3,
+                        telegram_id=telegram_id,
+                        usage_data=usage_data,
+                        intent=intent,
+                    )
                 persist_agent_result(db=db3, telegram_id=telegram_id, agent_result=result)
             finally:
                 db3.close()

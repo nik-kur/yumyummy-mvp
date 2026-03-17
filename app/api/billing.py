@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.deps import get_db
 from app.models.user import User
 from app.models.payment_event import PaymentEvent
-from app.billing.access import compute_access_status, trial_days_remaining
+from app.billing.access import compute_access_status, trial_days_remaining, check_usage_cap, get_usage_cap_usd
 from app.billing.plans import TRIAL_DAYS, get_active_plan
 from app.schemas.billing import (
     BillingStatusResponse,
@@ -35,9 +35,12 @@ def get_billing_status(telegram_id: str, db: Session = Depends(get_db)):
         "trial_started_at": user.trial_started_at,
         "trial_ends_at": user.trial_ends_at,
         "subscription_ends_at": user.subscription_ends_at,
+        "usage_cost_current_period": user.usage_cost_current_period,
     }
     status = compute_access_status(user_dict)
     remaining = trial_days_remaining(user_dict) if status == "trial" else None
+    usage_cap_usd = get_usage_cap_usd(user_dict)
+    usage_exceeded = not check_usage_cap(user_dict) if usage_cap_usd is not None else False
 
     return BillingStatusResponse(
         telegram_id=telegram_id,
@@ -48,6 +51,9 @@ def get_billing_status(telegram_id: str, db: Session = Depends(get_db)):
         subscription_plan_id=user.subscription_plan_id,
         subscription_ends_at=user.subscription_ends_at,
         subscription_auto_renew=user.subscription_auto_renew,
+        usage_cost_current_period=round(float(user.usage_cost_current_period or 0.0), 6),
+        usage_cap_usd=usage_cap_usd,
+        usage_exceeded=usage_exceeded,
     )
 
 
@@ -68,6 +74,8 @@ def start_trial(payload: TrialStartRequest, db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
     user.trial_started_at = now
     user.trial_ends_at = now + timedelta(days=TRIAL_DAYS)
+    user.usage_cost_current_period = 0.0
+    user.usage_period_start = now
     db.commit()
     db.refresh(user)
 
@@ -137,6 +145,8 @@ def record_payment_success(payload: PaymentSuccessRequest, db: Session = Depends
     user.subscription_ends_at = sub_ends
     user.subscription_auto_renew = plan.is_recurring
     user.subscription_telegram_charge_id = payload.telegram_payment_charge_id
+    user.usage_cost_current_period = 0.0
+    user.usage_period_start = now
 
     db.commit()
     db.refresh(user)

@@ -69,7 +69,8 @@ Good luck! 💪""",
         "billing.payment_period_recurring": "Your subscription renews automatically every 30 days.",
         "billing.payment_period_fixed": "Access is active until {ends_str}.",
         "billing.paysupport": "💬 <b>Payment support</b>\n\nIf you have questions or payment issues, message: @nik_kur\n\nWe reply within 24 hours.",
-        "billing.terms": "📄 <b>Terms of use</b>\n\n1. YumYummy is a nutrition tracking and macro counting service.\n2. Subscription payments are processed via Telegram Stars (XTR).\n3. Monthly subscription auto-renews every 30 days.\n4. You can cancel anytime in Telegram settings.\n5. After cancellation, access stays active until the end of paid period.\n\nDetailed policies: <a href=\"https://yumyummy.ai\">yumyummy.ai</a>",
+        "billing.terms": "📄 <b>Terms of use</b>\n\n1. YumYummy is a nutrition tracking and macro counting service.\n2. Subscription payments are processed via Telegram Stars (XTR).\n3. Monthly subscription auto-renews every 30 days.\n4. You can cancel anytime in Telegram settings.\n5. After cancellation, access stays active until the end of paid period.\n6. Service usage is subject to fair-use limits per billing period. If the limit is reached, contact support for assistance.\n\nDetailed policies: <a href=\"https://yumyummy.ai\">yumyummy.ai</a>",
+        "billing.usage_cap_reached": "⚠️ <b>Usage limit reached</b>\n\nYou have reached your AI usage limit for the current billing period.\nPlease contact support: @nik_kur",
         "runbot.default_source": "AI estimate based on known average values for listed meals/products",
         "runbot.summary_today": "Today's summary:",
         "runbot.logged": "✅ Logged {description}",
@@ -141,6 +142,8 @@ Good luck! 💪""",
 
 Удачи! 💪""",
         "onboarding.trial_activated": "🎉 Пробный период на 3 дня активирован!",
+        "billing.usage_cap_reached": "⚠️ <b>Лимит использования достигнут</b>\n\nТы достиг(ла) лимита AI-использования для текущего расчетного периода.\nПожалуйста, напиши в поддержку: @nik_kur",
+        "billing.terms": "📄 <b>Условия использования</b>\n\n1. YumYummy - сервис трекинга питания и подсчета КБЖУ.\n2. Оплата подписки проходит через Telegram Stars (XTR).\n3. Месячная подписка продлевается автоматически каждые 30 дней.\n4. Ты можешь отменить подписку в любой момент в настройках Telegram.\n5. После отмены доступ сохраняется до конца оплаченного периода.\n6. Использование сервиса подчиняется fair-use лимитам на расчетный период. Если лимит достигнут, свяжись с поддержкой.\n\nПодробные политики: <a href=\"https://yumyummy.ai\">yumyummy.ai</a>",
     },
 }
 
