@@ -54,21 +54,21 @@ class MealParserSchema__Totals(BaseModel):
 
 class MealParserSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class MealParserSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: MealParserSchema__Totals
   items: list[MealParserSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class HelpAgentSchema__Totals(BaseModel):
@@ -80,7 +80,7 @@ class HelpAgentSchema__Totals(BaseModel):
 
 class HelpAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -90,10 +90,10 @@ class HelpAgentSchema__ItemsItem(BaseModel):
 class HelpAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: HelpAgentSchema__Totals
   items: list[HelpAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class EatoutAgentSchema__Totals(BaseModel):
@@ -105,21 +105,21 @@ class EatoutAgentSchema__Totals(BaseModel):
 
 class EatoutAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class EatoutAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: EatoutAgentSchema__Totals
   items: list[EatoutAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class ProductAgentSchema__Totals(BaseModel):
@@ -131,21 +131,21 @@ class ProductAgentSchema__Totals(BaseModel):
 
 class ProductAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class ProductAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: ProductAgentSchema__Totals
   items: list[ProductAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class BarcodeAgentSchema__Totals(BaseModel):
@@ -157,21 +157,21 @@ class BarcodeAgentSchema__Totals(BaseModel):
 
 class BarcodeAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class BarcodeAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: BarcodeAgentSchema__Totals
   items: list[BarcodeAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class NutritionAdvisorSchema__Totals(BaseModel):
@@ -183,7 +183,7 @@ class NutritionAdvisorSchema__Totals(BaseModel):
 
 class NutritionAdvisorSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -193,10 +193,10 @@ class NutritionAdvisorSchema__ItemsItem(BaseModel):
 class NutritionAdvisorSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: NutritionAdvisorSchema__Totals
   items: list[NutritionAdvisorSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class FinalAgentSchema__Totals(BaseModel):
@@ -208,21 +208,21 @@ class FinalAgentSchema__Totals(BaseModel):
 
 class FinalAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class FinalAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: FinalAgentSchema__Totals
   items: list[FinalAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class PhotoMealAgentSchema__Totals(BaseModel):
@@ -234,21 +234,21 @@ class PhotoMealAgentSchema__Totals(BaseModel):
 
 class PhotoMealAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class PhotoMealAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: PhotoMealAgentSchema__Totals
   items: list[PhotoMealAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class NutritionLabelAgentSchema__Totals(BaseModel):
@@ -260,21 +260,21 @@ class NutritionLabelAgentSchema__Totals(BaseModel):
 
 class NutritionLabelAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class NutritionLabelAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: NutritionLabelAgentSchema__Totals
   items: list[NutritionLabelAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 router = Agent(
@@ -410,7 +410,7 @@ Rules:
 - source_url: null
 - message_text: short help text in English on how to use YumYummy + 3 example queries.
 Do not include any extra keys.""",
-  model="gpt-5.2",
+  model="gpt-5-mini",
   output_type=HelpAgentSchema,
   model_settings=ModelSettings(
     store=True,
@@ -472,7 +472,7 @@ RESPONSE FORMAT (JSON only, matching the schema):
 eatout_agent = Agent(
   name="Eatout agent",
   instructions=eatout_agent_instructions,
-  model="gpt-5.2",
+  model="gpt-5-mini",
   tools=[
     web_search_preview
   ],
@@ -555,7 +555,7 @@ Return ONLY JSON matching the output schema."""
 product_agent = Agent(
   name="Product agent",
   instructions=product_agent_instructions,
-  model="gpt-5.2",
+  model="gpt-5-mini",
   tools=[
     web_search_preview
   ],
@@ -850,9 +850,11 @@ async def run_workflow(workflow_input: WorkflowInput):
     force_intent = workflow.get("force_intent")
     nutrition_context = workflow.get("nutrition_context")
 
-    if force_intent == "food_advice":
-      state["intent"] = "food_advice"
+    _bypassable_intents = {"food_advice", "eatout", "product", "photo_meal", "barcode", "log_meal"}
+    if force_intent and force_intent in _bypassable_intents:
+      state["intent"] = force_intent
       state["user_text_clean"] = workflow["input_as_text"]
+      state["dish_or_product"] = workflow["input_as_text"]
       state["language"] = "ru"
     else:
       router_result_temp = await Runner.run(
