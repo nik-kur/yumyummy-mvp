@@ -20,8 +20,8 @@ class Settings(BaseSettings):
 
     # Billing / Telegram Stars
     billing_trial_days: int = 3
-    billing_monthly_price_xtr: int = 350
-    billing_yearly_price_xtr: int = 2940
+    billing_monthly_price_xtr: int = 1199
+    billing_yearly_price_xtr: int = 9599
     billing_paywall_enabled: bool = True
 
     model_config = SettingsConfigDict(

@@ -46,10 +46,15 @@ def _build_plans_text() -> str:
     plans = get_plans()
     lines = []
     for plan in plans.values():
+        usd_hint = f" ({plan.approx_usd})" if plan.approx_usd else ""
         if plan.is_recurring:
-            lines.append(f"⭐ <b>{plan.name_en or plan.name_ru}</b> — {plan.price_xtr} {tr('billing.plan_monthly_suffix', LANG)}")
+            lines.append(
+                f"⭐ <b>{plan.name_en}</b> — {plan.price_xtr} {tr('billing.plan_monthly_suffix', LANG)}{usd_hint}"
+            )
         else:
-            lines.append(f"⭐ <b>{plan.name_en or plan.name_ru}</b> — {plan.price_xtr} {tr('billing.plan_once_suffix', LANG)}")
+            lines.append(
+                f"⭐ <b>{plan.name_en}</b> — {plan.price_xtr} {tr('billing.plan_once_suffix', LANG)}{usd_hint}"
+            )
     return "\n".join(lines)
 
 
@@ -57,23 +62,28 @@ async def _create_plan_button(bot, plan, tg_id: int) -> types.InlineKeyboardButt
     """Create an invoice-link button for a plan (one-click payment)."""
     payload = f"sub:{plan.id}:{tg_id}"
 
+    if plan.is_recurring:
+        description = f"Monthly subscription ({plan.period_days}-day auto-renew)"
+    else:
+        description = f"Full access for {plan.period_days} days (one-time payment)"
+
     kwargs = dict(
-        title=f"YumYummy — {plan.name_en or plan.name_ru}",
-        description=(
-            f"Subscription for {plan.period_days} days with auto-renew"
-            if plan.is_recurring
-            else f"Access for {plan.period_days} days"
-        ),
+        title=f"YumYummy — {plan.name_en}",
+        description=description,
         payload=payload,
         currency="XTR",
-        prices=[LabeledPrice(label=plan.name_en or plan.name_ru, amount=plan.price_xtr)],
+        prices=[LabeledPrice(label=plan.name_en, amount=plan.price_xtr)],
     )
     if plan.subscription_period_seconds:
         kwargs["subscription_period"] = plan.subscription_period_seconds
 
     invoice_link = await bot.create_invoice_link(**kwargs)
 
-    label = f"⭐ {plan.name_en or plan.name_ru} — {plan.price_xtr} Stars"
+    usd_hint = f" {plan.approx_usd}" if plan.approx_usd else ""
+    if plan.is_recurring:
+        label = f"⭐ {plan.name_en} — {plan.price_xtr} Stars/mo{usd_hint}"
+    else:
+        label = f"⭐ {plan.name_en} — {plan.price_xtr} Stars{usd_hint}"
     return types.InlineKeyboardButton(text=label, url=invoice_link)
 
 
