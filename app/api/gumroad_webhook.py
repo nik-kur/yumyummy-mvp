@@ -126,9 +126,9 @@ async def gumroad_webhook(secret: str, request: Request, db: Session = Depends(g
         resource_name, sale_id, subscription_id, email, refunded, disputed,
     )
 
-    if settings.gumroad_seller_id and seller_id != settings.gumroad_seller_id:
-        logger.warning("[GUMROAD] seller_id mismatch: got %s, expected %s", seller_id, settings.gumroad_seller_id)
-        return {"status": "ignored", "reason": "seller_id_mismatch"}
+    # Seller ID from webhook is Gumroad's internal ID (not the username),
+    # so we only log it for debugging. The URL secret is sufficient auth.
+    logger.info("[GUMROAD] seller_id from webhook: %s", seller_id)
 
     user = _find_user_by_claim(db, claim_token)
     if user is None and subscription_id:
