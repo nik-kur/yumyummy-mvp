@@ -89,6 +89,14 @@ app.include_router(context_router)
 from app.api.billing import router as billing_router
 app.include_router(billing_router)
 
+# Include Gumroad webhook router
+from app.api.gumroad_webhook import router as gumroad_router
+app.include_router(gumroad_router)
+
+# Include billing admin/reconciliation router
+from app.api.billing_admin import router as billing_admin_router
+app.include_router(billing_admin_router)
+
 
 @app.get("/health")
 async def health_check():

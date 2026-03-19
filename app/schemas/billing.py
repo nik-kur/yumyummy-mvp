@@ -13,6 +13,7 @@ class BillingStatusResponse(BaseModel):
     subscription_plan_id: Optional[str] = None
     subscription_ends_at: Optional[datetime] = None
     subscription_auto_renew: Optional[bool] = None
+    subscription_provider: Optional[str] = None
     usage_cost_current_period: Optional[float] = None
     usage_cap_usd: Optional[float] = None
     usage_exceeded: Optional[bool] = None
@@ -58,3 +59,14 @@ class SubscriptionCancelResponse(BaseModel):
     telegram_id: str
     status: str
     access_until: Optional[datetime] = None
+
+
+class GumroadCheckoutRequest(BaseModel):
+    telegram_id: str
+    plan_id: str
+
+
+class GumroadCheckoutResponse(BaseModel):
+    checkout_url: str
+    plan_id: str
+    expires_in_seconds: int

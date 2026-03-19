@@ -11,12 +11,16 @@ class Plan:
     id: str
     name_en: str
     name_ru: str
-    price_xtr: int
     period_days: int
-    subscription_period_seconds: Optional[int]
     is_active: bool
     is_recurring: bool
+    # Telegram Stars pricing
+    price_xtr: int = 0
+    subscription_period_seconds: Optional[int] = None
     approx_usd: Optional[str] = None
+    # Gumroad pricing
+    gumroad_price_cents: int = 0
+    gumroad_recurrence: Optional[str] = None
 
 
 def get_plans() -> Dict[str, Plan]:
@@ -32,7 +36,9 @@ def get_plans() -> Dict[str, Plan]:
             subscription_period_seconds=SUBSCRIPTION_PERIOD_SECONDS,
             is_active=True,
             is_recurring=True,
-            approx_usd="~$14.99",
+            approx_usd="~$9.99",
+            gumroad_price_cents=settings.gumroad_monthly_price_cents,
+            gumroad_recurrence="monthly",
         ),
         "yearly": Plan(
             id="yearly",
@@ -43,7 +49,9 @@ def get_plans() -> Dict[str, Plan]:
             subscription_period_seconds=None,
             is_active=True,
             is_recurring=False,
-            approx_usd="~$119",
+            approx_usd="~$89.99",
+            gumroad_price_cents=settings.gumroad_yearly_price_cents,
+            gumroad_recurrence="yearly",
         ),
     }
 

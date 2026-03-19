@@ -557,8 +557,29 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     - проверяем, прошёл ли пользователь онбординг
     - если нет — запускаем онбординг
     - если да — показываем приветствие с меню
+    Supports deeplink: /start billing_check — post-purchase return flow.
     """
     tg_id = message.from_user.id
+
+    # Handle post-purchase deeplink return
+    args = message.text.split(maxsplit=1)
+    if len(args) > 1 and args[1].strip() == "billing_check":
+        billing = await get_billing_status(tg_id)
+        status = (billing or {}).get("access_status", "expired")
+        if status == "active":
+            provider = (billing or {}).get("subscription_provider", "")
+            provider_label = " via Gumroad" if provider == "gumroad" else ""
+            await message.answer(
+                f"✅ <b>Payment confirmed{provider_label}!</b>\n\nYour subscription is now active.\nTell me what you ate, and I'll log it!",
+                parse_mode="HTML",
+            )
+            return
+        else:
+            from app.bot.billing import show_paywall
+            await message.answer(
+                "⏳ Payment not received yet. If you just paid, please wait a moment and try again.",
+            )
+            return
 
     user = await ensure_user(tg_id)
 

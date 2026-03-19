@@ -40,6 +40,8 @@ class User(Base):
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_auto_renew = Column(Boolean, default=True, nullable=True)
     subscription_telegram_charge_id = Column(String, nullable=True)
+    subscription_provider = Column(String, nullable=True)
+    subscription_gumroad_id = Column(String, nullable=True)
     usage_cost_current_period = Column(Float, default=0.0, nullable=False)
     usage_period_start = Column(DateTime(timezone=True), nullable=True)
 

@@ -1,5 +1,6 @@
 """
-Billing handlers: paywall, Telegram Stars payments, trial, access guard.
+Billing handlers: paywall, Telegram Stars payments, Gumroad checkout,
+trial, access guard, and post-purchase return flow.
 """
 import json
 import logging
@@ -18,6 +19,7 @@ from app.bot.api_client import (
     start_trial,
     record_payment_success,
     cancel_subscription,
+    get_gumroad_checkout_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,6 +57,24 @@ def _build_plans_text() -> str:
             lines.append(
                 f"⭐ <b>{plan.name_en}</b> — {plan.price_xtr} {tr('billing.plan_once_suffix', LANG)}{usd_hint}"
             )
+    return "\n".join(lines)
+
+
+def _build_plans_text_with_gumroad() -> str:
+    plans = get_plans()
+    lines = []
+    for plan in plans.values():
+        usd_hint = f" ({plan.approx_usd})" if plan.approx_usd else ""
+        star_line = f"⭐ {plan.price_xtr} Stars"
+        usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
+        card_line = f"💳 {usd_price}" if settings.gumroad_enabled else ""
+        suffix = f" {star_line}"
+        if card_line:
+            suffix += f" / {card_line}"
+        if plan.is_recurring:
+            lines.append(f"<b>{plan.name_en}</b> —{suffix}/mo")
+        else:
+            lines.append(f"<b>{plan.name_en}</b> —{suffix}/year")
     return "\n".join(lines)
 
 
@@ -100,10 +120,29 @@ async def _build_paywall_keyboard(
         ])
 
     plans = get_plans()
+
+    # Telegram Stars buttons
     for plan in plans.values():
         if plan.is_active:
             btn = await _create_plan_button(bot, plan, tg_id)
             buttons.append([btn])
+
+    # Gumroad card-payment buttons
+    if settings.gumroad_enabled:
+        for plan in plans.values():
+            if plan.is_active:
+                usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
+                label = f"💳 {plan.name_en} — {usd_price}"
+                if plan.is_recurring:
+                    label += "/mo"
+                else:
+                    label += "/year"
+                buttons.append([
+                    types.InlineKeyboardButton(
+                        text=label,
+                        callback_data=f"billing:gumroad:{plan.id}",
+                    )
+                ])
 
     return types.InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -112,7 +151,11 @@ async def show_paywall(message: types.Message, billing: Optional[dict] = None) -
     if billing is None:
         billing = await get_billing_status(message.from_user.id)
     status = (billing or {}).get("access_status", "new")
-    plans_text = _build_plans_text()
+
+    if settings.gumroad_enabled:
+        plans_text = _build_plans_text_with_gumroad()
+    else:
+        plans_text = _build_plans_text()
 
     if status == "new":
         text = PAYWALL_TRIAL_TEXT.format(plans_text=plans_text)
@@ -191,6 +234,75 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
     else:
         await query.message.answer(
             tr("billing.trial_started", LANG, ends_str=ends_str),
+            parse_mode="HTML",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Gumroad checkout callback
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data.startswith("billing:gumroad:"))
+async def handle_gumroad_checkout(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    plan_id = query.data.split(":")[-1]
+
+    result = await get_gumroad_checkout_url(tg_id, plan_id)
+    if result is None or "checkout_url" not in result:
+        await query.message.answer(tr("billing.gumroad_error", LANG))
+        return
+
+    checkout_url = result["checkout_url"]
+    plan = get_active_plan(plan_id)
+    plan_name = plan.name_en if plan else plan_id
+
+    kb = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text=f"💳 Pay for {plan_name} on Gumroad",
+            url=checkout_url,
+        )],
+        [types.InlineKeyboardButton(
+            text=tr("billing.gumroad_check_btn", LANG),
+            callback_data="billing:check_payment",
+        )],
+    ])
+
+    await query.message.answer(
+        tr("billing.gumroad_redirect", LANG),
+        reply_markup=kb,
+        parse_mode="HTML",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Post-purchase: check payment status
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data == "billing:check_payment")
+async def handle_check_payment(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    billing = await get_billing_status(tg_id)
+    status = (billing or {}).get("access_status", "expired")
+
+    if status == "active":
+        provider = (billing or {}).get("subscription_provider", "")
+        provider_label = " via Gumroad" if provider == "gumroad" else ""
+        await query.message.answer(
+            tr("billing.payment_confirmed", LANG, provider_label=provider_label),
+            parse_mode="HTML",
+        )
+    else:
+        kb = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(
+                text=tr("billing.gumroad_check_btn", LANG),
+                callback_data="billing:check_payment",
+            )],
+        ])
+        await query.message.answer(
+            tr("billing.payment_pending", LANG),
+            reply_markup=kb,
             parse_mode="HTML",
         )
 
