@@ -44,37 +44,33 @@ PAYWALL_SUB_EXPIRED_TEXT = (
 )
 
 
-def _build_plans_text() -> str:
+def _build_plans_text_stars() -> str:
+    """Stars-only pricing for the separate Stars message."""
     plans = get_plans()
     lines = []
     for plan in plans.values():
         usd_hint = f" ({plan.approx_usd})" if plan.approx_usd else ""
         if plan.is_recurring:
             lines.append(
-                f"⭐ <b>{plan.name_en}</b> — {plan.price_xtr} {tr('billing.plan_monthly_suffix', LANG)}{usd_hint}"
+                f"<b>{plan.name_en}</b> — {plan.price_xtr} Stars/mo{usd_hint}"
             )
         else:
             lines.append(
-                f"⭐ <b>{plan.name_en}</b> — {plan.price_xtr} {tr('billing.plan_once_suffix', LANG)}{usd_hint}"
+                f"<b>{plan.name_en}</b> — {plan.price_xtr} Stars/year{usd_hint}"
             )
     return "\n".join(lines)
 
 
-def _build_plans_text_with_gumroad() -> str:
+def _build_plans_text_card() -> str:
+    """Card-only pricing for the main paywall message."""
     plans = get_plans()
     lines = []
     for plan in plans.values():
-        usd_hint = f" ({plan.approx_usd})" if plan.approx_usd else ""
-        star_line = f"⭐ {plan.price_xtr} Stars"
         usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
-        card_line = f"💳 {usd_price}" if settings.gumroad_enabled else ""
-        suffix = f" {star_line}"
-        if card_line:
-            suffix += f" / {card_line}"
         if plan.is_recurring:
-            lines.append(f"<b>{plan.name_en}</b> —{suffix}/mo")
+            lines.append(f"<b>{plan.name_en}</b> — {usd_price}/mo")
         else:
-            lines.append(f"<b>{plan.name_en}</b> —{suffix}/year")
+            lines.append(f"<b>{plan.name_en}</b> — {usd_price}/year")
     return "\n".join(lines)
 
 
@@ -121,28 +117,38 @@ async def _build_paywall_keyboard(
 
     plans = get_plans()
 
-    # Telegram Stars buttons
-    for plan in plans.values():
-        if plan.is_active:
-            btn = await _create_plan_button(bot, plan, tg_id)
-            buttons.append([btn])
-
-    # Gumroad card-payment buttons
     if settings.gumroad_enabled:
+        # Card-payment URL buttons (open Gumroad checkout directly)
         for plan in plans.values():
             if plan.is_active:
-                usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
-                label = f"💳 {plan.name_en} — {usd_price}"
-                if plan.is_recurring:
-                    label += "/mo"
-                else:
-                    label += "/year"
-                buttons.append([
-                    types.InlineKeyboardButton(
-                        text=label,
-                        callback_data=f"billing:gumroad:{plan.id}",
-                    )
-                ])
+                result = await get_gumroad_checkout_url(tg_id, plan.id)
+                if result and "checkout_url" in result:
+                    usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
+                    label = f"💳 {plan.name_en} — {usd_price}"
+                    if plan.is_recurring:
+                        label += "/mo"
+                    else:
+                        label += "/year"
+                    buttons.append([
+                        types.InlineKeyboardButton(
+                            text=label,
+                            url=result["checkout_url"],
+                        )
+                    ])
+
+        # "Pay with Telegram Stars" callback button
+        buttons.append([
+            types.InlineKeyboardButton(
+                text=tr("billing.show_stars_btn", LANG),
+                callback_data="billing:show_stars",
+            )
+        ])
+    else:
+        # Stars-only: show invoice buttons directly
+        for plan in plans.values():
+            if plan.is_active:
+                btn = await _create_plan_button(bot, plan, tg_id)
+                buttons.append([btn])
 
     return types.InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -153,9 +159,9 @@ async def show_paywall(message: types.Message, billing: Optional[dict] = None) -
     status = (billing or {}).get("access_status", "new")
 
     if settings.gumroad_enabled:
-        plans_text = _build_plans_text_with_gumroad()
+        plans_text = _build_plans_text_card()
     else:
-        plans_text = _build_plans_text()
+        plans_text = _build_plans_text_stars()
 
     if status == "new":
         text = PAYWALL_TRIAL_TEXT.format(plans_text=plans_text)
@@ -168,6 +174,20 @@ async def show_paywall(message: types.Message, billing: Optional[dict] = None) -
         kb = await _build_paywall_keyboard(message.bot, message.from_user.id, show_trial=False)
 
     await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+    # Send "Check payment status" hint alongside paywall when Gumroad is active
+    if settings.gumroad_enabled:
+        check_kb = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(
+                text=tr("billing.gumroad_check_btn", LANG),
+                callback_data="billing:check_payment",
+            )],
+        ])
+        await message.answer(
+            tr("billing.gumroad_check_hint", LANG),
+            reply_markup=check_kb,
+            parse_mode="HTML",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +259,30 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Gumroad checkout callback
+# Show Telegram Stars payment options
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data == "billing:show_stars")
+async def handle_show_stars(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    plans = get_plans()
+
+    buttons = []
+    for plan in plans.values():
+        if plan.is_active:
+            btn = await _create_plan_button(query.bot, plan, tg_id)
+            buttons.append([btn])
+
+    stars_plans_text = _build_plans_text_stars()
+    text = tr("billing.stars_info", LANG, stars_plans_text=stars_plans_text)
+
+    kb = types.InlineKeyboardMarkup(inline_keyboard=buttons)
+    await query.message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+
+# ---------------------------------------------------------------------------
+# Gumroad checkout callback (legacy, kept for backward compatibility)
 # ---------------------------------------------------------------------------
 
 @router.callback_query(F.data.startswith("billing:gumroad:"))
