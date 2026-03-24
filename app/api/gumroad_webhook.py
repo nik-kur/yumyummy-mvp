@@ -16,6 +16,7 @@ import json
 import logging
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
@@ -90,6 +91,38 @@ def _find_user_by_gumroad_sub(db: Session, subscription_id: Optional[str]) -> Op
     if not subscription_id:
         return None
     return db.query(User).filter(User.subscription_gumroad_id == subscription_id).first()
+
+
+async def _notify_user_payment_confirmed(telegram_id: str) -> None:
+    """Send a proactive Telegram message to the user after Gumroad payment is confirmed."""
+    token = settings.telegram_bot_token
+    if not token:
+        logger.warning("[GUMROAD] Cannot notify user: telegram_bot_token not set")
+        return
+
+    text = (
+        "\u2705 <b>Payment confirmed!</b>\n\n"
+        "Your subscription is now active.\n"
+        "Tell me what you ate, and I'll log it!"
+    )
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": telegram_id,
+        "text": text,
+        "parse_mode": "HTML",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 200:
+                logger.info("[GUMROAD] Notified user %s about payment confirmation", telegram_id)
+            else:
+                logger.warning(
+                    "[GUMROAD] Failed to notify user %s: status=%s body=%s",
+                    telegram_id, resp.status_code, resp.text[:200],
+                )
+    except Exception as e:
+        logger.warning("[GUMROAD] Error notifying user %s: %s", telegram_id, e)
 
 
 @router.post("/webhooks/gumroad/{secret}")
@@ -190,6 +223,9 @@ async def gumroad_webhook(secret: str, request: Request, db: Session = Depends(g
     else:
         logger.info("[GUMROAD] Ignoring resource_name=%s", resource_name)
         status = "ignored"
+
+    if status in ("activated", "renewed"):
+        await _notify_user_payment_confirmed(user.telegram_id)
 
     return {"status": status, "sale_id": sale_id}
 

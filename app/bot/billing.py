@@ -175,20 +175,6 @@ async def show_paywall(message: types.Message, billing: Optional[dict] = None) -
 
     await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
-    # Send "Check payment status" hint alongside paywall when Gumroad is active
-    if settings.gumroad_enabled:
-        check_kb = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(
-                text=tr("billing.gumroad_check_btn", LANG),
-                callback_data="billing:check_payment",
-            )],
-        ])
-        await message.answer(
-            tr("billing.gumroad_check_hint", LANG),
-            reply_markup=check_kb,
-            parse_mode="HTML",
-        )
-
 
 # ---------------------------------------------------------------------------
 # Access guard (call from other handlers)
