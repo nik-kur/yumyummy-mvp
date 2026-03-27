@@ -93,6 +93,14 @@ app.include_router(billing_router)
 from app.api.gumroad_webhook import router as gumroad_router
 app.include_router(gumroad_router)
 
+# Include Paddle checkout router
+from app.api.paddle_checkout import router as paddle_checkout_router
+app.include_router(paddle_checkout_router)
+
+# Include Paddle webhook router
+from app.api.paddle_webhook import router as paddle_webhook_router
+app.include_router(paddle_webhook_router)
+
 # Include billing admin/reconciliation router
 from app.api.billing_admin import router as billing_admin_router
 app.include_router(billing_admin_router)

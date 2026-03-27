@@ -42,6 +42,7 @@ class User(Base):
     subscription_telegram_charge_id = Column(String, nullable=True)
     subscription_provider = Column(String, nullable=True)
     subscription_gumroad_id = Column(String, nullable=True)
+    subscription_paddle_id = Column(String, nullable=True)
     usage_cost_current_period = Column(Float, default=0.0, nullable=False)
     usage_period_start = Column(DateTime(timezone=True), nullable=True)
 

@@ -40,6 +40,8 @@ def apply_subscription_payment(
     provider_payment_charge_id: Optional[str] = None,
     gumroad_sale_id: Optional[str] = None,
     gumroad_subscription_id: Optional[str] = None,
+    paddle_transaction_id: Optional[str] = None,
+    paddle_subscription_id: Optional[str] = None,
     amount_cents: Optional[int] = None,
     amount_xtr: Optional[int] = None,
     currency: str = "USD",
@@ -50,6 +52,7 @@ def apply_subscription_payment(
     raw_payload: Optional[str] = None,
     subscription_expiration_date: Optional[int] = None,
     period_days_override: Optional[int] = None,
+    **kwargs,
 ) -> str:
     """
     Idempotent: activate or renew a subscription for *user*.
@@ -59,7 +62,9 @@ def apply_subscription_payment(
     """
     if _is_duplicate(db, provider=provider, provider_event_id=provider_event_id,
                      telegram_charge_id=telegram_payment_charge_id,
-                     gumroad_sale_id=gumroad_sale_id, event_type=event_type):
+                     gumroad_sale_id=gumroad_sale_id,
+                     paddle_transaction_id=paddle_transaction_id,
+                     event_type=event_type):
         raise DuplicateEvent(f"Duplicate {provider} event")
 
     plan = get_active_plan(plan_id)
@@ -74,6 +79,8 @@ def apply_subscription_payment(
         provider_payment_charge_id=provider_payment_charge_id,
         gumroad_sale_id=gumroad_sale_id,
         gumroad_subscription_id=gumroad_subscription_id,
+        paddle_transaction_id=paddle_transaction_id,
+        paddle_subscription_id=paddle_subscription_id,
         plan_id=plan_id,
         amount_cents=amount_cents,
         amount_xtr=amount_xtr,
@@ -109,6 +116,8 @@ def apply_subscription_payment(
         user.subscription_telegram_charge_id = telegram_payment_charge_id
     if provider == "gumroad" and gumroad_subscription_id:
         user.subscription_gumroad_id = gumroad_subscription_id
+    if provider == "paddle" and paddle_subscription_id:
+        user.subscription_paddle_id = paddle_subscription_id
 
     user.usage_cost_current_period = 0.0
     user.usage_period_start = now
@@ -210,6 +219,7 @@ def _is_duplicate(
     provider_event_id: Optional[str],
     telegram_charge_id: Optional[str],
     gumroad_sale_id: Optional[str],
+    paddle_transaction_id: Optional[str] = None,
     event_type: str,
 ) -> bool:
     if provider == "telegram" and telegram_charge_id:
@@ -227,6 +237,12 @@ def _is_duplicate(
         return db.query(PaymentEvent).filter(
             PaymentEvent.gumroad_sale_id == gumroad_sale_id,
             PaymentEvent.event_type == "purchase",
+        ).first() is not None
+
+    if provider == "paddle" and paddle_transaction_id:
+        return db.query(PaymentEvent).filter(
+            PaymentEvent.paddle_transaction_id == paddle_transaction_id,
+            PaymentEvent.event_type == event_type,
         ).first() is not None
 
     return False

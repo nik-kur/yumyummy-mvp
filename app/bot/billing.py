@@ -20,6 +20,7 @@ from app.bot.api_client import (
     record_payment_success,
     cancel_subscription,
     get_gumroad_checkout_url,
+    get_paddle_checkout_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,11 @@ def _build_plans_text_card() -> str:
     return "\n".join(lines)
 
 
+def _card_payments_enabled() -> bool:
+    """True if any card payment provider (Paddle or Gumroad) is enabled."""
+    return settings.paddle_enabled or settings.gumroad_enabled
+
+
 async def _create_plan_button(bot, plan, tg_id: int) -> types.InlineKeyboardButton:
     """Create an invoice-link button for a plan (one-click payment)."""
     payload = f"sub:{plan.id}:{tg_id}"
@@ -117,24 +123,37 @@ async def _build_paywall_keyboard(
 
     plans = get_plans()
 
-    if settings.gumroad_enabled:
-        # Card-payment URL buttons (open Gumroad checkout directly)
+    if _card_payments_enabled():
         for plan in plans.values():
-            if plan.is_active:
+            if not plan.is_active:
+                continue
+
+            checkout_url = None
+
+            # Paddle first, then Gumroad fallback
+            if settings.paddle_enabled:
+                result = await get_paddle_checkout_url(tg_id, plan.id)
+                if result and "checkout_url" in result:
+                    checkout_url = result["checkout_url"]
+
+            if checkout_url is None and settings.gumroad_enabled:
                 result = await get_gumroad_checkout_url(tg_id, plan.id)
                 if result and "checkout_url" in result:
-                    usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
-                    label = f"💳 {plan.name_en} — {usd_price}"
-                    if plan.is_recurring:
-                        label += "/mo"
-                    else:
-                        label += "/year"
-                    buttons.append([
-                        types.InlineKeyboardButton(
-                            text=label,
-                            url=result["checkout_url"],
-                        )
-                    ])
+                    checkout_url = result["checkout_url"]
+
+            if checkout_url:
+                usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
+                label = f"💳 {plan.name_en} — {usd_price}"
+                if plan.is_recurring:
+                    label += "/mo"
+                else:
+                    label += "/year"
+                buttons.append([
+                    types.InlineKeyboardButton(
+                        text=label,
+                        url=checkout_url,
+                    )
+                ])
 
         # "Pay with Telegram Stars" callback button
         buttons.append([
@@ -158,7 +177,7 @@ async def show_paywall(message: types.Message, billing: Optional[dict] = None) -
         billing = await get_billing_status(message.from_user.id)
     status = (billing or {}).get("access_status", "new")
 
-    if settings.gumroad_enabled:
+    if _card_payments_enabled():
         plans_text = _build_plans_text_card()
     else:
         plans_text = _build_plans_text_stars()

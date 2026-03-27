@@ -70,3 +70,13 @@ class GumroadCheckoutResponse(BaseModel):
     checkout_url: str
     plan_id: str
     expires_in_seconds: int
+
+
+class PaddleCheckoutRequest(BaseModel):
+    telegram_id: str
+    plan_id: str
+
+
+class PaddleCheckoutResponse(BaseModel):
+    checkout_url: str
+    plan_id: str

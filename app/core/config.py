@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     gumroad_monthly_price_cents: int = 999
     gumroad_yearly_price_cents: int = 8999
 
+    # Billing / Paddle
+    paddle_enabled: bool = False
+    paddle_environment: str = "sandbox"  # "sandbox" | "production"
+    paddle_api_key: Optional[str] = None
+    paddle_webhook_secret: Optional[str] = None
+    paddle_client_side_token: Optional[str] = None
+    paddle_price_id_monthly: Optional[str] = None
+    paddle_price_id_yearly: Optional[str] = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

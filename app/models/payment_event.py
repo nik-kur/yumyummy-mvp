@@ -17,6 +17,8 @@ class PaymentEvent(Base):
     provider_payment_charge_id = Column(String, nullable=True)
     gumroad_sale_id = Column(String, nullable=True, index=True)
     gumroad_subscription_id = Column(String, nullable=True, index=True)
+    paddle_transaction_id = Column(String, nullable=True, index=True)
+    paddle_subscription_id = Column(String, nullable=True, index=True)
 
     plan_id = Column(String, nullable=False)
     amount_cents = Column(Integer, nullable=True)
