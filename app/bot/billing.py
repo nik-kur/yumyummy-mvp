@@ -418,10 +418,15 @@ async def handle_successful_payment(message: types.Message) -> None:
     else:
         ends_str = ""
 
+    is_recurring = getattr(payment, "is_recurring", False)
+    is_first = getattr(payment, "is_first_recurring", False)
+
     plan = get_active_plan(plan_id)
     status = result.get("status", "activated")
     if status == "already_processed":
         await message.answer(tr("billing.payment_already", LANG))
+    elif status == "renewed" and is_recurring and not is_first:
+        pass
     elif status == "renewed":
         await message.answer(
             tr("billing.payment_renewed", LANG, ends_str=ends_str),
@@ -434,7 +439,9 @@ async def handle_successful_payment(message: types.Message) -> None:
             else tr("billing.payment_period_fixed", LANG, ends_str=ends_str)
         )
         await message.answer(
-            tr("billing.payment_activated", LANG, ends_str=ends_str, period_text=period_text),
+            tr("billing.payment_activated", LANG, ends_str=ends_str, period_text=period_text)
+            + "\n\nYou can manage your subscription anytime in "
+            "<b>Profile → Manage subscription</b>.",
             parse_mode="HTML",
         )
 

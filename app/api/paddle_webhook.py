@@ -120,13 +120,15 @@ def _find_user(db: Session, data: dict) -> Optional[User]:
     return None
 
 
-async def _notify_user(telegram_id: str, text: str) -> None:
+async def _notify_user(telegram_id: str, text: str, disable_preview: bool = False) -> None:
     """Send a proactive Telegram message after Paddle payment events."""
     token = settings.telegram_bot_token
     if not token:
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {"chat_id": telegram_id, "text": text, "parse_mode": "HTML"}
+    payload: dict = {"chat_id": telegram_id, "text": text, "parse_mode": "HTML"}
+    if disable_preview:
+        payload["disable_web_page_preview"] = True
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(url, json=payload)
@@ -181,13 +183,16 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
             event_id=event_id,
             raw_payload=raw_payload,
         )
-        if status in ("activated", "renewed"):
+        if status == "activated":
             await _notify_user(
                 user.telegram_id,
                 "\u2705 <b>Payment confirmed!</b>\n\n"
                 "Your subscription is now active.\n"
-                "Tell me what you ate, and I'll log it!",
+                "Tell me what you ate, and I'll log it!\n\n"
+                "You can manage your subscription anytime in "
+                "<b>Profile → Manage subscription</b>.",
             )
+        # Auto-renewals (status == "renewed") are silent — no notification
 
     elif event_type == "subscription.activated":
         sub_id = data.get("data", {}).get("id")
@@ -197,12 +202,34 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
             logger.info("[PADDLE] Stored paddle subscription_id=%s for user_id=%s", sub_id, user.id)
         status = "subscription_stored"
 
-    elif event_type in ("subscription.canceled", "subscription.past_due"):
+    elif event_type == "subscription.canceled":
         status = apply_cancellation(
             db, user,
             provider="paddle",
             provider_event_id=event_id,
             raw_payload=raw_payload,
+        )
+
+    elif event_type == "subscription.past_due":
+        status = apply_cancellation(
+            db, user,
+            provider="paddle",
+            provider_event_id=event_id,
+            raw_payload=raw_payload,
+        )
+        mgmt_urls = data.get("data", {}).get("management_urls", {})
+        update_url = mgmt_urls.get("update_payment_method", "")
+        link_hint = ""
+        if update_url:
+            link_hint = f'\n\n<a href="{update_url}">Update payment method</a>'
+        await _notify_user(
+            user.telegram_id,
+            "\u26a0\ufe0f <b>Payment failed</b>\n\n"
+            "We couldn't renew your subscription. "
+            "Your access is now limited.\n\n"
+            "Please update your payment details to restore full access."
+            + link_hint,
+            disable_preview=True,
         )
 
     elif event_type == "adjustment.created":

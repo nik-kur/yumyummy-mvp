@@ -656,6 +656,20 @@ async def get_gumroad_checkout_url(telegram_id: int, plan_id: str) -> Optional[D
         return None
 
 
+async def get_paddle_portal_url(telegram_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/paddle/portal/{telegram_id}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_paddle_portal_url error: {e}")
+        return None
+
+
 async def get_paddle_checkout_url(telegram_id: int, plan_id: str) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/billing/paddle/checkout"
     payload = {"telegram_id": str(telegram_id), "plan_id": plan_id}

@@ -570,7 +570,8 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             provider = (billing or {}).get("subscription_provider", "")
             provider_label = " via Gumroad" if provider == "gumroad" else ""
             await message.answer(
-                f"✅ <b>Payment confirmed{provider_label}!</b>\n\nYour subscription is now active.\nTell me what you ate, and I'll log it!",
+                f"✅ <b>Payment confirmed{provider_label}!</b>\n\nYour subscription is now active.\nTell me what you ate, and I'll log it!\n\n"
+                "You can manage your subscription anytime in <b>Profile → Manage subscription</b>.",
                 parse_mode="HTML",
             )
             return

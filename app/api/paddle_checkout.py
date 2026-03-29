@@ -1,13 +1,16 @@
 """
-Paddle Billing checkout endpoint.
+Paddle Billing checkout and portal endpoints.
 
-Generates a URL to docs/pay.html with query params that Paddle.js
-uses to open the overlay checkout.
+- POST /billing/paddle/checkout — generates a URL to docs/pay.html with
+  query params that Paddle.js uses to open the overlay checkout.
+- GET  /billing/paddle/portal/{telegram_id} — returns the Paddle customer
+  portal URL (cancel / update payment method) for an existing subscriber.
 """
 
 import logging
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -60,3 +63,43 @@ def generate_paddle_checkout(payload: PaddleCheckoutRequest, db: Session = Depen
         checkout_url=checkout_url,
         plan_id=payload.plan_id,
     )
+
+
+@router.get("/paddle/portal/{telegram_id}")
+async def get_paddle_portal(telegram_id: str, db: Session = Depends(get_db)):
+    """Return the Paddle customer portal URL for managing a subscription."""
+    if not settings.paddle_enabled or not settings.paddle_api_key:
+        raise HTTPException(status_code=503, detail="Paddle not enabled")
+
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sub_id = user.subscription_paddle_id
+    if not sub_id:
+        raise HTTPException(status_code=404, detail="No Paddle subscription found")
+
+    base = "https://sandbox-api.paddle.com" if settings.paddle_environment == "sandbox" else "https://api.paddle.com"
+    url = f"{base}/subscriptions/{sub_id}"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {settings.paddle_api_key}"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        logger.error("[PADDLE] Failed to fetch subscription %s: %s", sub_id, e)
+        raise HTTPException(status_code=502, detail="Failed to fetch Paddle subscription")
+
+    mgmt = data.get("data", {}).get("management_urls", {})
+    cancel_url = mgmt.get("cancel")
+    update_url = mgmt.get("update_payment_method")
+
+    return {
+        "cancel_url": cancel_url,
+        "update_payment_method_url": update_url,
+        "subscription_id": sub_id,
+    }

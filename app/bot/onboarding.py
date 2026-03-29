@@ -25,8 +25,11 @@ from app.bot.api_client import (
     get_day_summary,
     get_saved_meals,
     start_trial,
+    get_billing_status,
+    get_paddle_portal_url,
 )
 from app.bot.billing import check_billing_access
+from app.core.config import settings
 from app.i18n import DEFAULT_LANG, tr
 
 logger = logging.getLogger(__name__)
@@ -316,6 +319,7 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="🔄 Recalculate targets", callback_data="profile_recalculate")],
             [InlineKeyboardButton(text="✏️ Enter targets manually", callback_data="profile_manual_kbju")],
+            [InlineKeyboardButton(text="💳 Manage subscription", callback_data="profile_manage_sub")],
         ]
     )
 
@@ -1096,10 +1100,7 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
     
-    # Billing status section
-    from app.bot.api_client import get_billing_status as _get_billing
-    from app.billing.access import compute_access_status
-    billing = await _get_billing(telegram_id)
+    billing = await get_billing_status(telegram_id)
     billing_section = ""
     if billing:
         status = billing.get("access_status", "new")
@@ -1154,6 +1155,94 @@ async def on_profile_recalculate(callback: types.CallbackQuery, state: FSMContex
     # Запускаем онбординг заново
     await callback.message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
     await state.set_state(OnboardingStates.waiting_for_goal)
+
+
+@router.callback_query(F.data == "profile_manage_sub")
+async def on_profile_manage_sub(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Show subscription status and management options."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    telegram_id = callback.from_user.id
+    billing = await get_billing_status(telegram_id)
+    if not billing:
+        await callback.message.answer("Could not load subscription info. Please try again later.")
+        return
+
+    status = billing.get("access_status", "new")
+
+    if status == "trial":
+        days_left = billing.get("trial_days_remaining", 0)
+        text = (
+            "💳 <b>Subscription status</b>\n\n"
+            f"You are on a <b>free trial</b> — {days_left:.0f} days remaining.\n\n"
+            "When your trial ends, subscribe to keep full access."
+        )
+        await callback.message.answer(text, parse_mode="HTML")
+        return
+
+    if status not in ("active",):
+        text = (
+            "💳 <b>Subscription status</b>\n\n"
+            "You don't have an active subscription.\n"
+            "Tap /subscribe to choose a plan."
+        )
+        await callback.message.answer(text, parse_mode="HTML")
+        return
+
+    provider = billing.get("subscription_provider", "")
+    plan_id = billing.get("subscription_plan_id", "")
+    auto_renew = billing.get("subscription_auto_renew")
+    ends_at = billing.get("subscription_ends_at", "")
+
+    ends_str = "—"
+    if isinstance(ends_at, str) and ends_at:
+        try:
+            from datetime import datetime as _dt
+            dt = _dt.fromisoformat(ends_at.replace("Z", "+00:00"))
+            ends_str = dt.strftime("%d.%m.%Y")
+        except ValueError:
+            ends_str = ends_at
+
+    plan_label = {"monthly": "Monthly", "yearly": "Yearly"}.get(plan_id, plan_id or "—")
+    renew_label = "auto-renew" if auto_renew else "expires"
+
+    text = (
+        "💳 <b>Subscription status</b>\n\n"
+        f"Plan: <b>{plan_label}</b>\n"
+        f"Status: <b>active</b> ({renew_label})\n"
+        f"Valid until: <b>{ends_str}</b>\n"
+    )
+
+    buttons = []
+
+    if provider == "paddle":
+        portal = await get_paddle_portal_url(telegram_id)
+        if portal:
+            update_url = portal.get("update_payment_method_url")
+            cancel_url = portal.get("cancel_url")
+            if update_url:
+                buttons.append([InlineKeyboardButton(
+                    text="💳 Update payment method", url=update_url,
+                )])
+            if cancel_url:
+                buttons.append([InlineKeyboardButton(
+                    text="❌ Cancel subscription", url=cancel_url,
+                )])
+        text += "\nPayment method: card (Paddle)"
+    elif provider == "telegram":
+        text += (
+            "\nPayment method: Telegram Stars\n"
+            "Manage in Telegram Settings → My Stars → Subscriptions"
+        )
+    elif provider == "gumroad":
+        text += "\nPayment method: card (Gumroad)"
+
+    if buttons:
+        kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
+    else:
+        await callback.message.answer(text, parse_mode="HTML")
 
 
 @router.callback_query(F.data == "profile_manual_kbju")
