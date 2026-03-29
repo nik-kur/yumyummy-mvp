@@ -27,6 +27,7 @@ from app.bot.api_client import (
     start_trial,
     get_billing_status,
     get_paddle_portal_url,
+    submit_churn_survey,
 )
 from app.bot.billing import check_billing_access
 from app.core.config import settings
@@ -61,6 +62,12 @@ class OnboardingStates(StatesGroup):
 class ProfileStates(StatesGroup):
     """Состояния для редактирования профиля"""
     waiting_for_manual_kbju = State()
+
+
+class CancelFlowStates(StatesGroup):
+    """Состояния для churn survey перед отменой подписки"""
+    waiting_for_reason = State()
+    waiting_for_comment = State()
 
 
 class FoodAdviceState(StatesGroup):
@@ -1220,22 +1227,23 @@ async def on_profile_manage_sub(callback: types.CallbackQuery, state: FSMContext
         portal = await get_paddle_portal_url(telegram_id)
         if portal:
             update_url = portal.get("update_payment_method_url")
-            cancel_url = portal.get("cancel_url")
             if update_url:
                 buttons.append([InlineKeyboardButton(
                     text="💳 Update payment method", url=update_url,
                 )])
-            if cancel_url:
-                buttons.append([InlineKeyboardButton(
-                    text="❌ Cancel subscription", url=cancel_url,
-                )])
+        buttons.append([InlineKeyboardButton(
+            text="❌ Cancel subscription", callback_data="cancel_sub_start",
+        )])
         text += "\nPayment method: card (Paddle)"
     elif provider == "telegram":
-        text += (
-            "\nPayment method: Telegram Stars\n"
-            "Manage in Telegram Settings → My Stars → Subscriptions"
-        )
+        buttons.append([InlineKeyboardButton(
+            text="❌ Cancel subscription", callback_data="cancel_sub_start",
+        )])
+        text += "\nPayment method: Telegram Stars"
     elif provider == "gumroad":
+        buttons.append([InlineKeyboardButton(
+            text="❌ Cancel subscription", callback_data="cancel_sub_start",
+        )])
         text += "\nPayment method: card (Gumroad)"
 
     if buttons:
@@ -1243,6 +1251,151 @@ async def on_profile_manage_sub(callback: types.CallbackQuery, state: FSMContext
         await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
     else:
         await callback.message.answer(text, parse_mode="HTML")
+
+
+# ============ Cancel Subscription Flow (Churn Survey) ============
+
+CHURN_REASONS = [
+    ("too_expensive", "💰 Too expensive"),
+    ("not_using", "📉 I don't use it enough"),
+    ("not_accurate", "🎯 Data isn't accurate enough"),
+    ("manual_effort", "⏱ Still too much manual effort"),
+    ("found_alternative", "🔄 Switched to another app"),
+    ("goal_reached", "🏆 I reached my goal"),
+    ("temporary", "⏸ Just pausing, will come back"),
+    ("other", "💬 Other reason"),
+]
+
+
+def _get_churn_reason_keyboard() -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(text=label, callback_data=f"churn:{reason_id}")]
+        for reason_id, label in CHURN_REASONS
+    ]
+    buttons.append([InlineKeyboardButton(
+        text="↩️ Never mind, keep my subscription",
+        callback_data="churn:nevermind",
+    )])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+@router.callback_query(F.data == "cancel_sub_start")
+async def on_cancel_sub_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start the churn survey before cancellation."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    await callback.message.answer(
+        "Before you go — could you tell us why you're cancelling?\n\n"
+        "Your feedback helps us improve YumYummy for everyone.",
+        reply_markup=_get_churn_reason_keyboard(),
+    )
+    await state.set_state(CancelFlowStates.waiting_for_reason)
+
+
+@router.callback_query(CancelFlowStates.waiting_for_reason, F.data == "churn:nevermind")
+async def on_churn_nevermind(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User decided not to cancel."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await state.clear()
+    await callback.message.answer(
+        "Great, your subscription stays active! 💪\n"
+        "Tell me what you ate, and I'll log it.",
+    )
+
+
+@router.callback_query(CancelFlowStates.waiting_for_reason, F.data.startswith("churn:"))
+async def on_churn_reason_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User selected a cancellation reason."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    reason = callback.data.split(":", 1)[1]
+    await state.update_data(churn_reason=reason)
+
+    reason_labels = dict(CHURN_REASONS)
+    label = reason_labels.get(reason, reason)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⏭ Skip", callback_data="churn_comment:skip")],
+    ])
+    await callback.message.answer(
+        f"Got it: <i>{label}</i>\n\n"
+        "Anything else you'd like to share? Type a message below, "
+        "or tap <b>Skip</b> to proceed.",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+    await state.set_state(CancelFlowStates.waiting_for_comment)
+
+
+@router.callback_query(CancelFlowStates.waiting_for_comment, F.data == "churn_comment:skip")
+async def on_churn_comment_skip(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User skipped the free-text comment."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await _finish_churn_survey(callback.from_user.id, state, callback.message)
+
+
+@router.message(CancelFlowStates.waiting_for_comment)
+async def on_churn_comment_received(message: types.Message, state: FSMContext) -> None:
+    """User typed a free-text comment."""
+    comment = message.text.strip()[:1000] if message.text else None
+    await state.update_data(churn_comment=comment)
+    await _finish_churn_survey(message.from_user.id, state, message)
+
+
+async def _finish_churn_survey(
+    telegram_id: int,
+    state: FSMContext,
+    message: types.Message,
+) -> None:
+    """Save the survey and show the actual cancel link."""
+    data = await state.get_data()
+    reason = data.get("churn_reason", "other")
+    comment = data.get("churn_comment")
+    await state.clear()
+
+    await submit_churn_survey(telegram_id, reason, comment)
+
+    billing = await get_billing_status(telegram_id)
+    provider = (billing or {}).get("subscription_provider", "")
+
+    buttons = []
+    extra_text = ""
+
+    if provider == "paddle":
+        portal = await get_paddle_portal_url(telegram_id)
+        if portal and portal.get("cancel_url"):
+            buttons.append([InlineKeyboardButton(
+                text="→ Cancel subscription on Paddle",
+                url=portal["cancel_url"],
+            )])
+        else:
+            extra_text = (
+                "\nTo cancel, check the receipt email from Paddle "
+                "or contact @nik_kur."
+            )
+    elif provider == "telegram":
+        extra_text = (
+            "\nTo cancel, go to Telegram Settings → My Stars → "
+            "Subscriptions → YumYummy."
+        )
+    else:
+        extra_text = "\nContact @nik_kur and we'll cancel it for you."
+
+    text = (
+        "Thank you for your feedback! 🙏\n\n"
+        "Tap below to proceed with cancellation."
+        + extra_text
+    )
+
+    if buttons:
+        kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+        await message.answer(text, reply_markup=kb)
+    else:
+        await message.answer(text)
 
 
 @router.callback_query(F.data == "profile_manual_kbju")

@@ -681,3 +681,23 @@ async def get_paddle_checkout_url(telegram_id: int, plan_id: str) -> Optional[Di
     except Exception as e:
         logger.error(f"[API] get_paddle_checkout_url error: {e}")
         return None
+
+
+async def submit_churn_survey(
+    telegram_id: int, reason: str, comment: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/churn-survey"
+    payload: Dict[str, Any] = {
+        "telegram_id": str(telegram_id),
+        "reason": reason,
+    }
+    if comment:
+        payload["comment"] = comment
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] submit_churn_survey error: {e}")
+        return None

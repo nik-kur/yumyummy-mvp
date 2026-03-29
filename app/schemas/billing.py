@@ -80,3 +80,14 @@ class PaddleCheckoutRequest(BaseModel):
 class PaddleCheckoutResponse(BaseModel):
     checkout_url: str
     plan_id: str
+
+
+class ChurnSurveyRequest(BaseModel):
+    telegram_id: str
+    reason: str
+    comment: Optional[str] = None
+
+
+class ChurnSurveyResponse(BaseModel):
+    status: str
+    survey_id: int

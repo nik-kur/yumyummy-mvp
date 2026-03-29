@@ -9,6 +9,7 @@ from app.models.user import User
 from app.billing.access import compute_access_status, trial_days_remaining, check_usage_cap, get_usage_cap_usd
 from app.billing.plans import TRIAL_DAYS, get_active_plan
 from app.billing.service import apply_subscription_payment, DuplicateEvent
+from app.models.churn_survey import ChurnSurvey
 from app.schemas.billing import (
     BillingStatusResponse,
     TrialStartRequest,
@@ -19,6 +20,8 @@ from app.schemas.billing import (
     SubscriptionCancelResponse,
     GumroadCheckoutRequest,
     GumroadCheckoutResponse,
+    ChurnSurveyRequest,
+    ChurnSurveyResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -209,3 +212,44 @@ def generate_gumroad_checkout(payload: GumroadCheckoutRequest, db: Session = Dep
         plan_id=payload.plan_id,
         expires_in_seconds=ttl,
     )
+
+
+VALID_CHURN_REASONS = {
+    "too_expensive",
+    "not_using",
+    "not_accurate",
+    "manual_effort",
+    "found_alternative",
+    "goal_reached",
+    "temporary",
+    "other",
+}
+
+
+@router.post("/churn-survey", response_model=ChurnSurveyResponse)
+def submit_churn_survey(payload: ChurnSurveyRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.telegram_id == payload.telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if payload.reason not in VALID_CHURN_REASONS:
+        raise HTTPException(status_code=400, detail=f"Invalid reason: {payload.reason}")
+
+    survey = ChurnSurvey(
+        user_id=user.id,
+        telegram_id=payload.telegram_id,
+        reason=payload.reason,
+        comment=payload.comment,
+        subscription_provider=user.subscription_provider,
+        subscription_plan_id=user.subscription_plan_id,
+    )
+    db.add(survey)
+    db.commit()
+    db.refresh(survey)
+
+    logger.info(
+        "[CHURN] Survey recorded: telegram_id=%s reason=%s",
+        payload.telegram_id, payload.reason,
+    )
+
+    return ChurnSurveyResponse(status="recorded", survey_id=survey.id)
