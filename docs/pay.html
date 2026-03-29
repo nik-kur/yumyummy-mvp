@@ -93,6 +93,7 @@
       margin: 16px auto;
       max-width: 480px;
       display: none;
+      padding: 0 24px;
     }
 
     .pay-success {
@@ -102,6 +103,23 @@
     }
     .pay-success h2 { color: #16a34a; margin-bottom: 12px; }
     .pay-success p { color: var(--muted); max-width: 400px; margin: 0 auto; }
+
+    .pay-loading {
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+    .pay-loading .spinner {
+      display: inline-block;
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -115,7 +133,14 @@
   </nav>
 </header>
 
-<div id="checkout-view">
+<!-- Loading state while checkout opens automatically -->
+<div id="loading-view" class="pay-loading" style="display:none;">
+  <div class="spinner"></div>
+  <div>Opening secure checkout...</div>
+</div>
+
+<!-- Plan selection (shown only if no plan pre-selected) -->
+<div id="checkout-view" style="display:none;">
   <div class="pay-hero">
     <h1>Choose your plan</h1>
     <p>Full access to YumYummy AI nutrition tracking. Cancel anytime.</p>
@@ -172,18 +197,41 @@
 
   var CLIENT_TOKEN = params.get("cst") || "";
   var ENV = params.get("env") || "sandbox";
-
-  if (CLIENT_TOKEN) {
-    Paddle.Initialize({
-      token: CLIENT_TOKEN,
-      environment: ENV
-    });
-  }
+  var initialized = false;
 
   function showError(msg) {
     var el = document.getElementById("error-msg");
     el.textContent = msg;
     el.style.display = "block";
+    document.getElementById("loading-view").style.display = "none";
+    document.getElementById("checkout-view").style.display = "block";
+  }
+
+  if (!CLIENT_TOKEN) {
+    showError("Payment is not configured. Please open this page from the bot.");
+  } else {
+    try {
+      Paddle.Environment.set(ENV);
+      Paddle.Initialize({
+        token: CLIENT_TOKEN,
+        eventCallback: function (ev) {
+          if (ev.name === "checkout.completed") {
+            document.getElementById("checkout-view").style.display = "none";
+            document.getElementById("loading-view").style.display = "none";
+            document.getElementById("success-view").style.display = "block";
+          }
+          if (ev.name === "checkout.closed") {
+            document.getElementById("loading-view").style.display = "none";
+            document.getElementById("checkout-view").style.display = "block";
+            document.getElementById("btn-monthly").disabled = false;
+            document.getElementById("btn-yearly").disabled = false;
+          }
+        }
+      });
+      initialized = true;
+    } catch (e) {
+      showError("Failed to initialize payment system: " + e.message);
+    }
   }
 
   window.openCheckout = function (selectedPlan) {
@@ -191,8 +239,8 @@
       showError("Missing Telegram user ID. Please open this page from the bot.");
       return;
     }
-    if (!CLIENT_TOKEN) {
-      showError("Payment is not configured. Please try again later.");
+    if (!initialized) {
+      showError("Payment system not ready. Please try again.");
       return;
     }
 
@@ -206,25 +254,29 @@
     document.getElementById("btn-yearly").disabled = true;
 
     Paddle.Checkout.open({
-      items: [{ priceId: priceId }],
+      settings: {
+        displayMode: "overlay",
+        theme: "light",
+        locale: "en"
+      },
+      items: [{ priceId: priceId, quantity: 1 }],
       customData: {
         telegram_id: telegramId,
         plan_id: selectedPlan,
         claim_token: token || ""
-      },
-      successCallback: function () {
-        document.getElementById("checkout-view").style.display = "none";
-        document.getElementById("success-view").style.display = "block";
-      },
-      closeCallback: function () {
-        document.getElementById("btn-monthly").disabled = false;
-        document.getElementById("btn-yearly").disabled = false;
       }
     });
   };
 
-  if (plan && PRICE_IDS[plan] && telegramId && CLIENT_TOKEN) {
-    openCheckout(plan);
+  // Auto-open checkout if plan is pre-selected from the bot
+  if (plan && PRICE_IDS[plan] && telegramId && initialized) {
+    document.getElementById("loading-view").style.display = "block";
+    // Small delay to let Paddle.js fully load
+    setTimeout(function () {
+      openCheckout(plan);
+    }, 500);
+  } else if (initialized) {
+    document.getElementById("checkout-view").style.display = "block";
   }
 })();
 </script>
