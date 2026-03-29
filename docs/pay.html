@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YumYummy — Subscribe</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+  <style>
+    .pay-hero {
+      text-align: center;
+      padding: 60px 24px 24px;
+    }
+    .pay-hero h1 { font-size: 1.75rem; margin-bottom: 8px; }
+    .pay-hero p { color: var(--muted); max-width: 480px; margin: 0 auto 32px; }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      max-width: 600px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+    }
+    .plan-card {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-align: center;
+      transition: border-color .15s, box-shadow .15s;
+      position: relative;
+    }
+    .plan-card:hover { border-color: var(--accent); }
+    .plan-card.popular {
+      border-color: var(--accent);
+      box-shadow: 0 4px 20px rgba(79, 70, 229, .12);
+    }
+    .plan-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 3px 14px;
+      border-radius: 100px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .plan-name { font-weight: 700; font-size: 1.1rem; margin-bottom: 4px; }
+    .plan-price { font-size: 1.6rem; font-weight: 800; margin-bottom: 2px; }
+    .plan-period { font-size: .85rem; color: var(--muted); margin-bottom: 20px; }
+    .plan-btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 32px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: .95rem;
+      border: none;
+      cursor: pointer;
+      transition: background .15s, transform .15s;
+      text-decoration: none;
+    }
+    .plan-btn:hover {
+      background: #4338ca;
+      transform: translateY(-1px);
+      text-decoration: none;
+      color: #fff;
+    }
+    .plan-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .pay-note {
+      text-align: center;
+      font-size: .82rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+    }
+
+    .pay-error {
+      text-align: center;
+      color: #dc2626;
+      font-size: .9rem;
+      margin: 16px auto;
+      max-width: 480px;
+      display: none;
+    }
+
+    .pay-success {
+      text-align: center;
+      padding: 60px 24px;
+      display: none;
+    }
+    .pay-success h2 { color: #16a34a; margin-bottom: 12px; }
+    .pay-success p { color: var(--muted); max-width: 400px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="brand">YumYummy</a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="support.html">Support</a>
+    <a href="terms.html">Terms</a>
+  </nav>
+</header>
+
+<div id="checkout-view">
+  <div class="pay-hero">
+    <h1>Choose your plan</h1>
+    <p>Full access to YumYummy AI nutrition tracking. Cancel anytime.</p>
+  </div>
+
+  <div id="error-msg" class="pay-error"></div>
+
+  <div class="plans-grid">
+    <div class="plan-card popular">
+      <div class="plan-badge">Most popular</div>
+      <div class="plan-name">Monthly</div>
+      <div class="plan-price">$9.99</div>
+      <div class="plan-period">per month</div>
+      <button class="plan-btn" id="btn-monthly" onclick="openCheckout('monthly')">Subscribe</button>
+    </div>
+    <div class="plan-card">
+      <div class="plan-name">Yearly</div>
+      <div class="plan-price">$89.99</div>
+      <div class="plan-period">per year <span style="color:var(--accent);font-weight:600;">— save 25%</span></div>
+      <button class="plan-btn" id="btn-yearly" onclick="openCheckout('yearly')">Subscribe</button>
+    </div>
+  </div>
+
+  <div class="pay-note">
+    Secure payment via Paddle. You can also pay with Telegram Stars directly inside the bot.
+  </div>
+</div>
+
+<div id="success-view" class="pay-success">
+  <h2>Payment confirmed!</h2>
+  <p>Your subscription is now active. Go back to the Telegram bot and start tracking!</p>
+  <br/>
+  <a href="https://t.me/yum_yummybot" class="plan-btn" style="display:inline-block;margin-top:12px;">Open YumYummy Bot</a>
+</div>
+
+<footer>
+  <a href="terms.html">Terms</a> &middot;
+  <a href="privacy.html">Privacy</a> &middot;
+  <a href="refunds.html">Refunds</a>
+  <br/>&copy; 2026 YumYummy
+</footer>
+
+<script>
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  var telegramId = params.get("tid");
+  var plan = params.get("plan");
+  var token = params.get("token");
+
+  var PRICE_IDS = {
+    monthly: "pri_01kmq60c1atp7edrsn5255kppm",
+    yearly:  "pri_01kmq6279x4zmkr5mj0vqaphyh"
+  };
+
+  var CLIENT_TOKEN = params.get("cst") || "";
+  var ENV = params.get("env") || "sandbox";
+
+  if (CLIENT_TOKEN) {
+    Paddle.Initialize({
+      token: CLIENT_TOKEN,
+      environment: ENV
+    });
+  }
+
+  function showError(msg) {
+    var el = document.getElementById("error-msg");
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+
+  window.openCheckout = function (selectedPlan) {
+    if (!telegramId) {
+      showError("Missing Telegram user ID. Please open this page from the bot.");
+      return;
+    }
+    if (!CLIENT_TOKEN) {
+      showError("Payment is not configured. Please try again later.");
+      return;
+    }
+
+    var priceId = PRICE_IDS[selectedPlan];
+    if (!priceId) {
+      showError("Unknown plan.");
+      return;
+    }
+
+    document.getElementById("btn-monthly").disabled = true;
+    document.getElementById("btn-yearly").disabled = true;
+
+    Paddle.Checkout.open({
+      items: [{ priceId: priceId }],
+      customData: {
+        telegram_id: telegramId,
+        plan_id: selectedPlan,
+        claim_token: token || ""
+      },
+      successCallback: function () {
+        document.getElementById("checkout-view").style.display = "none";
+        document.getElementById("success-view").style.display = "block";
+      },
+      closeCallback: function () {
+        document.getElementById("btn-monthly").disabled = false;
+        document.getElementById("btn-yearly").disabled = false;
+      }
+    });
+  };
+
+  if (plan && PRICE_IDS[plan] && telegramId && CLIENT_TOKEN) {
+    openCheckout(plan);
+  }
+})();
+</script>
+
+</body>
+</html>
