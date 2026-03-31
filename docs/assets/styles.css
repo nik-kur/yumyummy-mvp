@@ -59,7 +59,7 @@ p { margin: 0 0 14px; }
 ul, ol { margin: 0 0 14px; padding-left: 22px; }
 li { margin-bottom: 4px; }
 
-/* Paddle callout */
+/* Callout box */
 .callout {
   background: var(--accent-light);
   border-left: 4px solid var(--accent);

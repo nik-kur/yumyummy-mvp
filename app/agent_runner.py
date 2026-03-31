@@ -5,7 +5,7 @@ This module exposes run_yumyummy_workflow() which calls the Agent Builder workfl
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,9 @@ class WorkflowNotInstalledError(Exception):
 async def run_yumyummy_workflow(
     user_text: str,
     telegram_id: str,
-    image_url: str | None = None,
-    force_intent: str | None = None,
-    nutrition_context: str | None = None,
+    image_url: Optional[str] = None,
+    force_intent: Optional[str] = None,
+    nutrition_context: Optional[str] = None,
 ) -> dict:
     """
     Run the YumYummy Agent Builder workflow.

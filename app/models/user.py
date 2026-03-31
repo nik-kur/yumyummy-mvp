@@ -40,9 +40,15 @@ class User(Base):
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_auto_renew = Column(Boolean, default=True, nullable=True)
     subscription_telegram_charge_id = Column(String, nullable=True)
+    subscription_provider = Column(String, nullable=True)
+    subscription_gumroad_id = Column(String, nullable=True)
+    subscription_paddle_id = Column(String, nullable=True)
+    usage_cost_current_period = Column(Float, default=0.0, nullable=False)
+    usage_period_start = Column(DateTime(timezone=True), nullable=True)
 
     # Связи
     days = relationship("UserDay", back_populates="user")
     meals = relationship("MealEntry", back_populates="user")
     saved_meals = relationship("SavedMeal", back_populates="user")
     payment_events = relationship("PaymentEvent", back_populates="user")
+    usage_records = relationship("UsageRecord", back_populates="user")

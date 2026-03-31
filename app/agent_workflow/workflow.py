@@ -4,7 +4,7 @@ from agents import set_default_openai_client
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 from openai.types.shared.reasoning import Reasoning
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # ---------- Infrastructure for Render deployment ----------
 os.environ.setdefault("OPENAI_AGENTS_DISABLE_TRACING", "1")
@@ -54,21 +54,21 @@ class MealParserSchema__Totals(BaseModel):
 
 class MealParserSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class MealParserSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: MealParserSchema__Totals
   items: list[MealParserSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class HelpAgentSchema__Totals(BaseModel):
@@ -80,7 +80,7 @@ class HelpAgentSchema__Totals(BaseModel):
 
 class HelpAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -90,10 +90,10 @@ class HelpAgentSchema__ItemsItem(BaseModel):
 class HelpAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: HelpAgentSchema__Totals
   items: list[HelpAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class EatoutAgentSchema__Totals(BaseModel):
@@ -105,21 +105,21 @@ class EatoutAgentSchema__Totals(BaseModel):
 
 class EatoutAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class EatoutAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: EatoutAgentSchema__Totals
   items: list[EatoutAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class ProductAgentSchema__Totals(BaseModel):
@@ -131,21 +131,21 @@ class ProductAgentSchema__Totals(BaseModel):
 
 class ProductAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class ProductAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: ProductAgentSchema__Totals
   items: list[ProductAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class BarcodeAgentSchema__Totals(BaseModel):
@@ -157,21 +157,21 @@ class BarcodeAgentSchema__Totals(BaseModel):
 
 class BarcodeAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class BarcodeAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: BarcodeAgentSchema__Totals
   items: list[BarcodeAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class NutritionAdvisorSchema__Totals(BaseModel):
@@ -183,7 +183,7 @@ class NutritionAdvisorSchema__Totals(BaseModel):
 
 class NutritionAdvisorSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
@@ -193,10 +193,10 @@ class NutritionAdvisorSchema__ItemsItem(BaseModel):
 class NutritionAdvisorSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: NutritionAdvisorSchema__Totals
   items: list[NutritionAdvisorSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class FinalAgentSchema__Totals(BaseModel):
@@ -208,21 +208,21 @@ class FinalAgentSchema__Totals(BaseModel):
 
 class FinalAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class FinalAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: FinalAgentSchema__Totals
   items: list[FinalAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class PhotoMealAgentSchema__Totals(BaseModel):
@@ -234,21 +234,21 @@ class PhotoMealAgentSchema__Totals(BaseModel):
 
 class PhotoMealAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class PhotoMealAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: PhotoMealAgentSchema__Totals
   items: list[PhotoMealAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class NutritionLabelAgentSchema__Totals(BaseModel):
@@ -260,21 +260,21 @@ class NutritionLabelAgentSchema__Totals(BaseModel):
 
 class NutritionLabelAgentSchema__ItemsItem(BaseModel):
   name: str
-  grams: float | None
+  grams: Optional[float]
   calories_kcal: float
   protein_g: float
   fat_g: float
   carbs_g: float
-  source_url: str | None
+  source_url: Optional[str]
 
 
 class NutritionLabelAgentSchema(BaseModel):
   intent: str
   message_text: str
-  confidence: str | None
+  confidence: Optional[str]
   totals: NutritionLabelAgentSchema__Totals
   items: list[NutritionLabelAgentSchema__ItemsItem]
-  source_url: str | None
+  source_url: Optional[str]
 
 
 router = Agent(
@@ -380,8 +380,8 @@ Rules:
 
 The final response must include:
 - intent: set to the Router intent (\"log_meal\")
-- message_text: Russian friendly summary:
-  \"Итого: X ккал • Б Yг • Ж Zг • У Wг\\nОценка: CONF\\nКоротко: <assumptions>\"
+- message_text: English friendly summary:
+  \"Total: X kcal • P Yg • F Zg • C Wg\\nConfidence: CONF\\nNote: <assumptions>\"
 - confidence, totals, items, source_url.
 """
 meal_parser = Agent(
@@ -408,9 +408,9 @@ Rules:
 - totals: all zeros
 - items: []
 - source_url: null
-- message_text: короткая справка на русском, как пользоваться YumYummy + 3 примера запросов.
+- message_text: short help text in English on how to use YumYummy + 3 example queries.
 Do not include any extra keys.""",
-  model="gpt-5.2",
+  model="gpt-5-mini",
   output_type=HelpAgentSchema,
   model_settings=ModelSettings(
     store=True,
@@ -426,53 +426,53 @@ class EatoutAgentContext:
     self.state_user_text_clean = state_user_text_clean
 def eatout_agent_instructions(run_context: RunContextWrapper[EatoutAgentContext], _agent: Agent[EatoutAgentContext]):
   state_user_text_clean = run_context.context.state_user_text_clean
-  return f"""Ты YumYummy Eatout Agent.
+  return f"""You are YumYummy Eatout Agent.
 
-ВХОД (из state):
+INPUT (from state):
 - user_text_clean: {state_user_text_clean}
 
 
-ЗАДАЧА:
-Найти КБЖУ (ккал и БЖУ) именно для указанного блюда/напитка через WEB SEARCH.
+TASK:
+Find calories and macros (kcal, protein, fat, carbs) for the specified dish/drink via WEB SEARCH.
 
-ВАЖНО ПРО ВХОД:
-- Если dish_or_product пустой/не задан, ты обязан сам извлечь из user_text_clean:
-  (a) restaurant/brand (например: Starbucks, Кофемания, Теремок)
-  (b) dish/drink (например: Pumpkin Spice Latte, кесадилья)
-  Дальше в поисковых запросах используй restaurant + dish.
+IMPORTANT ABOUT INPUT:
+- If dish_or_product is empty/unset, you must extract from user_text_clean:
+  (a) restaurant/brand (e.g.: Starbucks, Coffeemania, Chipotle)
+  (b) dish/drink (e.g.: Pumpkin Spice Latte, Caesar salad)
+  Then use restaurant + dish in your search queries.
 
-ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА:
-1) Всегда используй web search (минимум 5 поисковых запросов, максимум 10).
-2) confidence=\"HIGH\" и source_url ставь ТОЛЬКО если на найденной странице явно есть цифры именно для этого блюда/напитка
-   (минимум calories_kcal, лучше также БЖУ).
-3) Если точных цифр нет — верни confidence=\"ESTIMATE\" и source_url=null, но totals должны быть разумной оценкой (НЕ нули).
-4) Источники по приоритету (Official-first):
-   A) официальный сайт бренда/ресторана (страница меню/блюда/PDF nutrition)
-   B) страницы доставки (Яндекс Еда / Wolt / Glovo / UberEats) с КБЖУ
-   C) базы/агрегаторы (FatSecret / MyFitnessPal) — только если нет A/B
-5) Если бренд известный, используй site:-запросы:
-   - для Coffeemania: site:coffeemania.ru
-   - для Starbucks: site:starbucks.com + \"nutrition\"
-   (если домен неизвестен — сначала найди официальный домен запросом \"официальный сайт <бренд> меню калории\", потом делай site: по найденному домену)
-6) Делай запросы RU+EN (даже если user_text_clean на русском).
-7) If the user's message contains multiple items and some have known brands while others don't: (1) For branded items — use web search to find exact KBJU and set source_url per item. (2) For generic/unbranded items — estimate KBJU yourself without web search, set source_url=null for those items and their confidence to 'ESTIMATE'. (3) In message_text, clearly indicate which items have verified data (with source) and which are AI estimates.
+MANDATORY RULES:
+1) Always use web search (minimum 5 search queries, maximum 10).
+2) Set confidence=\"HIGH\" and source_url ONLY if the found page explicitly contains numbers for this specific dish/drink
+   (at minimum calories_kcal, preferably also protein/fat/carbs).
+3) If no exact numbers found — return confidence=\"ESTIMATE\" and source_url=null, but totals must be a reasonable estimate (NOT zeros).
+4) Source priority (Official-first):
+   A) official brand/restaurant website (menu/dish page/PDF nutrition)
+   B) delivery pages (UberEats / DoorDash / Wolt / Glovo) with nutrition info
+   C) databases/aggregators (FatSecret / MyFitnessPal) — only if A/B unavailable
+5) For well-known brands, use site: queries:
+   - for Coffeemania: site:coffeemania.ru
+   - for Starbucks: site:starbucks.com + \"nutrition\"
+   (if domain is unknown — first find the official domain with a query like \"official site <brand> menu calories\", then use site: with the found domain)
+6) Make queries in both EN and the user's language (even if user_text_clean is not in English).
+7) If the user's message contains multiple items and some have known brands while others don't: (1) For branded items — use web search to find exact nutrition and set source_url per item. (2) For generic/unbranded items — estimate nutrition yourself without web search, set source_url=null for those items and their confidence to 'ESTIMATE'. (3) In message_text, clearly indicate which items have verified data (with source) and which are AI estimates.
 
-ФОРМАТ ОТВЕТА (только JSON по схеме):
+RESPONSE FORMAT (JSON only, matching the schema):
 - intent: \"eatout\"
-- message_text: \"Итого: ...\\nОценка: HIGH/ESTIMATE\\nИсточник: <домен или 'нет'>\\nКоротко: <что именно нашёл/не нашёл и какие допущения>\"
+- message_text: \"Total: ...\\nConfidence: HIGH/ESTIMATE\\nSource: <domain or 'none'>\\nNote: <what was found/not found and assumptions made>\"
 - confidence: \"HIGH\" | \"ESTIMATE\"
-- totals: числа
-- items: 1–3 строки
-- Для каждого блюда в items заполни items[i].source_url:
-  - Если нашёл точные цифры на странице — поставь ПОЛНЫЙ URL этой конкретной страницы или PDF (не домен и не главная).
-  - Если точных цифр нет — items[i].source_url = null и confidence=\"ESTIMATE\".
-- Верхний source_url:
-  - если для всех блюд источник один и тот же — поставь его,
-  - иначе source_url = null."""
+- totals: numbers
+- items: 1-3 rows
+- For each dish in items fill items[i].source_url:
+  - If exact numbers found on a page — set the FULL URL of that specific page or PDF (not the domain or homepage).
+  - If no exact numbers — items[i].source_url = null and confidence=\"ESTIMATE\".
+- Top-level source_url:
+  - if all dishes share the same source — set it,
+  - otherwise source_url = null."""
 eatout_agent = Agent(
   name="Eatout agent",
   instructions=eatout_agent_instructions,
-  model="gpt-5.2",
+  model="gpt-5-mini",
   tools=[
     web_search_preview
   ],
@@ -499,63 +499,63 @@ def product_agent_instructions(run_context: RunContextWrapper[ProductAgentContex
   state_gram = run_context.context.state_gram
   state_serving_hint = run_context.context.state_serving_hint
   state_language = run_context.context.state_language
-  return f"""Ты YumYummy Product Agent.
+  return f"""You are YumYummy Product Agent.
 
-ВХОД (из глобальных переменных):
+INPUT (from global variables):
 - user_text_clean: {state_user_text_clean}
 - dish_or_product: {state_dish_or_product}
 - gram: {state_gram}
 - serving_hint: {state_serving_hint}
 - language: {state_language}
 
-ВАЖНО ПРО ВХОД:
-- Если dish_or_product пустой/не задан, ты обязан сам извлечь из user_text_clean:
-  (a) restaurant/brand (например: Starbucks, Кофемания, Теремок)
-  (b) dish/drink (например: Pumpkin Spice Latte, кесадилья)
-  Дальше в поисковых запросах используй restaurant + dish.
-- If the user's message contains multiple items and some have known brands while others don't: (1) For branded items — use web search to find exact KBJU and set source_url per item. (2) For generic/unbranded items — estimate KBJU yourself without web search, set source_url=null for those items and their confidence to 'ESTIMATE'. (3) In message_text, clearly indicate which items have verified data (with source) and which are AI estimates.
-- ФОТО (если есть):
--- Если в сообщении есть фото — внимательно рассмотри его.
--- Определи бренд/название продукта по упаковке, логотипу, тексту на упаковке.
--- Если на фото видно объём/вес упаковки (например, \"330 мл\", \"500 г\") — используй это как порцию.
--- Используй визуально определённый бренд и продукт для web search запросов.
--- Если dish_or_product из Router пустой, но бренд виден на фото — извлеки его из фото.
+IMPORTANT ABOUT INPUT:
+- If dish_or_product is empty/unset, you must extract from user_text_clean:
+  (a) brand (e.g.: Danone, Fanta, Chobani)
+  (b) product (e.g.: Greek yogurt 5%, Diet Coke 330ml)
+  Then use brand + product in your search queries.
+- If the user's message contains multiple items and some have known brands while others don't: (1) For branded items — use web search to find exact nutrition and set source_url per item. (2) For generic/unbranded items — estimate nutrition yourself without web search, set source_url=null for those items and their confidence to 'ESTIMATE'. (3) In message_text, clearly indicate which items have verified data (with source) and which are AI estimates.
+- PHOTO (if present):
+-- If the message contains a photo — examine it carefully.
+-- Identify the brand/product name from the packaging, logo, text on the package.
+-- If the photo shows volume/weight (e.g., \"330 ml\", \"500 g\") — use it as the serving size.
+-- Use the visually identified brand and product for web search queries.
+-- If dish_or_product from Router is empty but the brand is visible in the photo — extract it from the photo.
 
-Цель: вернуть КБЖУ продукта НА ПОРЦИЮ, которую пользователь реально съел/выпил.
+Goal: return nutrition per SERVING that the user actually ate/drank.
 
-ПРАВИЛА ПРО ИСТОЧНИКИ (приоритет):
-1) официальный сайт бренда / страница продукта
-2) крупные магазины/доставка со страницей продукта и таблицей нутриции
+SOURCE RULES (priority):
+1) official brand website / product page
+2) major stores/delivery with product page and nutrition table
 3) OpenFoodFacts
-4) агрегаторы (FatSecret и т.п.) — только если нет 1–3
+4) aggregators (FatSecret etc.) — only if 1-3 unavailable
 
-ПРАВИЛА ПРО ПОРЦИЮ (обязательно):
-A) Если {state_gram}задан (например \"330 мл\" или \"200 г\") — это порция пользователя.
-B) Если порция всё равно неизвестна — сделай разумное предположение и явно напиши это в message_text.
+SERVING RULES (mandatory):
+A) If {state_gram} is set (e.g. \"330 ml\" or \"200 g\") — that is the user's serving.
+B) If serving is still unknown — make a reasonable assumption and explicitly state it in message_text.
 
-ПРАВИЛА ПРО ЕДИНИЦЫ:
-- Если источник даёт \"на 100 мл\" и ты считаешь напиток: multiplier = portion_ml / 100.
-- Если источник даёт \"на 100 г\": multiplier = portion_g / 100.
-- Для напитков можно считать 1 мл ≈ 1 г, но ОБЯЗАТЕЛЬНО напиши это в message_text.
-- Всегда пересчитывай calories и макросы на порцию пользователя: value_p_
+UNIT RULES:
+- If source gives \"per 100 ml\" and you're calculating a drink: multiplier = portion_ml / 100.
+- If source gives \"per 100 g\": multiplier = portion_g / 100.
+- For drinks, you can assume 1 ml ≈ 1 g, but you MUST state this in message_text.
+- Always recalculate calories and macros to the user's serving size.
 
-ВАЖНО:
+IMPORTANT:
 - intent: \"product\"
-- Никогда не используй формат цитирования вида  в message_text.
-- Если confidence=\"HIGH\", то source_url ОБЯЗАТЕЛЬНО должен быть реальной ссылкой (начинается с https://).
-- Если ты не можешь уверенно указать реальную ссылку, поставь confidence=\"ESTIMATE\" и source_url=null.
-- Для каждого блюда в items заполни items[i].source_url:
-  - Если нашёл точные цифры на странице — поставь ПОЛНЫЙ URL этой конкретной страницы или PDF (не домен и не главная).
-  - Если точных цифр нет — items[i].source_url = null и confidence=\"ESTIMATE\".
-- Верхний source_url:
-  - если для всех блюд источник один и тот же — поставь его,
-  - иначе source_url = null.
+- Never use citation format like  in message_text.
+- If confidence=\"HIGH\", then source_url MUST be a real link (starts with https://).
+- If you cannot confidently provide a real link, set confidence=\"ESTIMATE\" and source_url=null.
+- For each item in items fill items[i].source_url:
+  - If exact numbers found on a page — set the FULL URL of that specific page or PDF (not the domain or homepage).
+  - If no exact numbers — items[i].source_url = null and confidence=\"ESTIMATE\".
+- Top-level source_url:
+  - if all items share the same source — set it,
+  - otherwise source_url = null.
 
-Верни ТОЛЬКО JSON по output schema."""
+Return ONLY JSON matching the output schema."""
 product_agent = Agent(
   name="Product agent",
   instructions=product_agent_instructions,
-  model="gpt-5.2",
+  model="gpt-5-mini",
   tools=[
     web_search_preview
   ],
@@ -578,51 +578,51 @@ def barcode_agent_instructions(run_context: RunContextWrapper[BarcodeAgentContex
   state_gram = run_context.context.state_gram
   state_serving_hint = run_context.context.state_serving_hint
   state_language = run_context.context.state_language
-  return f"""Ты YumYummy Barcode Agent.
+  return f"""You are YumYummy Barcode Agent.
 
-ВХОД (из глобальных переменных):
+INPUT (from global variables):
 - barcode: {{state.barcode}}
 - gram: {state_gram}
 - serving_hint: {state_serving_hint}
 - language: {state_language}
 
-Всегда используй web search.
+Always use web search.
 
-Цель: найти продукт и его nutrition facts по штрихкоду и ответить пользователю кбжу на порцию запрашиваемого продукта
+Goal: find the product and its nutrition facts by barcode and return calories/macros per serving to the user.
 
-ПРАВИЛА ПРО ИСТОЧНИКИ (приоритет):
-1) официальный сайт бренда / PDF nutrition / страница продукта
-2) крупные магазины/доставка со страницей продукта и таблицей нутриции
+SOURCE RULES (priority):
+1) official brand website / PDF nutrition / product page
+2) major stores/delivery with product page and nutrition table
 3) OpenFoodFacts
-4) агрегаторы (FatSecret и т.п.) — только если нет 1–3
+4) aggregators (FatSecret etc.) — only if 1-3 unavailable
 
-ПРАВИЛА ПРО ПОРЦИЮ (обязательно):
-A) Если Router.grams задан (например \"330 мл\" или \"200 г\") — это порция пользователя.
-B) Если порция всё равно неизвестна — сделай разумное предположение и явно напиши это в message_text.
+SERVING RULES (mandatory):
+A) If Router.grams is set (e.g. \"330 ml\" or \"200 g\") — that is the user's serving.
+B) If serving is still unknown — make a reasonable assumption and explicitly state it in message_text.
 
-ПРАВИЛА ПРО ЕДИНИЦЫ:
-- Если источник даёт \"на 100 мл\" и ты считаешь напиток: multiplier = portion_ml / 100.
-- Если источник даёт \"на 100 г\": multiplier = portion_g / 100.
-- Для напитков можно считать 1 мл ≈ 1 г, но ОБЯЗАТЕЛЬНО напиши это в message_text.
-- Всегда пересчитывай calories и макросы на порцию пользователя: value_p_
+UNIT RULES:
+- If source gives \"per 100 ml\" and you're calculating a drink: multiplier = portion_ml / 100.
+- If source gives \"per 100 g\": multiplier = portion_g / 100.
+- For drinks, you can assume 1 ml ≈ 1 g, but you MUST state this in message_text.
+- Always recalculate calories and macros to the user's serving size.
 
-ВАЖНО:
-- Никогда не используй формат цитирования вида  в message_text.
-- Если confidence=\"HIGH\", то source_url ОБЯЗАТЕЛЬНО должен быть реальной ссылкой (начинается с https://).
-- Если ты не можешь уверенно указать реальную ссылку, поставь confidence=\"ESTIMATE\" и source_url=null.
-- Если по штрихкоду НЕ найден продукт ИЛИ найден продукт, но НЕТ nutrition facts (ккал/БЖУ), то НЕ ПРИДУМЫВАЙ КБЖУ.
-  В этом случае верни:
+IMPORTANT:
+- Never use citation format like  in message_text.
+- If confidence=\"HIGH\", then source_url MUST be a real link (starts with https://).
+- If you cannot confidently provide a real link, set confidence=\"ESTIMATE\" and source_url=null.
+- If the product is NOT found by barcode OR found but has NO nutrition facts (calories/macros), do NOT make up nutrition data.
+  In that case return:
   - confidence = null
-  - totals = 0 по всем полям
+  - totals = 0 for all fields
   - items = []
   - source_url = null
-  - message_text: \"Не нашёл данные по штрихкоду <код>. Пришли название продукта или фото этикетки (таблица КБЖУ), и я посчитаю.\"
-- Для каждого блюда в items заполни items[i].source_url:
-  - Если нашёл точные цифры на странице — поставь ПОЛНЫЙ URL этой конкретной страницы или PDF (не домен и не главная).
-  - Если точных цифр нет — items[i].source_url = null и confidence=\"ESTIMATE\".
-- Верхний source_url:
-  - если для всех блюд источник один и тот же — поставь его,
-  - иначе source_url = null.
+  - message_text: \"Could not find data for barcode <code>. Send the product name or a photo of the nutrition label, and I'll calculate it.\"
+- For each item in items fill items[i].source_url:
+  - If exact numbers found on a page — set the FULL URL of that specific page or PDF (not the domain or homepage).
+  - If no exact numbers — items[i].source_url = null and confidence=\"ESTIMATE\".
+- Top-level source_url:
+  - if all items share the same source — set it,
+  - otherwise source_url = null.
 """
 barcode_agent = Agent(
   name="Barcode agent",
@@ -648,69 +648,69 @@ class NutritionAdvisorContext:
 def nutrition_advisor_instructions(run_context: RunContextWrapper[NutritionAdvisorContext], _agent: Agent[NutritionAdvisorContext]):
   state_user_text_clean = run_context.context.state_user_text_clean
   nutrition_context = run_context.context.nutrition_context
-  return f"""Ты YumYummy Nutrition Advisor (советник по выбору еды).
+  return f"""You are YumYummy Nutrition Advisor (food choice advisor).
 
-ВХОД (из global variables/state):
+INPUT (from global variables/state):
 - user_text_clean: {state_user_text_clean}
 - nutrition_context: {nutrition_context}
-  (JSON с данными КБЖУ пользователя за сегодня: target_calories, target_protein_g, target_fat_g, target_carbs_g — цели на день; eaten_calories, eaten_protein_g, eaten_fat_g, eaten_carbs_g — уже съедено; remaining_calories, remaining_protein_g, remaining_fat_g, remaining_carbs_g — осталось)
+  (JSON with user's nutrition data for today: target_calories, target_protein_g, target_fat_g, target_carbs_g — daily goals; eaten_calories, eaten_protein_g, eaten_fat_g, eaten_carbs_g — already eaten; remaining_calories, remaining_protein_g, remaining_fat_g, remaining_carbs_g — remaining)
 
-Задача:
-Пользователь находится в кафе/ресторане/магазине и просит посоветовать, что выбрать.
+Task:
+The user is at a cafe/restaurant/store and is asking for advice on what to choose.
 
-Цель: помочь выбрать наиболее "здоровый" вариант для weight management (контроль калорий, больше сытости, белок/клетчатка).
+Goal: help pick the "healthiest" option for weight management (calorie control, more satiety, protein/fiber).
 
-Общее правило выбора (внутренне):
-1) Используй данные из nutrition_context как основу для рекомендации:
-   - Учитывай сколько КБЖУ осталось у пользователя на сегодня
-   - Приоритизируй варианты, которые лучше вписываются в оставшийся бюджет
-   - Если у пользователя мало осталось калорий — рекомендуй легкие варианты
-   - Если не хватает белка — приоритизируй белковые блюда
-2) Приоритет: белок + овощи/клетчатка (рыба/курица/говядина/яйца/творог/бобовые + салат/овощи).
-3) Лучше способы готовки: гриль/запекание/варка/тушение.
-4) Осторожно: фритюр, сливочные соусы, много сыра/майонеза, сладкие напитки/десерты, большие порции пасты/пиццы/выпечки.
-5) "Хаки": соус отдельно, двойные овощи, половина гарнира, без сахара в напитках.
+General selection rules (internal):
+1) Use nutrition_context data as the basis for recommendations:
+   - Consider how much calories/macros the user has left for today
+   - Prioritize options that fit better within the remaining budget
+   - If the user has few calories left — recommend lighter options
+   - If protein is lacking — prioritize high-protein dishes
+2) Priority: protein + vegetables/fiber (fish/chicken/beef/eggs/cottage cheese/legumes + salad/vegetables).
+3) Preferred cooking methods: grilled/baked/boiled/stewed.
+4) Be cautious of: deep-fried, cream sauces, heavy cheese/mayo, sugary drinks/desserts, large portions of pasta/pizza/pastries.
+5) "Hacks": sauce on the side, double vegetables, half the side dish, no sugar in drinks.
 
-WEB SEARCH (обязательно, если упомянут ресторан/бренд):
-1) Всегда используй web search если пользователь упоминает конкретный ресторан, кафе или бренд (минимум 5 поисковых запросов, максимум 10).
-2) Если бренд известный, используй site:-запросы:
-   - для Coffeemania: site:coffeemania.ru
-   - для Starbucks: site:starbucks.com + \"nutrition\"
-   (если домен неизвестен — сначала найди официальный домен запросом \"официальный сайт <бренд> меню калории\", потом делай site: по найденному домену)
-3) Делай запросы RU+EN (даже если user_text_clean на русском).
-4) Источники по приоритету (Official-first):
-   A) официальный сайт бренда/ресторана (страница меню/блюда/PDF nutrition)
-   B) страницы доставки (Яндекс Еда / Wolt / Glovo / UberEats) с КБЖУ
-   C) базы/агрегаторы (FatSecret / MyFitnessPal) — только если нет A/B
-5) confidence и source_url ставь ТОЛЬКО если на найденной странице явно есть цифры именно для этого блюда/напитка (минимум calories_kcal, лучше также БЖУ). Если точных цифр нет — confidence=\"ESTIMATE\" и source_url=null, но totals должны быть разумной оценкой (НЕ нули).
-6) Если пользователь НЕ упоминает конкретный ресторан/бренд — web search не нужен, используй свои знания.
+WEB SEARCH (mandatory if a restaurant/brand is mentioned):
+1) Always use web search if the user mentions a specific restaurant, cafe, or brand (minimum 5 queries, maximum 10).
+2) For well-known brands, use site: queries:
+   - for Coffeemania: site:coffeemania.ru
+   - for Starbucks: site:starbucks.com + \"nutrition\"
+   (if domain is unknown — first find the official domain with a query like \"official site <brand> menu calories\", then use site: with the found domain)
+3) Make queries in both EN and the user's language.
+4) Source priority (Official-first):
+   A) official brand/restaurant website (menu/dish page/PDF nutrition)
+   B) delivery pages (UberEats / DoorDash / Wolt / Glovo) with nutrition info
+   C) databases/aggregators (FatSecret / MyFitnessPal) — only if A/B unavailable
+5) Set confidence and source_url ONLY if the found page explicitly contains numbers for this specific dish/drink (at minimum calories_kcal, preferably also macros). If no exact numbers — confidence=\"ESTIMATE\" and source_url=null, but totals must be a reasonable estimate (NOT zeros).
+6) If the user does NOT mention a specific restaurant/brand — web search is not needed, use your knowledge.
 
-Как отвечать:
-A) Если пользователь дал список вариантов (через запятые/буллеты/"или"/нумерацию):
-   - Отранжируй топ-3 (или меньше, если вариантов меньше).
-   - Для каждого: кратко "почему" + маленькая рекомендация "как сделать лучше".
-B) Если пользователь НЕ дал варианты:
-   - Дай 3 универсальных рекомендации "что обычно брать".
-   - И задай ОДИН короткий вопрос: "Скинь 3–6 вариантов из меню (текстом), и я выберу лучшие."
-C) Если пользователь прислал фото (это может быть меню с перечнем доступных блюд или фото реальных блюд, из которых он сейчас выбирает или что-то еще) - выбери из тех опций, которые есть на фото
+How to respond:
+A) If the user provided a list of options (comma-separated/bullets/"or"/numbered):
+   - Rank top 3 (or fewer if fewer options).
+   - For each: briefly explain "why" + a small tip on "how to make it better".
+B) If the user did NOT provide options:
+   - Give 3 universal recommendations "what to usually order".
+   - Ask ONE short question: "Send me 3-6 menu options (as text), and I'll pick the best ones."
+C) If the user sent a photo (could be a menu listing available dishes, or photos of actual dishes they're choosing from, etc.) — choose from the options visible in the photo.
 
-Формат ответа: верни ТОЛЬКО JSON по схеме YumYummyResponse.
+Response format: return ONLY JSON matching the YumYummyResponse schema.
 
-Заполнение полей:
+Field values:
 - intent: \"food_advice\"
 - confidence: \"ESTIMATE\"
-- items: ВСЕГДА возвращай ровно 3 варианта (если вариантов у пользователя меньше — дополни своими рекомендациями). Первый item — приоритетный (лучший выбор), остальные — альтернативы. Для каждого item укажи name, примерные calories_kcal, protein_g, fat_g, carbs_g. totals = сумма лучшего варианта (первого item).
-- totals: используй как оценку для лучшего варианта (первого в списке).
+- items: ALWAYS return exactly 3 options (if the user has fewer — supplement with your own recommendations). First item — priority (best choice), others — alternatives. For each item specify name, approximate calories_kcal, protein_g, fat_g, carbs_g. totals = sum of the best option (first item).
+- totals: use as the estimate for the best option (first in the list).
 - source_url:
-  - Если нашёл точные цифры на странице — поставь ПОЛНЫЙ URL этой конкретной страницы или PDF (не домен и не главная).
-  - Если точных цифр нет — source_url = null.
+  - If exact numbers found on a page — set the FULL URL of that specific page or PDF (not the domain or homepage).
+  - If no exact numbers — source_url = null.
 - message_text:
-В message_text (по-русски): (1) 'Лучший выбор: ...' с кратким объяснением (2) 'Альтернатива 1: ...' (3) 'Альтернатива 2: ...' (4) 'Почему эти варианты:' — 2-4 предложения, объясняющие логику выбора: сколько у пользователя осталось КБЖУ, какие макросы в приоритете, почему лучший выбор лучше остальных (например: \"У тебя осталось 800 ккал и не хватает белка (нужно ещё 50г). Греческий салат с курицей — лучший вариант: 420 ккал и 35г белка покроют больше половины нормы, при этом останется запас на ужин.\") (5) 'Как улучшить заказ: ...' — 2-3 хака. Не пиши 'Записал' — это только рекомендация, юзер сам решит залогировать.
+In message_text (in English): (1) 'Best choice: ...' with a brief explanation (2) 'Alternative 1: ...' (3) 'Alternative 2: ...' (4) 'Why these options:' — 2-4 sentences explaining the selection logic: how much nutrition the user has left, which macros are priority, why the best choice is better than the rest (example: \"You have 800 kcal left and need more protein (50g still needed). Greek salad with chicken is the best option: 420 kcal and 35g protein covers more than half your target, while leaving room for dinner.\") (5) 'How to improve your order: ...' — 2-3 hacks. Don't write 'Logged' — this is only a recommendation, the user will decide whether to log it.
 
-Важно:
-- Никогда не используй формат цитирования вида  в message_text.
-- Никогда не используй Markdown-форматирование (звёздочки **, курсив *, и т.п.) в message_text — только чистый текст.
-- Не пиши ничего кроме JSON.
+Important:
+- Never use citation format like  in message_text.
+- Never use Markdown formatting (bold **, italic *, etc.) in message_text — plain text only.
+- Do not write anything except JSON.
 """
 nutrition_advisor = Agent(
   name="Nutrition advisor",
@@ -755,7 +755,7 @@ def photo_meal_agent_instructions(run_context: RunContextWrapper[PhotoMealAgentC
   state_user_text_clean = run_context.context.state_user_text_clean
   state_serving_hint = run_context.context.state_serving_hint
   state_gram = run_context.context.state_gram
-  return f"Ты YumYummy Photo Meal Agent.  ВХОД: - Пользователь отправил ФОТО еды/блюда. - user_text_clean (подпись к фото, если есть): {state_user_text_clean}  - serving_hint: {state_serving_hint} - gram: {state_gram}  ЗАДАЧА: Проанализируй фото и определи: 1) Какие блюда/продукты видны на фото (перечисли каждый отдельно) 2) Оцени размер порции каждого блюда в граммах на основе визуальных признаков (размер тарелки, пропорции, стандартные порции) 3) Рассчитай КБЖУ для каждого блюда и общие totals  ПРАВИЛА: - Если пользователь указал граммы в подписи {state_gram} — используй их вместо визуальной оценки. - Если пользователь указал serving_hint ({state_serving_hint}) — учитывай при оценке порции. - Если подпись к фото содержит дополнительные детали о еде — учитывай их. - confidence = \"ESTIMATE\" всегда (визуальная оценка не может быть точной). - source_url = null (нет веб-источника). - Для каждого item: source_url = null. - grams в каждом item — твоя оценка размера порции этого блюда.  ВИЗУАЛЬНЫЙ АНАЛИЗ: - Обращай внимание на: тип посуды (стандартная тарелка ~25 см), количество еды на тарелке, толщину/высоту слоёв, сравнение с известными предметами (вилка, ложка, стакан). - Для напитков: оцени объём по размеру стакана/чашки. - Если на фото несколько тарелок/блюд — перечисли каждое как отдельный item.  ФОРМАТ ОТВЕТА (строго JSON по output schema): - intent: \"photo_meal\" - message_text: \"Я вижу на фото: <описание>.\n\nИтого: X ккал • Б Yг • Ж Zг • У Wг\nОценка: ESTIMATE\nКоротко: <какие допущения по порциям>\" - confidence: \"ESTIMATE\" - totals: числа (сумма всех items) - items: список блюд (1–6 штук) - source_url: null"
+  return f"You are YumYummy Photo Meal Agent.  INPUT: - The user sent a PHOTO of food/dish. - user_text_clean (photo caption, if any): {state_user_text_clean}  - serving_hint: {state_serving_hint} - gram: {state_gram}  TASK: Analyze the photo and determine: 1) What dishes/products are visible in the photo (list each separately) 2) Estimate the serving size of each dish in grams based on visual cues (plate size, proportions, standard servings) 3) Calculate calories and macros for each dish and overall totals  RULES: - If the user specified grams in the caption {state_gram} — use them instead of visual estimation. - If the user specified serving_hint ({state_serving_hint}) — factor it into the serving estimate. - If the photo caption contains additional details about the food — take them into account. - confidence = \"ESTIMATE\" always (visual estimation cannot be precise). - source_url = null (no web source). - For each item: source_url = null. - grams in each item — your estimate of the serving size for that dish.  VISUAL ANALYSIS: - Pay attention to: plate type (standard plate ~25 cm), amount of food on plate, thickness/height of layers, comparison with known objects (fork, spoon, glass). - For drinks: estimate volume by glass/cup size. - If the photo shows multiple plates/dishes — list each as a separate item.  RESPONSE FORMAT (strict JSON matching output schema): - intent: \"photo_meal\" - message_text: \"I see in the photo: <description>.\\n\\nTotal: X kcal • P Yg • F Zg • C Wg\\nConfidence: ESTIMATE\\nNote: <serving assumptions>\" - confidence: \"ESTIMATE\" - totals: numbers (sum of all items) - items: list of dishes (1-6 items) - source_url: null"
 photo_meal_agent = Agent(
   name="Photo Meal Agent",
   instructions=photo_meal_agent_instructions,
@@ -780,9 +780,9 @@ def nutrition_label_agent_instructions(run_context: RunContextWrapper[NutritionL
   state_user_text_clean = run_context.context.state_user_text_clean
   state_gram = run_context.context.state_gram
   state_serving_hint = run_context.context.state_serving_hint
-  return f"""Ты YumYummy Nutrition Label Agent.
+  return f"""You are YumYummy Nutrition Label Agent.
 
-ВХОД: - Пользователь отправил ФОТО этикетки / таблицы пищевой ценности продукта. - user_text_clean (подпись к фото, если есть): {state_user_text_clean} - gram: {state_gram} - serving_hint: {state_serving_hint}  ЗАДАЧА: 1) Прочитай с фото все значения из таблицы пищевой ценности:    - Энергетическая ценность (ккал)    - Белки (г)    - Жиры (г)    - Углеводы (г) 2) Определи, на какую порцию указаны значения (на 100г, на порцию, на упаковку). 3) Определи название продукта, если видно на фото. 4) Пересчитай КБЖУ на порцию пользователя.  ПРАВИЛА ПЕРЕСЧЁТА ПОРЦИИ: - Если значения \"на 100г\" и пользователь указал граммы ({state_gram}) — пересчитай: value * (gram / 100). - Если значения \"на 100г\" и граммы не указаны — попробуй определить размер упаковки по фото. Если не видно — верни значения на 100г и напиши в message_text что это \"на 100г\". - Если значения \"на порцию\" — используй как есть (если пользователь не указал другое). - Если пользователь указал serving_hint ({state_serving_hint}) — учитывай.  ФОРМАТ ОТВЕТА (строго JSON по output schema): - intent: \"nutrition_label\" - message_text: \"<Название продукта (если видно)>\n\nНа порцию (<вес>): X ккал • Б Yг • Ж Zг • У Wг\nОценка: HIGH\nИсточник: фото этикетки\" - confidence: \"HIGH\" (данные считаны с этикетки) - totals: числа (пересчитанные на порцию) - items: 1 элемент с данными продукта - items[0].source_url: null - source_url: null  ВАЖНО: - Если фото нечёткое и значения не читаются — поставь confidence = \"ESTIMATE\" и попробуй разобрать что возможно. - Если видны только часть значений (например, только калории) — заполни что есть, остальное оцени и укажи в message_text. - Числа всегда должны быть > 0 если что-то видно на этикетке."""
+INPUT: - The user sent a PHOTO of a nutrition facts label / nutrition table from a product. - user_text_clean (photo caption, if any): {state_user_text_clean} - gram: {state_gram} - serving_hint: {state_serving_hint}  TASK: 1) Read all values from the nutrition facts table in the photo:    - Energy value (kcal)    - Protein (g)    - Fat (g)    - Carbohydrates (g) 2) Determine what serving size the values are for (per 100g, per serving, per package). 3) Identify the product name if visible in the photo. 4) Recalculate nutrition to the user's serving.  SERVING RECALCULATION RULES: - If values are \"per 100g\" and user specified grams ({state_gram}) — recalculate: value * (gram / 100). - If values are \"per 100g\" and grams not specified — try to determine package size from the photo. If not visible — return values per 100g and state in message_text that it's \"per 100g\". - If values are \"per serving\" — use as-is (unless user specified otherwise). - If user specified serving_hint ({state_serving_hint}) — factor it in.  RESPONSE FORMAT (strict JSON matching output schema): - intent: \"nutrition_label\" - message_text: \"<Product name (if visible)>\\n\\nPer serving (<weight>): X kcal • P Yg • F Zg • C Wg\\nConfidence: HIGH\\nSource: nutrition label photo\" - confidence: \"HIGH\" (data read from label) - totals: numbers (recalculated per serving) - items: 1 element with product data - items[0].source_url: null - source_url: null  IMPORTANT: - If the photo is blurry and values are hard to read — set confidence = \"ESTIMATE\" and try to read what you can. - If only some values are visible (e.g., only calories) — fill in what's available, estimate the rest, and note this in message_text. - Numbers should always be > 0 if something is visible on the label."""
 nutrition_label_agent = Agent(
   name="Nutrition label agent",
   instructions=nutrition_label_agent_instructions,
@@ -803,6 +803,107 @@ class WorkflowInput(BaseModel):
   telegram_id: Optional[str] = None
   force_intent: Optional[str] = None
   nutrition_context: Optional[str] = None
+
+
+MODEL_RATES_PER_1M: Dict[str, Dict[str, float]] = {
+  "gpt-5.2": {"input": 2.50, "output": 10.00},
+  "gpt-5-mini": {"input": 0.40, "output": 1.60},
+  "gpt-4.1": {"input": 2.00, "output": 8.00},
+  "gpt-5-nano": {"input": 0.10, "output": 0.40},
+}
+WEB_SEARCH_CALL_USD = 0.01
+
+
+def _safe_int(value: Any) -> int:
+  try:
+    return int(value or 0)
+  except (TypeError, ValueError):
+    return 0
+
+
+def _normalize_model_name(model_name: Optional[str]) -> Optional[str]:
+  if not model_name:
+    return None
+  lower = str(model_name).lower()
+  if lower.startswith("gpt-5.2"):
+    return "gpt-5.2"
+  if lower.startswith("gpt-5-mini"):
+    return "gpt-5-mini"
+  if lower.startswith("gpt-4.1"):
+    return "gpt-4.1"
+  if lower.startswith("gpt-5-nano"):
+    return "gpt-5-nano"
+  return str(model_name)
+
+
+def _count_web_search_calls(run_result: Any) -> int:
+  calls = 0
+  for item in getattr(run_result, "new_items", []) or []:
+    item_name = str(getattr(item, "name", "") or "").lower()
+    item_type = str(getattr(item, "type", "") or "").lower()
+    if item_name == "web_search":
+      calls += 1
+      continue
+    if item_type == "tool_call_item" and item_name == "web_search":
+      calls += 1
+      continue
+    # Conservative fallback for SDK object variants.
+    if "web_search" in str(item).lower() and "tool" in str(item).lower():
+      calls += 1
+  return calls
+
+
+def _accumulate_usage(run_result: Any, usage_totals: Dict[str, Any]) -> None:
+  usage = getattr(getattr(run_result, "context_wrapper", None), "usage", None)
+  if usage is None:
+    usage_totals["web_search_calls"] += _count_web_search_calls(run_result)
+    return
+
+  usage_totals["requests"] += _safe_int(getattr(usage, "requests", 0))
+  usage_totals["input_tokens"] += _safe_int(getattr(usage, "input_tokens", 0))
+  usage_totals["output_tokens"] += _safe_int(getattr(usage, "output_tokens", 0))
+  usage_totals["total_tokens"] += _safe_int(getattr(usage, "total_tokens", 0))
+  usage_totals["web_search_calls"] += _count_web_search_calls(run_result)
+
+  entries = getattr(usage, "request_usage_entries", None) or []
+  for entry in entries:
+    raw_name = getattr(entry, "model", None) or getattr(entry, "model_name", None)
+    model_name = _normalize_model_name(raw_name)
+    if not model_name:
+      continue
+    model_bucket = usage_totals["models"].setdefault(model_name, {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "total_tokens": 0,
+    })
+    model_bucket["requests"] += 1
+    model_bucket["input_tokens"] += _safe_int(getattr(entry, "input_tokens", 0))
+    model_bucket["output_tokens"] += _safe_int(getattr(entry, "output_tokens", 0))
+    model_bucket["total_tokens"] += _safe_int(getattr(entry, "total_tokens", 0))
+
+
+def _estimate_cost_usd(usage_totals: Dict[str, Any]) -> Dict[str, Any]:
+  model_costs: Dict[str, float] = {}
+  model_cost_total = 0.0
+  for model_name, model_usage in usage_totals["models"].items():
+    rates = MODEL_RATES_PER_1M.get(model_name)
+    if not rates:
+      continue
+    input_cost = (model_usage.get("input_tokens", 0) / 1_000_000) * rates["input"]
+    output_cost = (model_usage.get("output_tokens", 0) / 1_000_000) * rates["output"]
+    total = input_cost + output_cost
+    model_costs[model_name] = round(total, 6)
+    model_cost_total += total
+
+  web_search_cost = usage_totals["web_search_calls"] * WEB_SEARCH_CALL_USD
+  estimated_total = model_cost_total + web_search_cost
+  return {
+    "model_costs_usd": model_costs,
+    "model_cost_total_usd": round(model_cost_total, 6),
+    "web_search_cost_usd": round(web_search_cost, 6),
+    "estimated_total_cost_usd": round(estimated_total, 6),
+  }
 
 
 # Main code entrypoint
@@ -846,13 +947,23 @@ async def run_workflow(workflow_input: WorkflowInput):
       "__trace_source__": "agent-builder",
       "workflow_id": "wf_694ae28324988190a50d6e1291ae774e0e354af8993d38d6"
     })
+    usage_totals: Dict[str, Any] = {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "total_tokens": 0,
+      "web_search_calls": 0,
+      "models": {},
+    }
 
     force_intent = workflow.get("force_intent")
     nutrition_context = workflow.get("nutrition_context")
 
-    if force_intent == "food_advice":
-      state["intent"] = "food_advice"
+    _bypassable_intents = {"food_advice", "eatout", "product", "photo_meal", "barcode", "log_meal"}
+    if force_intent and force_intent in _bypassable_intents:
+      state["intent"] = force_intent
       state["user_text_clean"] = workflow["input_as_text"]
+      state["dish_or_product"] = workflow["input_as_text"]
       state["language"] = "ru"
     else:
       router_result_temp = await Runner.run(
@@ -860,6 +971,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[*conversation_history],
         run_config=_trace_cfg,
       )
+      _accumulate_usage(router_result_temp, usage_totals)
 
       conversation_history.extend([item.to_input_item() for item in router_result_temp.new_items])
 
@@ -891,6 +1003,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_date_hint=str(state["date_hint"] or ""),
         )
       )
+      _accumulate_usage(meal_parser_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in meal_parser_result_temp.new_items])
 
     elif state["intent"] == 'eatout':
@@ -900,6 +1013,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         run_config=_trace_cfg,
         context=EatoutAgentContext(state_user_text_clean=state["user_text_clean"])
       )
+      _accumulate_usage(eatout_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in eatout_agent_result_temp.new_items])
 
     elif state["intent"] == 'product':
@@ -915,6 +1029,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_language=str(state["language"] or "ru"),
         )
       )
+      _accumulate_usage(product_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in product_agent_result_temp.new_items])
 
     elif state["intent"] == 'barcode':
@@ -928,6 +1043,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_language=str(state["language"] or "ru"),
         )
       )
+      _accumulate_usage(barcode_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in barcode_agent_result_temp.new_items])
 
     elif state["intent"] == "food_advice":
@@ -940,6 +1056,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           nutrition_context=nutrition_context,
         )
       )
+      _accumulate_usage(nutrition_advisor_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in nutrition_advisor_result_temp.new_items])
 
     elif state["intent"] == "photo_meal":
@@ -953,6 +1070,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_gram=str(state["gram"] or ""),
         )
       )
+      _accumulate_usage(photo_meal_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in photo_meal_agent_result_temp.new_items])
 
     elif state["intent"] == "nutrition_label":
@@ -966,6 +1084,7 @@ async def run_workflow(workflow_input: WorkflowInput):
           state_serving_hint=str(state["serving_hint"] or ""),
         )
       )
+      _accumulate_usage(nutrition_label_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in nutrition_label_agent_result_temp.new_items])
 
     else:
@@ -974,6 +1093,7 @@ async def run_workflow(workflow_input: WorkflowInput):
         input=[*conversation_history],
         run_config=_trace_cfg,
       )
+      _accumulate_usage(help_agent_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in help_agent_result_temp.new_items])
 
     # ---- Final Agent: standardizes JSON output for all branches ----
@@ -982,6 +1102,7 @@ async def run_workflow(workflow_input: WorkflowInput):
       input=[*conversation_history],
       run_config=_trace_cfg,
     )
+    _accumulate_usage(final_agent_result_temp, usage_totals)
     conversation_history.extend([item.to_input_item() for item in final_agent_result_temp.new_items])
 
     if final_agent_result_temp.final_output is None:
@@ -991,7 +1112,18 @@ async def run_workflow(workflow_input: WorkflowInput):
       "output_text": final_agent_result_temp.final_output.json(),
       "output_parsed": final_agent_result_temp.final_output.model_dump()
     }
-    return final_agent_result["output_parsed"]
+    usage_summary = {
+      "requests": usage_totals["requests"],
+      "input_tokens": usage_totals["input_tokens"],
+      "output_tokens": usage_totals["output_tokens"],
+      "total_tokens": usage_totals["total_tokens"],
+      "web_search_calls": usage_totals["web_search_calls"],
+      "models": usage_totals["models"],
+      "cost": _estimate_cost_usd(usage_totals),
+    }
+    final_output = final_agent_result["output_parsed"]
+    final_output["_usage"] = usage_summary
+    return final_output
 
 
 # ---------- Helper for agent_runner.py ----------

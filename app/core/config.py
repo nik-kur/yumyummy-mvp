@@ -20,9 +20,28 @@ class Settings(BaseSettings):
 
     # Billing / Telegram Stars
     billing_trial_days: int = 3
-    billing_monthly_price_xtr: int = 350
-    billing_yearly_price_xtr: int = 2940
+    billing_monthly_price_xtr: int = 1199
+    billing_yearly_price_xtr: int = 9599
     billing_paywall_enabled: bool = True
+
+    # Billing / Gumroad
+    gumroad_enabled: bool = False
+    gumroad_access_token: Optional[str] = None
+    gumroad_seller_id: Optional[str] = None
+    gumroad_product_permalink: Optional[str] = None
+    gumroad_webhook_secret: Optional[str] = None
+    gumroad_claim_secret: Optional[str] = None
+    gumroad_monthly_price_cents: int = 999
+    gumroad_yearly_price_cents: int = 8999
+
+    # Billing / Paddle
+    paddle_enabled: bool = False
+    paddle_environment: str = "sandbox"  # "sandbox" | "production"
+    paddle_api_key: Optional[str] = None
+    paddle_webhook_secret: Optional[str] = None
+    paddle_client_side_token: Optional[str] = None
+    paddle_price_id_monthly: Optional[str] = None
+    paddle_price_id_yearly: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

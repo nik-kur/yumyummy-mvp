@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+USAGE_CAP_TRIAL_USD = 2.0
+USAGE_CAP_ACTIVE_USD = 10.0
+
 
 def compute_access_status(user: Dict[str, Any]) -> str:
     """
@@ -26,7 +29,27 @@ def compute_access_status(user: Dict[str, Any]) -> str:
 
 
 def has_access(user: Dict[str, Any]) -> bool:
-    return compute_access_status(user) in ("trial", "active")
+    return compute_access_status(user) in ("trial", "active") and check_usage_cap(user)
+
+
+def get_usage_cap_usd(user: Dict[str, Any]) -> Optional[float]:
+    status = compute_access_status(user)
+    if status == "trial":
+        return USAGE_CAP_TRIAL_USD
+    if status == "active":
+        return USAGE_CAP_ACTIVE_USD
+    return None
+
+
+def check_usage_cap(user: Dict[str, Any]) -> bool:
+    cap = get_usage_cap_usd(user)
+    if cap is None:
+        return True
+    try:
+        current_cost = float(user.get("usage_cost_current_period") or 0.0)
+    except (TypeError, ValueError):
+        current_cost = 0.0
+    return current_cost < cap
 
 
 def trial_days_remaining(user: Dict[str, Any]) -> float:

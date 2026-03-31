@@ -32,6 +32,8 @@ class UserUpdate(BaseModel):
     subscription_ends_at: Optional[datetime] = None
     subscription_auto_renew: Optional[bool] = None
     subscription_telegram_charge_id: Optional[str] = None
+    subscription_provider: Optional[str] = None
+    subscription_gumroad_id: Optional[str] = None
 
 
 class UserRead(UserBase):
@@ -55,5 +57,7 @@ class UserRead(UserBase):
     subscription_ends_at: Optional[datetime] = None
     subscription_auto_renew: Optional[bool] = None
     subscription_telegram_charge_id: Optional[str] = None
+    subscription_provider: Optional[str] = None
+    subscription_gumroad_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

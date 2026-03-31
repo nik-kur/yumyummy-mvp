@@ -1,5 +1,6 @@
 """
-Billing handlers: paywall, Telegram Stars payments, trial, access guard.
+Billing handlers: paywall, Telegram Stars payments, Gumroad checkout,
+trial, access guard, and post-purchase return flow.
 """
 import json
 import logging
@@ -12,73 +13,99 @@ from aiogram.types import LabeledPrice
 
 from app.core.config import settings
 from app.billing.plans import get_plans, get_active_plan, SUBSCRIPTION_PERIOD_SECONDS
+from app.i18n import DEFAULT_LANG, tr
 from app.bot.api_client import (
     get_billing_status,
     start_trial,
     record_payment_success,
     cancel_subscription,
+    get_gumroad_checkout_url,
+    get_paddle_checkout_url,
 )
 
 logger = logging.getLogger(__name__)
 
 router = Router()
+LANG = DEFAULT_LANG
 
 # ---------------------------------------------------------------------------
 # Paywall display
 # ---------------------------------------------------------------------------
 
 PAYWALL_TRIAL_TEXT = (
-    "🎉 <b>Попробуй YumYummy бесплатно!</b>\n\n"
-    "3 дня полного доступа — без оплаты.\n"
-    "После пробного периода выбери подходящий тариф.\n\n"
-    "{plans_text}"
+    tr("billing.paywall_trial", LANG)
 )
 
 PAYWALL_EXPIRED_TEXT = (
-    "⏰ <b>Пробный период закончился</b>\n\n"
-    "Чтобы продолжить пользоваться YumYummy, оформи подписку:\n\n"
-    "{plans_text}"
+    tr("billing.paywall_trial_expired", LANG)
 )
 
 PAYWALL_SUB_EXPIRED_TEXT = (
-    "⏰ <b>Подписка закончилась</b>\n\n"
-    "Оформи подписку, чтобы продолжить:\n\n"
-    "{plans_text}"
+    tr("billing.paywall_sub_expired", LANG)
 )
 
 
-def _build_plans_text() -> str:
+def _build_plans_text_stars() -> str:
+    """Stars-only pricing for the separate Stars message."""
     plans = get_plans()
     lines = []
     for plan in plans.values():
+        usd_hint = f" ({plan.approx_usd})" if plan.approx_usd else ""
         if plan.is_recurring:
-            lines.append(f"⭐ <b>{plan.name_ru}</b> — {plan.price_xtr} Stars/мес")
+            lines.append(
+                f"<b>{plan.name_en}</b> — {plan.price_xtr} Stars/mo{usd_hint}"
+            )
         else:
-            lines.append(f"⭐ <b>{plan.name_ru}</b> — {plan.price_xtr} Stars")
+            lines.append(
+                f"<b>{plan.name_en}</b> — {plan.price_xtr} Stars/year{usd_hint}"
+            )
     return "\n".join(lines)
+
+
+def _build_plans_text_card() -> str:
+    """Card-only pricing for the main paywall message."""
+    plans = get_plans()
+    lines = []
+    for plan in plans.values():
+        usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
+        if plan.is_recurring:
+            lines.append(f"<b>{plan.name_en}</b> — {usd_price}/mo")
+        else:
+            lines.append(f"<b>{plan.name_en}</b> — {usd_price}/year")
+    return "\n".join(lines)
+
+
+def _card_payments_enabled() -> bool:
+    """True if any card payment provider (Paddle or Gumroad) is enabled."""
+    return settings.paddle_enabled or settings.gumroad_enabled
 
 
 async def _create_plan_button(bot, plan, tg_id: int) -> types.InlineKeyboardButton:
     """Create an invoice-link button for a plan (one-click payment)."""
     payload = f"sub:{plan.id}:{tg_id}"
 
+    if plan.is_recurring:
+        description = f"Monthly subscription ({plan.period_days}-day auto-renew)"
+    else:
+        description = f"Full access for {plan.period_days} days (one-time payment)"
+
     kwargs = dict(
-        title=f"YumYummy — {plan.name_ru}",
-        description=(
-            f"Подписка на {plan.period_days} дней с автопродлением"
-            if plan.is_recurring
-            else f"Доступ на {plan.period_days} дней"
-        ),
+        title=f"YumYummy — {plan.name_en}",
+        description=description,
         payload=payload,
         currency="XTR",
-        prices=[LabeledPrice(label=plan.name_ru, amount=plan.price_xtr)],
+        prices=[LabeledPrice(label=plan.name_en, amount=plan.price_xtr)],
     )
     if plan.subscription_period_seconds:
         kwargs["subscription_period"] = plan.subscription_period_seconds
 
     invoice_link = await bot.create_invoice_link(**kwargs)
 
-    label = f"⭐ {plan.name_ru} — {plan.price_xtr} Stars"
+    usd_hint = f" {plan.approx_usd}" if plan.approx_usd else ""
+    if plan.is_recurring:
+        label = f"⭐ {plan.name_en} — {plan.price_xtr} Stars/mo{usd_hint}"
+    else:
+        label = f"⭐ {plan.name_en} — {plan.price_xtr} Stars{usd_hint}"
     return types.InlineKeyboardButton(text=label, url=invoice_link)
 
 
@@ -89,16 +116,58 @@ async def _build_paywall_keyboard(
     if show_trial:
         buttons.append([
             types.InlineKeyboardButton(
-                text="🆓 Начать бесплатно 3 дня",
+                text=tr("billing.start_trial_btn", LANG),
                 callback_data="billing:start_trial",
             )
         ])
 
     plans = get_plans()
-    for plan in plans.values():
-        if plan.is_active:
-            btn = await _create_plan_button(bot, plan, tg_id)
-            buttons.append([btn])
+
+    if _card_payments_enabled():
+        for plan in plans.values():
+            if not plan.is_active:
+                continue
+
+            checkout_url = None
+
+            # Paddle first, then Gumroad fallback
+            if settings.paddle_enabled:
+                result = await get_paddle_checkout_url(tg_id, plan.id)
+                if result and "checkout_url" in result:
+                    checkout_url = result["checkout_url"]
+
+            if checkout_url is None and settings.gumroad_enabled:
+                result = await get_gumroad_checkout_url(tg_id, plan.id)
+                if result and "checkout_url" in result:
+                    checkout_url = result["checkout_url"]
+
+            if checkout_url:
+                usd_price = f"${plan.gumroad_price_cents / 100:.2f}" if plan.gumroad_price_cents else plan.approx_usd
+                label = f"💳 {plan.name_en} — {usd_price}"
+                if plan.is_recurring:
+                    label += "/mo"
+                else:
+                    label += "/year"
+                buttons.append([
+                    types.InlineKeyboardButton(
+                        text=label,
+                        url=checkout_url,
+                    )
+                ])
+
+        # "Pay with Telegram Stars" callback button
+        buttons.append([
+            types.InlineKeyboardButton(
+                text=tr("billing.show_stars_btn", LANG),
+                callback_data="billing:show_stars",
+            )
+        ])
+    else:
+        # Stars-only: show invoice buttons directly
+        for plan in plans.values():
+            if plan.is_active:
+                btn = await _create_plan_button(bot, plan, tg_id)
+                buttons.append([btn])
 
     return types.InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -107,7 +176,11 @@ async def show_paywall(message: types.Message, billing: Optional[dict] = None) -
     if billing is None:
         billing = await get_billing_status(message.from_user.id)
     status = (billing or {}).get("access_status", "new")
-    plans_text = _build_plans_text()
+
+    if _card_payments_enabled():
+        plans_text = _build_plans_text_card()
+    else:
+        plans_text = _build_plans_text_stars()
 
     if status == "new":
         text = PAYWALL_TRIAL_TEXT.format(plans_text=plans_text)
@@ -139,6 +212,15 @@ async def check_billing_access(message: types.Message) -> bool:
         return True  # fail open on backend error
 
     status = billing.get("access_status", "new")
+    usage_exceeded = bool(billing.get("usage_exceeded", False))
+
+    if usage_exceeded and status in ("trial", "active"):
+        await message.answer(
+            tr("billing.usage_cap_reached", LANG),
+            parse_mode="HTML",
+        )
+        return False
+
     if status in ("trial", "active"):
         return True
 
@@ -156,7 +238,7 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
     tg_id = query.from_user.id
     result = await start_trial(tg_id)
     if result is None:
-        await query.message.answer("Не удалось активировать пробный период. Попробуй позже.")
+        await query.message.answer(tr("billing.activate_trial_error", LANG))
         return
 
     ends_at = result.get("trial_ends_at", "")
@@ -167,19 +249,108 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
         except ValueError:
             ends_str = ends_at
     else:
-        ends_str = "через 3 дня"
+        ends_str = tr("billing.trial_default_ends", LANG)
 
     if result.get("already_started"):
         await query.message.answer(
-            f"У тебя уже есть пробный период до {ends_str}.\n"
-            "Напиши, что ты съел, и я всё запишу!",
+            tr("billing.trial_already", LANG, ends_str=ends_str),
             parse_mode="HTML",
         )
     else:
         await query.message.answer(
-            f"🎉 <b>Пробный период активирован!</b>\n\n"
-            f"У тебя есть 3 дня полного доступа (до {ends_str}).\n"
-            f"Напиши или надиктуй, что ты съел, и я всё запишу!",
+            tr("billing.trial_started", LANG, ends_str=ends_str),
+            parse_mode="HTML",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Show Telegram Stars payment options
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data == "billing:show_stars")
+async def handle_show_stars(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    plans = get_plans()
+
+    buttons = []
+    for plan in plans.values():
+        if plan.is_active:
+            btn = await _create_plan_button(query.bot, plan, tg_id)
+            buttons.append([btn])
+
+    stars_plans_text = _build_plans_text_stars()
+    text = tr("billing.stars_info", LANG, stars_plans_text=stars_plans_text)
+
+    kb = types.InlineKeyboardMarkup(inline_keyboard=buttons)
+    await query.message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+
+# ---------------------------------------------------------------------------
+# Gumroad checkout callback (legacy, kept for backward compatibility)
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data.startswith("billing:gumroad:"))
+async def handle_gumroad_checkout(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    plan_id = query.data.split(":")[-1]
+
+    result = await get_gumroad_checkout_url(tg_id, plan_id)
+    if result is None or "checkout_url" not in result:
+        await query.message.answer(tr("billing.gumroad_error", LANG))
+        return
+
+    checkout_url = result["checkout_url"]
+    plan = get_active_plan(plan_id)
+    plan_name = plan.name_en if plan else plan_id
+
+    kb = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text=f"💳 Pay for {plan_name} on Gumroad",
+            url=checkout_url,
+        )],
+        [types.InlineKeyboardButton(
+            text=tr("billing.gumroad_check_btn", LANG),
+            callback_data="billing:check_payment",
+        )],
+    ])
+
+    await query.message.answer(
+        tr("billing.gumroad_redirect", LANG),
+        reply_markup=kb,
+        parse_mode="HTML",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Post-purchase: check payment status
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data == "billing:check_payment")
+async def handle_check_payment(query: types.CallbackQuery) -> None:
+    await query.answer()
+    tg_id = query.from_user.id
+    billing = await get_billing_status(tg_id)
+    status = (billing or {}).get("access_status", "expired")
+
+    if status == "active":
+        provider = (billing or {}).get("subscription_provider", "")
+        provider_label = " via Gumroad" if provider == "gumroad" else ""
+        await query.message.answer(
+            tr("billing.payment_confirmed", LANG, provider_label=provider_label),
+            parse_mode="HTML",
+        )
+    else:
+        kb = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(
+                text=tr("billing.gumroad_check_btn", LANG),
+                callback_data="billing:check_payment",
+            )],
+        ])
+        await query.message.answer(
+            tr("billing.payment_pending", LANG),
+            reply_markup=kb,
             parse_mode="HTML",
         )
 
@@ -232,8 +403,7 @@ async def handle_successful_payment(message: types.Message) -> None:
 
     if result is None:
         await message.answer(
-            "⚠️ Оплата прошла, но не удалось обновить подписку. "
-            "Напиши /paysupport — мы разберёмся."
+            tr("billing.payment_record_error", LANG)
         )
         logger.error(f"[BILLING] Backend failed to record payment for tg_id={tg_id}")
         return
@@ -248,27 +418,30 @@ async def handle_successful_payment(message: types.Message) -> None:
     else:
         ends_str = ""
 
+    is_recurring = getattr(payment, "is_recurring", False)
+    is_first = getattr(payment, "is_first_recurring", False)
+
     plan = get_active_plan(plan_id)
     status = result.get("status", "activated")
     if status == "already_processed":
-        await message.answer("Эта оплата уже была обработана ранее. Всё в порядке!")
+        await message.answer(tr("billing.payment_already", LANG))
+    elif status == "renewed" and is_recurring and not is_first:
+        pass
     elif status == "renewed":
         await message.answer(
-            f"🔄 <b>Подписка продлена!</b>\n"
-            f"Следующее продление: {ends_str}",
+            tr("billing.payment_renewed", LANG, ends_str=ends_str),
             parse_mode="HTML",
         )
     else:
         period_text = (
-            f"Подписка автоматически продлевается каждые 30 дней."
+            tr("billing.payment_period_recurring", LANG)
             if plan and plan.is_recurring
-            else f"Доступ активен до {ends_str}."
+            else tr("billing.payment_period_fixed", LANG, ends_str=ends_str)
         )
         await message.answer(
-            f"✅ <b>Подписка оформлена!</b>\n\n"
-            f"У тебя полный доступ к YumYummy до {ends_str}.\n"
-            f"{period_text}\n\n"
-            f"Напиши, что ты съел, и я всё запишу!",
+            tr("billing.payment_activated", LANG, ends_str=ends_str, period_text=period_text)
+            + "\n\nYou can manage your subscription anytime in "
+            "<b>Profile → Manage subscription</b>.",
             parse_mode="HTML",
         )
 
@@ -289,10 +462,7 @@ async def cmd_subscribe(message: types.Message) -> None:
 @router.message(Command("paysupport"))
 async def cmd_paysupport(message: types.Message) -> None:
     await message.answer(
-        "💬 <b>Поддержка по оплате</b>\n\n"
-        "Если у тебя возникли вопросы или проблемы с оплатой, "
-        "напиши: @nik_kur\n\n"
-        "Мы ответим в течение 24 часов.",
+        tr("billing.paysupport", LANG),
         parse_mode="HTML",
     )
 
@@ -304,13 +474,7 @@ async def cmd_paysupport(message: types.Message) -> None:
 @router.message(Command("terms"))
 async def cmd_terms(message: types.Message) -> None:
     await message.answer(
-        "📄 <b>Условия использования</b>\n\n"
-        "1. YumYummy — сервис для трекинга питания и подсчёта КБЖУ.\n"
-        "2. Подписка оплачивается через Telegram Stars (XTR).\n"
-        "3. Месячная подписка автоматически продлевается каждые 30 дней.\n"
-        "4. Отменить подписку можно в любой момент в настройках Telegram.\n"
-        "5. После отмены доступ сохраняется до конца оплаченного периода.\n\n"
-        'Подробные политики: <a href="https://yumyummy.ai">yumyummy.ai</a>',
+        tr("billing.terms", LANG),
         parse_mode="HTML",
         disable_web_page_preview=True,
     )

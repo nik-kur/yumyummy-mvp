@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
+from app.i18n import DEFAULT_LANG, tr
 
 logger = logging.getLogger(__name__)
+LANG = DEFAULT_LANG
 from app.deps import get_db
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -37,6 +39,7 @@ from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, Res
 from app.services.agent_runner import run_agent
 from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.services.agent_persist import persist_agent_result
+from app.services.usage_guardrails import record_usage_for_telegram_user
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
@@ -86,6 +89,22 @@ app.include_router(context_router)
 from app.api.billing import router as billing_router
 app.include_router(billing_router)
 
+# Include Gumroad webhook router
+from app.api.gumroad_webhook import router as gumroad_router
+app.include_router(gumroad_router)
+
+# Include Paddle checkout router
+from app.api.paddle_checkout import router as paddle_checkout_router
+app.include_router(paddle_checkout_router)
+
+# Include Paddle webhook router
+from app.api.paddle_webhook import router as paddle_webhook_router
+app.include_router(paddle_webhook_router)
+
+# Include billing admin/reconciliation router
+from app.api.billing_admin import router as billing_admin_router
+app.include_router(billing_admin_router)
+
 
 @app.get("/health")
 async def health_check():
@@ -102,7 +121,7 @@ async def ai_test():
     """
     messages = [
         {"role": "system", "content": "You are a concise assistant."},
-        {"role": "user", "content": "Ответь одной короткой фразой, что такое проект YumYummy."},
+        {"role": "user", "content": "Reply in one short sentence: what is YumYummy?"},
     ]
     answer = await chat_completion(messages)
     return {"answer": answer}
@@ -134,10 +153,10 @@ async def ai_voice_parse_meal(audio: UploadFile = File(...)):
         file_bytes = await audio.read()
     except Exception as e:
         logger.error(f"[VOICE] Error reading audio file: {e}")
-        raise HTTPException(status_code=400, detail="Не удалось прочитать аудиофайл")
+        raise HTTPException(status_code=400, detail="Could not read audio file")
 
     if not file_bytes:
-        raise HTTPException(status_code=400, detail="Пустой аудиофайл")
+        raise HTTPException(status_code=400, detail="Empty audio file")
 
     try:
         transcript = await transcribe_audio(
@@ -146,10 +165,10 @@ async def ai_voice_parse_meal(audio: UploadFile = File(...)):
         )
     except Exception as e:
         logger.error(f"[VOICE] Error transcribing audio: {e}")
-        raise HTTPException(status_code=500, detail="Не удалось распознать речь")
+        raise HTTPException(status_code=500, detail="Could not recognize speech")
 
     if not transcript.strip():
-        raise HTTPException(status_code=400, detail="Не удалось распознать речь")
+        raise HTTPException(status_code=400, detail="Could not recognize speech")
 
     # Пробуем product pipeline (web-search-first) на основе transcript
     product_result = None
@@ -260,17 +279,16 @@ async def _product_parse_logic(payload: ProductMealRequest) -> dict:
         # Если нашли в OpenFoodFacts
         if result.found and result.calories is not None and result.calories > 0:
             # Формируем описание
-            parts = [result.name or payload.name or "Продукт"]
+            parts = [result.name or payload.name or "Product"]
             if result.brand or payload.brand:
-                parts.append(f"бренд: {result.brand or payload.brand}")
+                parts.append(f"brand: {result.brand or payload.brand}")
             if payload.store:
-                parts.append(f"магазин: {payload.store}")
+                parts.append(f"store: {payload.store}")
             description = ", ".join(parts)
             
-            # Формируем notes
-            notes = "Данные из OpenFoodFacts"
+            notes = "Data from OpenFoodFacts"
             if result.portion_grams and result.portion_grams != 100.0:
-                notes += f" (пересчитано на упаковку {result.portion_grams:.0f} г, исходно на 100 г)"
+                notes += f" (recalculated for package {result.portion_grams:.0f}g, originally per 100g)"
             
             # Округляем значения
             calories = round(result.calories or 0.0)
@@ -297,13 +315,13 @@ async def _product_parse_logic(payload: ProductMealRequest) -> dict:
     if payload.name:
         desc_parts.append(payload.name)
     if payload.brand:
-        desc_parts.append(f"бренд {payload.brand}")
+        desc_parts.append(f"brand {payload.brand}")
     if payload.store:
-        desc_parts.append(f"из магазина {payload.store}")
+        desc_parts.append(f"from store {payload.store}")
     if payload.barcode:
-        desc_parts.append(f"штрихкод {payload.barcode}")
+        desc_parts.append(f"barcode {payload.barcode}")
     
-    fallback_text = "упаковочный продукт: " + ", ".join(desc_parts)
+    fallback_text = "packaged product: " + ", ".join(desc_parts)
     
     try:
         parsed = await parse_meal_text(fallback_text)
@@ -339,7 +357,7 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
     if not payload.barcode and not payload.name:
         raise HTTPException(
             status_code=400,
-            detail="Нужно указать либо штрихкод, либо название продукта"
+            detail="Either barcode or product name is required"
         )
     
     return await _product_parse_logic(payload)
@@ -381,8 +399,7 @@ async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
             "source_url": source_url,
         }
     
-    # 2) Fallback на LLM (если web_result is None или calories=0)
-    fallback_text = f"блюдо из ресторана: {payload.dish} в {payload.restaurant}"
+    fallback_text = f"restaurant dish: {payload.dish} at {payload.restaurant}"
     
     try:
         parsed = await parse_meal_text(fallback_text)
@@ -419,32 +436,31 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
     try:
         text = payload.text.strip()
         if not text:
-            raise HTTPException(status_code=400, detail="Текст не может быть пустым")
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
         
-        # 1) LLM парсит текст в JSON: restaurant, dish, city
         parse_prompt = (
-            "Ты ассистент. Тебе дают текст с описанием блюда из ресторана/кафе/доставки. "
-            "Извлеки из текста название ресторана (если есть) и название блюда.\n\n"
-            "Отвечай СТРОГО в формате JSON с полями:\n"
-            "- restaurant: строка или null (название ресторана/кафе/доставки, если указано)\n"
-            "- dish: строка (название блюда, ПОЛНОЕ название со всеми деталями)\n"
-            "- city: строка или null (город, если указан)\n\n"
-            "Правила:\n"
-            "1) Если ресторан не удаётся выделить, restaurant=null, dish=исходный текст (убери только предлоги 'в/из/at/in' если они есть в начале)\n"
-            "2) Если в тексте есть 'в/из/at/in' - это может указывать на ресторан\n"
-            "3) dish должно содержать ПОЛНОЕ название блюда со всеми деталями (например, 'бенедикт с ветчиной', а не просто 'бенедикт')\n"
-            "4) Примеры:\n"
-            "   'сырники из кофемании' -> {\"restaurant\": \"кофемания\", \"dish\": \"сырники\", \"city\": null}\n"
-            "   'бенедикт с ветчиной из Кофемании' -> {\"restaurant\": \"Кофемания\", \"dish\": \"бенедикт с ветчиной\", \"city\": null}\n"
-            "   'паста карбонара в vapiano' -> {\"restaurant\": \"vapiano\", \"dish\": \"паста карбонара\", \"city\": null}\n"
-            "   'бургер' -> {\"restaurant\": null, \"dish\": \"бургер\", \"city\": null}\n\n"
-            "Отвечай ТОЛЬКО JSON, без дополнительного текста."
+            "You are an assistant. You receive text describing a dish from a restaurant/cafe/delivery. "
+            "Extract the restaurant name (if present) and the dish name.\n\n"
+            "Reply STRICTLY in JSON format with fields:\n"
+            "- restaurant: string or null (restaurant/cafe/delivery name, if specified)\n"
+            "- dish: string (dish name, FULL name with all details)\n"
+            "- city: string or null (city, if specified)\n\n"
+            "Rules:\n"
+            "1) If the restaurant cannot be identified, restaurant=null, dish=original text (remove only prepositions 'at/from/in' if at the beginning)\n"
+            "2) If the text contains 'at/from/in' or Russian equivalents 'в/из' - it may indicate a restaurant\n"
+            "3) dish must contain the FULL dish name with all details (e.g., 'eggs benedict with ham', not just 'eggs benedict')\n"
+            "4) Examples:\n"
+            "   'syrniki from Coffeemania' -> {\"restaurant\": \"Coffeemania\", \"dish\": \"syrniki\", \"city\": null}\n"
+            "   'eggs benedict with ham from Coffeemania' -> {\"restaurant\": \"Coffeemania\", \"dish\": \"eggs benedict with ham\", \"city\": null}\n"
+            "   'pasta carbonara at Vapiano' -> {\"restaurant\": \"Vapiano\", \"dish\": \"pasta carbonara\", \"city\": null}\n"
+            "   'burger' -> {\"restaurant\": null, \"dish\": \"burger\", \"city\": null}\n\n"
+            "Reply ONLY with JSON, no additional text."
         )
         
         try:
             parse_messages = [
                 {"role": "system", "content": parse_prompt},
-                {"role": "user", "content": f"Текст: {text}"},
+                {"role": "user", "content": f"Text: {text}"},
             ]
             parse_response = await chat_completion(parse_messages)
             
@@ -510,9 +526,9 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
         
         # 3) Fallback на LLM (если web_result is None или calories=0)
         if restaurant:
-            fallback_text = f"блюдо из ресторана: {dish} в {restaurant}"
+            fallback_text = f"restaurant dish: {dish} at {restaurant}"
         else:
-            fallback_text = f"блюдо: {dish}"
+            fallback_text = f"dish: {dish}"
         
         try:
             parsed = await parse_meal_text(fallback_text)
@@ -521,9 +537,8 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
             raise HTTPException(status_code=500, detail=str(e))
         except Exception as e:
             logger.error(f"[BACKEND] Unexpected error in LLM fallback: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+            raise HTTPException(status_code=500, detail="Error processing request")
         
-        # Округляем значения
         calories = round(parsed.get("calories", 0.0))
         protein_g = round(parsed.get("protein_g", 0.0), 1)
         fat_g = round(parsed.get("fat_g", 0.0), 1)
@@ -541,11 +556,10 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
             "source_url": None,
         }
     except HTTPException:
-        # Пробрасываем HTTPException как есть
         raise
     except Exception as e:
         logger.error(f"[BACKEND] Unexpected error in restaurant_parse_text: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+        raise HTTPException(status_code=500, detail="Error processing request")
 
 
 @app.post("/ai/restaurant_parse_text_openai")
@@ -559,7 +573,7 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
     try:
         text = payload.text.strip()
         if not text:
-            raise HTTPException(status_code=400, detail="Текст не может быть пустым")
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
         
         # Определяем стратегию поиска и domain hints
         text_lower = text.lower()
@@ -1025,7 +1039,7 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
             }
         except Exception as fallback_error:
             logger.error(f"[BACKEND] Fallback parse_meal_text also failed: {fallback_error}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Ошибка при обработке запроса")
+            raise HTTPException(status_code=500, detail="Error processing request")
 
 
 # ---------- AGENT ----------
@@ -1050,7 +1064,7 @@ async def ai_agent(payload: AgentRequest, db: Session = Depends(get_db)):
         logger.error(f"[BACKEND] Error in agent endpoint: {e}", exc_info=True)
         return {
             "intent": "error",
-            "reply_text": f"Произошла ошибка: {str(e)}",
+            "reply_text": f"Error: {str(e)}",
             "meal": None,
             "day_summary": None,
             "week_summary": None,
@@ -1083,6 +1097,7 @@ async def agent_run(payload: WorkflowRunRequest):
             user_text=user_text, telegram_id=telegram_id, image_url=image_url,
             force_intent=force_intent, nutrition_context=nutrition_context,
         )
+        usage_data = result.pop("_usage", None)
         
         # Extract values for logging
         intent = result.get("intent", "unknown")
@@ -1101,6 +1116,13 @@ async def agent_run(payload: WorkflowRunRequest):
         try:
             db2 = SessionLocal()
             try:
+                if usage_data:
+                    record_usage_for_telegram_user(
+                        db=db2,
+                        telegram_id=telegram_id,
+                        usage_data=usage_data,
+                        intent=intent,
+                    )
                 persist_agent_result(db=db2, telegram_id=telegram_id, agent_result=result)
             finally:
                 db2.close()
@@ -1112,6 +1134,13 @@ async def agent_run(payload: WorkflowRunRequest):
             )
             db3 = SessionLocal()
             try:
+                if usage_data:
+                    record_usage_for_telegram_user(
+                        db=db3,
+                        telegram_id=telegram_id,
+                        usage_data=usage_data,
+                        intent=intent,
+                    )
                 persist_agent_result(db=db3, telegram_id=telegram_id, agent_result=result)
             finally:
                 db3.close()
@@ -1149,7 +1178,7 @@ async def agent_run(payload: WorkflowRunRequest):
             # Return friendly error response instead of crashing
             return WorkflowRunResponse(
                 intent="help",
-                message_text="Произошла ошибка при обработке ответа. Попробуйте позже.",
+                message_text=tr("main.workflow_response_error", LANG),
                 confidence=None,
                 totals=WorkflowTotals(
                     calories_kcal=0.0,
@@ -1168,7 +1197,7 @@ async def agent_run(payload: WorkflowRunRequest):
             logger.error(f"[WORKFLOW] request_id={request_id} telegram_id={telegram_id} {error_msg}")
             return WorkflowRunResponse(
                 intent="help",
-                message_text="Сервис временно не настроен (нет ключа OpenAI). Сообщите администратору.",
+                message_text=tr("main.workflow_not_configured", LANG),
                 confidence=None,
                 totals=WorkflowTotals(
                     calories_kcal=0.0,
@@ -1184,7 +1213,7 @@ async def agent_run(payload: WorkflowRunRequest):
             # Return friendly JSON saying workflow is not connected
             return WorkflowRunResponse(
                 intent="help",
-                message_text="Сервис временно не подключен. Попробуйте позже.",
+                message_text=tr("main.workflow_not_connected", LANG),
                 confidence=None,
                 totals=WorkflowTotals(
                     calories_kcal=0.0,
@@ -1205,7 +1234,7 @@ async def agent_run(payload: WorkflowRunRequest):
         # Return friendly JSON for quota/rate-limit errors
         return WorkflowRunResponse(
             intent="help",
-            message_text="Сервис перегружен или лимит исчерпан. Попробуй чуть позже.",
+            message_text=tr("main.workflow_overloaded", LANG),
             confidence=None,
             totals=WorkflowTotals(
                 calories_kcal=0.0,
@@ -1226,7 +1255,7 @@ async def agent_run(payload: WorkflowRunRequest):
         # Return friendly JSON for any other error (never crash)
         return WorkflowRunResponse(
             intent="help",
-            message_text="Произошла ошибка при обработке запроса. Попробуйте позже.",
+            message_text=tr("main.workflow_unexpected", LANG),
             confidence=None,
             totals=WorkflowTotals(
                 calories_kcal=0.0,

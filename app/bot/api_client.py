@@ -401,7 +401,7 @@ async def agent_run_workflow(
         logger.warning("[API] agent_run_workflow timeout")
         return {
             "intent": "help",
-            "message_text": "Я думаю дольше обычного 😅 Попробуй ещё раз через 10–20 секунд или уточни запрос.",
+            "message_text": "Taking longer than usual 😅 Please try again in 10-20 seconds or rephrase your request.",
             "confidence": None,
             "totals": {"calories_kcal": 0.0, "protein_g": 0.0, "fat_g": 0.0, "carbs_g": 0.0},
             "items": [],
@@ -640,4 +640,64 @@ async def cancel_subscription(telegram_id: int) -> Optional[Dict[str, Any]]:
             return resp.json()
     except Exception as e:
         logger.error(f"[API] cancel_subscription error: {e}")
+        return None
+
+
+async def get_gumroad_checkout_url(telegram_id: int, plan_id: str) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/gumroad/checkout"
+    payload = {"telegram_id": str(telegram_id), "plan_id": plan_id}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_gumroad_checkout_url error: {e}")
+        return None
+
+
+async def get_paddle_portal_url(telegram_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/paddle/portal/{telegram_id}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_paddle_portal_url error: {e}")
+        return None
+
+
+async def get_paddle_checkout_url(telegram_id: int, plan_id: str) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/paddle/checkout"
+    payload = {"telegram_id": str(telegram_id), "plan_id": plan_id}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] get_paddle_checkout_url error: {e}")
+        return None
+
+
+async def submit_churn_survey(
+    telegram_id: int, reason: str, comment: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/billing/churn-survey"
+    payload: Dict[str, Any] = {
+        "telegram_id": str(telegram_id),
+        "reason": reason,
+    }
+    if comment:
+        payload["comment"] = comment
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] submit_churn_survey error: {e}")
         return None
