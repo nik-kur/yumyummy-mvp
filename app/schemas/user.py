@@ -34,6 +34,9 @@ class UserUpdate(BaseModel):
     subscription_telegram_charge_id: Optional[str] = None
     subscription_provider: Optional[str] = None
     subscription_gumroad_id: Optional[str] = None
+    first_meal_after_onboarding_at: Optional[datetime] = None
+    features_used: Optional[str] = None
+    meals_count_trial: Optional[int] = None
 
 
 class UserRead(UserBase):
@@ -59,5 +62,8 @@ class UserRead(UserBase):
     subscription_telegram_charge_id: Optional[str] = None
     subscription_provider: Optional[str] = None
     subscription_gumroad_id: Optional[str] = None
+    first_meal_after_onboarding_at: Optional[datetime] = None
+    features_used: Optional[str] = None
+    meals_count_trial: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)

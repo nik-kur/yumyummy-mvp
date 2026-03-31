@@ -42,7 +42,8 @@ from app.bot.api_client import (
 )
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 from app.bot.billing import router as billing_router, check_billing_access, show_paywall
-from app.bot.api_client import get_billing_status, start_trial
+from app.bot.api_client import get_billing_status, start_trial, update_user
+from app.bot.lifecycle_notifications import send_first_meal_notification, send_feature_tip_voice
 from app.i18n import DEFAULT_LANG, tr
 
 
@@ -50,6 +51,39 @@ router = Router()
 LANG = DEFAULT_LANG
 
 MEAL_LOGGING_INTENTS = {"log_meal", "product", "eatout", "barcode", "photo_meal", "nutrition_label"}
+
+
+@router.callback_query(F.data == "show_paywall_from_notification")
+async def handle_show_paywall_from_notification(callback: types.CallbackQuery) -> None:
+    await callback.answer()
+    billing = await get_billing_status(callback.from_user.id)
+    await show_paywall(callback.message, billing)
+
+
+async def _track_meal_lifecycle(bot: Bot, tg_id: int) -> None:
+    """Track trial meal count and first-meal notification after a meal is logged."""
+    try:
+        user = await get_user(tg_id)
+        if not user or not user.get("onboarding_completed"):
+            return
+
+        # Track first meal after onboarding
+        if not user.get("first_meal_after_onboarding_at"):
+            await update_user(tg_id, first_meal_after_onboarding_at=datetime.now().isoformat())
+            await send_first_meal_notification(bot, str(tg_id))
+
+        # Increment trial meal count
+        billing = await get_billing_status(tg_id)
+        if billing and billing.get("access_status") == "trial":
+            current_count = user.get("meals_count_trial", 0) or 0
+            new_count = current_count + 1
+            await update_user(tg_id, meals_count_trial=new_count)
+            # Send voice tip after 2nd meal
+            if new_count == 2:
+                await send_feature_tip_voice(bot, str(tg_id))
+    except Exception:
+        logger.debug(f"Non-critical: lifecycle tracking failed for {tg_id}", exc_info=True)
+
 
 # FSM States for agent clarification
 class AgentClarification(StatesGroup):
@@ -561,9 +595,20 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     """
     tg_id = message.from_user.id
 
-    # Handle post-purchase deeplink return
+    # Handle deeplink arguments
     args = message.text.split(maxsplit=1)
-    if len(args) > 1 and args[1].strip() == "billing_check":
+    deeplink_arg = args[1].strip() if len(args) > 1 else ""
+
+    # /start reset_onboarding — developer tool to re-test onboarding
+    if deeplink_arg == "reset_onboarding":
+        await update_user(tg_id, onboarding_completed=False)
+        await state.clear()
+        user = await ensure_user(tg_id)
+        if user:
+            await start_onboarding(message, state)
+        return
+
+    if deeplink_arg == "billing_check":
         billing = await get_billing_status(tg_id)
         status = (billing or {}).get("access_status", "expired")
         if status == "active":
@@ -2429,6 +2474,9 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
 
     await message.answer(response_text, reply_markup=reply_markup)
 
+    if intent in MEAL_LOGGING_INTENTS:
+        await _track_meal_lifecycle(message.bot, message.from_user.id)
+
 
 @router.message(F.photo)
 async def handle_photo(message: types.Message, state: FSMContext) -> None:
@@ -2534,6 +2582,9 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
 
     await message.answer(response_text, reply_markup=reply_markup)
 
+    if intent in MEAL_LOGGING_INTENTS:
+        await _track_meal_lifecycle(message.bot, message.from_user.id)
+
 
 @router.message(Command("agent"))
 async def cmd_agent(message: types.Message, state: FSMContext) -> None:
@@ -2634,6 +2685,8 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
+            if intent in MEAL_LOGGING_INTENTS:
+                await _track_meal_lifecycle(message.bot, message.from_user.id)
         except Exception as send_error:
             logger.error(
                 f"[BOT /agent] Error sending message: {send_error}, "
@@ -2770,6 +2823,8 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")
+            if intent in MEAL_LOGGING_INTENTS:
+                await _track_meal_lifecycle(message.bot, message.from_user.id)
         except Exception as send_error:
             logger.error(
                 f"[BOT plain_text] Error sending message: {send_error}, "
@@ -3160,6 +3215,9 @@ async def main() -> None:
     # onboarding_router: menu button handlers during onboarding
     dp.include_router(onboarding_router)
     dp.include_router(router)
+
+    from app.bot.lifecycle_notifications import run_notification_scheduler
+    asyncio.create_task(run_notification_scheduler(bot))
 
     await dp.start_polling(bot)
 

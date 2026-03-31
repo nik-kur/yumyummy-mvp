@@ -17,6 +17,7 @@ from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
+from app.models.notification_event import NotificationEvent
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.meal import MealCreate, MealRead, MealUpdate, DaySummary
 from app.models.saved_meal import SavedMeal
