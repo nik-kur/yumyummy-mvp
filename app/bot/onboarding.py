@@ -30,11 +30,8 @@ from app.bot.api_client import (
     get_paddle_portal_url,
     submit_churn_survey,
     create_saved_meal,
-    use_saved_meal,
     get_meal_by_id,
-    delete_meal,
     agent_run_workflow,
-    ensure_user,
 )
 from app.bot.billing import check_billing_access
 from app.core.config import settings
@@ -49,25 +46,22 @@ SUPPORT_USERNAME = "nik_kur"
 
 
 def _get_run_bot_helpers():
-    from app.bot.run_bot import build_meal_response_from_agent, get_latest_meal_id_for_today, build_meal_keyboard
-    return build_meal_response_from_agent, get_latest_meal_id_for_today, build_meal_keyboard
+    from app.bot.run_bot import (
+        build_meal_response_from_agent,
+        get_latest_meal_id_for_today,
+        build_meal_keyboard,
+        normalize_source_url,
+    )
+    return build_meal_response_from_agent, get_latest_meal_id_for_today, build_meal_keyboard, normalize_source_url
 
 
 # ============ FSM States ============
 
 class OnboardingStates(StatesGroup):
-    """New onboarding: value-first, setup-second."""
+    """New onboarding: value-first, setup-second, parallelised."""
     waiting_for_start = State()
     waiting_for_demo_meal = State()
-    demo_meal_processing = State()
-    my_menu_save_prompt = State()
-    my_menu_try_prompt = State()
-    my_menu_logged_prompt = State()
-    today_view_prompt = State()
-    view_meals_prompt = State()
-    delete_meal_prompt = State()
-    delete_confirm_prompt = State()
-    transition_to_setup = State()
+    # Questionnaire (runs while agent searches in background)
     waiting_for_goal = State()
     waiting_for_gender = State()
     waiting_for_params = State()
@@ -76,6 +70,8 @@ class OnboardingStates(StatesGroup):
     waiting_for_manual_kbju = State()
     waiting_for_timezone = State()
     waiting_for_timezone_text = State()
+    # Post-questionnaire
+    my_menu_instruction = State()
     feature_guide = State()
     trial_activation = State()
 
@@ -175,53 +171,25 @@ No brand? No problem — I'll estimate from known averages.
 🚀 Let's try it! Tell me what you had for your last meal.
 Example: "cappuccino and a croissant at Starbucks\""""
 
-PROCESSING_MSG_1 = """⏳ Got it! I'm analyzing your meal now.
+DEMO_MEAL_PIVOT_TEXT = """⏳ Got it! I'm looking up the exact nutrition data for you.
 
-If I'm searching for brand or restaurant data, this may take up to a minute — I'm checking real sources, not guessing.
+While I search — let's set up your personal targets so I can show you how your meal fits into your day."""
 
-While you wait — some food for thought (pun intended):
+FINALIZING_SEARCH_TEXT = """⏳ Almost there! Just finalizing your meal analysis...
 
-Research shows that 92% of people who start calorie counting quit within 2 weeks. The #1 reason isn't lack of motivation — it's the friction. Traditional apps take 15-20 minutes per day: search the database, pick the right item from 50 options, enter grams, repeat for every ingredient.
+While you wait — a quick food for thought:
 
-Here's another one: a study in the journal Obesity found that people who consistently track their food lose 2x more weight than those who don't — but "consistently" is the key word. The tracker has to be easy enough to actually use every day.
+Research shows that 92% of people who start calorie counting quit within 2 weeks. The #1 reason? Friction. Traditional apps take 15-20 minutes per day to log everything manually.
+
+But a study in the journal Obesity found that consistent food trackers lose 2x more weight — "consistently" is the key word. The tracker has to be easy enough to use every day.
 
 That's exactly why YumYummy exists. One message, and I handle the rest. Most meals take under 10 seconds to log."""
 
-PROCESSING_MSG_2 = """💡 By the way — a few things I can do that might surprise you:
+MY_MENU_SAVED_INSTRUCTION_TEXT = """💾 Saved to your Menu!
 
-If you're at a restaurant and can't decide what to order — send me the menu (photo or text) and I'll tell you the best option based on your remaining calorie and macro budget for the day.
+You always have 🍽 My Menu available via the button at the bottom. Save your frequent dishes and log them in just 2 taps — no typing needed.
 
-Or just ask: "I'm at McDonald's, what should I get?" — and I'll figure it out.
-
-Almost done with your analysis..."""
-
-SAVE_TO_MENU_TEXT = """💾 Like this meal? You can save it to your personal menu!
-
-Tap the button below — next time you eat this, you'll log it in 2 taps instead of typing it out."""
-
-MY_MENU_SAVED_TEXT = """✅ Saved!
-
-Your menu is your collection of go-to meals. Think of it as speed-dial for food tracking — breakfast you eat every day, your favorite lunch spot order, regular snacks.
-
-Let's try it: tap 🍽 My Menu below to see your saved meal and log it from there."""
-
-MY_MENU_LOGGED_TEXT = """👍 See how fast that was? 2 taps — done.
-
-Now let's clean up this duplicate. I'll show you how to edit or delete any logged meal — you'll need this later:
-
-Tap 📊 Today below."""
-
-TODAY_VIEW_TEXT = """Now tap "🍽 View logged meals" to see the list."""
-
-DELETE_GUIDE_TEXT = """Tap the duplicate meal to see its options, then tap 🗑 Delete to remove it."""
-
-AFTER_DELETE_TEXT = """🎯 Perfect! You now know how to:
-— Log meals by typing, voice, or photo
-— Save favorites to My Menu
-— Log from My Menu in 2 taps
-— View, edit, and delete meals
-
-Now let's personalize your targets — takes about 30 seconds."""
+The more meals you save, the faster your daily tracking gets."""
 
 GOAL_TEXT = tr("onboarding.goal", LANG)
 
@@ -286,7 +254,6 @@ Activate your free trial:
 ✅ 3 days of full access
 ✅ Every feature unlocked
 ✅ No credit card required
-✅ Cancel anytime — no strings
 
 Just text, speak, or snap what you eat — I'll handle the rest."""
 
@@ -480,43 +447,165 @@ def format_remaining(current: float, target: float, unit: str = "kcal") -> str:
         return "right on target!"
 
 
-# ============ Demo Meal Processing ============
+# ============ Background Demo Meal Management ============
 
-async def _process_demo_meal(message: types.Message, state: FSMContext, text: str):
-    result_ready = asyncio.Event()
-    result_holder = {}
+_pending_demo_tasks: dict = {}
+_pending_demo_results: dict = {}
 
-    async def analyze():
-        result = await agent_run_workflow(telegram_id=str(message.from_user.id), text=text)
-        result_holder['result'] = result
-        result_ready.set()
 
-    async def delayed_msg():
-        await asyncio.sleep(15)
-        if not result_ready.is_set():
-            await message.answer(PROCESSING_MSG_2)
+async def _start_demo_meal_agent(telegram_id: int, text: str) -> None:
+    """Start agent search in background, store result when done."""
+    async def _run():
+        try:
+            result = await agent_run_workflow(telegram_id=str(telegram_id), text=text)
+            _pending_demo_results[telegram_id] = result
+        except Exception as e:
+            logger.error(f"[ONBOARDING] Demo meal agent failed for {telegram_id}: {e}")
+            _pending_demo_results[telegram_id] = None
 
-    task_analyze = asyncio.create_task(analyze())
-    task_msg = asyncio.create_task(delayed_msg())
+    _pending_demo_tasks[telegram_id] = asyncio.create_task(_run())
 
-    await task_analyze
-    task_msg.cancel()
+
+async def _await_demo_result(telegram_id: int, message: types.Message) -> Optional[dict]:
+    """Wait for agent result; send filler message if still running."""
+    task = _pending_demo_tasks.get(telegram_id)
+
+    if task and not task.done():
+        await message.answer(FINALIZING_SEARCH_TEXT)
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=120)
+        except asyncio.TimeoutError:
+            logger.error(f"[ONBOARDING] Agent timeout for {telegram_id}")
+
+    result = _pending_demo_results.pop(telegram_id, None)
+    _pending_demo_tasks.pop(telegram_id, None)
+    return result
+
+
+async def _deliver_combined_result(
+    message: types.Message, state: FSMContext, telegram_id: int
+) -> None:
+    """Show combined targets + meal result, auto-save to My Menu, continue flow."""
+    data = await state.get_data()
+
+    target_cal = data.get("target_calories", 2000)
+    target_prot = data.get("target_protein_g", 150)
+    target_fat = data.get("target_fat_g", 65)
+    target_carbs = data.get("target_carbs_g", 200)
+
+    result = await _await_demo_result(telegram_id, message)
+
+    build_meal_response, get_latest_meal_id, _, normalize_url = _get_run_bot_helpers()
+
+    if not result:
+        targets_text = (
+            f"🎯 Setup complete! Here are your personal targets:\n\n"
+            f"🔥 {target_cal:.0f} kcal · 🥩 {target_prot:.0f} g · "
+            f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g\n\n"
+            f"There was an issue analyzing your demo meal, but no worries — "
+            f"you can log it again anytime."
+        )
+        await message.answer(targets_text)
+        await _send_my_menu_instruction(message, state, telegram_id, meal_id=None)
+        return
+
+    meal_text = build_meal_response(result)
+
+    totals = result.get("totals") or {}
+    meal_cal = round(float(totals.get("calories_kcal") or 0))
+    pct = round(meal_cal / target_cal * 100) if target_cal > 0 else 0
+
+    combined = (
+        f"🎯 Setup complete! Here are your personal targets:\n\n"
+        f"🔥 {target_cal:.0f} kcal · 🥩 {target_prot:.0f} g · "
+        f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g\n\n"
+        f"─────────────────\n\n"
+        f"And your first meal analysis is ready:\n\n"
+        f"{meal_text}\n\n"
+        f"─────────────────\n"
+        f"📊 This meal is {pct}% of your daily calorie target"
+    )
+
+    # Build keyboard with source URL buttons (same as real usage)
+    source_url = result.get("source_url")
+    agent_items = result.get("items") or []
+
+    kb_rows = []
+    for item in agent_items:
+        if not isinstance(item, dict):
+            continue
+        item_url = normalize_url(item.get("source_url"))
+        if item_url:
+            item_name = item.get("name") or "Product"
+            label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+            kb_rows.append([InlineKeyboardButton(
+                text=f"🔗 Source: {label}", url=item_url,
+            )])
+
+    if not kb_rows:
+        url = normalize_url(source_url)
+        if url:
+            kb_rows.append([InlineKeyboardButton(text="🔗 Source", url=url)])
+
+    reply_markup = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
+    await message.answer(combined, reply_markup=reply_markup)
+
+    # Auto-save to My Menu
+    meal_id = await get_latest_meal_id(telegram_id)
+    await _auto_save_to_my_menu(telegram_id, meal_id)
+
+    # Show My Menu instruction + "What else?" button
+    await _send_my_menu_instruction(message, state, telegram_id, meal_id)
+
+
+async def _auto_save_to_my_menu(telegram_id: int, meal_id: Optional[int]) -> None:
+    """Auto-save the demo meal to the user's My Menu."""
+    if not meal_id:
+        return
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        return
+    user = await get_user(telegram_id)
+    if not user:
+        return
     try:
-        await task_msg
-    except asyncio.CancelledError:
-        pass
+        await create_saved_meal(
+            user_id=user["id"],
+            name=meal.get("description_user") or meal.get("description") or "My meal",
+            total_calories=meal.get("calories", 0),
+            total_protein_g=meal.get("protein_g", 0),
+            total_fat_g=meal.get("fat_g", 0),
+            total_carbs_g=meal.get("carbs_g", 0),
+            items=meal.get("items"),
+        )
+    except Exception as e:
+        logger.warning(f"[ONBOARDING] Auto-save to My Menu failed for {telegram_id}: {e}")
 
-    return result_holder.get('result')
+
+async def _send_my_menu_instruction(
+    message: types.Message,
+    state: FSMContext,
+    telegram_id: int,
+    meal_id: Optional[int],
+) -> None:
+    """Send My Menu instruction with 'What else?' button."""
+    what_else_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✨ What else can YumYummy do?",
+                callback_data="onboarding_what_else",
+            )]
+        ]
+    )
+    await message.answer(MY_MENU_SAVED_INSTRUCTION_TEXT, reply_markup=what_else_kb)
+    await state.set_state(OnboardingStates.my_menu_instruction)
 
 
 # ============ Onboarding Handlers — Phase 1: Hook ============
 
 async def start_onboarding(message: types.Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(
-        WELCOME_TEXT,
-        reply_markup=get_start_keyboard()
-    )
+    await message.answer(WELCOME_TEXT, reply_markup=get_start_keyboard())
     await state.set_state(OnboardingStates.waiting_for_start)
 
 
@@ -524,7 +613,6 @@ async def start_onboarding(message: types.Message, state: FSMContext) -> None:
 async def on_onboarding_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-
     await callback.message.answer(
         "Tell me what you had for your last meal — text, voice, or photo all work!"
     )
@@ -535,338 +623,40 @@ async def on_onboarding_start(callback: types.CallbackQuery, state: FSMContext) 
 async def on_demo_meal_text(message: types.Message, state: FSMContext) -> None:
     user_text = message.text.strip()
     if not user_text:
-        await message.answer("Please describe your meal — for example: 'cappuccino and a croissant at Starbucks'")
-        return
-
-    await state.set_state(OnboardingStates.demo_meal_processing)
-    await message.answer(PROCESSING_MSG_1)
-
-    result = await _process_demo_meal(message, state, user_text)
-
-    if not result:
         await message.answer(
-            "Something went wrong while analyzing your meal. Please try again — just type what you ate."
+            "Please describe your meal — for example: "
+            "'cappuccino and a croissant at Starbucks'"
         )
-        await state.set_state(OnboardingStates.waiting_for_demo_meal)
         return
 
-    build_meal_response_from_agent, get_latest_meal_id_for_today, _ = _get_run_bot_helpers()
-
-    meal_response = build_meal_response_from_agent(result)
-    await message.answer(meal_response)
-
-    meal_id = await get_latest_meal_id_for_today(message.from_user.id)
-    if not meal_id:
-        await message.answer(SAVE_TO_MENU_TEXT)
-        await state.set_state(OnboardingStates.my_menu_save_prompt)
-        return
-
-    await state.update_data(demo_meal_id=meal_id)
-
-    save_kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="💾 Save to My Menu", callback_data=f"onboarding_save_meal:{meal_id}")]
-        ]
-    )
-    await message.answer(SAVE_TO_MENU_TEXT, reply_markup=save_kb)
-    await state.set_state(OnboardingStates.my_menu_save_prompt)
-
-
-# ============ Onboarding Handlers — Phase 1a: My Menu Tutorial ============
-
-@router.callback_query(F.data.startswith("onboarding_save_meal:"))
-async def on_onboarding_save_meal(callback: types.CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
-
-    parts = callback.data.split(":", 1)
-    try:
-        meal_id = int(parts[1])
-    except (IndexError, ValueError):
-        await callback.message.answer("Could not save meal. Please try again.")
-        return
-
-    meal = await get_meal_by_id(meal_id)
-    if not meal:
-        await callback.message.answer("Could not find the meal. Let's continue.")
-        await _transition_to_my_menu_try(callback.message, state, callback.from_user.id)
-        return
-
-    user = await get_user(callback.from_user.id)
-    if not user:
-        await callback.message.answer("Could not load your profile.")
-        return
-
-    saved = await create_saved_meal(
-        user_id=user["id"],
-        name=meal.get("description_user") or meal.get("description") or "My meal",
-        total_calories=meal.get("calories", 0),
-        total_protein_g=meal.get("protein_g", 0),
-        total_fat_g=meal.get("fat_g", 0),
-        total_carbs_g=meal.get("carbs_g", 0),
-        items=meal.get("items"),
-    )
-
-    if saved:
-        await state.update_data(saved_meal_id=saved.get("id"))
-
-    await _transition_to_my_menu_try(callback.message, state, callback.from_user.id)
-
-
-async def _transition_to_my_menu_try(message: types.Message, state: FSMContext, telegram_id: int) -> None:
-    my_menu_kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="🍽 My Menu")]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
-    await message.answer(MY_MENU_SAVED_TEXT, reply_markup=my_menu_kb)
-    await state.set_state(OnboardingStates.my_menu_try_prompt)
-
-
-@router.message(OnboardingStates.my_menu_try_prompt, F.text == "🍽 My Menu")
-async def on_onboarding_my_menu(message: types.Message, state: FSMContext) -> None:
     tg_id = message.from_user.id
-    data = await get_saved_meals(tg_id, page=1, per_page=20)
 
-    if not data or not data.get("items"):
-        await message.answer("Your menu is empty. Let's continue with the setup.")
-        await _transition_to_today_view(message, state)
-        return
+    # Start agent search in background
+    await _start_demo_meal_agent(tg_id, user_text)
 
-    meals = data["items"]
-    rows = []
-    for m in meals:
-        name = m.get("name", "Meal")
-        cal = round(m.get("total_calories", 0))
-        label = f"✅ {name} ({cal} kcal)"
-        if len(label) > 50:
-            label = f"✅ {name[:40]}… ({cal})"
-        rows.append([InlineKeyboardButton(
-            text=label, callback_data=f"my_menu_log:{m['id']}"
-        )])
+    # Pivot to questionnaire while agent searches
+    await message.answer(DEMO_MEAL_PIVOT_TEXT)
+    await message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
+    await state.update_data(is_onboarding_demo=True)
+    await state.set_state(OnboardingStates.waiting_for_goal)
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
+
+@router.message(OnboardingStates.waiting_for_demo_meal, F.voice)
+async def on_demo_meal_voice(message: types.Message, state: FSMContext) -> None:
     await message.answer(
-        "🍽 My Menu\n\nTap a meal to log it instantly:",
-        reply_markup=keyboard,
+        "Voice input will work great after setup! "
+        "For this first demo, please type your meal.\n\n"
+        "Example: \"cappuccino and a croissant at Starbucks\""
     )
-    await state.set_state(OnboardingStates.my_menu_logged_prompt)
 
 
-@router.callback_query(OnboardingStates.my_menu_logged_prompt, F.data.startswith("my_menu_log:"))
-async def on_onboarding_my_menu_log(callback: types.CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
-
-    parts = callback.data.split(":", 1)
-    try:
-        saved_meal_id = int(parts[1])
-    except (IndexError, ValueError):
-        await callback.message.answer("Could not log the meal.")
-        return
-
-    result = await use_saved_meal(saved_meal_id)
-    if result:
-        cal = round(float(result.get("calories", 0)))
-        name = result.get("description_user") or result.get("name") or "Meal"
-        await callback.message.answer(f"✅ Logged: {name} ({cal} kcal)")
-    else:
-        await callback.message.answer("✅ Meal logged!")
-
-    await _transition_to_today_view(callback.message, state)
-
-
-async def _transition_to_today_view(message: types.Message, state: FSMContext) -> None:
-    today_kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📊 Today")]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
+@router.message(OnboardingStates.waiting_for_demo_meal, F.photo)
+async def on_demo_meal_photo(message: types.Message, state: FSMContext) -> None:
+    await message.answer(
+        "Photo input will work great after setup! "
+        "For this first demo, please type your meal.\n\n"
+        "Example: \"cappuccino and a croissant at Starbucks\""
     )
-    await message.answer(MY_MENU_LOGGED_TEXT, reply_markup=today_kb)
-    await state.set_state(OnboardingStates.today_view_prompt)
-
-
-@router.message(OnboardingStates.today_view_prompt, F.text == "📊 Today")
-async def on_onboarding_today(message: types.Message, state: FSMContext) -> None:
-    telegram_id = message.from_user.id
-
-    user = await get_user(telegram_id)
-    if not user:
-        await message.answer("Could not find your profile. Try /start")
-        return
-
-    today = date_type.today()
-    day_summary = await get_day_summary(user["id"], today)
-
-    current_cal = 0
-    current_prot = 0
-    current_fat = 0
-    current_carbs = 0
-    meals_count = 0
-
-    if day_summary:
-        current_cal = day_summary.get("total_calories", 0)
-        current_prot = day_summary.get("total_protein_g", 0)
-        current_fat = day_summary.get("total_fat_g", 0)
-        current_carbs = day_summary.get("total_carbs_g", 0)
-        meals_count = len(day_summary.get("meals", []))
-
-    text = f"""📊 Today, {today.strftime('%d.%m.%Y')}
-
-Calories: {current_cal:.0f} kcal
-Protein: {current_prot:.0f} g
-Fat: {current_fat:.0f} g
-Carbs: {current_carbs:.0f} g
-
-Meals logged: {meals_count}"""
-
-    view_kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(
-                text="🍽 View logged meals",
-                callback_data=f"onboarding_daylist:{today.isoformat()}"
-            )]
-        ]
-    )
-    await message.answer(text, reply_markup=view_kb)
-    await message.answer(TODAY_VIEW_TEXT)
-    await state.set_state(OnboardingStates.view_meals_prompt)
-
-
-@router.callback_query(OnboardingStates.view_meals_prompt, F.data.startswith("onboarding_daylist:"))
-async def on_onboarding_daylist(callback: types.CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
-
-    parts = callback.data.split(":", 1)
-    day_str = parts[1] if len(parts) >= 2 else ""
-
-    try:
-        day = date_type.fromisoformat(day_str)
-    except ValueError:
-        await callback.message.answer("Could not parse date.")
-        return
-
-    tg_id = callback.from_user.id
-    user = await ensure_user(tg_id)
-    if not user:
-        await callback.message.answer("Could not reach backend.")
-        return
-
-    summary = await get_day_summary(user["id"], day)
-    if not summary:
-        await callback.message.answer("No entries for this day.")
-        return
-
-    meals = summary.get("meals", [])
-    if not meals:
-        await callback.message.answer("No meals logged for this day.")
-        return
-
-    for meal in meals:
-        meal_id = meal.get("id")
-        desc = meal.get("description_user") or meal.get("description") or "Meal"
-        cal = round(float(meal.get("calories", 0)))
-        prot = round(float(meal.get("protein_g", 0)), 1)
-        fat = round(float(meal.get("fat_g", 0)), 1)
-        carbs = round(float(meal.get("carbs_g", 0)), 1)
-
-        meal_text = f"📝 {desc}\n{cal} kcal · P {prot} g · F {fat} g · C {carbs} g"
-
-        if meal_id:
-            meal_kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="✏️ Edit",
-                            callback_data=f"meal_edit:{meal_id}:{day.isoformat()}",
-                        ),
-                        InlineKeyboardButton(
-                            text="🗑 Delete",
-                            callback_data=f"onboarding_meal_delete:{meal_id}:{day.isoformat()}",
-                        ),
-                    ]
-                ]
-            )
-            await callback.message.answer(meal_text, reply_markup=meal_kb)
-        else:
-            await callback.message.answer(meal_text)
-
-    await callback.message.answer(DELETE_GUIDE_TEXT)
-    await state.set_state(OnboardingStates.delete_meal_prompt)
-
-
-@router.callback_query(OnboardingStates.delete_meal_prompt, F.data.startswith("onboarding_meal_delete:"))
-async def on_onboarding_meal_delete(callback: types.CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
-
-    parts = callback.data.split(":", 2)
-    if len(parts) < 3:
-        await callback.message.answer("Could not process deletion.")
-        return
-
-    try:
-        meal_id = int(parts[1])
-        day_str = parts[2]
-    except ValueError:
-        await callback.message.answer("Could not read deletion data.")
-        return
-
-    await state.update_data(delete_meal_id=meal_id, delete_day_str=day_str)
-
-    confirm_kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Yes, delete",
-                    callback_data=f"onboarding_meal_delete_yes:{meal_id}",
-                ),
-                InlineKeyboardButton(
-                    text="❌ Cancel",
-                    callback_data="onboarding_meal_delete_cancel",
-                ),
-            ]
-        ]
-    )
-    await callback.message.answer("Delete this entry?", reply_markup=confirm_kb)
-    await state.set_state(OnboardingStates.delete_confirm_prompt)
-
-
-@router.callback_query(OnboardingStates.delete_confirm_prompt, F.data.startswith("onboarding_meal_delete_yes:"))
-async def on_onboarding_meal_delete_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
-
-    parts = callback.data.split(":", 1)
-    try:
-        meal_id = int(parts[1])
-    except (IndexError, ValueError):
-        await callback.message.answer("Could not delete entry.")
-        return
-
-    ok = await delete_meal(meal_id)
-    if not ok:
-        await callback.message.answer("Could not delete entry. Let's continue anyway.")
-    else:
-        await callback.message.answer("✅ Deleted.")
-
-    await callback.message.answer(AFTER_DELETE_TEXT)
-
-    await callback.message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
-    await state.set_state(OnboardingStates.waiting_for_goal)
-
-
-@router.callback_query(OnboardingStates.delete_confirm_prompt, F.data == "onboarding_meal_delete_cancel")
-async def on_onboarding_meal_delete_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("OK, no worries. Let's move on.")
-
-    await callback.message.answer(AFTER_DELETE_TEXT)
-
-    await callback.message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
-    await state.set_state(OnboardingStates.waiting_for_goal)
 
 
 # ============ Onboarding Handlers — Phase 2: Personalization ============
@@ -1105,7 +895,11 @@ async def on_timezone_selected(callback: types.CallbackQuery, state: FSMContext)
     telegram_id = callback.from_user.id
     await update_user(telegram_id, timezone=tz_value)
 
-    await _send_feature_guide(callback.message, state)
+    data = await state.get_data()
+    if data.get("is_onboarding_demo"):
+        await _deliver_combined_result(callback.message, state, telegram_id)
+    else:
+        await _send_feature_guide(callback.message, state)
 
 
 @router.message(OnboardingStates.waiting_for_timezone_text)
@@ -1124,12 +918,37 @@ async def on_timezone_text_received(message: types.Message, state: FSMContext) -
     telegram_id = message.from_user.id
     await update_user(telegram_id, timezone=tz_text)
 
-    await _send_feature_guide(message, state)
+    data = await state.get_data()
+    if data.get("is_onboarding_demo"):
+        await _deliver_combined_result(message, state, telegram_id)
+    else:
+        await _send_feature_guide(message, state)
 
 
 # ============ Onboarding Handlers — Phase 3: Feature Guide + Trial ============
 
+@router.callback_query(F.data == "onboarding_what_else")
+async def on_what_else(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User tapped 'What else can YumYummy do?' — send feature guide + trial CTA."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    await callback.message.answer(FEATURE_GUIDE_TEXT)
+
+    trial_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🚀 Start my free trial",
+                callback_data="onboarding_start_trial",
+            )]
+        ]
+    )
+    await callback.message.answer(TRIAL_CTA_TEXT, reply_markup=trial_kb)
+    await state.set_state(OnboardingStates.trial_activation)
+
+
 async def _send_feature_guide(message: types.Message, state: FSMContext) -> None:
+    """Legacy path for profile recalculation flow."""
     await message.answer(FEATURE_GUIDE_TEXT)
 
     continue_kb = InlineKeyboardMarkup(

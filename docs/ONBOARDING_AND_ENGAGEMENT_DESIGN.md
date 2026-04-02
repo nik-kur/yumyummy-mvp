@@ -10,9 +10,9 @@
 
 ### Core Principle
 
-Value first, setup second. The user experiences the "aha moment" (logging a meal → seeing KBJU breakdown) before investing time in personalization. Demand Curve TTFV target: ≤60 seconds to first value.
+Value first, setup second, parallelised. The user sends a demo meal, then fills out the personalisation questionnaire while the agent searches in the background. When the questionnaire finishes, the bot presents targets + meal analysis in one combined "aha moment" message. The user never experiences a "loading" screen.
 
-### Phase 1 — Hook + First Value Demo
+### Phase 1 — Hook + Parallel Setup
 
 **Step 1: Welcome + Value Proposition**
 
@@ -34,97 +34,77 @@ No brand? No problem — I'll estimate from known averages.
 Example: "cappuccino and a croissant at Starbucks"
 ```
 
-**Step 2:** User sends their meal input. Bot starts processing via `agent_run_workflow`.
-
-**Step 3a: "While I'm working" message (sent 2-3 sec after input):**
+**Step 2:** User sends meal input → agent search starts in background → bot immediately pivots:
 
 ```
-⏳ Got it! I'm analyzing your meal now.
+⏳ Got it! I'm looking up the exact nutrition data for you.
 
-If I'm searching for brand or restaurant data, this may take up to a minute — I'm checking real sources, not guessing.
+While I search — let's set up your personal targets so I can show you how your meal fits into your day.
+```
 
-While you wait — some food for thought (pun intended):
+**Step 3 — Personalisation questionnaire (runs while agent searches):**
 
-Research shows that 92% of people who start calorie counting quit within 2 weeks. The #1 reason isn't lack of motivation — it's the friction. Traditional apps take 15-20 minutes per day: search the database, pick the right item from 50 options, enter grams, repeat for every ingredient.
+Goal → Gender → Age/Height/Weight → Activity → KBJU Targets (confirm or manual) → Timezone
 
-Here's another one: a study in the journal Obesity found that people who consistently track their food lose 2x more weight than those who don't — but "consistently" is the key word. The tracker has to be easy enough to actually use every day.
+Same questions as before (mostly button taps). Takes ~40-80 seconds — overlaps almost perfectly with agent search time.
+
+**Step 4 — Race condition handling:**
+
+- **Agent finished before questionnaire:** Result is held in memory, delivered immediately after timezone.
+- **Questionnaire finished before agent:** Bot sends a "finalizing" message with one engaging fact:
+
+```
+⏳ Almost there! Just finalizing your meal analysis...
+
+While you wait — a quick food for thought:
+
+Research shows that 92% of people who start calorie counting quit within 2 weeks. The #1 reason? Friction. Traditional apps take 15-20 minutes per day to log everything manually.
+
+But a study in the journal Obesity found that consistent food trackers lose 2x more weight — "consistently" is the key word. The tracker has to be easy enough to use every day.
 
 That's exactly why YumYummy exists. One message, and I handle the rest. Most meals take under 10 seconds to log.
 ```
 
-**Step 3b: Second engagement message (sent 15 sec after 3a, only if result isn't ready):**
+**Step 5 — Combined result (the "aha moment"):**
+
+One merged message: personal targets at top, meal analysis below, with percentage context. Includes source URL buttons matching real usage format.
 
 ```
-💡 By the way — a few things I can do that might surprise you:
+🎯 Setup complete! Here are your personal targets:
 
-If you're at a restaurant and can't decide what to order — send me the menu (photo or text) and I'll tell you the best option based on your remaining calorie and macro budget for the day.
+🔥 2100 kcal · 🥩 150 g · 🥑 65 g · 🍞 230 g
 
-Or just ask: "I'm at McDonald's, what should I get?" — and I'll figure it out.
+─────────────────
 
-Almost done with your analysis...
+And your first meal analysis is ready:
+
+✅ Logged: Cappuccino and a croissant at Starbucks
+386 kcal · P 12.5 g · F 18.2 g · C 45.3 g
+...
+
+─────────────────
+📊 This meal is 18% of your daily calorie target
 ```
 
-**Step 4:** Meal result delivered — standard KBJU breakdown (aha moment).
+Keyboard: `[🔗 Source: Starbucks Cappuccino]` (if source URL available)
 
-### Phase 1a — Interactive "My Menu" Tutorial
+### Phase 2 — My Menu + Feature Guide + Trial
 
-**Step 5: Introduce Save to My Menu**
-
-```
-💾 Like this meal? You can save it to your personal menu!
-
-Tap the button below — next time you eat this, you'll log it in 2 taps instead of typing it out.
-```
-
-Button: `[💾 Save to My Menu]`
-
-**Step 6: Explain + invite to try My Menu**
-
-After user saves:
+**Step 6:** Meal is auto-saved to My Menu. User sees confirmation + brief instruction:
 
 ```
-✅ Saved!
+💾 Saved to your Menu!
 
-Your menu is your collection of go-to meals. Think of it as speed-dial for food tracking — breakfast you eat every day, your favorite lunch spot order, regular snacks.
+You always have 🍽 My Menu available via the button at the bottom. Save your frequent dishes and log them in just 2 taps — no typing needed.
 
-Let's try it: tap [🍽 My Menu] below to see your saved meal and log it from there.
+The more meals you save, the faster your daily tracking gets.
 ```
 
-**Step 7: Guide through deletion**
+Button: `[✨ What else can YumYummy do?]`
 
-After user logs from My Menu:
+**Step 7: Feature guide + trial CTA (sent together on button tap)**
 
-```
-👍 See how fast that was? 2 taps — done.
-
-Now let's clean up this duplicate. I'll show you how to edit or delete any logged meal — you'll need this later:
-
-Tap [📊 Today] below.
-```
-
-Then guide: View logged meals → tap the duplicate → Delete.
-
-After deletion:
-
-```
-🎯 Perfect! You now know how to:
-— Log meals by typing, voice, or photo
-— Save favorites to My Menu
-— Log from My Menu in 2 taps
-— View, edit, and delete meals
-
-Now let's personalize your targets — takes about 30 seconds.
-```
-
-### Phase 2 — Personalization
-
-Steps 8-12: Goal → Gender → Age/Height/Weight → Activity → KBJU Targets (confirm or manual) → Timezone
-
-Same flow as before (mostly button taps).
-
-### Phase 3 — Feature Guide + Trial Activation
-
-**Step 13: Comprehensive Feature Guide**
+**Feature Guide:**
 
 ```
 📖 Here's everything YumYummy can do for you:
@@ -174,9 +154,9 @@ I'll suggest the best choice for your remaining daily budget.
 💡 This guide is always available — tap [📖 How to Use] in the menu anytime.
 ```
 
-**Step 14:** New permanent `[📖 How to Use]` button in the main menu.
+Permanent `[📖 How to Use]` button in the main menu.
 
-**Step 15: Trial Activation**
+**Trial Activation (sent together with feature guide):**
 
 ```
 🎉 You're all set!
@@ -186,7 +166,6 @@ Activate your free trial:
 ✅ 3 days of full access
 ✅ Every feature unlocked
 ✅ No credit card required
-✅ Cancel anytime — no strings
 
 Just text, speak, or snap what you eat — I'll handle the rest.
 ```
