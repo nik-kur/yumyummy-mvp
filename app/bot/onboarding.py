@@ -3,6 +3,7 @@ Onboarding flow and main menu handlers for the Telegram bot.
 Contains FSM states, handlers, and keyboards.
 """
 import asyncio
+import html as html_mod
 import json
 import re
 import logging
@@ -159,33 +160,39 @@ WELCOME_TEXT = """👋 Hi! I'm YumYummy — your AI nutrition tracker.
 
 Here's what makes me different:
 
-⚡ Log meals in seconds — any format works:
-📝 Text — "oatmeal with banana and coffee with milk"
-🎤 Voice — just describe your meal in a voice message
-📷 Photo — snap your plate, a label, or a barcode
+⚡ Meal logging in seconds in any format you love:
+• Text — "oatmeal with banana and coffee with milk"
+• Voice — just describe your meal in a voice message
+• Photo — snap your plate, a label, or a barcode
 
 🔬 Nerd-level precision:
-Mention a brand (Danone, Chobani) or a place (Starbucks, Chipotle) — I'll search the web for official nutrition data.
-No brand? No problem — I'll estimate from known averages.
+• Mention a brand (Danone, Chobani) or a place (Starbucks, Chipotle) — I'll search the web for official nutrition data.
+• No brand? No problem — I'll estimate from known averages.
 
 🚀 Let's try it! Tell me what you had for your last meal.
 Example: "cappuccino and a croissant at Starbucks\""""
 
-DEMO_MEAL_PIVOT_TEXT = """⏳ Got it! I'm looking up the exact nutrition data for you.
+DEMO_MEAL_PIVOT_TEXT = """⏳ Got it! I'm searching for official nutrition sources now — this may take 1-2 minutes, as I thoroughly check real data rather than guess.
 
 While I search — let's set up your personal targets so I can show you how your meal fits into your day."""
 
-FINALIZING_SEARCH_TEXT = """⏳ Almost there! Just finalizing your meal analysis...
+FINALIZING_SEARCH_TEXT = """⏳ Almost there! Just ~20 more seconds to finalize your meal analysis...
 
-While you wait — a quick food for thought:
+A quick food for thought while you wait:
 
-Research shows that 92% of people who start calorie counting quit within 2 weeks. The #1 reason? Friction. Traditional apps take 15-20 minutes per day to log everything manually.
+A large-scale study found that consistent food trackers lose 2x more weight than those who don't — but "consistently" is the key word. The tracker has to be easy enough to actually use every day.
 
-But a study in the journal Obesity found that consistent food trackers lose 2x more weight — "consistently" is the key word. The tracker has to be easy enough to use every day.
+Why do most people fail? Research shows that 92% who start calorie counting quit within 2 weeks. The #1 reason isn't motivation — it's friction. Traditional apps take 15-20 minutes per day to log everything manually.
 
 That's exactly why YumYummy exists. One message, and I handle the rest. Most meals take under 10 seconds to log."""
 
-MY_MENU_SAVED_INSTRUCTION_TEXT = """💾 Saved to your Menu!
+SAVE_TO_MENU_TEXT = """💾 Like this meal? Save it to your personal menu!
+
+Your menu is your collection of go-to meals — think of it as speed-dial for food tracking. Breakfast you eat every day, your favorite lunch spot order, regular snacks.
+
+Tap the button below — next time you eat this, you'll log it in 2 taps instead of typing it out."""
+
+MY_MENU_SAVED_INSTRUCTION_TEXT = """✅ Saved to your Menu!
 
 You always have 🍽 My Menu available via the button at the bottom. Save your frequent dishes and log them in just 2 taps — no typing needed.
 
@@ -330,14 +337,16 @@ def get_goal_confirmation_keyboard() -> InlineKeyboardMarkup:
 def get_timezone_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🇷🇺 Moscow (UTC+3)", callback_data="tz:Europe/Moscow")],
-            [InlineKeyboardButton(text="🇷🇺 Yekaterinburg (UTC+5)", callback_data="tz:Asia/Yekaterinburg")],
-            [InlineKeyboardButton(text="🇷🇺 Novosibirsk (UTC+7)", callback_data="tz:Asia/Novosibirsk")],
-            [InlineKeyboardButton(text="🇷🇺 Vladivostok (UTC+10)", callback_data="tz:Asia/Vladivostok")],
-            [InlineKeyboardButton(text="🇪🇺 Berlin (UTC+1)", callback_data="tz:Europe/Berlin")],
-            [InlineKeyboardButton(text="🇬🇧 London (UTC+0)", callback_data="tz:Europe/London")],
             [InlineKeyboardButton(text="🇺🇸 New York (UTC-5)", callback_data="tz:America/New_York")],
+            [InlineKeyboardButton(text="🇺🇸 Los Angeles (UTC-8)", callback_data="tz:America/Los_Angeles")],
+            [InlineKeyboardButton(text="🇬🇧 London (UTC+0)", callback_data="tz:Europe/London")],
+            [InlineKeyboardButton(text="🇪🇺 Berlin / Paris (UTC+1)", callback_data="tz:Europe/Berlin")],
+            [InlineKeyboardButton(text="🇷🇺 Moscow (UTC+3)", callback_data="tz:Europe/Moscow")],
             [InlineKeyboardButton(text="🇦🇪 Dubai (UTC+4)", callback_data="tz:Asia/Dubai")],
+            [InlineKeyboardButton(text="🇮🇳 Mumbai (UTC+5:30)", callback_data="tz:Asia/Kolkata")],
+            [InlineKeyboardButton(text="🇸🇬 Singapore (UTC+8)", callback_data="tz:Asia/Singapore")],
+            [InlineKeyboardButton(text="🇯🇵 Tokyo (UTC+9)", callback_data="tz:Asia/Tokyo")],
+            [InlineKeyboardButton(text="🇦🇺 Sydney (UTC+10)", callback_data="tz:Australia/Sydney")],
             [InlineKeyboardButton(text="🌍 Other...", callback_data="tz:other")],
         ]
     )
@@ -485,7 +494,7 @@ async def _await_demo_result(telegram_id: int, message: types.Message) -> Option
 async def _deliver_combined_result(
     message: types.Message, state: FSMContext, telegram_id: int
 ) -> None:
-    """Show combined targets + meal result, auto-save to My Menu, continue flow."""
+    """Show meal result + day summary with progress bars, then save-to-menu prompt."""
     data = await state.get_data()
 
     target_cal = data.get("target_calories", 2000)
@@ -498,32 +507,58 @@ async def _deliver_combined_result(
     build_meal_response, get_latest_meal_id, _, normalize_url = _get_run_bot_helpers()
 
     if not result:
-        targets_text = (
-            f"🎯 Setup complete! Here are your personal targets:\n\n"
+        fallback = (
+            "There was an issue analyzing your demo meal, but no worries — "
+            "you can log it again anytime.\n\n"
+            f"Your daily targets are set:\n"
             f"🔥 {target_cal:.0f} kcal · 🥩 {target_prot:.0f} g · "
-            f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g\n\n"
-            f"There was an issue analyzing your demo meal, but no worries — "
-            f"you can log it again anytime."
+            f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g"
         )
-        await message.answer(targets_text)
-        await _send_my_menu_instruction(message, state, telegram_id, meal_id=None)
+        await message.answer(fallback)
+        await _prompt_my_menu_save(message, state, telegram_id, meal_id=None)
         return
 
-    meal_text = build_meal_response(result)
+    meal_text_raw = build_meal_response(result)
+    meal_text = html_mod.escape(meal_text_raw)
 
     totals = result.get("totals") or {}
     meal_cal = round(float(totals.get("calories_kcal") or 0))
+    meal_prot = round(float(totals.get("protein_g") or 0), 1)
+    meal_fat = round(float(totals.get("fat_g") or 0), 1)
+    meal_carbs = round(float(totals.get("carbs_g") or 0), 1)
     pct = round(meal_cal / target_cal * 100) if target_cal > 0 else 0
 
+    bar_cal = build_progress_bar(meal_cal, target_cal)
+    bar_prot = build_progress_bar(meal_prot, target_prot)
+    bar_fat = build_progress_bar(meal_fat, target_fat)
+    bar_carbs = build_progress_bar(meal_carbs, target_carbs)
+
+    rem_cal = format_remaining(meal_cal, target_cal, "kcal")
+    rem_prot = format_remaining(meal_prot, target_prot, "g")
+    rem_fat = format_remaining(meal_fat, target_fat, "g")
+    rem_carbs = format_remaining(meal_carbs, target_carbs, "g")
+
+    today = date_type.today()
+
     combined = (
-        f"🎯 Setup complete! Here are your personal targets:\n\n"
-        f"🔥 {target_cal:.0f} kcal · 🥩 {target_prot:.0f} g · "
-        f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g\n\n"
-        f"─────────────────\n\n"
-        f"And your first meal analysis is ready:\n\n"
+        f"Your first meal analysis is ready 🎉\n\n"
         f"{meal_text}\n\n"
         f"─────────────────\n"
-        f"📊 This meal is {pct}% of your daily calorie target"
+        f"📊 This meal is {pct}% of your daily calorie target\n\n"
+        f"📊 Today, {today.strftime('%d.%m.%Y')}\n\n"
+        f"Calories: {meal_cal:.0f} / {target_cal:.0f} kcal\n"
+        f"{bar_cal}\n"
+        f"<i>{rem_cal}</i>\n\n"
+        f"Protein: {meal_prot:.0f} / {target_prot:.0f} g\n"
+        f"{bar_prot}\n"
+        f"<i>{rem_prot}</i>\n\n"
+        f"Fat: {meal_fat:.0f} / {target_fat:.0f} g\n"
+        f"{bar_fat}\n"
+        f"<i>{rem_fat}</i>\n\n"
+        f"Carbs: {meal_carbs:.0f} / {target_carbs:.0f} g\n"
+        f"{bar_carbs}\n"
+        f"<i>{rem_carbs}</i>\n\n"
+        f"Meals logged: 1"
     )
 
     # Build keyboard with source URL buttons (same as real usage)
@@ -548,47 +583,78 @@ async def _deliver_combined_result(
             kb_rows.append([InlineKeyboardButton(text="🔗 Source", url=url)])
 
     reply_markup = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
-    await message.answer(combined, reply_markup=reply_markup)
+    await message.answer(combined, reply_markup=reply_markup, parse_mode="HTML")
 
-    # Auto-save to My Menu
+    # Prompt user to save to My Menu (manual click)
     meal_id = await get_latest_meal_id(telegram_id)
-    await _auto_save_to_my_menu(telegram_id, meal_id)
-
-    # Show My Menu instruction + "What else?" button
-    await _send_my_menu_instruction(message, state, telegram_id, meal_id)
+    await _prompt_my_menu_save(message, state, telegram_id, meal_id)
 
 
-async def _auto_save_to_my_menu(telegram_id: int, meal_id: Optional[int]) -> None:
-    """Auto-save the demo meal to the user's My Menu."""
-    if not meal_id:
-        return
-    meal = await get_meal_by_id(meal_id)
-    if not meal:
-        return
-    user = await get_user(telegram_id)
-    if not user:
-        return
-    try:
-        await create_saved_meal(
-            user_id=user["id"],
-            name=meal.get("description_user") or meal.get("description") or "My meal",
-            total_calories=meal.get("calories", 0),
-            total_protein_g=meal.get("protein_g", 0),
-            total_fat_g=meal.get("fat_g", 0),
-            total_carbs_g=meal.get("carbs_g", 0),
-            items=meal.get("items"),
-        )
-    except Exception as e:
-        logger.warning(f"[ONBOARDING] Auto-save to My Menu failed for {telegram_id}: {e}")
-
-
-async def _send_my_menu_instruction(
+async def _prompt_my_menu_save(
     message: types.Message,
     state: FSMContext,
     telegram_id: int,
     meal_id: Optional[int],
 ) -> None:
-    """Send My Menu instruction with 'What else?' button."""
+    """Show Save to My Menu button for the user to tap."""
+    if meal_id:
+        save_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="💾 Save to My Menu",
+                    callback_data=f"onboarding_save_meal:{meal_id}",
+                )]
+            ]
+        )
+        await message.answer(SAVE_TO_MENU_TEXT, reply_markup=save_kb)
+        await state.set_state(OnboardingStates.my_menu_instruction)
+    else:
+        # No meal to save — skip directly to "What else?"
+        what_else_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="✨ What else can YumYummy do?",
+                    callback_data="onboarding_what_else",
+                )]
+            ]
+        )
+        await message.answer(
+            "Let's see what else I can do for you!",
+            reply_markup=what_else_kb,
+        )
+        await state.set_state(OnboardingStates.my_menu_instruction)
+
+
+@router.callback_query(F.data.startswith("onboarding_save_meal:"))
+async def on_onboarding_save_meal(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User tapped Save to My Menu — perform the save, show confirmation + what else."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    parts = callback.data.split(":", 1)
+    try:
+        meal_id = int(parts[1])
+    except (IndexError, ValueError):
+        await callback.message.answer("Could not save meal. Let's continue.")
+        return
+
+    meal = await get_meal_by_id(meal_id)
+    user = await get_user(callback.from_user.id)
+
+    if meal and user:
+        try:
+            await create_saved_meal(
+                user_id=user["id"],
+                name=meal.get("description_user") or meal.get("description") or "My meal",
+                total_calories=meal.get("calories", 0),
+                total_protein_g=meal.get("protein_g", 0),
+                total_fat_g=meal.get("fat_g", 0),
+                total_carbs_g=meal.get("carbs_g", 0),
+                items=meal.get("items"),
+            )
+        except Exception as e:
+            logger.warning(f"[ONBOARDING] Save to My Menu failed: {e}")
+
     what_else_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(
@@ -597,7 +663,7 @@ async def _send_my_menu_instruction(
             )]
         ]
     )
-    await message.answer(MY_MENU_SAVED_INSTRUCTION_TEXT, reply_markup=what_else_kb)
+    await callback.message.answer(MY_MENU_SAVED_INSTRUCTION_TEXT, reply_markup=what_else_kb)
     await state.set_state(OnboardingStates.my_menu_instruction)
 
 

@@ -21,14 +21,14 @@ Value first, setup second, parallelised. The user sends a demo meal, then fills 
 
 Here's what makes me different:
 
-⚡ Log meals in seconds — any format works:
-📝 Text — "oatmeal with banana and coffee with milk"
-🎤 Voice — just describe your meal in a voice message
-📷 Photo — snap your plate, a label, or a barcode
+⚡ Meal logging in seconds in any format you love:
+• Text — "oatmeal with banana and coffee with milk"
+• Voice — just describe your meal in a voice message
+• Photo — snap your plate, a label, or a barcode
 
 🔬 Nerd-level precision:
-Mention a brand (Danone, Chobani) or a place (Starbucks, Chipotle) — I'll search the web for official nutrition data.
-No brand? No problem — I'll estimate from known averages.
+• Mention a brand (Danone, Chobani) or a place (Starbucks, Chipotle) — I'll search the web for official nutrition data.
+• No brand? No problem — I'll estimate from known averages.
 
 🚀 Let's try it! Tell me what you had for your last meal.
 Example: "cappuccino and a croissant at Starbucks"
@@ -37,7 +37,7 @@ Example: "cappuccino and a croissant at Starbucks"
 **Step 2:** User sends meal input → agent search starts in background → bot immediately pivots:
 
 ```
-⏳ Got it! I'm looking up the exact nutrition data for you.
+⏳ Got it! I'm searching for official nutrition sources now — this may take 1-2 minutes, as I thoroughly check real data rather than guess.
 
 While I search — let's set up your personal targets so I can show you how your meal fits into your day.
 ```
@@ -54,46 +54,63 @@ Same questions as before (mostly button taps). Takes ~40-80 seconds — overlaps
 - **Questionnaire finished before agent:** Bot sends a "finalizing" message with one engaging fact:
 
 ```
-⏳ Almost there! Just finalizing your meal analysis...
+⏳ Almost there! Just ~20 more seconds to finalize your meal analysis...
 
-While you wait — a quick food for thought:
+A quick food for thought while you wait:
 
-Research shows that 92% of people who start calorie counting quit within 2 weeks. The #1 reason? Friction. Traditional apps take 15-20 minutes per day to log everything manually.
+A large-scale study found that consistent food trackers lose 2x more weight than those who don't — but "consistently" is the key word. The tracker has to be easy enough to actually use every day.
 
-But a study in the journal Obesity found that consistent food trackers lose 2x more weight — "consistently" is the key word. The tracker has to be easy enough to use every day.
+Why do most people fail? Research shows that 92% who start calorie counting quit within 2 weeks. The #1 reason isn't motivation — it's friction. Traditional apps take 15-20 minutes per day to log everything manually.
 
 That's exactly why YumYummy exists. One message, and I handle the rest. Most meals take under 10 seconds to log.
 ```
 
 **Step 5 — Combined result (the "aha moment"):**
 
-One merged message: personal targets at top, meal analysis below, with percentage context. Includes source URL buttons matching real usage format.
+One merged message: meal analysis first, then percentage context, then full day summary with progress bars (same format as "📊 Today" view). Includes source URL buttons matching real usage format.
 
 ```
-🎯 Setup complete! Here are your personal targets:
-
-🔥 2100 kcal · 🥩 150 g · 🥑 65 g · 🍞 230 g
-
-─────────────────
-
-And your first meal analysis is ready:
+Your first meal analysis is ready 🎉
 
 ✅ Logged: Cappuccino and a croissant at Starbucks
 386 kcal · P 12.5 g · F 18.2 g · C 45.3 g
-...
+🔗 Source: starbucks.com
 
 ─────────────────
 📊 This meal is 18% of your daily calorie target
+
+📊 Today, 02.04.2026
+
+Calories: 386 / 2100 kcal
+██░░░░░░░░░░░░░ 18%
+1714 kcal left
+
+Protein: 12 / 150 g
+█░░░░░░░░░░░░░░ 8%
+138 g left
+...
 ```
 
 Keyboard: `[🔗 Source: Starbucks Cappuccino]` (if source URL available)
 
 ### Phase 2 — My Menu + Feature Guide + Trial
 
-**Step 6:** Meal is auto-saved to My Menu. User sees confirmation + brief instruction:
+**Step 6:** User is prompted to save the meal to My Menu:
 
 ```
-💾 Saved to your Menu!
+💾 Like this meal? Save it to your personal menu!
+
+Your menu is your collection of go-to meals — think of it as speed-dial for food tracking. Breakfast you eat every day, your favorite lunch spot order, regular snacks.
+
+Tap the button below — next time you eat this, you'll log it in 2 taps instead of typing it out.
+```
+
+Button: `[💾 Save to My Menu]`
+
+After user taps save → confirmation + instruction:
+
+```
+✅ Saved to your Menu!
 
 You always have 🍽 My Menu available via the button at the bottom. Save your frequent dishes and log them in just 2 taps — no typing needed.
 
