@@ -420,57 +420,6 @@
       line-height: 1.6;
     }
 
-    /* ── Steps ── */
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      counter-reset: step;
-    }
-    @media (max-width: 700px) {
-      .steps-grid { grid-template-columns: 1fr; }
-    }
-    .step-card {
-      position: relative;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 36px 28px 28px;
-      counter-increment: step;
-      transition: all .2s;
-    }
-    .step-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 4px 24px rgba(108,92,231,.06);
-    }
-    .step-card::before {
-      content: counter(step);
-      position: absolute;
-      top: -18px;
-      left: 24px;
-      width: 36px;
-      height: 36px;
-      background: var(--accent);
-      color: #fff;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: .9rem;
-      box-shadow: 0 4px 12px var(--accent-glow);
-    }
-    .step-card h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .step-card p {
-      font-size: .88rem;
-      color: var(--text-secondary);
-      line-height: 1.6;
-    }
-
     /* ── Bottom CTA ── */
     .cta-section {
       text-align: center;
@@ -651,10 +600,25 @@
       font-weight: 600;
     }
 
-    /* ── Showcase inside section ── */
-    .section-alt .showcase-grid {
-      max-width: 1000px;
+    /* ── Hero showcase row ── */
+    .hero-showcase {
+      margin-top: 56px;
+      max-width: 1100px;
+    }
+
+    /* ── Founder story ── */
+    .founder-text {
+      max-width: 680px;
       margin: 0 auto;
+    }
+    .founder-text p {
+      font-size: .95rem;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      margin-bottom: 18px;
+    }
+    .founder-text p:last-child {
+      margin-bottom: 0;
     }
 
     /* ── 4-col showcase ── */
@@ -668,34 +632,25 @@
       .showcase-grid-4 { grid-template-columns: 1fr; }
     }
 
-    /* ── Pricing Note Bar ── */
-    .pricing-note-bar {
-      max-width: 720px;
-      margin: -32px auto 0;
-      padding: 0 24px 56px;
+    /* ── CTA Pricing Note ── */
+    .cta-pricing-note {
+      margin-top: 28px;
+      background: rgba(108,92,231,.06);
+      border: 1px solid rgba(108,92,231,.10);
+      border-radius: 12px;
+      padding: 16px 22px;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
     }
-    .pricing-note-inner {
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
-      background: var(--accent-bg);
-      border: 1px solid rgba(108,92,231,.12);
-      border-radius: 14px;
-      padding: 20px 24px;
-    }
-    .pricing-note-icon {
-      font-size: 1.3rem;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .pricing-note-inner p {
-      font-size: .9rem;
-      color: var(--text-secondary);
-      line-height: 1.65;
+    .cta-pricing-note p {
+      font-size: .84rem;
+      color: var(--text-muted);
+      line-height: 1.6;
       margin: 0;
     }
-    .pricing-note-inner strong {
-      color: var(--text);
+    .cta-pricing-note strong {
+      color: var(--text-secondary);
     }
     .pricing-save-inline {
       display: inline-block;
@@ -782,6 +737,7 @@
       .nav-links a:not(.nav-cta) { display: none; }
       .hero { padding: 72px 20px 56px; }
       .hero-proof { gap: 16px; font-size: .8rem; }
+      .hero-showcase { margin-top: 40px; }
       .section { padding: 56px 20px; }
       .cta-section { padding: 72px 20px; }
     }
@@ -795,7 +751,6 @@
     <a href="index.html" class="nav-brand">YumYummy</a>
     <div class="nav-links">
       <a href="#features">Features</a>
-      <a href="#how-it-works">How it works</a>
       <a href="#faq">FAQ</a>
       <a href="support.html">Support</a>
       <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="nav-cta">
@@ -845,39 +800,45 @@
         </div>
       </div>
     </div>
+    <div class="hero-showcase">
+      <div class="showcase-grid showcase-grid-4">
+        <div class="showcase-card">
+          <div class="showcase-emoji">✍️</div>
+          <div class="showcase-label">Type it</div>
+          <div class="showcase-desc">"Had oatmeal with banana and a coffee"</div>
+        </div>
+        <div class="showcase-card">
+          <div class="showcase-emoji">🎤</div>
+          <div class="showcase-label">Say it</div>
+          <div class="showcase-desc">Send a voice message — YumYummy transcribes &amp; logs</div>
+        </div>
+        <div class="showcase-card">
+          <div class="showcase-emoji">📸</div>
+          <div class="showcase-label">Snap it</div>
+          <div class="showcase-desc">Take a photo of your meal or nutrition label — YumYummy identifies it and logs the nutrition.</div>
+        </div>
+        <div class="showcase-card">
+          <div class="showcase-emoji">📷</div>
+          <div class="showcase-label">Scan it</div>
+          <div class="showcase-desc">Snap a barcode for exact product nutrition</div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ── Input Modes Section ── -->
-<section class="section-alt" id="input-modes">
-  <div class="section">
-    <div class="section-header">
-      <div class="section-tag">Four ways to log</div>
-      <h2 class="section-title">However you eat, YumYummy tracks it</h2>
-      <p class="section-subtitle">Built by an ex-McKinsey manager who spent 5 years eating at airports, hotels, and client sites. No tracker on the market hit the mark &mdash; all too slow, too inaccurate, or too judgmental. So this one was built from scratch, and battle-tested on every meal for 2+ months straight.</p>
-    </div>
-    <div class="showcase-grid showcase-grid-4">
-      <div class="showcase-card">
-        <div class="showcase-emoji">✍️</div>
-        <div class="showcase-label">Type it</div>
-        <div class="showcase-desc">"Had oatmeal with banana and a coffee"</div>
-      </div>
-      <div class="showcase-card">
-        <div class="showcase-emoji">🎤</div>
-        <div class="showcase-label">Say it</div>
-        <div class="showcase-desc">Send a voice message — YumYummy transcribes &amp; logs</div>
-      </div>
-      <div class="showcase-card">
-        <div class="showcase-emoji">📸</div>
-        <div class="showcase-label">Snap it</div>
-        <div class="showcase-desc">Take a photo of your meal or nutrition label — YumYummy identifies it and logs the nutrition.</div>
-      </div>
-      <div class="showcase-card">
-        <div class="showcase-emoji">📷</div>
-        <div class="showcase-label">Scan it</div>
-        <div class="showcase-desc">Snap a barcode for exact product nutrition</div>
-      </div>
-    </div>
+<!-- ── Founder Story ── -->
+<section class="section" id="story">
+  <div class="section-header">
+    <div class="section-tag">The backstory</div>
+    <h2 class="section-title">Built by an ex-McKinsey manager<br/>to hit his nutrition goals</h2>
+  </div>
+  <div class="founder-text">
+    <p>You know the drill. You're at a restaurant, you order something, and then comes the moment &mdash; do you even bother logging it?</p>
+    <p>You open your tracker. Search &ldquo;chicken shawarma.&rdquo; Fourteen results, none from this restaurant. Pick one that looks close enough. Guess the portion. Add the side. Guess that too. Three minutes later you've logged something &mdash; but you don't trust the numbers. And you do this five times a day.</p>
+    <p>Or you just&hellip; don't. You skip the meal. Then the next one. By Friday the app is collecting dust.</p>
+    <p>YumYummy was built by someone who lived this cycle for years &mdash; eating at airports, client sites, hotels in different cities every week. An ex-McKinsey manager who tried every tracker on the market and hit the same wall every time: the tools were either fast but inaccurate, or accurate but painfully slow. Logging a restaurant meal accurately? Basically impossible.</p>
+    <p>So this one was built from scratch. And battle-tested on every meal, every day, for over two months &mdash; across restaurants, cafes, airports, and home kitchens. Not as a side project. As the tracker its creator actually wanted to use.</p>
   </div>
 </section>
 
@@ -1018,36 +979,6 @@
   </div>
 </section>
 
-<!-- ── How it works ── -->
-<section class="section" id="how-it-works">
-  <div class="section-header">
-    <div class="section-tag">How it works</div>
-    <h2 class="section-title">Start tracking in under 60 seconds</h2>
-  </div>
-  <div class="steps-grid">
-    <div class="step-card">
-      <h3>Open the bot</h3>
-      <p>Search @yum_yummybot in Telegram or tap the button on this page. No signup, no email required.</p>
-    </div>
-    <div class="step-card">
-      <h3>Set your goal</h3>
-      <p>Answer a few quick questions — your weight, target, activity. YumYummy builds your personal plan instantly.</p>
-    </div>
-    <div class="step-card">
-      <h3>Log your first meal</h3>
-      <p>Type "had pasta carbonara", send a voice note, or scan a barcode. That's it — 10 seconds per meal from here on out.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ── Pricing Note ── -->
-<div class="pricing-note-bar" id="pricing">
-  <div class="pricing-note-inner">
-    <span class="pricing-note-icon">💡</span>
-    <p>Your first <strong>3 days are completely free</strong> — full access, no credit card. If you love it, plans start at <strong>$9.99/month</strong> or <strong>$84.99/year</strong> <span class="pricing-save-inline">save 29%</span>. No charges until you decide. Cancel anytime.</p>
-  </div>
-</div>
-
 <!-- ── Bottom CTA ── -->
 <section class="cta-section">
   <div class="cta-inner">
@@ -1057,6 +988,9 @@
       <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
       Try free for 3 days — no card needed
     </a>
+    <div class="cta-pricing-note">
+      <p>Your first <strong>3 days are completely free</strong> — full access, no credit card. After that, plans start at <strong>$9.99/month</strong> or <strong>$84.99/year</strong> <span class="pricing-save-inline">save 29%</span>. No charges until you decide. Cancel anytime.</p>
+    </div>
   </div>
 </section>
 
