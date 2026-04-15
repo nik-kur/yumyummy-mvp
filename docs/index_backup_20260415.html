@@ -92,6 +92,7 @@
       position: relative;
       overflow: hidden;
       padding: 100px 24px 80px;
+      text-align: center;
     }
     .hero::before {
       content: '';
@@ -108,7 +109,7 @@
     .hero-inner {
       position: relative;
       z-index: 1;
-      max-width: 1100px;
+      max-width: 720px;
       margin: 0 auto;
     }
     .hero-pill {
@@ -151,13 +152,15 @@
       font-size: 1.15rem;
       color: var(--text-secondary);
       max-width: 520px;
-      margin: 0 0 32px;
+      margin: 0 auto 40px;
       line-height: 1.7;
     }
     .hero-actions {
       display: flex;
       gap: 14px;
+      justify-content: center;
       flex-wrap: wrap;
+      margin-bottom: 48px;
     }
     .btn {
       display: inline-flex;
@@ -198,65 +201,16 @@
       width: 20px; height: 20px;
     }
 
-    /* Hero two-column layout */
-    .hero-content {
-      display: flex;
-      align-items: center;
-      gap: 3rem;
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-    .hero-text {
-      flex: 1;
-      text-align: left;
-    }
-    .hero-phone-mockup {
-      flex: 0 0 320px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    .phone-frame {
-      position: relative;
-      width: 280px;
-      background: #1a1a2e;
-      border-radius: 36px;
-      padding: 12px;
-      box-shadow: 0 25px 60px rgba(108, 92, 231, 0.15), 0 8px 20px rgba(0,0,0,0.1);
-    }
-    .phone-notch {
-      width: 100px;
-      height: 24px;
-      background: #1a1a2e;
-      border-radius: 0 0 16px 16px;
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 2;
-    }
-    .phone-video {
-      width: 100%;
-      border-radius: 24px;
-      display: block;
-    }
-    .hero-muted {
-      font-size: .85rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-    }
-
     /* Hero social proof */
     .hero-proof {
       display: flex;
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
       flex-wrap: wrap;
       font-size: .85rem;
       color: var(--text-muted);
       font-weight: 500;
-      margin-bottom: 32px;
     }
     .hero-proof span {
       display: flex;
@@ -614,191 +568,7 @@
       font-weight: 600;
     }
 
-    /* ── Founder Bar ── */
-    .founder-bar {
-      padding: 2rem 24px;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(108,92,231,.03) 0%, rgba(108,92,231,.01) 100%);
-    }
-    .founder-bar .container {
-      max-width: 700px;
-      margin: 0 auto;
-    }
-    .founder-story {
-      font-size: .95rem;
-      color: var(--text-secondary);
-      line-height: 1.75;
-      text-align: center;
-      font-style: italic;
-      font-weight: 400;
-    }
-
-    /* ── 4-col showcase ── */
-    .showcase-grid-4 {
-      grid-template-columns: repeat(4, 1fr);
-    }
-    @media (max-width: 900px) {
-      .showcase-grid-4 { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 500px) {
-      .showcase-grid-4 { grid-template-columns: 1fr; }
-    }
-
-    /* ── Pricing ── */
-    .pricing-section {
-      background: var(--bg-alt);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .pricing-card {
-      max-width: 500px;
-      margin: 0 auto;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 40px 36px;
-      text-align: center;
-      box-shadow: 0 4px 24px rgba(108,92,231,.06);
-    }
-    .pricing-trial {
-      background: var(--accent-bg);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 28px;
-    }
-    .pricing-highlight {
-      font-size: 1.35rem;
-      font-weight: 800;
-      color: var(--accent);
-      display: block;
-      margin-bottom: 4px;
-    }
-    .pricing-trial p {
-      font-size: .92rem;
-      color: var(--text-secondary);
-      margin: 0;
-    }
-    .pricing-divider {
-      width: 60px;
-      height: 2px;
-      background: var(--border);
-      margin: 0 auto 28px;
-    }
-    .pricing-plans {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-    .pricing-plan {
-      display: flex;
-      align-items: baseline;
-      gap: 2px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .price {
-      font-size: 2rem;
-      font-weight: 900;
-      color: var(--text);
-      letter-spacing: -.03em;
-    }
-    .period {
-      font-size: 1rem;
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-    .pricing-or {
-      font-size: .9rem;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-    .pricing-save {
-      display: inline-block;
-      background: var(--accent);
-      color: #fff;
-      font-size: .72rem;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 100px;
-      margin-left: 8px;
-      letter-spacing: .02em;
-    }
-    .pricing-note {
-      font-size: .88rem;
-      color: var(--text-muted);
-      margin-bottom: 28px;
-    }
-    .pricing-cta {
-      width: 100%;
-      justify-content: center;
-    }
-
-    /* ── FAQ ── */
-    .faq-list {
-      max-width: 700px;
-      margin: 0 auto;
-    }
-    .faq-item {
-      border-bottom: 1px solid var(--border);
-      padding: 1.25rem 0;
-    }
-    .faq-item summary {
-      font-weight: 600;
-      font-size: 1.05rem;
-      cursor: pointer;
-      list-style: none;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-    }
-    .faq-item summary::-webkit-details-marker { display: none; }
-    .faq-item summary::after {
-      content: '+';
-      font-size: 1.5rem;
-      color: var(--accent);
-      transition: transform 0.2s;
-      flex-shrink: 0;
-    }
-    .faq-item[open] summary::after {
-      content: '−';
-    }
-    .faq-item p {
-      margin-top: 0.75rem;
-      color: #64748b;
-      line-height: 1.7;
-      font-size: .92rem;
-    }
-
     /* ── Responsive ── */
-    @media (max-width: 768px) {
-      .hero-content {
-        flex-direction: column;
-        text-align: center;
-      }
-      .hero-text {
-        text-align: center;
-      }
-      .hero-phone-mockup {
-        flex: none;
-        width: 100%;
-        max-width: 300px;
-        margin: 0 auto;
-      }
-      .hero-proof {
-        align-items: center;
-      }
-      .hero-actions {
-        justify-content: center;
-      }
-      .hero-muted {
-        text-align: center;
-      }
-    }
     @media (max-width: 640px) {
       .nav { padding: 0 16px; }
       .nav-inner { height: 56px; }
@@ -820,11 +590,9 @@
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#faq">FAQ</a>
       <a href="support.html">Support</a>
       <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="nav-cta">
-        Try free — no card needed
+        Open in Telegram
       </a>
     </div>
   </div>
@@ -833,57 +601,37 @@
 <!-- ── Hero ── -->
 <section class="hero">
   <div class="hero-inner">
-    <div class="hero-content">
-      <div class="hero-text">
-        <div class="hero-pill">
-          <span class="dot"></span>
-          AI-powered Telegram bot for nutrition tracking
-        </div>
-        <h1>
-          Effortless logging.<br/>
-          <span class="gradient">Precision you can trust.</span>
-        </h1>
-        <p class="hero-sub">
-          Most trackers make you choose: easy or accurate. YumYummy gives you both &mdash; real nutrition data, just seconds of your time spend.
-        </p>
-        <div class="hero-proof">
-          <span><span class="proof-icon">🔍</span> Real data from official sources</span>
-          <span><span class="proof-icon">⚡</span> Log any meal in 10 seconds</span>
-          <span><span class="proof-icon">💬</span> Right inside Telegram &mdash; no app to download</span>
-        </div>
-        <div class="hero-actions">
-          <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
-            <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-            Try free for 3 days — no card needed
-          </a>
-          <a href="#how-it-works" class="btn btn-ghost">How it works</a>
-        </div>
-        <p class="hero-muted">Just play around and see how it works — no commitment.</p>
-      </div>
-      <div class="hero-phone-mockup">
-        <div class="phone-frame">
-          <div class="phone-notch"></div>
-          <video autoplay muted loop playsinline class="phone-video">
-            <source src="hero_final.mp4" type="video/mp4">
-          </video>
-        </div>
-      </div>
+    <div class="hero-pill">
+      <span class="dot"></span>
+      AI-powered nutrition tracking
     </div>
-  </div>
-</section>
-
-<!-- ── Founder Story Bar ── -->
-<section class="founder-bar">
-  <div class="container">
-    <p class="founder-story">
-      Built by an ex-McKinsey manager who spent 5 years eating at airports, hotels, and client sites. He tried every tracker on the market — all too slow, too inaccurate, or too judgmental. So he built the one he actually wanted to use. He's been tracking every meal with it for 2+ months.
+    <h1>
+      Effortless logging.<br/>
+      <span class="gradient">Precision you can trust.</span>
+    </h1>
+    <p class="hero-sub">
+      Most trackers make you choose: easy or accurate. YumYummy gives you both.
+      Just say what you ate &mdash; we search official sources in real time
+      and return verified calories and macros in seconds.
     </p>
+    <div class="hero-actions">
+      <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+        <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
+        Try free in Telegram
+      </a>
+      <a href="#how-it-works" class="btn btn-ghost">How it works</a>
+    </div>
+    <div class="hero-proof">
+      <span><span class="proof-icon">🔍</span> Real data from official sources</span>
+      <span><span class="proof-icon">⚡</span> Log a meal in 5 seconds</span>
+      <span><span class="proof-icon">💬</span> Right inside Telegram</span>
+    </div>
   </div>
 </section>
 
 <!-- ── Input Modes Showcase ── -->
 <div class="showcase">
-  <div class="showcase-grid showcase-grid-4">
+  <div class="showcase-grid">
     <div class="showcase-card">
       <div class="showcase-emoji">✍️</div>
       <div class="showcase-label">Type it</div>
@@ -893,11 +641,6 @@
       <div class="showcase-emoji">🎤</div>
       <div class="showcase-label">Say it</div>
       <div class="showcase-desc">Send a voice message — YumYummy transcribes &amp; logs</div>
-    </div>
-    <div class="showcase-card">
-      <div class="showcase-emoji">📸</div>
-      <div class="showcase-label">Snap it</div>
-      <div class="showcase-desc">Take a photo of your meal or nutrition label — YumYummy identifies it and logs the nutrition.</div>
     </div>
     <div class="showcase-card">
       <div class="showcase-emoji">📷</div>
@@ -914,7 +657,7 @@
       <div class="section-tag">Why it's different</div>
       <h2 class="section-title">Not another AI guess.<br/>Real data. Real sources.</h2>
       <p class="section-subtitle" style="text-align:left;">
-        Most calorie apps give you a generic AI guess and call it a day.
+        Most calorie apps give you a generic LLM estimate and call it a day.
         YumYummy goes further &mdash; it <strong>actively searches the internet</strong> for
         official nutrition data before giving you a number.
       </p>
@@ -1034,10 +777,10 @@
         </div>
       </div>
       <div class="feature">
-        <div class="feature-icon-wrap">🎯</div>
+        <div class="feature-icon-wrap">📤</div>
         <div class="feature-body">
-          <h3>Transparent accuracy</h3>
-          <p>Every log is labeled Exact, Estimate, or Approximate — so you always know how reliable the data is.</p>
+          <h3>Export anytime</h3>
+          <p>Download all your data as CSV — works with Excel, Google Sheets, or any analytics tool.</p>
         </div>
       </div>
     </div>
@@ -1061,89 +804,20 @@
     </div>
     <div class="step-card">
       <h3>Log your first meal</h3>
-      <p>Type "had pasta carbonara", send a voice note, or scan a barcode. That's it — 10 seconds per meal from here on out.</p>
+      <p>Type "had pasta carbonara", send a voice note, or scan a barcode. That's it — you're tracking.</p>
     </div>
-  </div>
-</section>
-
-<!-- ── Pricing ── -->
-<section class="pricing-section" id="pricing">
-  <div class="section">
-    <div class="section-header">
-      <div class="section-tag">Pricing</div>
-      <h2 class="section-title">Simple pricing. No surprises.</h2>
-    </div>
-    <div class="pricing-card">
-      <div class="pricing-trial">
-        <span class="pricing-highlight">3-day free trial</span>
-        <p>Full access. No credit card needed.</p>
-      </div>
-      <div class="pricing-divider"></div>
-      <div class="pricing-plans">
-        <div class="pricing-plan">
-          <span class="price">$9.99</span>
-          <span class="period">/month</span>
-        </div>
-        <div class="pricing-or">or</div>
-        <div class="pricing-plan">
-          <span class="price">$84.99</span>
-          <span class="period">/year</span>
-          <span class="pricing-save">Save 29%</span>
-        </div>
-      </div>
-      <p class="pricing-note">Cancel anytime. No questions asked.</p>
-      <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary pricing-cta">
-        <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-        Try free for 3 days — no card needed
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- ── FAQ ── -->
-<section class="section" id="faq">
-  <div class="section-header">
-    <div class="section-tag">FAQ</div>
-    <h2 class="section-title">Common questions</h2>
-  </div>
-  <div class="faq-list">
-    <details class="faq-item">
-      <summary>I've tried calorie trackers before and always quit. Why would this be different?</summary>
-      <p>Because the reason you quit wasn't you — it was the tool. Most trackers take 3–5 minutes per meal: searching databases, scrolling through options, adjusting serving sizes. That's 15–20 minutes a day on logging alone. YumYummy takes 10 seconds — just text, say, or snap what you ate. When tracking is that easy, sticking with it stops being a willpower problem.</p>
-    </details>
-    <details class="faq-item">
-      <summary>How accurate is it? AI calorie estimates are usually wrong.</summary>
-      <p>You're right — generic AI guesses aren't good enough. That's why YumYummy doesn't guess first. It searches the web for real nutrition data: restaurant menus, manufacturer websites, product databases. You get the best accuracy possible — official numbers from official sources. AI estimation is only a fallback when real data isn't available online, and the bot always tells you which one you got: Exact (official source), Estimate, or Approximate.</p>
-    </details>
-    <details class="faq-item">
-      <summary>Is $9.99/month worth it for a calorie tracker?</summary>
-      <p>You're not paying for a tracker. You're paying for data accurate enough to actually reach your health goal — whether that's losing weight, building muscle, or just eating better. A free app with unreliable data means months of effort based on wrong numbers. That's the expensive option. YumYummy gives you real nutrition data from real sources in 10 seconds, for less than the cost of a single coffee.</p>
-    </details>
-    <details class="faq-item">
-      <summary>A Telegram bot? Is this a real product?</summary>
-      <p>Try it for 30 seconds and you'll forget it's a bot. YumYummy is a full nutrition tracking system — personalized macro targets, daily and weekly summaries, saved meals, smart meal recommendations, data export — that happens to live inside Telegram, where you already spend your time. No app to download. No account to create. Just tap Start.</p>
-    </details>
-    <details class="faq-item">
-      <summary>Do I need to enter my credit card to try it?</summary>
-      <p>No. Tap Start in Telegram and get 3 days of full access — every feature, no limits — with zero payment info required. No surprise charges. No "forgot to cancel" stress. If it's not for you, it just stops. If you want to continue, you choose a plan.</p>
-    </details>
-    <details class="faq-item">
-      <summary>Does it work for restaurant meals / local food / specific cuisines?</summary>
-      <p>Yes — that's where YumYummy really shines. It searches the web for nutrition data from specific restaurants, cafes, and brands. Starbucks, Domino's, your local shawarma place — if the nutrition info exists online, YumYummy will find it. It works globally: Dubai, Moscow, Jakarta, Istanbul, or anywhere else.</p>
-    </details>
   </div>
 </section>
 
 <!-- ── Bottom CTA ── -->
 <section class="cta-section">
   <div class="cta-inner">
-    <h2>Track your next meal in 10&nbsp;seconds</h2>
-    <p>Text what you ate, send a voice note, or snap a photo. YumYummy finds the real nutrition data and gives you the numbers &mdash; all inside Telegram.</p>
+    <h2>Your next meal is a message&nbsp;away</h2>
+    <p>Join thousands of people who ditched spreadsheets and complicated apps for a simple chat with&nbsp;YumYummy.</p>
     <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
       <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-      Try free for 3 days — no card needed
+      Try YumYummy for free
     </a>
-    <p class="hero-muted">Just play around and see how it works.</p>
   </div>
 </section>
 
