@@ -215,37 +215,79 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      perspective: 1200px;
     }
     .phone-frame {
       position: relative;
-      width: 280px;
-      background: #1a1a2e;
-      border-radius: 36px;
-      padding: 12px;
-      box-shadow: 0 25px 60px rgba(108, 92, 231, 0.15), 0 8px 20px rgba(0,0,0,0.1);
+      width: 272px;
+      background: #1c1c1e;
+      border-radius: 44px;
+      padding: 14px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.08),
+        0 2px 4px rgba(0,0,0,.12),
+        0 8px 24px rgba(0,0,0,.15),
+        0 32px 64px rgba(108, 92, 231, 0.18),
+        inset 0 0 0 1.5px rgba(255,255,255,.06);
+      transform: rotateY(-2deg) rotateX(1deg);
+      transition: transform .4s ease;
     }
-    .phone-notch {
-      width: 100px;
-      height: 24px;
-      background: #1a1a2e;
-      border-radius: 0 0 16px 16px;
+    .phone-frame:hover {
+      transform: rotateY(0deg) rotateX(0deg);
+    }
+    .phone-frame::before {
+      content: '';
       position: absolute;
-      top: 0;
+      top: 60px;
+      right: -2.5px;
+      width: 3px;
+      height: 32px;
+      background: linear-gradient(180deg, #2a2a2e 0%, #3a3a3e 50%, #2a2a2e 100%);
+      border-radius: 0 2px 2px 0;
+    }
+    .phone-frame::after {
+      content: '';
+      position: absolute;
+      top: 100px;
+      left: -2.5px;
+      width: 3px;
+      height: 56px;
+      background: linear-gradient(180deg, #2a2a2e 0%, #3a3a3e 50%, #2a2a2e 100%);
+      border-radius: 2px 0 0 2px;
+      box-shadow: 0 44px 0 0 #2a2a2e;
+    }
+    .phone-screen {
+      position: relative;
+      border-radius: 32px;
+      overflow: hidden;
+      background: #000;
+      aspect-ratio: 9 / 19.5;
+    }
+    .phone-dynamic-island {
+      position: absolute;
+      top: 10px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 2;
+      width: 90px;
+      height: 26px;
+      background: #000;
+      border-radius: 20px;
+      z-index: 3;
     }
     .phone-video {
       width: 100%;
-      border-radius: 24px;
+      height: 100%;
+      object-fit: cover;
       display: block;
     }
-    .hero-muted {
-      font-size: .85rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
+    .phone-screen-glare {
+      position: absolute;
+      inset: 0;
+      border-radius: 32px;
+      background: linear-gradient(135deg, rgba(255,255,255,.08) 0%, transparent 40%, transparent 60%, rgba(255,255,255,.03) 100%);
+      pointer-events: none;
+      z-index: 4;
     }
-
     /* Hero social proof */
     .hero-proof {
       display: flex;
@@ -268,11 +310,6 @@
     }
 
     /* ── Showcase cards ── */
-    .showcase {
-      padding: 32px 24px 80px;
-      max-width: 1000px;
-      margin: 0 auto;
-    }
     .showcase-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -282,7 +319,7 @@
       .showcase-grid { grid-template-columns: 1fr; }
     }
     .showcase-card {
-      background: var(--bg-alt);
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 28px 24px;
@@ -614,24 +651,10 @@
       font-weight: 600;
     }
 
-    /* ── Founder Bar ── */
-    .founder-bar {
-      padding: 2rem 24px;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(108,92,231,.03) 0%, rgba(108,92,231,.01) 100%);
-    }
-    .founder-bar .container {
-      max-width: 700px;
+    /* ── Showcase inside section ── */
+    .section-alt .showcase-grid {
+      max-width: 1000px;
       margin: 0 auto;
-    }
-    .founder-story {
-      font-size: .95rem;
-      color: var(--text-secondary);
-      line-height: 1.75;
-      text-align: center;
-      font-style: italic;
-      font-weight: 400;
     }
 
     /* ── 4-col showcase ── */
@@ -645,96 +668,46 @@
       .showcase-grid-4 { grid-template-columns: 1fr; }
     }
 
-    /* ── Pricing ── */
-    .pricing-section {
-      background: var(--bg-alt);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+    /* ── Pricing Note Bar ── */
+    .pricing-note-bar {
+      max-width: 720px;
+      margin: -32px auto 0;
+      padding: 0 24px 56px;
     }
-    .pricing-card {
-      max-width: 500px;
-      margin: 0 auto;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 40px 36px;
-      text-align: center;
-      box-shadow: 0 4px 24px rgba(108,92,231,.06);
-    }
-    .pricing-trial {
+    .pricing-note-inner {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
       background: var(--accent-bg);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 28px;
+      border: 1px solid rgba(108,92,231,.12);
+      border-radius: 14px;
+      padding: 20px 24px;
     }
-    .pricing-highlight {
-      font-size: 1.35rem;
-      font-weight: 800;
-      color: var(--accent);
-      display: block;
-      margin-bottom: 4px;
+    .pricing-note-icon {
+      font-size: 1.3rem;
+      flex-shrink: 0;
+      margin-top: 1px;
     }
-    .pricing-trial p {
-      font-size: .92rem;
+    .pricing-note-inner p {
+      font-size: .9rem;
       color: var(--text-secondary);
+      line-height: 1.65;
       margin: 0;
     }
-    .pricing-divider {
-      width: 60px;
-      height: 2px;
-      background: var(--border);
-      margin: 0 auto 28px;
-    }
-    .pricing-plans {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-    .pricing-plan {
-      display: flex;
-      align-items: baseline;
-      gap: 2px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .price {
-      font-size: 2rem;
-      font-weight: 900;
+    .pricing-note-inner strong {
       color: var(--text);
-      letter-spacing: -.03em;
     }
-    .period {
-      font-size: 1rem;
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-    .pricing-or {
-      font-size: .9rem;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-    .pricing-save {
+    .pricing-save-inline {
       display: inline-block;
       background: var(--accent);
       color: #fff;
-      font-size: .72rem;
+      font-size: .68rem;
       font-weight: 700;
-      padding: 3px 10px;
+      padding: 2px 8px;
       border-radius: 100px;
-      margin-left: 8px;
       letter-spacing: .02em;
-    }
-    .pricing-note {
-      font-size: .88rem;
-      color: var(--text-muted);
-      margin-bottom: 28px;
-    }
-    .pricing-cta {
-      width: 100%;
-      justify-content: center;
+      vertical-align: middle;
+      margin: 0 2px;
     }
 
     /* ── FAQ ── */
@@ -786,17 +759,20 @@
       .hero-phone-mockup {
         flex: none;
         width: 100%;
-        max-width: 300px;
+        max-width: 260px;
         margin: 0 auto;
+      }
+      .phone-frame {
+        transform: none;
+      }
+      .phone-frame:hover {
+        transform: none;
       }
       .hero-proof {
         align-items: center;
       }
       .hero-actions {
         justify-content: center;
-      }
-      .hero-muted {
-        text-align: center;
       }
     }
     @media (max-width: 640px) {
@@ -820,7 +796,6 @@
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
-      <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
       <a href="support.html">Support</a>
       <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="nav-cta">
@@ -856,56 +831,55 @@
             <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
             Try free for 3 days — no card needed
           </a>
-          <a href="#how-it-works" class="btn btn-ghost">How it works</a>
         </div>
-        <p class="hero-muted">Just play around and see how it works — no commitment.</p>
       </div>
       <div class="hero-phone-mockup">
         <div class="phone-frame">
-          <div class="phone-notch"></div>
-          <video autoplay muted loop playsinline class="phone-video">
-            <source src="hero_final.mp4" type="video/mp4">
-          </video>
+          <div class="phone-screen">
+            <div class="phone-dynamic-island"></div>
+            <video autoplay muted loop playsinline class="phone-video">
+              <source src="hero_final.mp4" type="video/mp4">
+            </video>
+            <div class="phone-screen-glare"></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── Founder Story Bar ── -->
-<section class="founder-bar">
-  <div class="container">
-    <p class="founder-story">
-      Built by an ex-McKinsey manager who spent 5 years eating at airports, hotels, and client sites. He tried every tracker on the market — all too slow, too inaccurate, or too judgmental. So he built the one he actually wanted to use. He's been tracking every meal with it for 2+ months.
-    </p>
+<!-- ── Input Modes Section ── -->
+<section class="section-alt" id="input-modes">
+  <div class="section">
+    <div class="section-header">
+      <div class="section-tag">Four ways to log</div>
+      <h2 class="section-title">However you eat, YumYummy tracks it</h2>
+      <p class="section-subtitle">Built by an ex-McKinsey manager who spent 5 years eating at airports, hotels, and client sites. No tracker on the market hit the mark &mdash; all too slow, too inaccurate, or too judgmental. So this one was built from scratch, and battle-tested on every meal for 2+ months straight.</p>
+    </div>
+    <div class="showcase-grid showcase-grid-4">
+      <div class="showcase-card">
+        <div class="showcase-emoji">✍️</div>
+        <div class="showcase-label">Type it</div>
+        <div class="showcase-desc">"Had oatmeal with banana and a coffee"</div>
+      </div>
+      <div class="showcase-card">
+        <div class="showcase-emoji">🎤</div>
+        <div class="showcase-label">Say it</div>
+        <div class="showcase-desc">Send a voice message — YumYummy transcribes &amp; logs</div>
+      </div>
+      <div class="showcase-card">
+        <div class="showcase-emoji">📸</div>
+        <div class="showcase-label">Snap it</div>
+        <div class="showcase-desc">Take a photo of your meal or nutrition label — YumYummy identifies it and logs the nutrition.</div>
+      </div>
+      <div class="showcase-card">
+        <div class="showcase-emoji">📷</div>
+        <div class="showcase-label">Scan it</div>
+        <div class="showcase-desc">Snap a barcode for exact product nutrition</div>
+      </div>
+    </div>
   </div>
 </section>
-
-<!-- ── Input Modes Showcase ── -->
-<div class="showcase">
-  <div class="showcase-grid showcase-grid-4">
-    <div class="showcase-card">
-      <div class="showcase-emoji">✍️</div>
-      <div class="showcase-label">Type it</div>
-      <div class="showcase-desc">"Had oatmeal with banana and a coffee"</div>
-    </div>
-    <div class="showcase-card">
-      <div class="showcase-emoji">🎤</div>
-      <div class="showcase-label">Say it</div>
-      <div class="showcase-desc">Send a voice message — YumYummy transcribes &amp; logs</div>
-    </div>
-    <div class="showcase-card">
-      <div class="showcase-emoji">📸</div>
-      <div class="showcase-label">Snap it</div>
-      <div class="showcase-desc">Take a photo of your meal or nutrition label — YumYummy identifies it and logs the nutrition.</div>
-    </div>
-    <div class="showcase-card">
-      <div class="showcase-emoji">📷</div>
-      <div class="showcase-label">Scan it</div>
-      <div class="showcase-desc">Snap a barcode for exact product nutrition</div>
-    </div>
-  </div>
-</div>
 
 <!-- ── Accuracy Section ── -->
 <section class="section" id="accuracy">
@@ -1066,37 +1040,23 @@
   </div>
 </section>
 
-<!-- ── Pricing ── -->
-<section class="pricing-section" id="pricing">
-  <div class="section">
-    <div class="section-header">
-      <div class="section-tag">Pricing</div>
-      <h2 class="section-title">Simple pricing. No surprises.</h2>
-    </div>
-    <div class="pricing-card">
-      <div class="pricing-trial">
-        <span class="pricing-highlight">3-day free trial</span>
-        <p>Full access. No credit card needed.</p>
-      </div>
-      <div class="pricing-divider"></div>
-      <div class="pricing-plans">
-        <div class="pricing-plan">
-          <span class="price">$9.99</span>
-          <span class="period">/month</span>
-        </div>
-        <div class="pricing-or">or</div>
-        <div class="pricing-plan">
-          <span class="price">$84.99</span>
-          <span class="period">/year</span>
-          <span class="pricing-save">Save 29%</span>
-        </div>
-      </div>
-      <p class="pricing-note">Cancel anytime. No questions asked.</p>
-      <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary pricing-cta">
-        <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-        Try free for 3 days — no card needed
-      </a>
-    </div>
+<!-- ── Pricing Note ── -->
+<div class="pricing-note-bar" id="pricing">
+  <div class="pricing-note-inner">
+    <span class="pricing-note-icon">💡</span>
+    <p>Your first <strong>3 days are completely free</strong> — full access, no credit card. If you love it, plans start at <strong>$9.99/month</strong> or <strong>$84.99/year</strong> <span class="pricing-save-inline">save 29%</span>. No charges until you decide. Cancel anytime.</p>
+  </div>
+</div>
+
+<!-- ── Bottom CTA ── -->
+<section class="cta-section">
+  <div class="cta-inner">
+    <h2>Try it right now &mdash; zero&nbsp;commitment</h2>
+    <p>No credit card, no email, no account. Just tap Start in Telegram and see how YumYummy tracks your meals in seconds.</p>
+    <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+      <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
+      Try free for 3 days — no card needed
+    </a>
   </div>
 </section>
 
@@ -1131,19 +1091,6 @@
       <summary>Does it work for restaurant meals / local food / specific cuisines?</summary>
       <p>Yes — that's where YumYummy really shines. It searches the web for nutrition data from specific restaurants, cafes, and brands. Starbucks, Domino's, your local shawarma place — if the nutrition info exists online, YumYummy will find it. It works globally: Dubai, Moscow, Jakarta, Istanbul, or anywhere else.</p>
     </details>
-  </div>
-</section>
-
-<!-- ── Bottom CTA ── -->
-<section class="cta-section">
-  <div class="cta-inner">
-    <h2>Track your next meal in 10&nbsp;seconds</h2>
-    <p>Text what you ate, send a voice note, or snap a photo. YumYummy finds the real nutrition data and gives you the numbers &mdash; all inside Telegram.</p>
-    <a href="https://t.me/yum_yummybot" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
-      <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-      Try free for 3 days — no card needed
-    </a>
-    <p class="hero-muted">Just play around and see how it works.</p>
   </div>
 </section>
 
