@@ -156,21 +156,16 @@ def calculate_targets(
 
 # ============ Texts ============
 
-WELCOME_TEXT = """👋 Hi! I'm YumYummy — your AI nutrition tracker.
-
-Here's what makes me different:
-
-⚡ Meal logging in seconds in any format you love:
-• Text — "oatmeal with banana and coffee with milk"
-• Voice — just describe your meal in a voice message
-• Photo — snap your plate, a label, or a barcode
-
-🔬 Nerd-level precision:
-• Mention a brand (Danone, Chobani) or a place (Starbucks, Chipotle) — I'll search the web for official nutrition data.
-• No brand? No problem — I'll estimate from known averages.
-
-🚀 Let's try it! Tell me what you had for your last meal.
-Example: "cappuccino and a croissant at Starbucks\""""
+WELCOME_TEXT = (
+    "👋 Hi! I'm YumYummy — your AI nutrition tracker in Telegram.\n\n"
+    "Tell me what you ate. Text, voice, or photo — I'll find the real nutrition data in about 10 seconds.\n\n"
+    "What makes this different from other trackers:\n\n"
+    "🔍 Real data — I search the web for official nutrition info from restaurants and brands. Not a guess from a database.\n"
+    "⚡ 10 seconds — just describe your meal in any way. No searching, no scrolling, no manual entry.\n"
+    "💬 Right here in Telegram — no app to download.\n\n"
+    "🚀 Let's try it right now. Tell me your last meal.\n"
+    "Example: \"cappuccino and a croissant at Starbucks\""
+)
 
 DEMO_MEAL_PIVOT_TEXT = """⏳ Got it! I'm searching for official nutrition sources now — this may take 1-2 minutes, as I thoroughly check real data rather than guess.
 

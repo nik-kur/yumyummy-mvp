@@ -53,7 +53,14 @@ Tell me what you had for breakfast today.
 Good luck! 💪""",
         "onboarding.trial_activated": "🎉 3-day trial activated!",
         "billing.paywall_trial": "🎉 <b>Try YumYummy for free!</b>\n\n3 days of full access - no payment required.\nAfter trial, pick the plan that fits you best.\n\n{plans_text}",
-        "billing.paywall_trial_expired": "⏰ <b>Your trial has ended</b>\n\nTo keep using YumYummy, choose a subscription:\n\n{plans_text}",
+        "billing.paywall_trial_expired": (
+            "⏰ <b>Your trial has ended</b>\n\n"
+            "Your targets, saved meals, and tracking history are saved — "
+            "subscribe to keep logging and see your progress grow.\n\n"
+            "{plans_text}\n\n"
+            "🛡 Not sure? 30-day money-back guarantee. "
+            "If it's not for you, tap Support and get a full refund — no questions asked."
+        ),
         "billing.paywall_sub_expired": "⏰ <b>Your subscription has ended</b>\n\nRenew your plan to continue:\n\n{plans_text}",
         "billing.stars_info": "⭐ <b>Pay with Telegram Stars</b>\n\n{stars_plans_text}\n\n<i>These are subscription prices for YumYummy, not the cost of buying Stars themselves. The actual amount you pay for Stars may be higher due to App Store / Google Play and Telegram fees. Please double-check the price before purchasing Stars.</i>",
         "billing.show_stars_btn": "⭐ Pay with Telegram Stars",

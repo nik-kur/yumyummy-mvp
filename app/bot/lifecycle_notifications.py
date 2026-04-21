@@ -199,6 +199,79 @@ Whenever you're ready to track your nutrition again, your account and settings a
 
 This is my last message — no more reminders after this. Take care!"""
 
+# ── Subscriber re-engagement (Day 4-14 after going silent) ──────────────────
+
+SUBSCRIBER_REENGAGEMENT_D1 = (
+    "👋 Hey! What did you have for lunch today? "
+    "Just text it — I'll handle the rest."
+)
+
+SUBSCRIBER_REENGAGEMENT_D3 = (
+    "📱 Quick one: you can also send me a voice note. "
+    "\"Had pasta with chicken and a coffee\" — that's all it takes. "
+    "Give it a try when you eat next."
+)
+
+SUBSCRIBER_REENGAGEMENT_D5 = (
+    "💡 Even logging one meal a day gives you a useful picture of your nutrition. "
+    "No need to be perfect — just aware. "
+    "What's on your plate today?"
+)
+
+SUBSCRIBER_REENGAGEMENT_D7 = (
+    "📊 Your targets and saved meals are all here, waiting. "
+    "Whenever you're ready, just tell me what you ate. "
+    "No judgment — even after a break."
+)
+
+SUBSCRIBER_REENGAGEMENT_D14 = (
+    "👋 It's been a while! If tracking isn't working for you right now, that's okay. "
+    "I'm here whenever you want to pick it back up. "
+    "Your data isn't going anywhere."
+)
+
+# Tiers ordered by threshold descending so the highest matching unsent tier wins.
+SUBSCRIBER_REENGAGEMENT_TIERS = [
+    (14, "subscriber_reengagement_d14", SUBSCRIBER_REENGAGEMENT_D14),
+    (7, "subscriber_reengagement_d7", SUBSCRIBER_REENGAGEMENT_D7),
+    (5, "subscriber_reengagement_d5", SUBSCRIBER_REENGAGEMENT_D5),
+    (3, "subscriber_reengagement_d3", SUBSCRIBER_REENGAGEMENT_D3),
+    (1, "subscriber_reengagement_d1", SUBSCRIBER_REENGAGEMENT_D1),
+]
+
+# ── Weekly summary report ───────────────────────────────────────────────────
+
+WEEKLY_SUMMARY_ACTIVE = (
+    "📈 Your week in review ({date_range}):\n\n"
+    "🍽 Meals logged: {meals_count}\n"
+    "📅 Active days: {active_days}/7\n"
+    "🎯 Within calorie target: {on_target_pct}% of days\n"
+    "🥩 Avg protein: {avg_protein}g / {protein_target}g target\n\n"
+    "{trend_message}\n\n"
+    "Keep it up next week! 💪"
+)
+
+WEEKLY_SUMMARY_INACTIVE = (
+    "📊 Your week ({date_range}):\n\n"
+    "🍽 Meals logged: {meals_count}\n"
+    "📅 Active days: {active_days}/7\n\n"
+    "Even tracking a few meals gives you useful data. "
+    "Tip: logging just breakfast every day is a great starting pattern. "
+    "It takes 10 seconds and sets the tone for the rest of the day."
+)
+
+WEEKLY_TREND_SOLID = (
+    "Your consistency is solid. "
+    "This is how habits form — one meal at a time."
+)
+WEEKLY_TREND_MODERATE = (
+    "Tracking 3-4 days still gives you useful data. Every logged meal counts."
+)
+WEEKLY_TREND_LOW = (
+    "Even a few logs show patterns. "
+    "Try logging just breakfast this week — it takes 10 seconds."
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -503,17 +576,27 @@ async def _process_user_notifications(bot: Bot, db, user: User):
     trial_day = _trial_day(user)
     days_after = _days_since_trial_end(user)
     hour = _user_local_hour(user)
+    has_sub = _has_active_subscription(user)
 
-    # Skip users with an active paid subscription (they don't need lifecycle nudges)
-    if _has_active_subscription(user):
+    # ── Active-subscriber flows ─────────────────────────────────────────
+    # Paying subscribers get re-engagement nudges (if they go silent) and a
+    # weekly summary report every Sunday evening.
+    if has_sub:
+        await _process_subscriber_reengagement(bot, db, user, tg_id, hour)
+        await _process_weekly_summaries(bot, db, user, tg_id, hour)
         return
 
     # ── Trial-period notifications ──────────────────────────────────────
     if trial_day is not None and days_after is None:
         await _process_trial_notifications(bot, db, user, tg_id, trial_day, hour)
 
+        # Trial users still on an active trial past Day 3 (e.g. extended trial)
+        # also get the subscriber re-engagement sequence.
+        if trial_day >= 4:
+            await _process_subscriber_reengagement(bot, db, user, tg_id, hour)
+
     # ── Post-trial win-back ─────────────────────────────────────────────
-    if days_after is not None and not _has_active_subscription(user):
+    if days_after is not None and not has_sub:
         await _process_winback_notifications(bot, db, user, tg_id, days_after, hour)
 
 
@@ -698,3 +781,172 @@ async def _process_winback_notifications(
         if 9 <= hour < 15:
             if await _send_notification(bot, int(tg_id), WINBACK_T30):
                 _record_sent(db, tg_id, "winback_t30")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Subscriber re-engagement (silent paying users + extended-trial Day 4+)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _days_since_last_meal(db, user: User) -> Optional[int]:
+    """Whole-day count since the user's most recent logged meal.
+
+    Returns None if the user has no meals at all (nothing to re-engage from).
+    """
+    last_meal = (
+        db.query(MealEntry)
+        .filter(MealEntry.user_id == user.id)
+        .order_by(MealEntry.eaten_at.desc())
+        .first()
+    )
+    if last_meal is None or last_meal.eaten_at is None:
+        return None
+
+    last_eaten = last_meal.eaten_at
+    if last_eaten.tzinfo is None:
+        last_eaten = last_eaten.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    return max((now - last_eaten).days, 0)
+
+
+async def _process_subscriber_reengagement(
+    bot: Bot, db, user: User, tg_id: str, hour: int
+):
+    """Nudge paying subscribers (or active trial Day 4+) who've gone silent.
+
+    Fires at most once per tier, only in the 10:00-14:00 local lunch window,
+    using the highest matching unsent tier. The five tiers (1/3/5/7/14 days)
+    are capped at 5 total messages; after D14 nothing further is sent.
+    """
+    # Only fire in the user's local lunch window.
+    if not (10 <= hour < 14):
+        return
+
+    days_since = _days_since_last_meal(db, user)
+    if days_since is None:
+        return
+
+    # Highest matching unsent tier wins — this naturally handles the
+    # "reset on new meal" rule: once the user logs again, days_since drops
+    # to 0 and nothing fires until they go silent long enough for the next
+    # unsent tier threshold.
+    for threshold, event_type, text in SUBSCRIBER_REENGAGEMENT_TIERS:
+        if days_since < threshold:
+            continue
+        if _was_sent(db, tg_id, event_type):
+            continue
+        if await _send_notification(bot, int(tg_id), text):
+            _record_sent(db, tg_id, event_type)
+        return
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Weekly summary report (Sunday evening, active subscribers)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _format_date_range(start: date, end: date) -> str:
+    """Format a date range like 'Nov 10 - Nov 16' (or with year if they differ)."""
+    if start.year == end.year:
+        return f"{start.strftime('%b %d')} - {end.strftime('%b %d')}"
+    return f"{start.strftime('%b %d, %Y')} - {end.strftime('%b %d, %Y')}"
+
+
+def _compute_weekly_stats(db, user: User, end_date: date) -> dict:
+    """Compute weekly nutrition stats for the 7-day window ending at `end_date`.
+
+    Returns meals_count, active_days, on_target_pct, avg_protein and the
+    underlying date range.
+    """
+    start_date = end_date - timedelta(days=6)
+
+    user_days = db.query(UserDay).filter(
+        UserDay.user_id == user.id,
+        UserDay.date >= start_date,
+        UserDay.date <= end_date,
+    ).all()
+    day_ids = [ud.id for ud in user_days]
+
+    if day_ids:
+        meals_count = db.query(MealEntry).filter(
+            MealEntry.user_day_id.in_(day_ids)
+        ).count()
+    else:
+        meals_count = 0
+
+    # Active day = UserDay with at least one meal entry.
+    active_user_days = []
+    for ud in user_days:
+        meals = db.query(MealEntry).filter(MealEntry.user_day_id == ud.id).count()
+        if meals > 0:
+            active_user_days.append(ud)
+    active_days = len(active_user_days)
+
+    target_cal = user.target_calories or 2000
+    on_target = 0
+    total_protein = 0.0
+    for ud in active_user_days:
+        cal = ud.total_calories or 0
+        if abs(cal - target_cal) <= target_cal * 0.10:
+            on_target += 1
+        total_protein += ud.total_protein_g or 0
+
+    on_target_pct = round(on_target / active_days * 100) if active_days else 0
+    avg_protein = round(total_protein / active_days) if active_days else 0
+
+    return {
+        "meals_count": meals_count,
+        "active_days": active_days,
+        "on_target_pct": on_target_pct,
+        "avg_protein": avg_protein,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
+async def _process_weekly_summaries(bot: Bot, db, user: User, tg_id: str, hour: int):
+    """Send a weekly progress report to active subscribers on Sunday evening.
+
+    Deduped per ISO week via `weekly_summary_YYYY_WW`. Sunday is weekday() == 6.
+    """
+    # Sunday evening, 18:00-20:00 local.
+    local_now = _user_local_now(user)
+    if local_now.weekday() != 6:
+        return
+    if not (18 <= hour < 20):
+        return
+
+    end_date = local_now.date()
+    iso_year, iso_week, _ = end_date.isocalendar()
+    event_type = f"weekly_summary_{iso_year}_{iso_week:02d}"
+    if _was_sent(db, tg_id, event_type):
+        return
+
+    stats = _compute_weekly_stats(db, user, end_date)
+    date_range = _format_date_range(stats["start_date"], stats["end_date"])
+
+    if stats["meals_count"] >= 3:
+        if stats["active_days"] >= 5:
+            trend_message = WEEKLY_TREND_SOLID
+        elif stats["active_days"] >= 3:
+            trend_message = WEEKLY_TREND_MODERATE
+        else:
+            trend_message = WEEKLY_TREND_LOW
+        text = WEEKLY_SUMMARY_ACTIVE.format(
+            date_range=date_range,
+            meals_count=stats["meals_count"],
+            active_days=stats["active_days"],
+            on_target_pct=stats["on_target_pct"],
+            avg_protein=stats["avg_protein"],
+            protein_target=round(user.target_protein_g or 120),
+            trend_message=trend_message,
+        )
+    else:
+        text = WEEKLY_SUMMARY_INACTIVE.format(
+            date_range=date_range,
+            meals_count=stats["meals_count"],
+            active_days=stats["active_days"],
+        )
+
+    if await _send_notification(bot, int(tg_id), text):
+        _record_sent(db, tg_id, event_type)
