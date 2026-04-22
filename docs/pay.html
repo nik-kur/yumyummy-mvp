@@ -169,6 +169,23 @@
   </div>
 </div>
 
+<!-- Interstitial for Telegram WebView: redirect user to external browser -->
+<div id="open-in-browser-view" style="display:none;">
+  <div class="pay-hero">
+    <h1>Open this page in your browser</h1>
+    <p>For Apple&nbsp;Pay and card payments to work correctly, this page needs to be opened in Safari or Chrome. It takes one tap.</p>
+  </div>
+  <div style="text-align:center;padding:0 24px 48px;">
+    <a id="open-external-btn" class="plan-btn" style="padding:16px 40px;font-size:1rem;">
+      Open in browser
+    </a>
+    <div id="ios-hint" style="display:none;margin-top:24px;font-size:.88rem;color:var(--muted);max-width:420px;margin-left:auto;margin-right:auto;">
+      If nothing happens: tap <b>&middot;&middot;&middot;</b> at the top right of
+      this window, then choose <b>Open in Safari</b> or <b>Open in Browser</b>.
+    </div>
+  </div>
+</div>
+
 <div id="success-view" class="pay-success">
   <h2>Payment confirmed!</h2>
   <p>Your subscription is now active. Go back to the Telegram bot and start tracking!</p>
@@ -185,11 +202,60 @@
 
 <script>
 (function () {
+  /* ---- Telegram WebView detection ---- */
+  function isTelegramWebView() {
+    var ua = navigator.userAgent || "";
+    var hasTgObj = !!(window.Telegram && (window.Telegram.WebView || window.Telegram.WebApp));
+    var uaLooksTg = /Telegram/i.test(ua);
+    var isAndroidWV = /Android/i.test(ua) && /\bwv\b/i.test(ua);
+    var isIOSInApp = /iPhone|iPad|iPod/i.test(ua) && !/Safari/i.test(ua);
+    return hasTgObj || uaLooksTg || isAndroidWV || isIOSInApp;
+  }
+
+  function isAndroidUA() {
+    return /Android/i.test(navigator.userAgent || "");
+  }
+
+  function buildChromeIntentUrl(httpsUrl) {
+    var u = new URL(httpsUrl);
+    return "intent://" + u.host + u.pathname + u.search +
+           "#Intent;scheme=https;package=com.android.chrome" +
+           ";S.browser_fallback_url=" + encodeURIComponent(httpsUrl) + ";end";
+  }
+
+  function renderOpenInBrowserView() {
+    document.getElementById("loading-view").style.display = "none";
+    document.getElementById("checkout-view").style.display = "none";
+    document.getElementById("open-in-browser-view").style.display = "block";
+
+    var currentUrl = window.location.href;
+    var btn = document.getElementById("open-external-btn");
+
+    if (isAndroidUA()) {
+      var intentUrl = buildChromeIntentUrl(currentUrl);
+      btn.href = intentUrl;
+      setTimeout(function () { window.location.href = intentUrl; }, 100);
+    } else {
+      btn.href = currentUrl;
+      btn.target = "_blank";
+      btn.rel = "noopener";
+      document.getElementById("ios-hint").style.display = "block";
+    }
+  }
+
+  /* ---- Parse query params ---- */
   var params = new URLSearchParams(window.location.search);
   var telegramId = params.get("tid");
   var plan = params.get("plan");
   var token = params.get("token");
 
+  /* ---- If inside Telegram WebView, skip Paddle and show interstitial ---- */
+  if (isTelegramWebView()) {
+    renderOpenInBrowserView();
+    return;
+  }
+
+  /* ---- Normal flow: initialise Paddle checkout ---- */
   var PRICE_IDS = {
     monthly: "pri_01kmq60c1atp7edrsn5255kppm",
     yearly:  "pri_01kmq6279x4zmkr5mj0vqaphyh"
@@ -268,10 +334,8 @@
     });
   };
 
-  // Auto-open checkout if plan is pre-selected from the bot
   if (plan && PRICE_IDS[plan] && telegramId && initialized) {
     document.getElementById("loading-view").style.display = "block";
-    // Small delay to let Paddle.js fully load
     setTimeout(function () {
       openCheckout(plan);
     }, 500);
