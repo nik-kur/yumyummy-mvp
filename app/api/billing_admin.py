@@ -9,7 +9,7 @@ Protected by internal API token. Use for:
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ from app.models.user import User
 from app.models.payment_event import PaymentEvent
 from app.billing.plans import get_active_plan
 from app.billing.service import apply_subscription_payment, DuplicateEvent
+from app.billing.paddle_reconcile import reconcile_all, reconcile_user
 
 logger = logging.getLogger(__name__)
 
@@ -169,4 +170,68 @@ def get_user_billing(
         subscription_gumroad_id=user.subscription_gumroad_id,
         trial_started_at=user.trial_started_at,
         trial_ends_at=user.trial_ends_at,
+    )
+
+
+# ---------- Paddle reconciliation ----------
+
+
+class PaddleReconcileResult(BaseModel):
+    telegram_id: str
+    status: str
+    new_ends_at: Optional[datetime] = None
+    paddle_status: Optional[str] = None
+    error: Optional[str] = None
+
+
+@router.post("/paddle/reconcile/{telegram_id}", response_model=PaddleReconcileResult)
+async def paddle_reconcile_user(
+    telegram_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_admin_token),
+):
+    """
+    Pull a single user's subscription from Paddle and mirror its
+    ``current_billing_period.ends_at`` / ``status`` / ``scheduled_change``
+    into our DB. Use after a webhook is suspected to have been missed,
+    or before manually debugging a user's billing complaint.
+    """
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    res = await reconcile_user(db, user)
+    return PaddleReconcileResult(
+        telegram_id=res.telegram_id,
+        status=res.status,
+        new_ends_at=res.new_ends_at,
+        paddle_status=res.paddle_status,
+        error=res.error,
+    )
+
+
+class PaddleReconcileAllResponse(BaseModel):
+    reconciled: int
+    results: List[PaddleReconcileResult]
+
+
+@router.post("/paddle/reconcile-all", response_model=PaddleReconcileAllResponse)
+async def paddle_reconcile_all_endpoint(
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_admin_token),
+):
+    """Reconcile every Paddle user in the about-to-expire / recently-expired window."""
+    results = await reconcile_all(db)
+    return PaddleReconcileAllResponse(
+        reconciled=len(results),
+        results=[
+            PaddleReconcileResult(
+                telegram_id=r.telegram_id,
+                status=r.status,
+                new_ends_at=r.new_ends_at,
+                paddle_status=r.paddle_status,
+                error=r.error,
+            )
+            for r in results
+        ],
     )

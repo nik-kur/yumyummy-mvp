@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import date as date_type
+from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
@@ -80,6 +81,56 @@ def run_migrations():
             logger.error(f"[STARTUP] Alembic migration failed: {result.stderr.strip()}")
     except Exception as e:
         logger.error(f"[STARTUP] Alembic migration error: {e}")
+
+
+# ---------- Paddle reconciliation background loop ----------
+# Webhooks remain the primary sync mechanism. This loop is a safety net that
+# pulls Paddle's source of truth for any user whose local end date is in the
+# 'about to expire' window, in case a webhook was lost.
+
+import asyncio
+_PADDLE_RECONCILE_INTERVAL_SECONDS = 6 * 60 * 60  # 6 hours
+_paddle_reconcile_task: Optional["asyncio.Task[None]"] = None  # type: ignore[name-defined]
+
+
+@app.on_event("startup")
+async def start_paddle_reconcile_loop():
+    if not settings.paddle_enabled or not settings.paddle_api_key:
+        logger.info("[STARTUP] Paddle reconcile loop not started (paddle_enabled=%s, api_key=%s)",
+                    settings.paddle_enabled, bool(settings.paddle_api_key))
+        return
+
+    async def _loop():
+        from app.billing.paddle_reconcile import reconcile_all
+        while True:
+            try:
+                db_session = SessionLocal()
+                try:
+                    await reconcile_all(db_session)
+                finally:
+                    db_session.close()
+            except Exception as e:
+                logger.exception("[PADDLE-RECON] Background loop error: %s", e)
+            await asyncio.sleep(_PADDLE_RECONCILE_INTERVAL_SECONDS)
+
+    global _paddle_reconcile_task
+    _paddle_reconcile_task = asyncio.create_task(_loop())
+    logger.info(
+        "[STARTUP] Paddle reconcile loop started (every %ds)",
+        _PADDLE_RECONCILE_INTERVAL_SECONDS,
+    )
+
+
+@app.on_event("shutdown")
+async def stop_paddle_reconcile_loop():
+    global _paddle_reconcile_task
+    if _paddle_reconcile_task is not None:
+        _paddle_reconcile_task.cancel()
+        try:
+            await _paddle_reconcile_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        _paddle_reconcile_task = None
 
 
 # Include context API router for agent tools
