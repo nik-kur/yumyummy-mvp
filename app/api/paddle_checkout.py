@@ -56,6 +56,13 @@ def generate_paddle_checkout(payload: PaddleCheckoutRequest, db: Session = Depen
         "token": token,
         "cst": settings.paddle_client_side_token,
         "env": settings.paddle_environment,
+        # Explicit source flag so pay.html always shows the
+        # "open in external browser" interstitial when launched
+        # from Telegram. Paddle's overlay (3DS, Apple Pay token
+        # exchange) breaks inside Telegram's in-app browsers
+        # (incl. iOS SFSafariViewController), so UA sniffing
+        # alone is unreliable — this is the source of truth.
+        "src": "tg",
     }
     checkout_url = f"https://yumyummy.ai/pay.html?{urlencode(params)}"
 
