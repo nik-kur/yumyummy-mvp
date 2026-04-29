@@ -202,7 +202,25 @@
 
 <script>
 (function () {
-  /* ---- Telegram WebView detection ---- */
+  /* ---- Parse query params ---- */
+  var params = new URLSearchParams(window.location.search);
+  var telegramId = params.get("tid");
+  var plan = params.get("plan");
+  var token = params.get("token");
+  // Explicit signal from the bot that this URL was generated for a
+  // Telegram user. Source of truth for "should we show the
+  // open-in-external-browser interstitial?".
+  var src = params.get("src");
+  // Set by the interstitial when the user re-opens the URL in a real
+  // browser. Skips the interstitial on the second visit so we don't
+  // loop the user.
+  var alreadyExternal = params.get("external") === "1";
+
+  /* ---- Telegram WebView detection (UA fallback) ----
+     This is intentionally loose because Telegram opens URL buttons in
+     SFSafariViewController on iOS, whose UA does contain "Safari" and
+     does NOT contain "Telegram". We rely primarily on src=tg from the
+     bot; this UA heuristic only catches edge cases (e.g. shared links). */
   function isTelegramWebView() {
     var ua = navigator.userAgent || "";
     var hasTgObj = !!(window.Telegram && (window.Telegram.WebView || window.Telegram.WebApp));
@@ -214,6 +232,16 @@
 
   function isAndroidUA() {
     return /Android/i.test(navigator.userAgent || "");
+  }
+
+  function isIOSUA() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  }
+
+  function buildExternalUrl() {
+    var u = new URL(window.location.href);
+    u.searchParams.set("external", "1");
+    return u.toString();
   }
 
   function buildChromeIntentUrl(httpsUrl) {
@@ -228,29 +256,32 @@
     document.getElementById("checkout-view").style.display = "none";
     document.getElementById("open-in-browser-view").style.display = "block";
 
-    var currentUrl = window.location.href;
+    var externalUrl = buildExternalUrl();
     var btn = document.getElementById("open-external-btn");
 
     if (isAndroidUA()) {
-      var intentUrl = buildChromeIntentUrl(currentUrl);
+      var intentUrl = buildChromeIntentUrl(externalUrl);
       btn.href = intentUrl;
       setTimeout(function () { window.location.href = intentUrl; }, 100);
     } else {
-      btn.href = currentUrl;
+      // iOS / other: a plain https link with target=_blank. Telegram's
+      // in-app browser usually keeps it in-app, so we also surface the
+      // "tap ⋯ → Open in Safari" hint as the primary instruction.
+      btn.href = externalUrl;
       btn.target = "_blank";
       btn.rel = "noopener";
-      document.getElementById("ios-hint").style.display = "block";
+      if (isIOSUA()) {
+        document.getElementById("ios-hint").style.display = "block";
+      }
     }
   }
 
-  /* ---- Parse query params ---- */
-  var params = new URLSearchParams(window.location.search);
-  var telegramId = params.get("tid");
-  var plan = params.get("plan");
-  var token = params.get("token");
-
-  /* ---- If inside Telegram WebView, skip Paddle and show interstitial ---- */
-  if (isTelegramWebView()) {
+  /* ---- Decide whether to show the interstitial ----
+     1. If user already came back via the interstitial (external=1),
+        always go straight to Paddle.
+     2. Else, if the bot tagged the URL with src=tg, show interstitial.
+     3. Else, fall back to UA-based detection for shared / legacy links. */
+  if (!alreadyExternal && (src === "tg" || isTelegramWebView())) {
     renderOpenInBrowserView();
     return;
   }
