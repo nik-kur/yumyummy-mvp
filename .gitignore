@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 .env
 dummy.db
+landing-backup/
+docs/hero_final.mp4
