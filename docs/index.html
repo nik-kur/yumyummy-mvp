@@ -211,9 +211,11 @@
 
   /* RESPONSIVE */
   @media (max-width: 960px){
-    .hero-grid{grid-template-columns:1fr;gap:48px}
-    .phone-wrap{order:-1}
+    .hero-grid{grid-template-columns:1fr;gap:40px}
+    .phone-wrap{order:1}
     .phone-wrap::before{width:380px;height:380px}
+    .phone-frame{width:260px;height:528px;border-radius:42px}
+    .phone-screen{border-radius:34px}
     .acc-grid{grid-template-columns:1fr;gap:48px}
     .story-grid{grid-template-columns:1fr;gap:32px}
     .story-aside{position:static}
@@ -271,16 +273,6 @@
 </style>
 </head>
 <body>
-
-<!-- UTILITY BAR (legal links — both compliance & user reach) -->
-<div class="utility-bar">
-  <div class="utility-inner">
-    <a href="terms.html">Terms</a>
-    <a href="privacy.html">Privacy</a>
-    <a href="refunds.html">Refunds</a>
-    <a href="support.html">Support</a>
-  </div>
-</div>
 
 <!-- NAV -->
 <nav class="nav">
@@ -455,7 +447,7 @@
     <div class="story-grid">
       <aside class="story-aside">
         <div class="eyebrow">The backstory</div>
-        <h2 style="margin-top:14px">Built by an <span style="white-space:nowrap">ex&#8209;McKinsey&nbsp;manager</span> to hit nutrition&nbsp;goals</h2>
+        <h2 style="margin-top:14px">Built by <span style="white-space:nowrap">an&nbsp;ex&#8209;McKinsey&nbsp;manager</span> to&nbsp;hit nutrition&nbsp;goals</h2>
         <div class="pull-quote">"Logging a restaurant meal accurately? Basically&nbsp;impossible."</div>
       </aside>
       <div class="story-text">
