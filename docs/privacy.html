@@ -8,14 +8,33 @@
 </head>
 <body>
 
-<header>
-  <a href="index.html" class="brand">YumYummy</a>
-  <nav>
+<!-- Utility bar (legal links — matches landing) -->
+<div class="utility-bar">
+  <div class="utility-inner">
     <a href="terms.html">Terms</a>
     <a href="privacy.html" class="active">Privacy</a>
     <a href="refunds.html">Refunds</a>
     <a href="support.html">Support</a>
-  </nav>
+  </div>
+</div>
+
+<!-- Header (matches landing nav) -->
+<header>
+  <div class="header-inner">
+    <a class="brand" href="index.html">
+      <img src="assets/logo.png" alt="YumYummy" width="36" height="36">
+      <span class="brand-name">YumYummy</span>
+    </a>
+    <nav>
+      <a href="index.html#accuracy">How it works</a>
+      <a href="index.html#features">Features</a>
+      <a href="index.html#faq">FAQ</a>
+      <a class="btn btn-primary nav-cta" href="https://t.me/yum_yummybot" target="_blank" rel="noopener">
+        <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"></path></svg>
+        Open in Telegram
+      </a>
+    </nav>
+  </div>
 </header>
 
 <main>
@@ -162,11 +181,37 @@
 </main>
 
 <footer>
-  &copy; 2026 YumYummy. All rights reserved. &nbsp;|&nbsp;
-  <a href="terms.html">Terms</a> &nbsp;|&nbsp;
-  <a href="privacy.html">Privacy</a> &nbsp;|&nbsp;
-  <a href="refunds.html">Refunds</a> &nbsp;|&nbsp;
-  <a href="support.html">Support</a>
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <a class="brand" href="index.html">
+        <img src="assets/logo.png" alt="YumYummy" width="32" height="32">
+        <span class="brand-name">YumYummy</span>
+      </a>
+      <p class="foot-tagline">A Telegram-native nutrition log that pulls calories and macros from real sources, not LLM guesses.</p>
+    </div>
+    <div class="foot-col">
+      <h5>Product</h5>
+      <ul>
+        <li><a href="index.html#accuracy">How it works</a></li>
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#faq">FAQ</a></li>
+        <li><a href="https://t.me/yum_yummybot" target="_blank" rel="noopener">Open in Telegram</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <h5>Legal &amp; Help</h5>
+      <ul>
+        <li><a href="terms.html">Terms &amp; Conditions</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="refunds.html">Refund Policy</a></li>
+        <li><a href="support.html">Support &amp; Contact</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <span>&copy; 2026 YumYummy. All rights reserved.</span>
+    <span>yumyummy.ai</span>
+  </div>
 </footer>
 
 </body>
