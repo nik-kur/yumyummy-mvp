@@ -17,6 +17,7 @@ from app.models.user import User
 from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
 from app.models.notification_event import NotificationEvent
+from app.services.user_time import today_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +246,7 @@ WEEKLY_SUMMARY_ACTIVE = (
     "📈 Your week in review ({date_range}):\n\n"
     "🍽 Meals logged: {meals_count}\n"
     "📅 Active days: {active_days}/7\n"
-    "🎯 Within calorie target: {on_target_pct}% of days\n"
+    "🎯 At or below calorie target: {on_target_pct}% of days\n"
     "🥩 Avg protein: {avg_protein}g / {protein_target}g target\n\n"
     "{trend_message}\n\n"
     "Keep it up next week! 💪"
@@ -328,7 +329,7 @@ def _days_since_trial_end(user: User) -> Optional[int]:
 
 
 def _get_meals_count_today(db, user: User) -> int:
-    today = date.today()
+    today = today_for_user(user)
     user_day = db.query(UserDay).filter(
         UserDay.user_id == user.id,
         UserDay.date == today,
@@ -363,7 +364,7 @@ def _build_subscription_button() -> InlineKeyboardMarkup:
 
 def _build_day_summary_text(db, user: User, target_date: Optional[date] = None) -> str:
     """Build a text summary of nutrition for a given day."""
-    target = target_date or date.today()
+    target = target_date or today_for_user(user)
     user_day = db.query(UserDay).filter(
         UserDay.user_id == user.id,
         UserDay.date == target,
@@ -392,7 +393,7 @@ def _build_day_summary_text(db, user: User, target_date: Optional[date] = None) 
 
 def _get_active_days_count(db, user: User, days_back: int = 3) -> int:
     """Count how many of the last N days had at least 1 meal."""
-    today = date.today()
+    today = today_for_user(user)
     count = 0
     for i in range(days_back):
         d = today - timedelta(days=i)
@@ -409,7 +410,7 @@ def _get_active_days_count(db, user: User, days_back: int = 3) -> int:
 
 def _get_avg_calories(db, user: User, days_back: int = 2) -> float:
     """Average daily calories over last N days."""
-    today = date.today()
+    today = today_for_user(user)
     total = 0.0
     counted = 0
     for i in range(days_back):
@@ -425,7 +426,7 @@ def _get_avg_calories(db, user: User, days_back: int = 2) -> float:
 
 
 def _get_avg_protein(db, user: User, days_back: int = 3) -> float:
-    today = date.today()
+    today = today_for_user(user)
     total = 0.0
     counted = 0
     for i in range(days_back):
@@ -441,8 +442,8 @@ def _get_avg_protein(db, user: User, days_back: int = 3) -> float:
 
 
 def _get_on_target_days_pct(db, user: User, days_back: int = 3) -> int:
-    """Percentage of days where calories were within ±15% of target."""
-    today = date.today()
+    """Percentage of days where calories were at or below target."""
+    today = today_for_user(user)
     target = user.target_calories or 2000
     on_target = 0
     total = 0
@@ -454,7 +455,7 @@ def _get_on_target_days_pct(db, user: User, days_back: int = 3) -> int:
         ).first()
         if user_day and (user_day.total_calories or 0) > 0:
             total += 1
-            if abs(user_day.total_calories - target) <= target * 0.15:
+            if user_day.total_calories <= target:
                 on_target += 1
     if total == 0:
         return 0
@@ -462,7 +463,7 @@ def _get_on_target_days_pct(db, user: User, days_back: int = 3) -> int:
 
 
 def _logged_yesterday(db, user: User) -> bool:
-    yesterday = date.today() - timedelta(days=1)
+    yesterday = today_for_user(user) - timedelta(days=1)
     user_day = db.query(UserDay).filter(
         UserDay.user_id == user.id,
         UserDay.date == yesterday,
@@ -887,7 +888,7 @@ def _compute_weekly_stats(db, user: User, end_date: date) -> dict:
     total_protein = 0.0
     for ud in active_user_days:
         cal = ud.total_calories or 0
-        if abs(cal - target_cal) <= target_cal * 0.10:
+        if cal <= target_cal:
             on_target += 1
         total_protein += ud.total_protein_g or 0
 

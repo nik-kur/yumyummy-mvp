@@ -359,10 +359,6 @@ async def run_agent(
             "week_summary": None,
         }
     
-    # Default to today if no date provided
-    if not date_str:
-        date_str = date.today().isoformat()
-    
     # Validate user exists
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -373,6 +369,11 @@ async def run_agent(
             "day_summary": None,
             "week_summary": None,
         }
+
+    # Default to today in user timezone if no date provided
+    if not date_str:
+        from app.services.user_time import today_for_user
+        date_str = today_for_user(user).isoformat()
     
     # Detect known restaurant/store domain and query type
     known_domain = _detect_known_restaurant_domain(text)

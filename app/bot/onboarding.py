@@ -3,6 +3,7 @@ Onboarding flow and main menu handlers for the Telegram bot.
 Contains FSM states, handlers, and keyboards.
 """
 import asyncio
+import base64
 import html as html_mod
 import json
 import re
@@ -37,6 +38,7 @@ from app.bot.api_client import (
 from app.bot.billing import check_billing_access
 from app.core.config import settings
 from app.i18n import DEFAULT_LANG, tr
+from app.services.user_time import today_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -366,8 +368,8 @@ def get_day_actions_keyboard(day_str: str, from_today: bool = False) -> InlineKe
     )
 
 
-def get_week_days_keyboard() -> InlineKeyboardMarkup:
-    today = date_type.today()
+def get_week_days_keyboard(user=None) -> InlineKeyboardMarkup:
+    today = today_for_user(user) if user else date_type.today()
     buttons = []
 
     day_names = {
@@ -457,11 +459,15 @@ _pending_demo_tasks: dict = {}
 _pending_demo_results: dict = {}
 
 
-async def _start_demo_meal_agent(telegram_id: int, text: str) -> None:
+async def _start_demo_meal_agent(
+    telegram_id: int, text: str, image_url: str | None = None,
+) -> None:
     """Start agent search in background, store result when done."""
     async def _run():
         try:
-            result = await agent_run_workflow(telegram_id=str(telegram_id), text=text)
+            result = await agent_run_workflow(
+                telegram_id=str(telegram_id), text=text, image_url=image_url,
+            )
             _pending_demo_results[telegram_id] = result
         except Exception as e:
             logger.error(f"[ONBOARDING] Demo meal agent failed for {telegram_id}: {e}")
@@ -533,7 +539,8 @@ async def _deliver_combined_result(
     rem_fat = format_remaining(meal_fat, target_fat, "g")
     rem_carbs = format_remaining(meal_carbs, target_carbs, "g")
 
-    today = date_type.today()
+    user = await get_user(telegram_id)
+    today = today_for_user(user)
 
     combined = (
         f"Your first meal analysis is ready 🎉\n\n"
@@ -713,11 +720,38 @@ async def on_demo_meal_voice(message: types.Message, state: FSMContext) -> None:
 
 @router.message(OnboardingStates.waiting_for_demo_meal, F.photo)
 async def on_demo_meal_photo(message: types.Message, state: FSMContext) -> None:
-    await message.answer(
-        "Photo input will work great after setup! "
-        "For this first demo, please type your meal.\n\n"
-        "Example: \"cappuccino and a croissant at Starbucks\""
-    )
+    tg_id = message.from_user.id
+
+    try:
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        photo_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[ONBOARDING] Error downloading photo: {e}")
+        await message.answer(
+            "Could not download photo. Please try again or type your meal instead.\n\n"
+            "Example: \"cappuccino and a croissant at Starbucks\""
+        )
+        return
+
+    if not photo_bytes:
+        await message.answer(
+            "Photo appears to be empty. Please try again or type your meal instead."
+        )
+        return
+
+    b64 = base64.b64encode(photo_bytes).decode("utf-8")
+    image_data_uri = f"data:image/jpeg;base64,{b64}"
+
+    text = (message.caption or "").strip() or "Identify what's in the photo and estimate macros"
+
+    await _start_demo_meal_agent(tg_id, text, image_url=image_data_uri)
+
+    await message.answer(DEMO_MEAL_PIVOT_TEXT)
+    await message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
+    await state.update_data(is_onboarding_demo=True)
+    await state.set_state(OnboardingStates.waiting_for_goal)
 
 
 # ============ Onboarding Handlers — Phase 2: Personalization ============
@@ -1070,7 +1104,7 @@ async def on_menu_today(message: types.Message, state: FSMContext) -> None:
         await message.answer("Could not find your profile. Try /start")
         return
 
-    today = date_type.today()
+    today = today_for_user(user)
     day_summary = await get_day_summary(user["id"], today)
 
     target_cal = user.get("target_calories") or 2000
@@ -1142,7 +1176,7 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
 
-    today = date_type.today()
+    today = today_for_user(user)
     week_data = []
     total_cal = 0
     total_prot = 0
@@ -1202,7 +1236,7 @@ Daily average ({days_with_data} days):
 
 Tap a day to view details:"""
 
-    await message.answer(text, reply_markup=get_week_days_keyboard())
+    await message.answer(text, reply_markup=get_week_days_keyboard(user))
 
 
 @router.message(F.text == "🍽 My Menu")
@@ -1279,7 +1313,7 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
         await message.answer("Could not find your profile. Try /start")
         return
 
-    today = date_type.today()
+    today = today_for_user(user)
     day_summary = await get_day_summary(user["id"], today)
 
     target_cal = user.get("target_calories") or 2000

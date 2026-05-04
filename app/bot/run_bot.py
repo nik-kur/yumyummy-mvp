@@ -39,12 +39,14 @@ from app.bot.api_client import (
     update_saved_meal,
     delete_saved_meal,
     use_saved_meal,
+    repeat_meal,
 )
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 from app.bot.billing import router as billing_router, check_billing_access, show_paywall
 from app.bot.api_client import get_billing_status, start_trial, update_user
 from app.bot.lifecycle_notifications import send_first_meal_notification, send_feature_tip_voice
 from app.i18n import DEFAULT_LANG, tr
+from app.services.user_time import today_for_user
 
 
 router = Router()
@@ -431,10 +433,16 @@ def build_meal_keyboard(
         if url:
             rows.append([types.InlineKeyboardButton(text="🔗 Source", url=url)])
 
-    rows.append([types.InlineKeyboardButton(
-        text="💾 Save to My Menu",
-        callback_data=f"save_meal:{meal_id}",
-    )])
+    rows.append([
+        types.InlineKeyboardButton(
+            text="💾 Save to My Menu",
+            callback_data=f"save_meal:{meal_id}",
+        ),
+        types.InlineKeyboardButton(
+            text="🔁 Repeat log",
+            callback_data=f"repeat_meal:{meal_id}",
+        ),
+    ])
 
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -499,7 +507,7 @@ async def get_latest_meal_id_for_today(telegram_id: int) -> Optional[int]:
     if user is None:
         return None
 
-    summary = await get_day_summary(user_id=user["id"], day=date_type.today())
+    summary = await get_day_summary(user_id=user["id"], day=today_for_user(user))
     if not summary:
         return None
 
@@ -828,7 +836,7 @@ async def cmd_log(message: types.Message) -> None:
         return
 
     user_id = user["id"]
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -942,7 +950,7 @@ async def cmd_barcode(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -1092,7 +1100,7 @@ async def cmd_product(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -1218,7 +1226,7 @@ async def cmd_ai_log(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -1334,7 +1342,7 @@ async def cmd_eatout(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
     
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
     meal = await create_meal(
         user_id=user_id,
         day=today,
@@ -1455,7 +1463,7 @@ async def cmd_eatout_a(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
     
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
     meal = await create_meal(
         user_id=user_id,
         day=today,
@@ -1517,7 +1525,7 @@ async def cmd_today(message: types.Message) -> None:
         return
 
     user_id = user["id"]
-    today = date_type.today()
+    today = today_for_user(user)
 
     summary = await get_day_summary(user_id=user_id, day=today)
     if summary is None:
@@ -1555,7 +1563,7 @@ async def cmd_week(message: types.Message) -> None:
         return
 
     user_id = user["id"]
-    today = date_type.today()
+    today = today_for_user(user)
     start_date = today - timedelta(days=6)
 
     total_calories = 0.0
@@ -2006,7 +2014,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
         await query.message.answer("Could not reach backend. Please try again later 🙏")
         return
 
-    today = date_type.today()
+    today = today_for_user(user)
     result = await create_meal(
         user_id=user["id"],
         day=today,
@@ -2449,7 +2457,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         if meal_id:
             reply_markup = build_meal_keyboard(
                 meal_id=meal_id,
-                day=date_type.today(),
+                day=today_for_user(user),
                 source_url=source_url,
                 items=agent_items,
             )
@@ -2478,21 +2486,12 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         await _track_meal_lifecycle(message.bot, message.from_user.id)
 
 
-@router.message(F.photo)
-async def handle_photo(message: types.Message, state: FSMContext) -> None:
-    """
-    Handle photo messages. Downloads the photo, base64-encodes it,
-    and sends it through the agent workflow for food recognition.
-    """
-    if not await check_billing_access(message):
-        return
-    tg_id = message.from_user.id
-    user = await ensure_user(tg_id)
-    if user is None:
-        await message.answer("Could not reach backend. Please try again later 🙏")
-        return
+_media_group_buffers: Dict[str, list] = {}
+_media_group_tasks: Dict[str, asyncio.Task] = {}
 
-    # Download the largest resolution photo
+
+async def _download_photo_as_data_uri(message: types.Message) -> Optional[str]:
+    """Download the largest resolution photo from a message and return a base64 data URI."""
     try:
         photo = message.photo[-1]
         file = await message.bot.get_file(photo.file_id)
@@ -2500,22 +2499,22 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         photo_bytes = bio.read()
     except Exception as e:
         logger.error(f"[PHOTO] Error downloading photo: {e}")
-        await message.answer("Could not download photo. Please try again 🙏")
-        return
-
+        return None
     if not photo_bytes:
-        await message.answer("Photo is empty. Please try again 🙏")
-        return
-
-    # Base64-encode as data URI
+        return None
     b64 = base64.b64encode(photo_bytes).decode("utf-8")
-    image_data_uri = f"data:image/jpeg;base64,{b64}"
+    return f"data:image/jpeg;base64,{b64}"
 
-    # Use caption as text, or a default prompt
-    text = (message.caption or "").strip() or "Identify what's in the photo and estimate macros"
 
-    processing_msg = await message.answer("📸 Analyzing photo - back in 1-2 minutes!")
-
+async def _process_single_photo(
+    message: types.Message,
+    state: FSMContext,
+    user: dict,
+    image_data_uri: str,
+    text: str,
+) -> Optional[dict]:
+    """Run agent workflow for a single photo and return the result (or None on failure)."""
+    tg_id = message.from_user.id
     try:
         result = await agent_run_workflow(
             telegram_id=str(tg_id),
@@ -2524,47 +2523,32 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         )
     except Exception as e:
         logger.error(f"[PHOTO] Error running agent workflow: {e}", exc_info=True)
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer("Service is temporarily unavailable, please try later.")
-        return
+        return None
+    return result
 
-    if result is None:
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer("Service is temporarily unavailable, please try later.")
-        return
 
-    try:
-        await processing_msg.delete()
-    except Exception:
-        pass
-
+def _build_photo_reply(
+    result: dict,
+    user: dict,
+    agent_items: list,
+    source_url: Optional[str],
+) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
+    """Build response text and reply_markup from a photo agent result."""
     intent = result.get("intent", "unknown")
     message_text = result.get("message_text", "Processing error")
-    source_url = result.get("source_url")
-    agent_items = result.get("items") or []
     has_source_url = source_url is not None and source_url != ""
     has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
 
     reply_markup = None
     if intent in MEAL_LOGGING_INTENTS:
-        meal_id = await get_latest_meal_id_for_today(message.from_user.id)
-        if meal_id:
-            reply_markup = build_meal_keyboard(
-                meal_id=meal_id,
-                day=date_type.today(),
-                source_url=source_url,
-                items=agent_items,
-            )
-            if agent_items:
-                await state.update_data(**{f"meal_items_{meal_id}": agent_items})
+        response_text = build_meal_response_from_agent(result)
+    else:
+        response_text = message_text
 
-    if reply_markup is None and (has_source_url or has_item_sources):
+    if intent in MEAL_LOGGING_INTENTS:
+        pass  # meal_id will be attached by caller
+
+    if not reply_markup and (has_source_url or has_item_sources):
         source_buttons = []
         for it in agent_items:
             if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
@@ -2576,9 +2560,137 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         if source_buttons:
             reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
 
-    response_text = message_text
+    return response_text, reply_markup
+
+
+async def _flush_media_group(media_group_id: str, anchor_message: types.Message, state: FSMContext) -> None:
+    """Process a buffered media group: single status message, parallel agent calls."""
+    await asyncio.sleep(1.5)
+
+    entries = _media_group_buffers.pop(media_group_id, [])
+    _media_group_tasks.pop(media_group_id, None)
+
+    if not entries:
+        return
+
+    first_msg, first_user, first_uri = entries[0]
+    user = first_user
+
+    processing_msg = await anchor_message.answer(
+        f"📸 Analyzing {len(entries)} photo{'s' if len(entries) > 1 else ''} — back in 1-2 minutes!"
+    )
+
+    caption = (anchor_message.caption or "").strip() or "Identify what's in the photo and estimate macros"
+
+    async def _run_one(msg, uri, text):
+        return await _process_single_photo(msg, state, user, uri, text)
+
+    results = await asyncio.gather(
+        *[_run_one(msg, uri, caption) for msg, _, uri in entries],
+        return_exceptions=True,
+    )
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    any_logged = False
+    for (msg, _, _), result in zip(entries, results):
+        if isinstance(result, Exception) or result is None:
+            await anchor_message.answer("Could not analyze one of the photos. Please try again.")
+            continue
+
+        intent = result.get("intent", "unknown")
+        source_url = result.get("source_url")
+        agent_items = result.get("items") or []
+
+        response_text, reply_markup = _build_photo_reply(result, user, agent_items, source_url)
+
+        if intent in MEAL_LOGGING_INTENTS:
+            meal_id = await get_latest_meal_id_for_today(anchor_message.from_user.id)
+            if meal_id:
+                reply_markup = build_meal_keyboard(
+                    meal_id=meal_id,
+                    day=today_for_user(user),
+                    source_url=source_url,
+                    items=agent_items,
+                )
+                if agent_items:
+                    await state.update_data(**{f"meal_items_{meal_id}": agent_items})
+            any_logged = True
+
+        await anchor_message.answer(response_text, reply_markup=reply_markup)
+
+    if any_logged:
+        await _track_meal_lifecycle(anchor_message.bot, anchor_message.from_user.id)
+
+
+@router.message(F.photo)
+async def handle_photo(message: types.Message, state: FSMContext) -> None:
+    """
+    Handle photo messages. Downloads the photo, base64-encodes it,
+    and sends it through the agent workflow for food recognition.
+    Supports media groups (albums): buffers photos for 1.5 s, then
+    processes them in parallel with a single status message.
+    """
+    if not await check_billing_access(message):
+        return
+    tg_id = message.from_user.id
+    user = await ensure_user(tg_id)
+    if user is None:
+        await message.answer("Could not reach backend. Please try again later 🙏")
+        return
+
+    image_data_uri = await _download_photo_as_data_uri(message)
+    if image_data_uri is None:
+        await message.answer("Could not download photo. Please try again 🙏")
+        return
+
+    # --- Media group (album) handling ---
+    mg_id = message.media_group_id
+    if mg_id:
+        buf = _media_group_buffers.setdefault(mg_id, [])
+        buf.append((message, user, image_data_uri))
+        if mg_id not in _media_group_tasks:
+            _media_group_tasks[mg_id] = asyncio.create_task(
+                _flush_media_group(mg_id, message, state)
+            )
+        return
+
+    # --- Single photo path (unchanged logic) ---
+    text = (message.caption or "").strip() or "Identify what's in the photo and estimate macros"
+
+    processing_msg = await message.answer("📸 Analyzing photo — back in 1-2 minutes!")
+
+    result = await _process_single_photo(message, state, user, image_data_uri, text)
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    if result is None:
+        await message.answer("Service is temporarily unavailable, please try later.")
+        return
+
+    intent = result.get("intent", "unknown")
+    source_url = result.get("source_url")
+    agent_items = result.get("items") or []
+
+    response_text, reply_markup = _build_photo_reply(result, user, agent_items, source_url)
+
     if intent in MEAL_LOGGING_INTENTS:
-        response_text = build_meal_response_from_agent(result)
+        meal_id = await get_latest_meal_id_for_today(message.from_user.id)
+        if meal_id:
+            reply_markup = build_meal_keyboard(
+                meal_id=meal_id,
+                day=today_for_user(user),
+                source_url=source_url,
+                items=agent_items,
+            )
+            if agent_items:
+                await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
     await message.answer(response_text, reply_markup=reply_markup)
 
@@ -2659,7 +2771,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
             if meal_id:
                 reply_markup = build_meal_keyboard(
                     meal_id=meal_id,
-                    day=date_type.today(),
+                    day=today_for_user(user),
                     source_url=source_url,
                     items=agent_items,
                 )
@@ -2797,7 +2909,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
             if meal_id:
                 reply_markup = build_meal_keyboard(
                     meal_id=meal_id,
-                    day=date_type.today(),
+                    day=today_for_user(user),
                     source_url=source_url,
                     items=agent_items,
                 )
@@ -2932,6 +3044,53 @@ async def handle_save_confirm(query: types.CallbackQuery, state: FSMContext) -> 
     await _do_save_meal(query.message, state, meal_id, name)
 
 
+# --- Repeat logging ---
+
+@router.callback_query(F.data.startswith("repeat_meal:"))
+async def handle_repeat_meal(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    if len(parts) < 2:
+        await query.message.answer("Could not repeat this log.")
+        return
+
+    try:
+        source_meal_id = int(parts[1])
+    except ValueError:
+        await query.message.answer("Could not read data.")
+        return
+
+    new_meal = await repeat_meal(source_meal_id)
+    if not new_meal:
+        await query.message.answer("Could not repeat this meal. Please try again later.")
+        return
+
+    tg_id = query.from_user.id
+    user = await ensure_user(tg_id)
+
+    cal = round(new_meal.get("calories", 0))
+    prot = round(new_meal.get("protein_g", 0), 1)
+    fat = round(new_meal.get("fat_g", 0), 1)
+    carbs = round(new_meal.get("carbs_g", 0), 1)
+    desc = new_meal.get("description_user", "Meal")
+
+    text = (
+        f"🔁 Logged again:\n\n"
+        f"{desc}\n"
+        f"🔥 {cal} kcal · 🥩 {prot}g · 🧈 {fat}g · 🍞 {carbs}g"
+    )
+
+    new_meal_id = new_meal.get("id")
+    reply_markup = None
+    if new_meal_id and user:
+        reply_markup = build_meal_keyboard(
+            meal_id=new_meal_id,
+            day=today_for_user(user),
+        )
+
+    await query.message.answer(text, reply_markup=reply_markup)
+
+
 # --- Quick log from My Menu ---
 
 @router.callback_query(F.data.startswith("my_menu_log:"))
@@ -2959,7 +3118,7 @@ async def handle_my_menu_log(query: types.CallbackQuery, state: FSMContext) -> N
         await query.message.answer("Could not reach backend. Please try again later.")
         return
 
-    today = date_type.today()
+    today = today_for_user(user)
     meal_result = await create_meal(
         user_id=user["id"],
         day=today,

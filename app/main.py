@@ -1571,6 +1571,70 @@ def delete_meal(meal_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 
+@app.post("/meals/{meal_id}/repeat", response_model=MealRead)
+def repeat_meal(meal_id: int, db: Session = Depends(get_db)):
+    """Clone an existing meal entry into today's UserDay (in user timezone)."""
+    import pytz
+    from datetime import datetime
+
+    source = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    user = db.query(User).filter(User.id == source.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    tz_name = user.timezone or "Europe/Moscow"
+    try:
+        user_tz = pytz.timezone(tz_name)
+    except pytz.exceptions.UnknownTimeZoneError:
+        user_tz = pytz.timezone("Europe/Moscow")
+    now_local = datetime.now(user_tz)
+    today = now_local.date()
+
+    user_day = (
+        db.query(UserDay)
+        .filter(UserDay.user_id == user.id, UserDay.date == today)
+        .first()
+    )
+    if not user_day:
+        user_day = UserDay(
+            user_id=user.id,
+            date=today,
+            total_calories=0,
+            total_protein_g=0,
+            total_fat_g=0,
+            total_carbs_g=0,
+        )
+        db.add(user_day)
+        db.flush()
+
+    new_meal = MealEntry(
+        user_id=user.id,
+        user_day_id=user_day.id,
+        eaten_at=now_local,
+        description_user=source.description_user,
+        calories=source.calories,
+        protein_g=source.protein_g,
+        fat_g=source.fat_g,
+        carbs_g=source.carbs_g,
+        uc_type=source.uc_type,
+        accuracy_level=source.accuracy_level,
+    )
+
+    user_day.total_calories += source.calories
+    user_day.total_protein_g += source.protein_g
+    user_day.total_fat_g += source.fat_g
+    user_day.total_carbs_g += source.carbs_g
+
+    db.add(new_meal)
+    db.commit()
+    db.refresh(new_meal)
+
+    return new_meal
+
+
 # ---------- DAY SUMMARY ----------
 
 
