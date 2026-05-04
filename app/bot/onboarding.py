@@ -976,7 +976,7 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
     await state.set_state(OnboardingStates.waiting_for_timezone)
 
 
-@router.callback_query(F.data.startswith("tz:"))
+@router.callback_query(OnboardingStates.waiting_for_timezone, F.data.startswith("tz:"))
 async def on_timezone_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
