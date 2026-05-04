@@ -82,6 +82,8 @@ class OnboardingStates(StatesGroup):
 class ProfileStates(StatesGroup):
     """States for profile editing."""
     waiting_for_manual_kbju = State()
+    waiting_for_timezone_change = State()
+    waiting_for_timezone_text_change = State()
 
 
 class CancelFlowStates(StatesGroup):
@@ -354,6 +356,7 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="🔄 Recalculate targets", callback_data="profile_recalculate")],
             [InlineKeyboardButton(text="✏️ Enter targets manually", callback_data="profile_manual_kbju")],
+            [InlineKeyboardButton(text="🌍 Change timezone", callback_data="profile_change_tz")],
             [InlineKeyboardButton(text="💳 Manage subscription", callback_data="profile_manage_sub")],
         ]
     )
@@ -1411,6 +1414,16 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
 
+    tz_name = user.get("timezone") or "Europe/Moscow"
+    try:
+        import pytz as _pytz
+        _tz = _pytz.timezone(tz_name)
+        from datetime import datetime as _dt
+        _now = _dt.now(_tz)
+        tz_display = f"{tz_name} (UTC{_now.strftime('%z')[:3]}:{_now.strftime('%z')[3:]})"
+    except Exception:
+        tz_display = tz_name
+
     billing = await get_billing_status(telegram_id)
     billing_section = ""
     if billing:
@@ -1452,7 +1465,9 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
 • 🔥 Calories: {target_cal:.0f} kcal
 • 🥩 Protein: {target_prot:.0f} g
 • 🥑 Fat: {target_fat:.0f} g
-• 🍞 Carbs: {target_carbs:.0f} g{billing_section}"""
+• 🍞 Carbs: {target_carbs:.0f} g
+
+🌍 Timezone: {tz_display}{billing_section}"""
 
     await message.answer(text, reply_markup=get_profile_keyboard())
 
@@ -1702,6 +1717,74 @@ async def on_profile_manual_kbju(callback: types.CallbackQuery, state: FSMContex
 
     await callback.message.answer(MANUAL_KBJU_TEXT)
     await state.set_state(ProfileStates.waiting_for_manual_kbju)
+
+
+@router.callback_query(F.data == "profile_change_tz")
+async def on_profile_change_tz(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    telegram_id = callback.from_user.id
+    user = await get_user(telegram_id)
+    current_tz = (user.get("timezone") or "Europe/Moscow") if user else "Europe/Moscow"
+
+    await callback.message.answer(
+        f"Your current timezone: <b>{current_tz}</b>\n\n"
+        "Choose a new timezone:",
+        parse_mode="HTML",
+        reply_markup=get_timezone_keyboard(),
+    )
+    await state.update_data(tz_change_from_profile=True)
+    await state.set_state(ProfileStates.waiting_for_timezone_change)
+
+
+@router.callback_query(ProfileStates.waiting_for_timezone_change, F.data.startswith("tz:"))
+async def on_profile_timezone_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    tz_value = callback.data.split(":", 1)[1]
+
+    if tz_value == "other":
+        await callback.message.answer(
+            tr("onboarding.timezone_other", LANG)
+        )
+        await state.set_state(ProfileStates.waiting_for_timezone_text_change)
+        return
+
+    telegram_id = callback.from_user.id
+    await update_user(telegram_id, timezone=tz_value)
+    await state.clear()
+
+    await callback.message.answer(
+        f"✅ Timezone updated to <b>{tz_value}</b>",
+        parse_mode="HTML",
+        reply_markup=get_main_menu_keyboard(),
+    )
+
+
+@router.message(ProfileStates.waiting_for_timezone_text_change)
+async def on_profile_timezone_text_received(message: types.Message, state: FSMContext) -> None:
+    import pytz
+    tz_text = message.text.strip()
+
+    try:
+        pytz.timezone(tz_text)
+    except pytz.exceptions.UnknownTimeZoneError:
+        await message.answer(
+            tr("onboarding.timezone_invalid", LANG, tz=tz_text)
+        )
+        return
+
+    telegram_id = message.from_user.id
+    await update_user(telegram_id, timezone=tz_text)
+    await state.clear()
+
+    await message.answer(
+        f"✅ Timezone updated to <b>{tz_text}</b>",
+        parse_mode="HTML",
+        reply_markup=get_main_menu_keyboard(),
+    )
 
 
 @router.message(ProfileStates.waiting_for_manual_kbju)
