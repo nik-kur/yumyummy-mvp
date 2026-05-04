@@ -1514,8 +1514,8 @@ def update_meal(
     if not meal:
         raise HTTPException(status_code=404, detail="Meal not found")
 
-    user_day = db.query(UserDay).filter(UserDay.id == meal.user_day_id).first()
-    if not user_day:
+    old_user_day = db.query(UserDay).filter(UserDay.id == meal.user_day_id).first()
+    if not old_user_day:
         raise HTTPException(status_code=404, detail="User day not found")
 
     old_calories = meal.calories
@@ -1531,18 +1531,55 @@ def update_meal(
     if meal_in.description_user is not None:
         meal.description_user = meal_in.description_user
 
+    moved_to_new_day = False
+    new_user_day = old_user_day
+
     if meal_in.eaten_at is not None:
-        meal.eaten_at = meal_in.eaten_at
+        new_eaten_at = meal_in.eaten_at
+        meal.eaten_at = new_eaten_at
+
+        target_date = new_eaten_at.date() if hasattr(new_eaten_at, "date") else new_eaten_at
+        if target_date != old_user_day.date:
+            old_user_day.total_calories -= old_calories
+            old_user_day.total_protein_g -= old_protein
+            old_user_day.total_fat_g -= old_fat
+            old_user_day.total_carbs_g -= old_carbs
+
+            new_user_day = (
+                db.query(UserDay)
+                .filter(UserDay.user_id == meal.user_id, UserDay.date == target_date)
+                .first()
+            )
+            if not new_user_day:
+                new_user_day = UserDay(
+                    user_id=meal.user_id,
+                    date=target_date,
+                    total_calories=0,
+                    total_protein_g=0,
+                    total_fat_g=0,
+                    total_carbs_g=0,
+                )
+                db.add(new_user_day)
+                db.flush()
+
+            meal.user_day_id = new_user_day.id
+            moved_to_new_day = True
 
     meal.calories = new_calories
     meal.protein_g = new_protein
     meal.fat_g = new_fat
     meal.carbs_g = new_carbs
 
-    user_day.total_calories += new_calories - old_calories
-    user_day.total_protein_g += new_protein - old_protein
-    user_day.total_fat_g += new_fat - old_fat
-    user_day.total_carbs_g += new_carbs - old_carbs
+    if moved_to_new_day:
+        new_user_day.total_calories += new_calories
+        new_user_day.total_protein_g += new_protein
+        new_user_day.total_fat_g += new_fat
+        new_user_day.total_carbs_g += new_carbs
+    else:
+        old_user_day.total_calories += new_calories - old_calories
+        old_user_day.total_protein_g += new_protein - old_protein
+        old_user_day.total_fat_g += new_fat - old_fat
+        old_user_day.total_carbs_g += new_carbs - old_carbs
 
     db.commit()
     db.refresh(meal)

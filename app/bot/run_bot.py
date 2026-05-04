@@ -94,9 +94,8 @@ class AgentClarification(StatesGroup):
 
 class MealEditState(StatesGroup):
     waiting_for_choice = State()
-    waiting_for_name = State()
-    waiting_for_macros = State()
-    waiting_for_time = State()
+    waiting_for_datetime = State()
+    waiting_for_edit_comment = State()
 
 
 class SavedMealStates(StatesGroup):
@@ -162,11 +161,13 @@ def build_meal_response_text(
     notes: Optional[str] = None,
     source_url: Optional[str] = None,
     summary: Optional[Dict[str, Any]] = None,
+    is_edit: bool = False,
 ) -> str:
     source_label = format_source_label(source_url)
     all_zero = calories == 0 and protein_g == 0 and fat_g == 0 and carbs_g == 0
+    header_key = "runbot.updated" if is_edit else "runbot.logged"
     lines = [
-        tr("runbot.logged", LANG, description=description),
+        tr(header_key, LANG, description=description),
         "",
     ]
     if all_zero:
@@ -192,6 +193,7 @@ def build_meal_response_from_agent(
     result: Dict[str, Any],
     *,
     summary: Optional[Dict[str, Any]] = None,
+    is_edit: bool = False,
 ) -> str:
     totals = result.get("totals") or {}
     calories = round(float(totals.get("calories_kcal") or 0))
@@ -242,6 +244,7 @@ def build_meal_response_from_agent(
         accuracy_level=derived_accuracy,
         source_url=derived_source,
         summary=summary,
+        is_edit=is_edit,
     )
     if len(valid_items) <= 1:
         return base_text
@@ -480,16 +483,12 @@ def build_edit_choice_keyboard(meal_id: int, day: date_type) -> types.InlineKeyb
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text="Name",
-                    callback_data=f"meal_edit_field:name:{meal_id}:{day.isoformat()}",
+                    text="📅 Time & Date",
+                    callback_data=f"meal_edit_field:datetime:{meal_id}:{day.isoformat()}",
                 ),
                 types.InlineKeyboardButton(
-                    text="Macros",
-                    callback_data=f"meal_edit_field:macros:{meal_id}:{day.isoformat()}",
-                ),
-                types.InlineKeyboardButton(
-                    text="🕐 Time",
-                    callback_data=f"meal_edit_field:time:{meal_id}:{day.isoformat()}",
+                    text="🍽 Dishes / Macros",
+                    callback_data=f"meal_edit_field:dishes:{meal_id}:{day.isoformat()}",
                 ),
             ],
             [
@@ -1700,7 +1699,7 @@ async def handle_meal_edit(query: types.CallbackQuery, state: FSMContext) -> Non
 
     reply_markup = build_edit_choice_keyboard(meal_id=meal_id, day=day)
     await query.message.answer(
-        "What would you like to edit?", reply_markup=reply_markup
+        "What would you like to change?", reply_markup=reply_markup
     )
 
 
@@ -1728,20 +1727,24 @@ async def handle_meal_edit_field(query: types.CallbackQuery, state: FSMContext) 
 
     await state.update_data(meal_id=meal_id, day=day_str, field=field)
 
-    if field == "name":
-        await state.set_state(MealEditState.waiting_for_name)
-        await query.message.answer("Send a new meal name.")
-    elif field == "macros":
-        await state.set_state(MealEditState.waiting_for_macros)
+    if field == "datetime":
+        await state.set_state(MealEditState.waiting_for_datetime)
         await query.message.answer(
-            "Enter macros in kcal/p/f/c format.\n"
-            "Example: 350/25/10/40"
+            "Send the new date and time.\n"
+            "Format: <code>YYYY-MM-DD HH:MM</code> (full) or <code>HH:MM</code> "
+            "(keeps the meal's current date).\n\n"
+            "Examples:\n"
+            "• <code>2026-05-04 14:30</code>\n"
+            "• <code>14:30</code>",
+            parse_mode="HTML",
         )
-    elif field == "time":
-        await state.set_state(MealEditState.waiting_for_time)
+    elif field == "dishes":
+        await state.set_state(MealEditState.waiting_for_edit_comment)
         await query.message.answer(
-            "Enter meal time in HH:MM format.\n"
-            "Example: 14:30"
+            "What should I change? You can send a text or a voice message — for example:\n"
+            "• \"I only ate half\"\n"
+            "• \"no rice\"\n"
+            "• \"the milk was skimmed\""
         )
     else:
         await query.message.answer("I couldn't determine what to edit.")
@@ -1807,54 +1810,41 @@ async def finalize_meal_update(
             await message.answer(build_day_summary_text(summary, day))
 
 
-@router.message(MealEditState.waiting_for_name)
-async def handle_meal_edit_name(message: types.Message, state: FSMContext) -> None:
-    text = (message.text or "").strip()
-    if not text:
-        await message.answer("Name cannot be empty. Please send it again.")
-        return
-
-    await finalize_meal_update(message, state, description=text)
+_MENU_BUTTON_TEXTS = {"📊 Today", "📈 Week", "👤 Profile", "📤 Export", "💬 Support", "📖 How to Use"}
 
 
-@router.message(MealEditState.waiting_for_macros)
-async def handle_meal_edit_macros(message: types.Message, state: FSMContext) -> None:
-    text = message.text or ""
-    parsed = parse_macros_input(text)
-    if parsed is None:
-        await message.answer(
-            "Invalid format. Enter macros as kcal/p/f/c.\n"
-            "Example: 350/25/10/40"
-        )
-        return
-
-    calories, protein_g, fat_g, carbs_g = parsed
-    await finalize_meal_update(
-        message,
-        state,
-        calories=calories,
-        protein_g=protein_g,
-        fat_g=fat_g,
-        carbs_g=carbs_g,
-    )
-
-
-@router.message(MealEditState.waiting_for_time)
-async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> None:
-    text = (message.text or "").strip()
-    # Parse time in HH:MM format
+def _parse_edit_datetime(text: str, fallback_date: date_type) -> Optional[datetime]:
+    """Parse user input as either 'YYYY-MM-DD HH:MM' or 'HH:MM' (using fallback_date)."""
     import re
-    match = re.match(r"^(\d{1,2}):(\d{2})$", text)
-    if not match:
-        await message.answer(
-            "Invalid format. Enter time as HH:MM.\n"
-            "Example: 14:30"
-        )
-        return
+    text = text.strip()
 
-    hour, minute = int(match.group(1)), int(match.group(2))
-    if hour > 23 or minute > 59:
-        await message.answer("Invalid time. Hours 0-23, minutes 0-59.")
+    full_match = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})$", text)
+    if full_match:
+        try:
+            year, month, day, hour, minute = (int(g) for g in full_match.groups())
+            return datetime(year, month, day, hour, minute)
+        except ValueError:
+            return None
+
+    short_match = re.match(r"^(\d{1,2}):(\d{2})$", text)
+    if short_match:
+        try:
+            hour, minute = int(short_match.group(1)), int(short_match.group(2))
+            if hour > 23 or minute > 59:
+                return None
+            return datetime(fallback_date.year, fallback_date.month, fallback_date.day, hour, minute)
+        except ValueError:
+            return None
+
+    return None
+
+
+@router.message(MealEditState.waiting_for_datetime)
+async def handle_meal_edit_datetime(message: types.Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+
+    if text in _MENU_BUTTON_TEXTS or text.startswith("/"):
+        await state.clear()
         return
 
     data = await state.get_data()
@@ -1873,15 +1863,25 @@ async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> No
         await message.answer("Could not read entry date.")
         return
 
-    # Build datetime with the meal's date and user-specified time
+    naive_dt = _parse_edit_datetime(text, day)
+    if naive_dt is None:
+        await message.answer(
+            "Invalid format. Send <code>YYYY-MM-DD HH:MM</code> or <code>HH:MM</code>.\n"
+            "Example: <code>2026-05-04 14:30</code> or <code>14:30</code>",
+            parse_mode="HTML",
+        )
+        return
+
     import pytz
-    user_tz_name = "Europe/Moscow"  # default, will be overridden by user's timezone
+    user_tz_name = "Europe/Moscow"
     user = await get_user(message.from_user.id)
     if user and user.get("timezone"):
         user_tz_name = user["timezone"]
-    user_tz = pytz.timezone(user_tz_name)
+    try:
+        user_tz = pytz.timezone(user_tz_name)
+    except pytz.exceptions.UnknownTimeZoneError:
+        user_tz = pytz.timezone("Europe/Moscow")
 
-    naive_dt = datetime(day.year, day.month, day.day, hour, minute)
     local_dt = user_tz.localize(naive_dt)
     eaten_at_iso = local_dt.isoformat()
 
@@ -1891,7 +1891,207 @@ async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> No
         return
 
     await state.clear()
-    await message.answer(f"✅ Updated time to {hour:02d}:{minute:02d}.")
+
+    new_day = local_dt.date()
+    response_text = build_meal_response_text(
+        description=updated.get("description_user") or tr("runbot.no_description", LANG),
+        calories=round(float(updated.get("calories") or 0)),
+        protein_g=round(float(updated.get("protein_g") or 0), 1),
+        fat_g=round(float(updated.get("fat_g") or 0), 1),
+        carbs_g=round(float(updated.get("carbs_g") or 0), 1),
+        is_edit=True,
+    )
+    response_text = (
+        f"{response_text}\n\n"
+        f"🕐 New time: {local_dt.strftime('%Y-%m-%d %H:%M')}"
+    )
+    reply_markup = build_meal_keyboard(meal_id=meal_id, day=new_day)
+    await message.answer(response_text, reply_markup=reply_markup)
+
+
+def _format_original_meal_context(meal: Dict[str, Any], items: Optional[list]) -> str:
+    """Compact text block describing the meal currently logged, fed to the edit agent."""
+    desc = meal.get("description_user") or "Meal"
+    cal = round(float(meal.get("calories") or 0))
+    prot = round(float(meal.get("protein_g") or 0), 1)
+    fat = round(float(meal.get("fat_g") or 0), 1)
+    carbs = round(float(meal.get("carbs_g") or 0), 1)
+
+    lines = [
+        "ORIGINAL MEAL:",
+        f"- Description: {desc}",
+    ]
+
+    if items:
+        item_lines = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            name = it.get("name") or "item"
+            grams = it.get("grams")
+            i_cal = round(float(it.get("calories_kcal") or 0))
+            i_prot = round(float(it.get("protein_g") or 0), 1)
+            i_fat = round(float(it.get("fat_g") or 0), 1)
+            i_carbs = round(float(it.get("carbs_g") or 0), 1)
+            grams_part = f", {grams}g" if grams else ""
+            item_lines.append(f"  * {name}{grams_part} — {i_cal} kcal, P {i_prot}g, F {i_fat}g, C {i_carbs}g")
+        if item_lines:
+            lines.append("- Items:")
+            lines.extend(item_lines)
+
+    lines.append(f"- Total: {cal} kcal, P {prot}g, F {fat}g, C {carbs}g")
+    return "\n".join(lines)
+
+
+async def _process_meal_edit_comment(message: types.Message, state: FSMContext, comment: str) -> None:
+    data = await state.get_data()
+    meal_id = data.get("meal_id")
+    day_str = data.get("day")
+
+    if not meal_id or not day_str:
+        await state.clear()
+        await message.answer("Could not find entry for editing.")
+        return
+
+    if not comment or not comment.strip():
+        await message.answer("Please describe what to change in a few words.")
+        return
+
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        await state.clear()
+        await message.answer("Could not find this meal anymore.")
+        return
+
+    cached_items = data.get(f"meal_items_{meal_id}")
+    original_context = _format_original_meal_context(meal, cached_items)
+
+    await state.clear()
+    processing_msg = await message.answer("✏️ Applying your edit — back in a moment...")
+
+    try:
+        result = await agent_run_workflow(
+            telegram_id=str(message.from_user.id),
+            text=comment,
+            force_intent="edit_meal",
+            nutrition_context=original_context,
+        )
+    except Exception as e:
+        logger.error(f"[EDIT_MEAL] Error running agent workflow: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Service is temporarily unavailable, please try later.")
+        return
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    if result is None:
+        await message.answer("Service is temporarily unavailable, please try later.")
+        return
+
+    intent = result.get("intent", "")
+    totals = result.get("totals") or {}
+    new_calories = float(totals.get("calories_kcal") or 0)
+    new_protein = float(totals.get("protein_g") or 0)
+    new_fat = float(totals.get("fat_g") or 0)
+    new_carbs = float(totals.get("carbs_g") or 0)
+    new_items = result.get("items") or []
+
+    if intent != "edit_meal" or (
+        new_calories == 0 and new_protein == 0 and new_fat == 0 and new_carbs == 0 and not new_items
+    ):
+        await message.answer(
+            "Could not apply this edit. Please try a more specific comment "
+            "(e.g. \"I only ate half\" or \"no rice\")."
+        )
+        return
+
+    description_parts = [
+        item.get("name") for item in new_items if isinstance(item, dict) and item.get("name")
+    ][:3]
+    new_description = ", ".join(description_parts).strip() or meal.get("description_user") or "Meal"
+
+    updated = await update_meal(
+        meal_id=meal_id,
+        description=new_description,
+        calories=round(new_calories),
+        protein_g=round(new_protein, 1),
+        fat_g=round(new_fat, 1),
+        carbs_g=round(new_carbs, 1),
+    )
+    if updated is None:
+        await message.answer("Could not save the updated meal. Please try again later 🙏")
+        return
+
+    if new_items:
+        await state.update_data(**{f"meal_items_{meal_id}": new_items})
+
+    try:
+        day = date_type.fromisoformat(day_str)
+    except ValueError:
+        day = date_type.today()
+
+    response_text = build_meal_response_from_agent(result, is_edit=True)
+    reply_markup = build_meal_keyboard(
+        meal_id=meal_id,
+        day=day,
+        source_url=result.get("source_url"),
+        items=new_items,
+    )
+    await message.answer(response_text, reply_markup=reply_markup)
+
+
+@router.message(MealEditState.waiting_for_edit_comment, F.text)
+async def handle_meal_edit_comment_text(message: types.Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+
+    if text in _MENU_BUTTON_TEXTS or text.startswith("/"):
+        await state.clear()
+        return
+
+    await _process_meal_edit_comment(message, state, comment=text)
+
+
+@router.message(MealEditState.waiting_for_edit_comment, F.voice)
+async def handle_meal_edit_comment_voice(message: types.Message, state: FSMContext) -> None:
+    try:
+        file = await message.bot.get_file(message.voice.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        audio_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[EDIT_MEAL] Error downloading voice: {e}")
+        await message.answer("Could not download voice message. Please try again.")
+        return
+
+    if not audio_bytes:
+        await message.answer("Voice message is empty. Please try again.")
+        return
+
+    await message.answer("🎙 Transcribing voice...")
+    parsed = await voice_parse_meal(audio_bytes)
+    if parsed is None:
+        await message.answer("Could not process voice. Please try again.")
+        return
+
+    transcript = (parsed.get("transcript", "") or "").strip()
+    if not transcript:
+        await message.answer("Could not recognize speech. Please try again.")
+        return
+
+    await message.answer(f"Recognized: \"{transcript}\"")
+    await _process_meal_edit_comment(message, state, comment=transcript)
+
+
+@router.message(MealEditState.waiting_for_edit_comment, F.photo)
+async def handle_meal_edit_comment_photo(message: types.Message, state: FSMContext) -> None:
+    await message.answer(
+        "Photo edits aren't supported yet — please describe the change in text or voice."
+    )
 
 
 @router.callback_query(F.data.startswith("meal_delete:"))

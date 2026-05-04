@@ -277,6 +277,32 @@ class NutritionLabelAgentSchema(BaseModel):
   source_url: Optional[str]
 
 
+class EditMealAgentSchema__Totals(BaseModel):
+  calories_kcal: float
+  protein_g: float
+  fat_g: float
+  carbs_g: float
+
+
+class EditMealAgentSchema__ItemsItem(BaseModel):
+  name: str
+  grams: Optional[float]
+  calories_kcal: float
+  protein_g: float
+  fat_g: float
+  carbs_g: float
+  source_url: Optional[str]
+
+
+class EditMealAgentSchema(BaseModel):
+  intent: str
+  message_text: str
+  confidence: Optional[str]
+  totals: EditMealAgentSchema__Totals
+  items: list[EditMealAgentSchema__ItemsItem]
+  source_url: Optional[str]
+
+
 router = Agent(
   name="Router",
   instructions="""You are YumYummy Router. Your job: classify the user message into an intent and extract routing fields.
@@ -308,6 +334,7 @@ Intents (for TEXT-ONLY messages or after image rules have been applied):
 
 Rules:
 - Never give back intent food_advice. Food advice is handled externally.
+- Never give back intent edit_meal. Edit-meal is handled externally via force_intent.
 - If message mentions a restaurant/cafe/brand menu item (e.g., Starbucks, Joe & The Juice, Coffeemania), choose eatout (even if grams are mentioned).
 - If message mentions a packaged product brand menu item (e.g., Fanta, Danone, ФрутоНяня, Азбука Вкуса, Carrefour, etc.), choose product (even if grams are mentioned).
 - If the message contains BOTH branded items (with known brand/store) AND generic/homemade items without a brand — choose intent 'product' (or 'eatout' if restaurant). The downstream agent will handle the mix.
@@ -732,7 +759,7 @@ nutrition_advisor = Agent(
 
 final_agent = Agent(
   name="Final agent",
-  instructions="""You receive a JSON object from upstream (either Meal Parser, Eatout Agent, Product Agent, Barcode Agent, Nutrition Advisor, or Help Agent).
+  instructions="""You receive a JSON object from upstream (either Meal Parser, Eatout Agent, Product Agent, Barcode Agent, Nutrition Advisor, Edit Meal Agent, or Help Agent).
 Return ONLY the same object, unchanged, matching the provided schema exactly.
 Do not add or remove fields. Do not modify any values. Just pass the data through.""",
   model="gpt-4.1",
@@ -742,6 +769,64 @@ Do not add or remove fields. Do not modify any values. Just pass the data throug
     top_p=1,
     max_tokens=2048,
     store=True
+  )
+)
+
+
+class EditMealAgentContext:
+  def __init__(self, state_user_text_clean: str, original_meal_context: Optional[str] = None):
+    self.state_user_text_clean = state_user_text_clean
+    self.original_meal_context = original_meal_context
+
+
+def edit_meal_agent_instructions(run_context: RunContextWrapper[EditMealAgentContext], _agent: Agent[EditMealAgentContext]):
+  state_user_text_clean = run_context.context.state_user_text_clean
+  original_meal_context = run_context.context.original_meal_context or ""
+  return f"""You are YumYummy Edit Meal Agent.
+
+You are correcting a meal that the user has ALREADY logged. You receive:
+1) ORIGINAL MEAL — the meal as currently saved (description, items with macros, totals).
+2) USER EDIT COMMENT — the user's correction (e.g. "I only ate half", "no rice", "milk was skimmed", "add a side of fries").
+
+ORIGINAL MEAL:
+{original_meal_context}
+
+USER EDIT COMMENT:
+{state_user_text_clean}
+
+TASK:
+Apply the user's correction to produce an UPDATED version of the meal in the same JSON shape.
+
+RULES:
+- Preserve unchanged items exactly (same name, grams, macros, source_url) — do not re-estimate them.
+- If the user says "half" or a similar fraction → scale that item's grams and macros by that factor.
+- If the user says "no X" or "remove X" → drop that item entirely from items list.
+- If the user clarifies a property (e.g. "milk was skimmed", "no sugar", "with cream") → recompute that item's macros using common nutrition averages for the corrected version.
+- If the user adds something (e.g. "I forgot the bread", "add a side of fries") → add a NEW item with reasonable macro estimates from common averages. Do NOT call web search.
+- If the user changes a quantity (e.g. "200ml instead of 300ml") → scale the relevant item proportionally.
+- Recompute totals as the exact sum of the resulting items.
+- intent: "edit_meal"
+- confidence: "ESTIMATE" (no source verification)
+- source_url: keep original meal-level source_url if items kept their source_urls, else null
+- For each item: keep its original source_url when the item itself was unchanged; set null for new or recomputed items.
+- message_text (in English, plain text — no Markdown, no citations): a short summary like "Updated based on your note. New total: X kcal • P Yg • F Zg • C Wg." or "Removed Y; updated total: ..."
+
+DO NOT call web search. DO NOT invent restaurant brand specifics. Use generic nutrition averages for any recomputation.
+Return ONLY the JSON matching the output schema."""
+
+
+edit_meal_agent = Agent(
+  name="Edit meal",
+  instructions=edit_meal_agent_instructions,
+  model="gpt-5-nano",
+  tools=[],
+  output_type=EditMealAgentSchema,
+  model_settings=ModelSettings(
+    store=True,
+    reasoning=Reasoning(
+      effort="medium",
+      summary="auto"
+    )
   )
 )
 
@@ -959,7 +1044,7 @@ async def run_workflow(workflow_input: WorkflowInput):
     force_intent = workflow.get("force_intent")
     nutrition_context = workflow.get("nutrition_context")
 
-    _bypassable_intents = {"food_advice", "eatout", "product", "photo_meal", "barcode", "log_meal"}
+    _bypassable_intents = {"food_advice", "eatout", "product", "photo_meal", "barcode", "log_meal", "edit_meal"}
     if force_intent and force_intent in _bypassable_intents:
       state["intent"] = force_intent
       state["user_text_clean"] = workflow["input_as_text"]
@@ -1058,6 +1143,19 @@ async def run_workflow(workflow_input: WorkflowInput):
       )
       _accumulate_usage(nutrition_advisor_result_temp, usage_totals)
       conversation_history.extend([item.to_input_item() for item in nutrition_advisor_result_temp.new_items])
+
+    elif state["intent"] == "edit_meal":
+      edit_meal_result_temp = await Runner.run(
+        edit_meal_agent,
+        input=[*conversation_history],
+        run_config=_trace_cfg,
+        context=EditMealAgentContext(
+          state_user_text_clean=state["user_text_clean"],
+          original_meal_context=nutrition_context,
+        )
+      )
+      _accumulate_usage(edit_meal_result_temp, usage_totals)
+      conversation_history.extend([item.to_input_item() for item in edit_meal_result_temp.new_items])
 
     elif state["intent"] == "photo_meal":
       photo_meal_agent_result_temp = await Runner.run(
