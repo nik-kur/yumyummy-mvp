@@ -3058,6 +3058,15 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
     processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
     
     try:
+        user = await ensure_user(message.from_user.id)
+        if user is None:
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            await message.answer("Could not reach backend. Please try again later 🙏")
+            return
+
         # Call agent/run endpoint
         logger.info(f"[BOT plain_text] Calling agent_run_workflow for telegram_id={tg_id}, text={text[:50]}...")
         result = await agent_run_workflow(telegram_id=tg_id, text=text)
