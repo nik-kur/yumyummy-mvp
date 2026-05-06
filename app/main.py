@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import date as date_type
+from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
+from app.models.notification_event import NotificationEvent
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.meal import MealCreate, MealRead, MealUpdate, DaySummary
 from app.models.saved_meal import SavedMeal
@@ -79,6 +81,56 @@ def run_migrations():
             logger.error(f"[STARTUP] Alembic migration failed: {result.stderr.strip()}")
     except Exception as e:
         logger.error(f"[STARTUP] Alembic migration error: {e}")
+
+
+# ---------- Paddle reconciliation background loop ----------
+# Webhooks remain the primary sync mechanism. This loop is a safety net that
+# pulls Paddle's source of truth for any user whose local end date is in the
+# 'about to expire' window, in case a webhook was lost.
+
+import asyncio
+_PADDLE_RECONCILE_INTERVAL_SECONDS = 6 * 60 * 60  # 6 hours
+_paddle_reconcile_task: Optional["asyncio.Task[None]"] = None  # type: ignore[name-defined]
+
+
+@app.on_event("startup")
+async def start_paddle_reconcile_loop():
+    if not settings.paddle_enabled or not settings.paddle_api_key:
+        logger.info("[STARTUP] Paddle reconcile loop not started (paddle_enabled=%s, api_key=%s)",
+                    settings.paddle_enabled, bool(settings.paddle_api_key))
+        return
+
+    async def _loop():
+        from app.billing.paddle_reconcile import reconcile_all
+        while True:
+            try:
+                db_session = SessionLocal()
+                try:
+                    await reconcile_all(db_session)
+                finally:
+                    db_session.close()
+            except Exception as e:
+                logger.exception("[PADDLE-RECON] Background loop error: %s", e)
+            await asyncio.sleep(_PADDLE_RECONCILE_INTERVAL_SECONDS)
+
+    global _paddle_reconcile_task
+    _paddle_reconcile_task = asyncio.create_task(_loop())
+    logger.info(
+        "[STARTUP] Paddle reconcile loop started (every %ds)",
+        _PADDLE_RECONCILE_INTERVAL_SECONDS,
+    )
+
+
+@app.on_event("shutdown")
+async def stop_paddle_reconcile_loop():
+    global _paddle_reconcile_task
+    if _paddle_reconcile_task is not None:
+        _paddle_reconcile_task.cancel()
+        try:
+            await _paddle_reconcile_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        _paddle_reconcile_task = None
 
 
 # Include context API router for agent tools
@@ -1462,8 +1514,8 @@ def update_meal(
     if not meal:
         raise HTTPException(status_code=404, detail="Meal not found")
 
-    user_day = db.query(UserDay).filter(UserDay.id == meal.user_day_id).first()
-    if not user_day:
+    old_user_day = db.query(UserDay).filter(UserDay.id == meal.user_day_id).first()
+    if not old_user_day:
         raise HTTPException(status_code=404, detail="User day not found")
 
     old_calories = meal.calories
@@ -1479,18 +1531,55 @@ def update_meal(
     if meal_in.description_user is not None:
         meal.description_user = meal_in.description_user
 
+    moved_to_new_day = False
+    new_user_day = old_user_day
+
     if meal_in.eaten_at is not None:
-        meal.eaten_at = meal_in.eaten_at
+        new_eaten_at = meal_in.eaten_at
+        meal.eaten_at = new_eaten_at
+
+        target_date = new_eaten_at.date() if hasattr(new_eaten_at, "date") else new_eaten_at
+        if target_date != old_user_day.date:
+            old_user_day.total_calories -= old_calories
+            old_user_day.total_protein_g -= old_protein
+            old_user_day.total_fat_g -= old_fat
+            old_user_day.total_carbs_g -= old_carbs
+
+            new_user_day = (
+                db.query(UserDay)
+                .filter(UserDay.user_id == meal.user_id, UserDay.date == target_date)
+                .first()
+            )
+            if not new_user_day:
+                new_user_day = UserDay(
+                    user_id=meal.user_id,
+                    date=target_date,
+                    total_calories=0,
+                    total_protein_g=0,
+                    total_fat_g=0,
+                    total_carbs_g=0,
+                )
+                db.add(new_user_day)
+                db.flush()
+
+            meal.user_day_id = new_user_day.id
+            moved_to_new_day = True
 
     meal.calories = new_calories
     meal.protein_g = new_protein
     meal.fat_g = new_fat
     meal.carbs_g = new_carbs
 
-    user_day.total_calories += new_calories - old_calories
-    user_day.total_protein_g += new_protein - old_protein
-    user_day.total_fat_g += new_fat - old_fat
-    user_day.total_carbs_g += new_carbs - old_carbs
+    if moved_to_new_day:
+        new_user_day.total_calories += new_calories
+        new_user_day.total_protein_g += new_protein
+        new_user_day.total_fat_g += new_fat
+        new_user_day.total_carbs_g += new_carbs
+    else:
+        old_user_day.total_calories += new_calories - old_calories
+        old_user_day.total_protein_g += new_protein - old_protein
+        old_user_day.total_fat_g += new_fat - old_fat
+        old_user_day.total_carbs_g += new_carbs - old_carbs
 
     db.commit()
     db.refresh(meal)
@@ -1517,6 +1606,70 @@ def delete_meal(meal_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"status": "deleted"}
+
+
+@app.post("/meals/{meal_id}/repeat", response_model=MealRead)
+def repeat_meal(meal_id: int, db: Session = Depends(get_db)):
+    """Clone an existing meal entry into today's UserDay (in user timezone)."""
+    import pytz
+    from datetime import datetime
+
+    source = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    user = db.query(User).filter(User.id == source.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    tz_name = user.timezone or "Europe/Moscow"
+    try:
+        user_tz = pytz.timezone(tz_name)
+    except pytz.exceptions.UnknownTimeZoneError:
+        user_tz = pytz.timezone("Europe/Moscow")
+    now_local = datetime.now(user_tz)
+    today = now_local.date()
+
+    user_day = (
+        db.query(UserDay)
+        .filter(UserDay.user_id == user.id, UserDay.date == today)
+        .first()
+    )
+    if not user_day:
+        user_day = UserDay(
+            user_id=user.id,
+            date=today,
+            total_calories=0,
+            total_protein_g=0,
+            total_fat_g=0,
+            total_carbs_g=0,
+        )
+        db.add(user_day)
+        db.flush()
+
+    new_meal = MealEntry(
+        user_id=user.id,
+        user_day_id=user_day.id,
+        eaten_at=now_local,
+        description_user=source.description_user,
+        calories=source.calories,
+        protein_g=source.protein_g,
+        fat_g=source.fat_g,
+        carbs_g=source.carbs_g,
+        uc_type=source.uc_type,
+        accuracy_level=source.accuracy_level,
+    )
+
+    user_day.total_calories += source.calories
+    user_day.total_protein_g += source.protein_g
+    user_day.total_fat_g += source.fat_g
+    user_day.total_carbs_g += source.carbs_g
+
+    db.add(new_meal)
+    db.commit()
+    db.refresh(new_meal)
+
+    return new_meal
 
 
 # ---------- DAY SUMMARY ----------

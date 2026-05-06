@@ -13,7 +13,7 @@ Forget manual calorie counting, kitchen scales, and endless spreadsheets.
 
 Just tell me what you ate - I'll do the rest.
 
-🎯 What makes me different:
+What makes me different:
 
 ⚡ Super convenient
 Text, voice, or barcode photo - log food instantly
@@ -21,7 +21,7 @@ Text, voice, or barcode photo - log food instantly
 🧠 I understand you like a real nutrition coach
 "had borscht with bread" and "a cappuccino at Starbucks" - both work great
 
-🎯 Accurate data
+Accurate data
 I search official nutrition data for restaurants and products online
 
 🤖 Personal advisor
@@ -38,7 +38,7 @@ Let's set everything up for you - takes ~30 seconds.""",
         "onboarding.timezone_invalid": "Could not recognize time zone '{tz}'. Try again, e.g. Asia/Dubai or Europe/Paris",
         "onboarding.save_error": "Something went wrong while saving. Please try again later.",
         "onboarding.start_needed": "Please complete setup first. Tap /start",
-        "onboarding.final": """🎉 Done!
+        "onboarding.final": """Done 👌
 
 Quick reminder:
 📝 Type or say what you ate
@@ -47,13 +47,20 @@ Quick reminder:
 🤔 What should I eat? -> smart recommendation
 📊 Today / 📈 Week -> your progress
 
-🚀 Try it now!
+Try it now.
 Tell me what you had for breakfast today.
 
-Good luck! 💪""",
-        "onboarding.trial_activated": "🎉 3-day trial activated!",
-        "billing.paywall_trial": "🎉 <b>Try YumYummy for free!</b>\n\n3 days of full access - no payment required.\nAfter trial, pick the plan that fits you best.\n\n{plans_text}",
-        "billing.paywall_trial_expired": "⏰ <b>Your trial has ended</b>\n\nTo keep using YumYummy, choose a subscription:\n\n{plans_text}",
+All set 👌""",
+        "onboarding.trial_activated": "3-day trial activated 👌",
+        "billing.paywall_trial": "<b>Try YumYummy for free</b>\n\n3 days of full access — no payment required.\nAfter trial, pick the plan that fits you best.\n\n{plans_text}",
+        "billing.paywall_trial_expired": (
+            "⏰ <b>Your trial has ended</b>\n\n"
+            "Your targets, saved meals, and tracking history are saved — "
+            "subscribe to keep logging and see your progress grow.\n\n"
+            "{plans_text}\n\n"
+            "🛡 Not sure? 30-day money-back guarantee. "
+            "If it's not for you, tap Support and get a full refund — no questions asked."
+        ),
         "billing.paywall_sub_expired": "⏰ <b>Your subscription has ended</b>\n\nRenew your plan to continue:\n\n{plans_text}",
         "billing.stars_info": "⭐ <b>Pay with Telegram Stars</b>\n\n{stars_plans_text}\n\n<i>These are subscription prices for YumYummy, not the cost of buying Stars themselves. The actual amount you pay for Stars may be higher due to App Store / Google Play and Telegram fees. Please double-check the price before purchasing Stars.</i>",
         "billing.show_stars_btn": "⭐ Pay with Telegram Stars",
@@ -63,7 +70,7 @@ Good luck! 💪""",
         "billing.start_trial_btn": "🆓 Start 3-day free trial",
         "billing.activate_trial_error": "Could not activate trial. Please try again later.",
         "billing.trial_already": "You already have an active trial until {ends_str}.\nJust tell me what you ate and I'll log it!",
-        "billing.trial_started": "🎉 <b>Trial activated!</b>\n\nYou now have 3 days of full access (until {ends_str}).\nType or dictate what you ate, and I'll log everything!",
+        "billing.trial_started": "<b>Trial activated 👌</b>\n\nYou now have 3 days of full access (until {ends_str}).\nType or dictate what you ate, and I'll log everything.",
         "billing.trial_default_ends": "in 3 days",
         "billing.payment_record_error": "⚠️ Payment succeeded, but we couldn't update your subscription. Send /paysupport and we'll fix it.",
         "billing.payment_already": "This payment was already processed. Everything is fine!",
@@ -82,6 +89,7 @@ Good luck! 💪""",
         "runbot.default_source": "AI estimate based on known average values for listed meals/products",
         "runbot.summary_today": "Today's summary:",
         "runbot.logged": "✅ Logged {description}",
+        "runbot.updated": "♻️ Updated {description}",
         "runbot.macros_unknown": "ℹ️ Could not estimate calories/macros",
         "runbot.source_link": "🔗 Source: {source_label}",
         "runbot.source_hint": "💡 Source: {source_label}",
@@ -111,7 +119,7 @@ Good luck! 💪""",
 
 Просто скажи или напиши, что ты съел — всё остальное сделаю я.
 
-🎯 Что меня отличает:
+Что меня отличает:
 
 ⚡ Максимально удобно
 Текст, голос или фото штрих-кода — логируй еду мгновенно
@@ -119,7 +127,7 @@ Good luck! 💪""",
 🧠 Понимаю тебя как настоящий нутрициолог
 "поел борща с хлебом" и "капучино в Старбаксе" — одинаково хорошо
 
-🎯 Точные данные
+Точные данные
 Ищу официальную информацию по ресторанам и продуктам в интернете
 
 🤖 Персональный советник
@@ -136,7 +144,7 @@ Good luck! 💪""",
         "onboarding.timezone_invalid": "Не удалось распознать часовой пояс '{tz}'. Попробуй ещё раз, например: Asia/Dubai, Europe/Paris",
         "onboarding.save_error": "Произошла ошибка при сохранении. Попробуй ещё раз позже.",
         "onboarding.start_needed": "Сначала нужно пройти настройку! Нажми /start",
-        "onboarding.final": """🎉 Готово!
+        "onboarding.final": """Готово 👌
 
 Краткая памятка:
 📝 Пиши или говори что съел
@@ -145,11 +153,11 @@ Good luck! 💪""",
 🤔 Что съесть? → умный совет
 📊 Сегодня / 📈 Неделя → твой прогресс
 
-🚀 Попробуй прямо сейчас!
+Попробуй прямо сейчас.
 Напиши, что ты ел сегодня на завтрак.
 
-Удачи! 💪""",
-        "onboarding.trial_activated": "🎉 Пробный период на 3 дня активирован!",
+Удачи 👌""",
+        "onboarding.trial_activated": "Пробный период на 3 дня активирован 👌",
         "billing.usage_cap_reached": "⚠️ <b>Лимит использования достигнут</b>\n\nТы достиг(ла) лимита AI-использования для текущего расчетного периода.\nПожалуйста, напиши в поддержку: @nik_kur",
         "billing.terms": "📄 <b>Условия использования</b>\n\n1. YumYummy — сервис трекинга питания и подсчёта КБЖУ.\n2. Оплата принимается через Telegram Stars (XTR) или банковскую карту (через Paddle).\n3. Месячный план продлевается автоматически каждые 30 дней. Годовой план — разовый платёж на 365 дней.\n4. Подписку через Stars можно отменить в настройках Telegram. Подписку через Paddle — через Profile → Manage subscription, или через письмо-чек от Paddle.\n5. После отмены доступ сохраняется до конца оплаченного периода.\n6. Использование сервиса подчиняется fair-use лимитам на расчётный период. Если лимит достигнут, свяжись с поддержкой.\n\nПодробные политики: <a href=\"https://yumyummy.ai\">yumyummy.ai</a>",
     },

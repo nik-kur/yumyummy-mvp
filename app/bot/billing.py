@@ -2,12 +2,13 @@
 Billing handlers: paywall, Telegram Stars payments, Gumroad checkout,
 trial, access guard, and post-purchase return flow.
 """
+import asyncio
 import json
 import logging
 from datetime import datetime
 from typing import Optional
 
-from aiogram import Router, types, F
+from aiogram import Bot, Router, types, F
 from aiogram.filters import Command
 from aiogram.types import LabeledPrice
 
@@ -43,6 +44,28 @@ PAYWALL_EXPIRED_TEXT = (
 PAYWALL_SUB_EXPIRED_TEXT = (
     tr("billing.paywall_sub_expired", LANG)
 )
+
+# Delayed follow-up shown 30 seconds after the subscription confirmation, to
+# give new subscribers a quick "how to get the most out of this" orientation.
+POST_PURCHASE_MESSAGE = (
+    "🙌 Welcome to the club\n\n"
+    "Here's how to get the most out of YumYummy:\n\n"
+    "1. Log at least 1 meal per day — consistency beats perfection\n"
+    "2. Try \"🤔 What should I eat?\" when you're deciding on lunch\n"
+    "3. Save your go-to meals to My Menu — 2-tap logging from then on\n\n"
+    "Your first weekly summary lands in 7 days. Let's start logging."
+)
+
+POST_PURCHASE_DELAY_SECONDS = 30
+
+
+async def _send_post_purchase_celebration(bot: Bot, user_id: int) -> None:
+    """Send the post-purchase welcome message after a short delay."""
+    try:
+        await asyncio.sleep(POST_PURCHASE_DELAY_SECONDS)
+        await bot.send_message(user_id, POST_PURCHASE_MESSAGE)
+    except Exception as e:
+        logger.warning(f"[BILLING] Failed to send post-purchase message to {user_id}: {e}")
 
 
 def _build_plans_text_stars() -> str:
@@ -444,6 +467,8 @@ async def handle_successful_payment(message: types.Message) -> None:
             "<b>Profile → Manage subscription</b>.",
             parse_mode="HTML",
         )
+        # Fire-and-forget 30s follow-up "welcome to the club" orientation.
+        asyncio.create_task(_send_post_purchase_celebration(message.bot, tg_id))
 
 
 # ---------------------------------------------------------------------------

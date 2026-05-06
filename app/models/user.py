@@ -46,6 +46,11 @@ class User(Base):
     usage_cost_current_period = Column(Float, default=0.0, nullable=False)
     usage_period_start = Column(DateTime(timezone=True), nullable=True)
 
+    # Lifecycle notifications
+    first_meal_after_onboarding_at = Column(DateTime(timezone=True), nullable=True)
+    features_used = Column(String, nullable=True)  # JSON: {"voice": false, "barcode": false, "my_menu": false, "what_to_eat": false}
+    meals_count_trial = Column(Integer, default=0, nullable=False)
+
     # Связи
     days = relationship("UserDay", back_populates="user")
     meals = relationship("MealEntry", back_populates="user")

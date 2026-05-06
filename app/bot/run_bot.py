@@ -39,17 +39,53 @@ from app.bot.api_client import (
     update_saved_meal,
     delete_saved_meal,
     use_saved_meal,
+    repeat_meal,
 )
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 from app.bot.billing import router as billing_router, check_billing_access, show_paywall
-from app.bot.api_client import get_billing_status, start_trial
+from app.bot.api_client import get_billing_status, start_trial, update_user
+from app.bot.lifecycle_notifications import send_first_meal_notification, send_feature_tip_voice
 from app.i18n import DEFAULT_LANG, tr
+from app.services.user_time import today_for_user
 
 
 router = Router()
 LANG = DEFAULT_LANG
 
 MEAL_LOGGING_INTENTS = {"log_meal", "product", "eatout", "barcode", "photo_meal", "nutrition_label"}
+
+
+@router.callback_query(F.data == "show_paywall_from_notification")
+async def handle_show_paywall_from_notification(callback: types.CallbackQuery) -> None:
+    await callback.answer()
+    billing = await get_billing_status(callback.from_user.id)
+    await show_paywall(callback.message, billing)
+
+
+async def _track_meal_lifecycle(bot: Bot, tg_id: int) -> None:
+    """Track trial meal count and first-meal notification after a meal is logged."""
+    try:
+        user = await get_user(tg_id)
+        if not user or not user.get("onboarding_completed"):
+            return
+
+        # Track first meal after onboarding
+        if not user.get("first_meal_after_onboarding_at"):
+            await update_user(tg_id, first_meal_after_onboarding_at=datetime.now().isoformat())
+            await send_first_meal_notification(bot, str(tg_id))
+
+        # Increment trial meal count
+        billing = await get_billing_status(tg_id)
+        if billing and billing.get("access_status") == "trial":
+            current_count = user.get("meals_count_trial", 0) or 0
+            new_count = current_count + 1
+            await update_user(tg_id, meals_count_trial=new_count)
+            # Send voice tip after 2nd meal
+            if new_count == 2:
+                await send_feature_tip_voice(bot, str(tg_id))
+    except Exception:
+        logger.debug(f"Non-critical: lifecycle tracking failed for {tg_id}", exc_info=True)
+
 
 # FSM States for agent clarification
 class AgentClarification(StatesGroup):
@@ -58,9 +94,8 @@ class AgentClarification(StatesGroup):
 
 class MealEditState(StatesGroup):
     waiting_for_choice = State()
-    waiting_for_name = State()
-    waiting_for_macros = State()
-    waiting_for_time = State()
+    waiting_for_datetime = State()
+    waiting_for_edit_comment = State()
 
 
 class SavedMealStates(StatesGroup):
@@ -126,11 +161,13 @@ def build_meal_response_text(
     notes: Optional[str] = None,
     source_url: Optional[str] = None,
     summary: Optional[Dict[str, Any]] = None,
+    is_edit: bool = False,
 ) -> str:
     source_label = format_source_label(source_url)
     all_zero = calories == 0 and protein_g == 0 and fat_g == 0 and carbs_g == 0
+    header_key = "runbot.updated" if is_edit else "runbot.logged"
     lines = [
-        tr("runbot.logged", LANG, description=description),
+        tr(header_key, LANG, description=description),
         "",
     ]
     if all_zero:
@@ -156,6 +193,7 @@ def build_meal_response_from_agent(
     result: Dict[str, Any],
     *,
     summary: Optional[Dict[str, Any]] = None,
+    is_edit: bool = False,
 ) -> str:
     totals = result.get("totals") or {}
     calories = round(float(totals.get("calories_kcal") or 0))
@@ -206,6 +244,7 @@ def build_meal_response_from_agent(
         accuracy_level=derived_accuracy,
         source_url=derived_source,
         summary=summary,
+        is_edit=is_edit,
     )
     if len(valid_items) <= 1:
         return base_text
@@ -397,10 +436,16 @@ def build_meal_keyboard(
         if url:
             rows.append([types.InlineKeyboardButton(text="🔗 Source", url=url)])
 
-    rows.append([types.InlineKeyboardButton(
-        text="💾 Save to My Menu",
-        callback_data=f"save_meal:{meal_id}",
-    )])
+    rows.append([
+        types.InlineKeyboardButton(
+            text="💾 Save to My Menu",
+            callback_data=f"save_meal:{meal_id}",
+        ),
+        types.InlineKeyboardButton(
+            text="🔁 Repeat log",
+            callback_data=f"repeat_meal:{meal_id}",
+        ),
+    ])
 
     return types.InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -438,16 +483,12 @@ def build_edit_choice_keyboard(meal_id: int, day: date_type) -> types.InlineKeyb
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text="Name",
-                    callback_data=f"meal_edit_field:name:{meal_id}:{day.isoformat()}",
+                    text="📅 Time & Date",
+                    callback_data=f"meal_edit_field:datetime:{meal_id}:{day.isoformat()}",
                 ),
                 types.InlineKeyboardButton(
-                    text="Macros",
-                    callback_data=f"meal_edit_field:macros:{meal_id}:{day.isoformat()}",
-                ),
-                types.InlineKeyboardButton(
-                    text="🕐 Time",
-                    callback_data=f"meal_edit_field:time:{meal_id}:{day.isoformat()}",
+                    text="🍽 Dishes / Macros",
+                    callback_data=f"meal_edit_field:dishes:{meal_id}:{day.isoformat()}",
                 ),
             ],
             [
@@ -465,7 +506,7 @@ async def get_latest_meal_id_for_today(telegram_id: int) -> Optional[int]:
     if user is None:
         return None
 
-    summary = await get_day_summary(user_id=user["id"], day=date_type.today())
+    summary = await get_day_summary(user_id=user["id"], day=today_for_user(user))
     if not summary:
         return None
 
@@ -561,9 +602,20 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     """
     tg_id = message.from_user.id
 
-    # Handle post-purchase deeplink return
+    # Handle deeplink arguments
     args = message.text.split(maxsplit=1)
-    if len(args) > 1 and args[1].strip() == "billing_check":
+    deeplink_arg = args[1].strip() if len(args) > 1 else ""
+
+    # /start reset_onboarding — developer tool to re-test onboarding
+    if deeplink_arg == "reset_onboarding":
+        await update_user(tg_id, onboarding_completed=False)
+        await state.clear()
+        user = await ensure_user(tg_id)
+        if user:
+            await start_onboarding(message, state)
+        return
+
+    if deeplink_arg == "billing_check":
         billing = await get_billing_status(tg_id)
         status = (billing or {}).get("access_status", "expired")
         if status == "active":
@@ -783,7 +835,7 @@ async def cmd_log(message: types.Message) -> None:
         return
 
     user_id = user["id"]
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -866,7 +918,7 @@ async def cmd_barcode(message: types.Message) -> None:
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     # 2) Просим backend найти продукт по штрихкоду
     parsed = await product_parse_meal_by_barcode(barcode)
@@ -897,7 +949,7 @@ async def cmd_barcode(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -1016,7 +1068,7 @@ async def cmd_product(message: types.Message) -> None:
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     # 2) Просим backend найти продукт по названию
     parsed = await product_parse_meal_by_name(name, brand=brand, store=store)
@@ -1047,7 +1099,7 @@ async def cmd_product(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -1139,7 +1191,7 @@ async def cmd_ai_log(message: types.Message) -> None:
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     # 2) Просим backend/LLM оценить КБЖУ
     parsed = await ai_parse_meal(raw_text)
@@ -1173,7 +1225,7 @@ async def cmd_ai_log(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
 
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
 
     meal = await create_meal(
         user_id=user_id,
@@ -1257,7 +1309,7 @@ async def cmd_eatout(message: types.Message) -> None:
     user_id = user["id"]
     
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     # 2) Просим backend найти блюдо из ресторана по свободному тексту
     parsed = await restaurant_parse_text(text=raw_text)
@@ -1289,7 +1341,7 @@ async def cmd_eatout(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
     
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
     meal = await create_meal(
         user_id=user_id,
         day=today,
@@ -1378,7 +1430,7 @@ async def cmd_eatout_a(message: types.Message) -> None:
     user_id = user["id"]
     
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     # 2) Просим backend найти блюдо из ресторана через OpenAI web search
     parsed = await restaurant_parse_text_openai(text=raw_text)
@@ -1410,7 +1462,7 @@ async def cmd_eatout_a(message: types.Message) -> None:
     carbs_g = round(carbs_g, 1)
     
     # 3) Записываем это как MealEntry на сегодня
-    today = date_type.today()
+    today = today_for_user(user)
     meal = await create_meal(
         user_id=user_id,
         day=today,
@@ -1472,7 +1524,7 @@ async def cmd_today(message: types.Message) -> None:
         return
 
     user_id = user["id"]
-    today = date_type.today()
+    today = today_for_user(user)
 
     summary = await get_day_summary(user_id=user_id, day=today)
     if summary is None:
@@ -1510,7 +1562,7 @@ async def cmd_week(message: types.Message) -> None:
         return
 
     user_id = user["id"]
-    today = date_type.today()
+    today = today_for_user(user)
     start_date = today - timedelta(days=6)
 
     total_calories = 0.0
@@ -1647,7 +1699,7 @@ async def handle_meal_edit(query: types.CallbackQuery, state: FSMContext) -> Non
 
     reply_markup = build_edit_choice_keyboard(meal_id=meal_id, day=day)
     await query.message.answer(
-        "What would you like to edit?", reply_markup=reply_markup
+        "What would you like to change?", reply_markup=reply_markup
     )
 
 
@@ -1675,20 +1727,24 @@ async def handle_meal_edit_field(query: types.CallbackQuery, state: FSMContext) 
 
     await state.update_data(meal_id=meal_id, day=day_str, field=field)
 
-    if field == "name":
-        await state.set_state(MealEditState.waiting_for_name)
-        await query.message.answer("Send a new meal name.")
-    elif field == "macros":
-        await state.set_state(MealEditState.waiting_for_macros)
+    if field == "datetime":
+        await state.set_state(MealEditState.waiting_for_datetime)
         await query.message.answer(
-            "Enter macros in kcal/p/f/c format.\n"
-            "Example: 350/25/10/40"
+            "Send the new date and time.\n"
+            "Format: <code>YYYY-MM-DD HH:MM</code> (full) or <code>HH:MM</code> "
+            "(keeps the meal's current date).\n\n"
+            "Examples:\n"
+            "• <code>2026-05-04 14:30</code>\n"
+            "• <code>14:30</code>",
+            parse_mode="HTML",
         )
-    elif field == "time":
-        await state.set_state(MealEditState.waiting_for_time)
+    elif field == "dishes":
+        await state.set_state(MealEditState.waiting_for_edit_comment)
         await query.message.answer(
-            "Enter meal time in HH:MM format.\n"
-            "Example: 14:30"
+            "What should I change? You can send a text or a voice message — for example:\n"
+            "• \"I only ate half\"\n"
+            "• \"no rice\"\n"
+            "• \"the milk was skimmed\""
         )
     else:
         await query.message.answer("I couldn't determine what to edit.")
@@ -1754,54 +1810,41 @@ async def finalize_meal_update(
             await message.answer(build_day_summary_text(summary, day))
 
 
-@router.message(MealEditState.waiting_for_name)
-async def handle_meal_edit_name(message: types.Message, state: FSMContext) -> None:
-    text = (message.text or "").strip()
-    if not text:
-        await message.answer("Name cannot be empty. Please send it again.")
-        return
-
-    await finalize_meal_update(message, state, description=text)
+_MENU_BUTTON_TEXTS = {"📊 Today", "📈 Week", "👤 Profile", "📤 Export", "💬 Support", "📖 How to Use"}
 
 
-@router.message(MealEditState.waiting_for_macros)
-async def handle_meal_edit_macros(message: types.Message, state: FSMContext) -> None:
-    text = message.text or ""
-    parsed = parse_macros_input(text)
-    if parsed is None:
-        await message.answer(
-            "Invalid format. Enter macros as kcal/p/f/c.\n"
-            "Example: 350/25/10/40"
-        )
-        return
-
-    calories, protein_g, fat_g, carbs_g = parsed
-    await finalize_meal_update(
-        message,
-        state,
-        calories=calories,
-        protein_g=protein_g,
-        fat_g=fat_g,
-        carbs_g=carbs_g,
-    )
-
-
-@router.message(MealEditState.waiting_for_time)
-async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> None:
-    text = (message.text or "").strip()
-    # Parse time in HH:MM format
+def _parse_edit_datetime(text: str, fallback_date: date_type) -> Optional[datetime]:
+    """Parse user input as either 'YYYY-MM-DD HH:MM' or 'HH:MM' (using fallback_date)."""
     import re
-    match = re.match(r"^(\d{1,2}):(\d{2})$", text)
-    if not match:
-        await message.answer(
-            "Invalid format. Enter time as HH:MM.\n"
-            "Example: 14:30"
-        )
-        return
+    text = text.strip()
 
-    hour, minute = int(match.group(1)), int(match.group(2))
-    if hour > 23 or minute > 59:
-        await message.answer("Invalid time. Hours 0-23, minutes 0-59.")
+    full_match = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})$", text)
+    if full_match:
+        try:
+            year, month, day, hour, minute = (int(g) for g in full_match.groups())
+            return datetime(year, month, day, hour, minute)
+        except ValueError:
+            return None
+
+    short_match = re.match(r"^(\d{1,2}):(\d{2})$", text)
+    if short_match:
+        try:
+            hour, minute = int(short_match.group(1)), int(short_match.group(2))
+            if hour > 23 or minute > 59:
+                return None
+            return datetime(fallback_date.year, fallback_date.month, fallback_date.day, hour, minute)
+        except ValueError:
+            return None
+
+    return None
+
+
+@router.message(MealEditState.waiting_for_datetime)
+async def handle_meal_edit_datetime(message: types.Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+
+    if text in _MENU_BUTTON_TEXTS or text.startswith("/"):
+        await state.clear()
         return
 
     data = await state.get_data()
@@ -1820,15 +1863,25 @@ async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> No
         await message.answer("Could not read entry date.")
         return
 
-    # Build datetime with the meal's date and user-specified time
+    naive_dt = _parse_edit_datetime(text, day)
+    if naive_dt is None:
+        await message.answer(
+            "Invalid format. Send <code>YYYY-MM-DD HH:MM</code> or <code>HH:MM</code>.\n"
+            "Example: <code>2026-05-04 14:30</code> or <code>14:30</code>",
+            parse_mode="HTML",
+        )
+        return
+
     import pytz
-    user_tz_name = "Europe/Moscow"  # default, will be overridden by user's timezone
+    user_tz_name = "Europe/Moscow"
     user = await get_user(message.from_user.id)
     if user and user.get("timezone"):
         user_tz_name = user["timezone"]
-    user_tz = pytz.timezone(user_tz_name)
+    try:
+        user_tz = pytz.timezone(user_tz_name)
+    except pytz.exceptions.UnknownTimeZoneError:
+        user_tz = pytz.timezone("Europe/Moscow")
 
-    naive_dt = datetime(day.year, day.month, day.day, hour, minute)
     local_dt = user_tz.localize(naive_dt)
     eaten_at_iso = local_dt.isoformat()
 
@@ -1838,7 +1891,207 @@ async def handle_meal_edit_time(message: types.Message, state: FSMContext) -> No
         return
 
     await state.clear()
-    await message.answer(f"✅ Updated time to {hour:02d}:{minute:02d}.")
+
+    new_day = local_dt.date()
+    response_text = build_meal_response_text(
+        description=updated.get("description_user") or tr("runbot.no_description", LANG),
+        calories=round(float(updated.get("calories") or 0)),
+        protein_g=round(float(updated.get("protein_g") or 0), 1),
+        fat_g=round(float(updated.get("fat_g") or 0), 1),
+        carbs_g=round(float(updated.get("carbs_g") or 0), 1),
+        is_edit=True,
+    )
+    response_text = (
+        f"{response_text}\n\n"
+        f"🕐 New time: {local_dt.strftime('%Y-%m-%d %H:%M')}"
+    )
+    reply_markup = build_meal_keyboard(meal_id=meal_id, day=new_day)
+    await message.answer(response_text, reply_markup=reply_markup)
+
+
+def _format_original_meal_context(meal: Dict[str, Any], items: Optional[list]) -> str:
+    """Compact text block describing the meal currently logged, fed to the edit agent."""
+    desc = meal.get("description_user") or "Meal"
+    cal = round(float(meal.get("calories") or 0))
+    prot = round(float(meal.get("protein_g") or 0), 1)
+    fat = round(float(meal.get("fat_g") or 0), 1)
+    carbs = round(float(meal.get("carbs_g") or 0), 1)
+
+    lines = [
+        "ORIGINAL MEAL:",
+        f"- Description: {desc}",
+    ]
+
+    if items:
+        item_lines = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            name = it.get("name") or "item"
+            grams = it.get("grams")
+            i_cal = round(float(it.get("calories_kcal") or 0))
+            i_prot = round(float(it.get("protein_g") or 0), 1)
+            i_fat = round(float(it.get("fat_g") or 0), 1)
+            i_carbs = round(float(it.get("carbs_g") or 0), 1)
+            grams_part = f", {grams}g" if grams else ""
+            item_lines.append(f"  * {name}{grams_part} — {i_cal} kcal, P {i_prot}g, F {i_fat}g, C {i_carbs}g")
+        if item_lines:
+            lines.append("- Items:")
+            lines.extend(item_lines)
+
+    lines.append(f"- Total: {cal} kcal, P {prot}g, F {fat}g, C {carbs}g")
+    return "\n".join(lines)
+
+
+async def _process_meal_edit_comment(message: types.Message, state: FSMContext, comment: str) -> None:
+    data = await state.get_data()
+    meal_id = data.get("meal_id")
+    day_str = data.get("day")
+
+    if not meal_id or not day_str:
+        await state.clear()
+        await message.answer("Could not find entry for editing.")
+        return
+
+    if not comment or not comment.strip():
+        await message.answer("Please describe what to change in a few words.")
+        return
+
+    meal = await get_meal_by_id(meal_id)
+    if not meal:
+        await state.clear()
+        await message.answer("Could not find this meal anymore.")
+        return
+
+    cached_items = data.get(f"meal_items_{meal_id}")
+    original_context = _format_original_meal_context(meal, cached_items)
+
+    await state.clear()
+    processing_msg = await message.answer("✏️ Applying your edit — back in a moment...")
+
+    try:
+        result = await agent_run_workflow(
+            telegram_id=str(message.from_user.id),
+            text=comment,
+            force_intent="edit_meal",
+            nutrition_context=original_context,
+        )
+    except Exception as e:
+        logger.error(f"[EDIT_MEAL] Error running agent workflow: {e}", exc_info=True)
+        try:
+            await processing_msg.delete()
+        except Exception:
+            pass
+        await message.answer("Service is temporarily unavailable, please try later.")
+        return
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    if result is None:
+        await message.answer("Service is temporarily unavailable, please try later.")
+        return
+
+    intent = result.get("intent", "")
+    totals = result.get("totals") or {}
+    new_calories = float(totals.get("calories_kcal") or 0)
+    new_protein = float(totals.get("protein_g") or 0)
+    new_fat = float(totals.get("fat_g") or 0)
+    new_carbs = float(totals.get("carbs_g") or 0)
+    new_items = result.get("items") or []
+
+    if intent != "edit_meal" or (
+        new_calories == 0 and new_protein == 0 and new_fat == 0 and new_carbs == 0 and not new_items
+    ):
+        await message.answer(
+            "Could not apply this edit. Please try a more specific comment "
+            "(e.g. \"I only ate half\" or \"no rice\")."
+        )
+        return
+
+    description_parts = [
+        item.get("name") for item in new_items if isinstance(item, dict) and item.get("name")
+    ][:3]
+    new_description = ", ".join(description_parts).strip() or meal.get("description_user") or "Meal"
+
+    updated = await update_meal(
+        meal_id=meal_id,
+        description=new_description,
+        calories=round(new_calories),
+        protein_g=round(new_protein, 1),
+        fat_g=round(new_fat, 1),
+        carbs_g=round(new_carbs, 1),
+    )
+    if updated is None:
+        await message.answer("Could not save the updated meal. Please try again later 🙏")
+        return
+
+    if new_items:
+        await state.update_data(**{f"meal_items_{meal_id}": new_items})
+
+    try:
+        day = date_type.fromisoformat(day_str)
+    except ValueError:
+        day = date_type.today()
+
+    response_text = build_meal_response_from_agent(result, is_edit=True)
+    reply_markup = build_meal_keyboard(
+        meal_id=meal_id,
+        day=day,
+        source_url=result.get("source_url"),
+        items=new_items,
+    )
+    await message.answer(response_text, reply_markup=reply_markup)
+
+
+@router.message(MealEditState.waiting_for_edit_comment, F.text)
+async def handle_meal_edit_comment_text(message: types.Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+
+    if text in _MENU_BUTTON_TEXTS or text.startswith("/"):
+        await state.clear()
+        return
+
+    await _process_meal_edit_comment(message, state, comment=text)
+
+
+@router.message(MealEditState.waiting_for_edit_comment, F.voice)
+async def handle_meal_edit_comment_voice(message: types.Message, state: FSMContext) -> None:
+    try:
+        file = await message.bot.get_file(message.voice.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        audio_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[EDIT_MEAL] Error downloading voice: {e}")
+        await message.answer("Could not download voice message. Please try again.")
+        return
+
+    if not audio_bytes:
+        await message.answer("Voice message is empty. Please try again.")
+        return
+
+    await message.answer("🎙 Transcribing voice...")
+    parsed = await voice_parse_meal(audio_bytes)
+    if parsed is None:
+        await message.answer("Could not process voice. Please try again.")
+        return
+
+    transcript = (parsed.get("transcript", "") or "").strip()
+    if not transcript:
+        await message.answer("Could not recognize speech. Please try again.")
+        return
+
+    await message.answer(f"Recognized: \"{transcript}\"")
+    await _process_meal_edit_comment(message, state, comment=transcript)
+
+
+@router.message(MealEditState.waiting_for_edit_comment, F.photo)
+async def handle_meal_edit_comment_photo(message: types.Message, state: FSMContext) -> None:
+    await message.answer(
+        "Photo edits aren't supported yet — please describe the change in text or voice."
+    )
 
 
 @router.callback_query(F.data.startswith("meal_delete:"))
@@ -1961,7 +2214,7 @@ async def handle_advice_log(query: types.CallbackQuery, state: FSMContext) -> No
         await query.message.answer("Could not reach backend. Please try again later 🙏")
         return
 
-    today = date_type.today()
+    today = today_for_user(user)
     result = await create_meal(
         user_id=user["id"],
         day=today,
@@ -2012,7 +2265,7 @@ async def _process_food_advice_input(
 
     await state.clear()
 
-    processing_msg = await message.answer("🤔 Thinking about the best recommendation - back in 1-2 minutes!")
+    processing_msg = await message.answer("🤔 Thinking about the best pick — back in 1-2 minutes.")
 
     try:
         result = await agent_run_workflow(
@@ -2360,7 +2613,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         await message.answer("Could not recognize speech. Please try again 🙏")
         return
 
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     try:
         result = await agent_run_workflow(
@@ -2404,7 +2657,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         if meal_id:
             reply_markup = build_meal_keyboard(
                 meal_id=meal_id,
-                day=date_type.today(),
+                day=today_for_user(user),
                 source_url=source_url,
                 items=agent_items,
             )
@@ -2429,12 +2682,157 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
 
     await message.answer(response_text, reply_markup=reply_markup)
 
+    if intent in MEAL_LOGGING_INTENTS:
+        await _track_meal_lifecycle(message.bot, message.from_user.id)
+
+
+_media_group_buffers: Dict[str, list] = {}
+_media_group_tasks: Dict[str, asyncio.Task] = {}
+
+
+async def _download_photo_as_data_uri(message: types.Message) -> Optional[str]:
+    """Download the largest resolution photo from a message and return a base64 data URI."""
+    try:
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        photo_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[PHOTO] Error downloading photo: {e}")
+        return None
+    if not photo_bytes:
+        return None
+    b64 = base64.b64encode(photo_bytes).decode("utf-8")
+    return f"data:image/jpeg;base64,{b64}"
+
+
+async def _process_single_photo(
+    message: types.Message,
+    state: FSMContext,
+    user: dict,
+    image_data_uri: str,
+    text: str,
+) -> Optional[dict]:
+    """Run agent workflow for a single photo and return the result (or None on failure)."""
+    tg_id = message.from_user.id
+    try:
+        result = await agent_run_workflow(
+            telegram_id=str(tg_id),
+            text=text,
+            image_url=image_data_uri,
+        )
+    except Exception as e:
+        logger.error(f"[PHOTO] Error running agent workflow: {e}", exc_info=True)
+        return None
+    return result
+
+
+def _build_photo_reply(
+    result: dict,
+    user: dict,
+    agent_items: list,
+    source_url: Optional[str],
+) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
+    """Build response text and reply_markup from a photo agent result."""
+    intent = result.get("intent", "unknown")
+    message_text = result.get("message_text", "Processing error")
+    has_source_url = source_url is not None and source_url != ""
+    has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
+
+    reply_markup = None
+    if intent in MEAL_LOGGING_INTENTS:
+        response_text = build_meal_response_from_agent(result)
+    else:
+        response_text = message_text
+
+    if intent in MEAL_LOGGING_INTENTS:
+        pass  # meal_id will be attached by caller
+
+    if not reply_markup and (has_source_url or has_item_sources):
+        source_buttons = []
+        for it in agent_items:
+            if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
+                item_name = it.get("name") or "Product"
+                label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Source: {label}", url=normalize_source_url(it["source_url"]))])
+        if not source_buttons and has_source_url:
+            source_buttons.append([types.InlineKeyboardButton(text="🔗 Source", url=source_url)])
+        if source_buttons:
+            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
+
+    return response_text, reply_markup
+
+
+async def _flush_media_group(media_group_id: str, anchor_message: types.Message, state: FSMContext) -> None:
+    """Process a buffered media group: single status message, parallel agent calls."""
+    await asyncio.sleep(1.5)
+
+    entries = _media_group_buffers.pop(media_group_id, [])
+    _media_group_tasks.pop(media_group_id, None)
+
+    if not entries:
+        return
+
+    first_msg, first_user, first_uri = entries[0]
+    user = first_user
+
+    processing_msg = await anchor_message.answer(
+        f"📸 Analyzing {len(entries)} photo{'s' if len(entries) > 1 else ''} — back in 1-2 minutes!"
+    )
+
+    caption = (anchor_message.caption or "").strip() or "Identify what's in the photo and estimate macros"
+
+    async def _run_one(msg, uri, text):
+        return await _process_single_photo(msg, state, user, uri, text)
+
+    results = await asyncio.gather(
+        *[_run_one(msg, uri, caption) for msg, _, uri in entries],
+        return_exceptions=True,
+    )
+
+    try:
+        await processing_msg.delete()
+    except Exception:
+        pass
+
+    any_logged = False
+    for (msg, _, _), result in zip(entries, results):
+        if isinstance(result, Exception) or result is None:
+            await anchor_message.answer("Could not analyze one of the photos. Please try again.")
+            continue
+
+        intent = result.get("intent", "unknown")
+        source_url = result.get("source_url")
+        agent_items = result.get("items") or []
+
+        response_text, reply_markup = _build_photo_reply(result, user, agent_items, source_url)
+
+        if intent in MEAL_LOGGING_INTENTS:
+            meal_id = await get_latest_meal_id_for_today(anchor_message.from_user.id)
+            if meal_id:
+                reply_markup = build_meal_keyboard(
+                    meal_id=meal_id,
+                    day=today_for_user(user),
+                    source_url=source_url,
+                    items=agent_items,
+                )
+                if agent_items:
+                    await state.update_data(**{f"meal_items_{meal_id}": agent_items})
+            any_logged = True
+
+        await anchor_message.answer(response_text, reply_markup=reply_markup)
+
+    if any_logged:
+        await _track_meal_lifecycle(anchor_message.bot, anchor_message.from_user.id)
+
 
 @router.message(F.photo)
 async def handle_photo(message: types.Message, state: FSMContext) -> None:
     """
     Handle photo messages. Downloads the photo, base64-encodes it,
     and sends it through the agent workflow for food recognition.
+    Supports media groups (albums): buffers photos for 1.5 s, then
+    processes them in parallel with a single status message.
     """
     if not await check_billing_access(message):
         return
@@ -2444,95 +2842,60 @@ async def handle_photo(message: types.Message, state: FSMContext) -> None:
         await message.answer("Could not reach backend. Please try again later 🙏")
         return
 
-    # Download the largest resolution photo
-    try:
-        photo = message.photo[-1]
-        file = await message.bot.get_file(photo.file_id)
-        bio = await message.bot.download_file(file.file_path)
-        photo_bytes = bio.read()
-    except Exception as e:
-        logger.error(f"[PHOTO] Error downloading photo: {e}")
+    image_data_uri = await _download_photo_as_data_uri(message)
+    if image_data_uri is None:
         await message.answer("Could not download photo. Please try again 🙏")
         return
 
-    if not photo_bytes:
-        await message.answer("Photo is empty. Please try again 🙏")
+    # --- Media group (album) handling ---
+    mg_id = message.media_group_id
+    if mg_id:
+        buf = _media_group_buffers.setdefault(mg_id, [])
+        buf.append((message, user, image_data_uri))
+        if mg_id not in _media_group_tasks:
+            _media_group_tasks[mg_id] = asyncio.create_task(
+                _flush_media_group(mg_id, message, state)
+            )
         return
 
-    # Base64-encode as data URI
-    b64 = base64.b64encode(photo_bytes).decode("utf-8")
-    image_data_uri = f"data:image/jpeg;base64,{b64}"
-
-    # Use caption as text, or a default prompt
+    # --- Single photo path (unchanged logic) ---
     text = (message.caption or "").strip() or "Identify what's in the photo and estimate macros"
 
-    processing_msg = await message.answer("📸 Analyzing photo - back in 1-2 minutes!")
+    processing_msg = await message.answer("📸 Analyzing photo — back in 1-2 minutes!")
 
-    try:
-        result = await agent_run_workflow(
-            telegram_id=str(tg_id),
-            text=text,
-            image_url=image_data_uri,
-        )
-    except Exception as e:
-        logger.error(f"[PHOTO] Error running agent workflow: {e}", exc_info=True)
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer("Service is temporarily unavailable, please try later.")
-        return
-
-    if result is None:
-        try:
-            await processing_msg.delete()
-        except Exception:
-            pass
-        await message.answer("Service is temporarily unavailable, please try later.")
-        return
+    result = await _process_single_photo(message, state, user, image_data_uri, text)
 
     try:
         await processing_msg.delete()
     except Exception:
         pass
 
+    if result is None:
+        await message.answer("Service is temporarily unavailable, please try later.")
+        return
+
     intent = result.get("intent", "unknown")
-    message_text = result.get("message_text", "Processing error")
     source_url = result.get("source_url")
     agent_items = result.get("items") or []
-    has_source_url = source_url is not None and source_url != ""
-    has_item_sources = any(isinstance(it, dict) and it.get("source_url") for it in agent_items)
 
-    reply_markup = None
+    response_text, reply_markup = _build_photo_reply(result, user, agent_items, source_url)
+
     if intent in MEAL_LOGGING_INTENTS:
         meal_id = await get_latest_meal_id_for_today(message.from_user.id)
         if meal_id:
             reply_markup = build_meal_keyboard(
                 meal_id=meal_id,
-                day=date_type.today(),
+                day=today_for_user(user),
                 source_url=source_url,
                 items=agent_items,
             )
             if agent_items:
                 await state.update_data(**{f"meal_items_{meal_id}": agent_items})
 
-    if reply_markup is None and (has_source_url or has_item_sources):
-        source_buttons = []
-        for it in agent_items:
-            if isinstance(it, dict) and normalize_source_url(it.get("source_url")):
-                item_name = it.get("name") or "Product"
-                label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
-                source_buttons.append([types.InlineKeyboardButton(text=f"🔗 Source: {label}", url=normalize_source_url(it["source_url"]))])
-        if not source_buttons and has_source_url:
-            source_buttons.append([types.InlineKeyboardButton(text="🔗 Source", url=source_url)])
-        if source_buttons:
-            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=source_buttons)
-
-    response_text = message_text
-    if intent in MEAL_LOGGING_INTENTS:
-        response_text = build_meal_response_from_agent(result)
-
     await message.answer(response_text, reply_markup=reply_markup)
+
+    if intent in MEAL_LOGGING_INTENTS:
+        await _track_meal_lifecycle(message.bot, message.from_user.id)
 
 
 @router.message(Command("agent"))
@@ -2554,7 +2917,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         return
     
     # Send processing message
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     try:
         # Call agent/run endpoint
@@ -2608,7 +2971,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
             if meal_id:
                 reply_markup = build_meal_keyboard(
                     meal_id=meal_id,
-                    day=date_type.today(),
+                    day=today_for_user(user),
                     source_url=source_url,
                     items=agent_items,
                 )
@@ -2634,6 +2997,8 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT /agent] Successfully sent message for telegram_id={tg_id}, intent={intent}")
+            if intent in MEAL_LOGGING_INTENTS:
+                await _track_meal_lifecycle(message.bot, message.from_user.id)
         except Exception as send_error:
             logger.error(
                 f"[BOT /agent] Error sending message: {send_error}, "
@@ -2690,9 +3055,18 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         return
     
     # Send processing message
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     try:
+        user = await ensure_user(message.from_user.id)
+        if user is None:
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            await message.answer("Could not reach backend. Please try again later 🙏")
+            return
+
         # Call agent/run endpoint
         logger.info(f"[BOT plain_text] Calling agent_run_workflow for telegram_id={tg_id}, text={text[:50]}...")
         result = await agent_run_workflow(telegram_id=tg_id, text=text)
@@ -2744,7 +3118,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
             if meal_id:
                 reply_markup = build_meal_keyboard(
                     meal_id=meal_id,
-                    day=date_type.today(),
+                    day=today_for_user(user),
                     source_url=source_url,
                     items=agent_items,
                 )
@@ -2770,6 +3144,8 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
                 response_text = build_meal_response_from_agent(result)
             await message.answer(response_text, reply_markup=reply_markup)
             logger.info(f"[BOT plain_text] Successfully sent message for telegram_id={tg_id}, intent={intent}")
+            if intent in MEAL_LOGGING_INTENTS:
+                await _track_meal_lifecycle(message.bot, message.from_user.id)
         except Exception as send_error:
             logger.error(
                 f"[BOT plain_text] Error sending message: {send_error}, "
@@ -2877,6 +3253,53 @@ async def handle_save_confirm(query: types.CallbackQuery, state: FSMContext) -> 
     await _do_save_meal(query.message, state, meal_id, name)
 
 
+# --- Repeat logging ---
+
+@router.callback_query(F.data.startswith("repeat_meal:"))
+async def handle_repeat_meal(query: types.CallbackQuery, state: FSMContext) -> None:
+    await query.answer()
+    parts = query.data.split(":", 1)
+    if len(parts) < 2:
+        await query.message.answer("Could not repeat this log.")
+        return
+
+    try:
+        source_meal_id = int(parts[1])
+    except ValueError:
+        await query.message.answer("Could not read data.")
+        return
+
+    new_meal = await repeat_meal(source_meal_id)
+    if not new_meal:
+        await query.message.answer("Could not repeat this meal. Please try again later.")
+        return
+
+    tg_id = query.from_user.id
+    user = await ensure_user(tg_id)
+
+    cal = round(new_meal.get("calories", 0))
+    prot = round(new_meal.get("protein_g", 0), 1)
+    fat = round(new_meal.get("fat_g", 0), 1)
+    carbs = round(new_meal.get("carbs_g", 0), 1)
+    desc = new_meal.get("description_user", "Meal")
+
+    text = (
+        f"🔁 Logged again:\n\n"
+        f"{desc}\n"
+        f"{cal} kcal · 🥩 {prot}g · 🧈 {fat}g · 🍞 {carbs}g"
+    )
+
+    new_meal_id = new_meal.get("id")
+    reply_markup = None
+    if new_meal_id and user:
+        reply_markup = build_meal_keyboard(
+            meal_id=new_meal_id,
+            day=today_for_user(user),
+        )
+
+    await query.message.answer(text, reply_markup=reply_markup)
+
+
 # --- Quick log from My Menu ---
 
 @router.callback_query(F.data.startswith("my_menu_log:"))
@@ -2904,7 +3327,7 @@ async def handle_my_menu_log(query: types.CallbackQuery, state: FSMContext) -> N
         await query.message.answer("Could not reach backend. Please try again later.")
         return
 
-    today = date_type.today()
+    today = today_for_user(user)
     meal_result = await create_meal(
         user_id=user["id"],
         day=today,
@@ -3160,6 +3583,9 @@ async def main() -> None:
     # onboarding_router: menu button handlers during onboarding
     dp.include_router(onboarding_router)
     dp.include_router(router)
+
+    from app.bot.lifecycle_notifications import run_notification_scheduler
+    asyncio.create_task(run_notification_scheduler(bot))
 
     await dp.start_polling(bot)
 

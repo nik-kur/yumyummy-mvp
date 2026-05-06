@@ -564,6 +564,18 @@ async def use_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+async def repeat_meal(meal_id: int) -> Optional[Dict[str, Any]]:
+    url = f"{settings.backend_base_url}/meals/{meal_id}/repeat"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"[API] repeat_meal error: {e}")
+        return None
+
+
 # ============ Billing ============
 
 

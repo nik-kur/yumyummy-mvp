@@ -1,7 +1,10 @@
 """
-Модуль онбординга и главного меню для Telegram бота.
-Содержит FSM состояния, обработчики и клавиатуры.
+Onboarding flow and main menu handlers for the Telegram bot.
+Contains FSM states, handlers, and keyboards.
 """
+import asyncio
+import base64
+import html as html_mod
 import json
 import re
 import logging
@@ -28,25 +31,40 @@ from app.bot.api_client import (
     get_billing_status,
     get_paddle_portal_url,
     submit_churn_survey,
+    create_saved_meal,
+    get_meal_by_id,
+    agent_run_workflow,
 )
 from app.bot.billing import check_billing_access
 from app.core.config import settings
 from app.i18n import DEFAULT_LANG, tr
+from app.services.user_time import today_for_user
 
 logger = logging.getLogger(__name__)
 
 router = Router()
 LANG = DEFAULT_LANG
 
-# Константы
 SUPPORT_USERNAME = "nik_kur"
+
+
+def _get_run_bot_helpers():
+    from app.bot.run_bot import (
+        build_meal_response_from_agent,
+        get_latest_meal_id_for_today,
+        build_meal_keyboard,
+        normalize_source_url,
+    )
+    return build_meal_response_from_agent, get_latest_meal_id_for_today, build_meal_keyboard, normalize_source_url
 
 
 # ============ FSM States ============
 
 class OnboardingStates(StatesGroup):
-    """Состояния для онбординга"""
+    """New onboarding: value-first, setup-second, parallelised."""
     waiting_for_start = State()
+    waiting_for_demo_meal = State()
+    # Questionnaire (runs while agent searches in background)
     waiting_for_goal = State()
     waiting_for_gender = State()
     waiting_for_params = State()
@@ -55,23 +73,27 @@ class OnboardingStates(StatesGroup):
     waiting_for_manual_kbju = State()
     waiting_for_timezone = State()
     waiting_for_timezone_text = State()
-    tutorial_step_1 = State()
-    tutorial_step_2 = State()
+    # Post-questionnaire
+    my_menu_instruction = State()
+    feature_guide = State()
+    trial_activation = State()
 
 
 class ProfileStates(StatesGroup):
-    """Состояния для редактирования профиля"""
+    """States for profile editing."""
     waiting_for_manual_kbju = State()
+    waiting_for_timezone_change = State()
+    waiting_for_timezone_text_change = State()
 
 
 class CancelFlowStates(StatesGroup):
-    """Состояния для churn survey перед отменой подписки"""
+    """States for churn survey before subscription cancellation."""
     waiting_for_reason = State()
     waiting_for_comment = State()
 
 
 class FoodAdviceState(StatesGroup):
-    """Состояния для режима food advice"""
+    """States for food advice mode."""
     waiting_for_choice = State()
     waiting_for_input = State()
 
@@ -79,9 +101,6 @@ class FoodAdviceState(StatesGroup):
 # ============ KBJU Calculation (Mifflin-St Jeor) ============
 
 def calculate_bmr(gender: str, weight_kg: float, height_cm: int, age: int) -> float:
-    """
-    Рассчитать базовый метаболизм по формуле Миффлина-Сан Жеора.
-    """
     if gender == "male":
         return 10 * weight_kg + 6.25 * height_cm - 5 * age + 5
     else:
@@ -89,9 +108,6 @@ def calculate_bmr(gender: str, weight_kg: float, height_cm: int, age: int) -> fl
 
 
 def calculate_tdee(bmr: float, activity_level: str) -> float:
-    """
-    Рассчитать суточный расход энергии с учётом активности.
-    """
     activity_multipliers = {
         "sedentary": 1.2,
         "light": 1.375,
@@ -110,38 +126,30 @@ def calculate_targets(
     activity_level: str,
     goal_type: str,
 ) -> dict:
-    """
-    Рассчитать целевые КБЖУ на основе параметров пользователя.
-    """
     bmr = calculate_bmr(gender, weight_kg, height_cm, age)
     tdee = calculate_tdee(bmr, activity_level)
-    
-    # Корректировка калорий в зависимости от цели
+
     if goal_type == "lose":
-        target_calories = tdee - 500  # Дефицит 500 ккал
+        target_calories = tdee - 500
     elif goal_type == "gain":
-        target_calories = tdee + 300  # Профицит 300 ккал
-    else:  # maintain
+        target_calories = tdee + 300
+    else:
         target_calories = tdee
-    
-    # Расчёт БЖУ
-    # Белок: 2г на кг веса (для похудения/набора) или 1.6г (поддержание)
+
     if goal_type == "lose":
         protein_g = weight_kg * 2.0
     elif goal_type == "gain":
         protein_g = weight_kg * 2.2
     else:
         protein_g = weight_kg * 1.6
-    
-    # Жиры: 25-30% от калорий
+
     fat_calories = target_calories * 0.28
     fat_g = fat_calories / 9
-    
-    # Углеводы: остаток калорий
+
     protein_calories = protein_g * 4
     carbs_calories = target_calories - protein_calories - fat_calories
     carbs_g = carbs_calories / 4
-    
+
     return {
         "target_calories": round(target_calories),
         "target_protein_g": round(protein_g),
@@ -152,7 +160,42 @@ def calculate_targets(
 
 # ============ Texts ============
 
-WELCOME_TEXT = tr("onboarding.welcome", LANG)
+WELCOME_TEXT = (
+    "👋 Hi! I'm YumYummy — your AI nutrition tracker in Telegram.\n\n"
+    "Tell me what you ate. Text, voice, or photo — I'll find the real nutrition data in about 10 seconds.\n\n"
+    "What makes this different from other trackers:\n\n"
+    "🔍 Real data — I search the web for official nutrition info from restaurants and brands. Not a guess from a database.\n"
+    "⚡ 10 seconds — just describe your meal in any way. No searching, no scrolling, no manual entry.\n"
+    "💬 Right here in Telegram — no app to download.\n\n"
+    "Let's try it right now. Tell me your last meal.\n"
+    "Example: \"cappuccino and a croissant at Starbucks\""
+)
+
+DEMO_MEAL_PIVOT_TEXT = """⏳ Got it! I'm searching for official nutrition sources now — this may take 1-2 minutes, as I thoroughly check real data rather than guess.
+
+While I search — let's set up your personal targets so I can show you how your meal fits into your day."""
+
+FINALIZING_SEARCH_TEXT = """⏳ Almost there! Just ~20 more seconds to finalize your meal analysis...
+
+A quick food for thought while you wait:
+
+A large-scale study found that consistent food trackers lose 2x more weight than those who don't — but "consistently" is the key word. The tracker has to be easy enough to actually use every day.
+
+Why do most people fail? Research shows that 92% who start calorie counting quit within 2 weeks. The #1 reason isn't motivation — it's friction. Traditional apps take 15-20 minutes per day to log everything manually.
+
+That's exactly why YumYummy exists. One message, and I handle the rest. Most meals take under 10 seconds to log."""
+
+SAVE_TO_MENU_TEXT = """💾 Like this meal? Save it to your personal menu!
+
+Your menu is your collection of go-to meals — think of it as speed-dial for food tracking. Breakfast you eat every day, your favorite lunch spot order, regular snacks.
+
+Tap the button below — next time you eat this, you'll log it in 2 taps instead of typing it out."""
+
+MY_MENU_SAVED_INSTRUCTION_TEXT = """✅ Saved to your Menu!
+
+You always have 🍽 My Menu available via the button at the bottom. Save your frequent dishes and log them in just 2 taps — no typing needed.
+
+The more meals you save, the faster your daily tracking gets."""
 
 GOAL_TEXT = tr("onboarding.goal", LANG)
 
@@ -162,68 +205,78 @@ PARAMS_TEXT = tr("onboarding.params", LANG)
 
 ACTIVITY_TEXT = tr("onboarding.activity", LANG)
 
-TUTORIAL_STEP1_TEXT = """📝 HOW TO LOG FOOD
-
-Main rule: write or speak naturally. I will understand.
-
-✍️ TEXT:
-"Had 2 eggs and avocado toast"
-"Oatmeal with banana and a spoon of honey"
-"Caesar salad and 200g steak"
-
-🎤 VOICE:
-Send a voice message: "For breakfast I had cottage cheese with berries and coffee with milk"
-
-🏪 WITH CONTEXT (more accurate):
-If you mention where you bought/ordered it, I'll search official nutrition data:
-
-"Cappuccino and a croissant at Starbucks"
--> I'll find exact calories from the official menu
-
-"Epica 6% cottage cheese from VkusVill"
--> I'll find manufacturer data
-
-"Tom Yum at Tanuki"
--> I'll search the restaurant menu
-
-No context? No problem - I'll estimate from average values.
-
-📷 BARCODE:
-For packaged products, just take a photo of the barcode on the package. I'll find the product in the database."""
-
-TUTORIAL_STEP2_TEXT = """🤔 SMART ADVICE - WHAT SHOULD I EAT?
-
-Not sure what to choose? Ask me - I'll suggest the best option based on your remaining calories and macros.
-
-Examples:
-• "I'm at McDonald's, what should I order?"
-• "I need a snack, I have 300 kcal left"
-• "What should I cook for dinner? Need protein"
-
-Tap [🤔 What should I eat?] in the menu or just ask!
-
-📊 TRACK YOUR PROGRESS
-
-[📊 Today] - what you ate and what is left
-[📈 Week] - 7-day statistics
-
-Check before meals - planning gets much easier."""
-
-FINAL_TEXT = tr("onboarding.final", LANG)
-
 MANUAL_KBJU_TEXT = tr("onboarding.manual_kbju", LANG)
+
+FEATURE_GUIDE_TEXT = """📖 Here's everything YumYummy can do for you:
+
+─────────────────
+⏱ 10-Second Meal Logging — Any Format
+
+Text — "2 eggs, toast with avocado, black coffee"
+Voice — send a voice message describing your meal
+Photo — snap your plate and I'll estimate KBJU
+Barcode — photo of a product barcode = exact data
+Nutrition label — photo of a label on packaging
+
+─────────────────
+🔬 Nerd-Level Precision — Not Just Rough Estimates
+
+Mention a brand or restaurant:
+"Cappuccino at Starbucks" → I search for official Starbucks nutrition data
+"Epica yogurt 6%" → I find the manufacturer's numbers
+"Tom Yum at Wagamama" → I look up the restaurant menu
+No context? I estimate from known averages for that dish.
+
+─────────────────
+🍽 My Menu — Your Favorites on Speed-Dial
+
+Save meals you eat often → log them in 2 taps next time.
+You already tried this during setup!
+
+─────────────────
+🤔 What Should I Eat — Nutrition Advisor in Your Pocket
+
+Not sure what to pick? Tell me your options:
+"I'm at McDonald's, what should I order?"
+"Need a snack, 300 kcal left"
+"What should I cook for dinner? Need protein"
+I'll suggest the best choice for your remaining daily budget.
+
+─────────────────
+📊 Track Your Progress
+
+📊 Today — what you ate, what's left, progress bars
+📈 Week — 7-day stats, daily averages, trends
+📤 Export — download all your data as CSV
+
+─────────────────
+
+💡 This guide is always available — tap 📖 How to Use in the menu anytime."""
+
+TRIAL_CTA_TEXT = """You're all set.
+
+Activate your free trial:
+
+✅ 3 days of full access
+✅ Every feature unlocked
+✅ No credit card required
+
+Just text, speak, or snap what you eat — I'll handle the rest."""
+
+TRIAL_ACTIVATED_TEXT = """Free trial activated 👌  Full access for 3 days.
+
+Your next step: log your next meal whenever you're ready. I'm here 24/7."""
 
 
 # ============ Keyboards ============
 
 def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
-    """Главное меню"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📊 Today"), KeyboardButton(text="📈 Week")],
             [KeyboardButton(text="🍽 My Menu"), KeyboardButton(text="🤔 What should I eat?")],
             [KeyboardButton(text="👤 Profile"), KeyboardButton(text="📤 Export")],
-            [KeyboardButton(text="💬 Support")],
+            [KeyboardButton(text="📖 How to Use"), KeyboardButton(text="💬 Support")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Type what you ate or choose an action...",
@@ -231,16 +284,14 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
 
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
-    """Кнопка начала онбординга"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🚀 Start", callback_data="onboarding_start")]
+            [InlineKeyboardButton(text="👋 Let's go", callback_data="onboarding_start")]
         ]
     )
 
 
 def get_goal_keyboard() -> InlineKeyboardMarkup:
-    """Выбор цели"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔻 Lose weight", callback_data="goal_lose")],
@@ -251,7 +302,6 @@ def get_goal_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_gender_keyboard() -> InlineKeyboardMarkup:
-    """Выбор пола"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -263,7 +313,6 @@ def get_gender_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_activity_keyboard() -> InlineKeyboardMarkup:
-    """Выбор уровня активности"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🛋 Minimal - mostly sedentary", callback_data="activity_sedentary")],
@@ -276,7 +325,6 @@ def get_activity_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_goal_confirmation_keyboard() -> InlineKeyboardMarkup:
-    """Подтверждение целей КБЖУ"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="✅ Looks good, continue", callback_data="goals_confirm")],
@@ -286,53 +334,35 @@ def get_goal_confirmation_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_timezone_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора часового пояса"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🇷🇺 Moscow (UTC+3)", callback_data="tz:Europe/Moscow")],
-            [InlineKeyboardButton(text="🇷🇺 Yekaterinburg (UTC+5)", callback_data="tz:Asia/Yekaterinburg")],
-            [InlineKeyboardButton(text="🇷🇺 Novosibirsk (UTC+7)", callback_data="tz:Asia/Novosibirsk")],
-            [InlineKeyboardButton(text="🇷🇺 Vladivostok (UTC+10)", callback_data="tz:Asia/Vladivostok")],
-            [InlineKeyboardButton(text="🇪🇺 Berlin (UTC+1)", callback_data="tz:Europe/Berlin")],
-            [InlineKeyboardButton(text="🇬🇧 London (UTC+0)", callback_data="tz:Europe/London")],
             [InlineKeyboardButton(text="🇺🇸 New York (UTC-5)", callback_data="tz:America/New_York")],
+            [InlineKeyboardButton(text="🇺🇸 Los Angeles (UTC-8)", callback_data="tz:America/Los_Angeles")],
+            [InlineKeyboardButton(text="🇬🇧 London (UTC+0)", callback_data="tz:Europe/London")],
+            [InlineKeyboardButton(text="🇪🇺 Berlin / Paris (UTC+1)", callback_data="tz:Europe/Berlin")],
+            [InlineKeyboardButton(text="🇷🇺 Moscow (UTC+3)", callback_data="tz:Europe/Moscow")],
             [InlineKeyboardButton(text="🇦🇪 Dubai (UTC+4)", callback_data="tz:Asia/Dubai")],
+            [InlineKeyboardButton(text="🇮🇳 Mumbai (UTC+5:30)", callback_data="tz:Asia/Kolkata")],
+            [InlineKeyboardButton(text="🇸🇬 Singapore (UTC+8)", callback_data="tz:Asia/Singapore")],
+            [InlineKeyboardButton(text="🇯🇵 Tokyo (UTC+9)", callback_data="tz:Asia/Tokyo")],
+            [InlineKeyboardButton(text="🇦🇺 Sydney (UTC+10)", callback_data="tz:Australia/Sydney")],
             [InlineKeyboardButton(text="🌍 Other...", callback_data="tz:other")],
         ]
     )
 
 
-def get_tutorial_next_keyboard() -> InlineKeyboardMarkup:
-    """Кнопка продолжения туториала"""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="👍 Got it, next", callback_data="tutorial_next")]
-        ]
-    )
-
-
-def get_tutorial_finish_keyboard() -> InlineKeyboardMarkup:
-    """Кнопка завершения туториала"""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="👍 All clear!", callback_data="tutorial_finish")]
-        ]
-    )
-
-
 def get_profile_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура для профиля"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔄 Recalculate targets", callback_data="profile_recalculate")],
             [InlineKeyboardButton(text="✏️ Enter targets manually", callback_data="profile_manual_kbju")],
+            [InlineKeyboardButton(text="🌍 Change timezone", callback_data="profile_change_tz")],
             [InlineKeyboardButton(text="💳 Manage subscription", callback_data="profile_manage_sub")],
         ]
     )
 
 
 def get_day_actions_keyboard(day_str: str, from_today: bool = False) -> InlineKeyboardMarkup:
-    """Клавиатура для просмотра приёмов пищи за день"""
     suffix = ":from_today" if from_today else ""
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -341,15 +371,14 @@ def get_day_actions_keyboard(day_str: str, from_today: bool = False) -> InlineKe
     )
 
 
-def get_week_days_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура с днями недели для drill-down"""
-    today = date_type.today()
+def get_week_days_keyboard(user=None) -> InlineKeyboardMarkup:
+    today = today_for_user(user) if user else date_type.today()
     buttons = []
-    
+
     day_names = {
         0: "Mon", 1: "Tue", 2: "Wed", 3: "Thu", 4: "Fri", 5: "Sat", 6: "Sun"
     }
-    
+
     for i in range(7):
         day = today - timedelta(days=6-i)
         day_name = day_names[day.weekday()]
@@ -357,7 +386,7 @@ def get_week_days_keyboard() -> InlineKeyboardMarkup:
         if day == today:
             day_label = f"📍 {day_label}"
         buttons.append([InlineKeyboardButton(text=day_label, callback_data=f"daylist:{day.isoformat()}")])
-    
+
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -369,10 +398,9 @@ def get_targets_presentation_text(
     target_fat_g: float,
     target_carbs_g: float,
 ) -> str:
-    """Формирует красивый текст с целями КБЖУ"""
-    return f"""🎯 Your personal targets are ready!
+    return f"""Your personal targets are set 👌
 
-🔥 Calories:  {target_calories:.0f} kcal
+Calories:  {target_calories:.0f} kcal
 🥩 Protein:   {target_protein_g:.0f} g
 🥑 Fat:       {target_fat_g:.0f} g
 🍞 Carbs:     {target_carbs_g:.0f} g
@@ -392,7 +420,6 @@ You can always adjust your targets in "Profile"."""
 
 
 async def check_onboarding_completed(message: types.Message) -> bool:
-    """Проверяет, прошёл ли пользователь онбординг"""
     user = await get_user(message.from_user.id)
     if not user or not user.get("onboarding_completed", False):
         await message.answer(
@@ -403,25 +430,23 @@ async def check_onboarding_completed(message: types.Message) -> bool:
 
 
 def build_progress_bar(current: float, target: float, width: int = 15) -> str:
-    """Строит прогресс-бар с процентом"""
     if target <= 0:
         return "░" * width + " 0%"
-    
+
     pct = current / target * 100
     ratio = min(current / target, 1.5)
     filled = int(ratio * width)
     filled = min(filled, width + 5)
-    
+
     if ratio <= 1.0:
         bar = "█" * filled + "░" * (width - filled)
     else:
         bar = "█" * width + "🔴" * min(filled - width, 5)
-    
+
     return f"{bar} {pct:.0f}%"
 
 
 def format_remaining(current: float, target: float, unit: str = "kcal") -> str:
-    """Форматирует остаток: 'осталось X' или 'перебор на X'"""
     diff = target - current
     if diff > 0:
         return f"{diff:.0f} {unit} left"
@@ -431,62 +456,339 @@ def format_remaining(current: float, target: float, unit: str = "kcal") -> str:
         return "right on target!"
 
 
-# ============ Onboarding Handlers ============
+# ============ Background Demo Meal Management ============
+
+_pending_demo_tasks: dict = {}
+_pending_demo_results: dict = {}
+
+
+async def _start_demo_meal_agent(
+    telegram_id: int, text: str, image_url: str | None = None,
+) -> None:
+    """Start agent search in background, store result when done."""
+    async def _run():
+        try:
+            result = await agent_run_workflow(
+                telegram_id=str(telegram_id), text=text, image_url=image_url,
+            )
+            _pending_demo_results[telegram_id] = result
+        except Exception as e:
+            logger.error(f"[ONBOARDING] Demo meal agent failed for {telegram_id}: {e}")
+            _pending_demo_results[telegram_id] = None
+
+    _pending_demo_tasks[telegram_id] = asyncio.create_task(_run())
+
+
+async def _await_demo_result(telegram_id: int, message: types.Message) -> Optional[dict]:
+    """Wait for agent result; send filler message if still running."""
+    task = _pending_demo_tasks.get(telegram_id)
+
+    if task and not task.done():
+        await message.answer(FINALIZING_SEARCH_TEXT)
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=120)
+        except asyncio.TimeoutError:
+            logger.error(f"[ONBOARDING] Agent timeout for {telegram_id}")
+
+    result = _pending_demo_results.pop(telegram_id, None)
+    _pending_demo_tasks.pop(telegram_id, None)
+    return result
+
+
+async def _deliver_combined_result(
+    message: types.Message, state: FSMContext, telegram_id: int
+) -> None:
+    """Show meal result + day summary with progress bars, then save-to-menu prompt."""
+    data = await state.get_data()
+
+    target_cal = data.get("target_calories", 2000)
+    target_prot = data.get("target_protein_g", 150)
+    target_fat = data.get("target_fat_g", 65)
+    target_carbs = data.get("target_carbs_g", 200)
+
+    result = await _await_demo_result(telegram_id, message)
+
+    build_meal_response, get_latest_meal_id, _, normalize_url = _get_run_bot_helpers()
+
+    if not result:
+        fallback = (
+            "There was an issue analyzing your demo meal, but no worries — "
+            "you can log it again anytime.\n\n"
+            f"Your daily targets are set:\n"
+            f"{target_cal:.0f} kcal · 🥩 {target_prot:.0f} g · "
+            f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g"
+        )
+        await message.answer(fallback)
+        await _prompt_my_menu_save(message, state, telegram_id, meal_id=None)
+        return
+
+    meal_text_raw = build_meal_response(result)
+    meal_text = html_mod.escape(meal_text_raw)
+
+    totals = result.get("totals") or {}
+    meal_cal = round(float(totals.get("calories_kcal") or 0))
+    meal_prot = round(float(totals.get("protein_g") or 0), 1)
+    meal_fat = round(float(totals.get("fat_g") or 0), 1)
+    meal_carbs = round(float(totals.get("carbs_g") or 0), 1)
+    pct = round(meal_cal / target_cal * 100) if target_cal > 0 else 0
+
+    bar_cal = build_progress_bar(meal_cal, target_cal)
+    bar_prot = build_progress_bar(meal_prot, target_prot)
+    bar_fat = build_progress_bar(meal_fat, target_fat)
+    bar_carbs = build_progress_bar(meal_carbs, target_carbs)
+
+    rem_cal = format_remaining(meal_cal, target_cal, "kcal")
+    rem_prot = format_remaining(meal_prot, target_prot, "g")
+    rem_fat = format_remaining(meal_fat, target_fat, "g")
+    rem_carbs = format_remaining(meal_carbs, target_carbs, "g")
+
+    user = await get_user(telegram_id)
+    today = today_for_user(user)
+
+    combined = (
+        f"Your first meal analysis is ready 👌\n\n"
+        f"{meal_text}\n\n"
+        f"─────────────────\n"
+        f"📊 This meal is {pct}% of your daily calorie target\n\n"
+        f"📊 Today, {today.strftime('%d.%m.%Y')}\n\n"
+        f"Calories: {meal_cal:.0f} / {target_cal:.0f} kcal\n"
+        f"{bar_cal}\n"
+        f"<i>{rem_cal}</i>\n\n"
+        f"Protein: {meal_prot:.0f} / {target_prot:.0f} g\n"
+        f"{bar_prot}\n"
+        f"<i>{rem_prot}</i>\n\n"
+        f"Fat: {meal_fat:.0f} / {target_fat:.0f} g\n"
+        f"{bar_fat}\n"
+        f"<i>{rem_fat}</i>\n\n"
+        f"Carbs: {meal_carbs:.0f} / {target_carbs:.0f} g\n"
+        f"{bar_carbs}\n"
+        f"<i>{rem_carbs}</i>\n\n"
+        f"Meals logged: 1"
+    )
+
+    # Build keyboard with source URL buttons (same as real usage)
+    source_url = result.get("source_url")
+    agent_items = result.get("items") or []
+
+    kb_rows = []
+    for item in agent_items:
+        if not isinstance(item, dict):
+            continue
+        item_url = normalize_url(item.get("source_url"))
+        if item_url:
+            item_name = item.get("name") or "Product"
+            label = item_name if len(item_name) <= 30 else item_name[:27] + "..."
+            kb_rows.append([InlineKeyboardButton(
+                text=f"🔗 Source: {label}", url=item_url,
+            )])
+
+    if not kb_rows:
+        url = normalize_url(source_url)
+        if url:
+            kb_rows.append([InlineKeyboardButton(text="🔗 Source", url=url)])
+
+    reply_markup = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
+    await message.answer(combined, reply_markup=reply_markup, parse_mode="HTML")
+
+    # Prompt user to save to My Menu (manual click)
+    meal_id = await get_latest_meal_id(telegram_id)
+    await _prompt_my_menu_save(message, state, telegram_id, meal_id)
+
+
+async def _prompt_my_menu_save(
+    message: types.Message,
+    state: FSMContext,
+    telegram_id: int,
+    meal_id: Optional[int],
+) -> None:
+    """Show Save to My Menu button for the user to tap."""
+    if meal_id:
+        save_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="💾 Save to My Menu",
+                    callback_data=f"onboarding_save_meal:{meal_id}",
+                )]
+            ]
+        )
+        await message.answer(SAVE_TO_MENU_TEXT, reply_markup=save_kb)
+        await state.set_state(OnboardingStates.my_menu_instruction)
+    else:
+        # No meal to save — skip directly to "What else?"
+        what_else_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="✨ What else can YumYummy do?",
+                    callback_data="onboarding_what_else",
+                )]
+            ]
+        )
+        await message.answer(
+            "Let's see what else I can do for you!",
+            reply_markup=what_else_kb,
+        )
+        await state.set_state(OnboardingStates.my_menu_instruction)
+
+
+@router.callback_query(F.data.startswith("onboarding_save_meal:"))
+async def on_onboarding_save_meal(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User tapped Save to My Menu — perform the save, show confirmation + what else."""
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    parts = callback.data.split(":", 1)
+    try:
+        meal_id = int(parts[1])
+    except (IndexError, ValueError):
+        await callback.message.answer("Could not save meal. Let's continue.")
+        return
+
+    meal = await get_meal_by_id(meal_id)
+    user = await get_user(callback.from_user.id)
+
+    if meal and user:
+        try:
+            await create_saved_meal(
+                user_id=user["id"],
+                name=meal.get("description_user") or meal.get("description") or "My meal",
+                total_calories=meal.get("calories", 0),
+                total_protein_g=meal.get("protein_g", 0),
+                total_fat_g=meal.get("fat_g", 0),
+                total_carbs_g=meal.get("carbs_g", 0),
+                items=meal.get("items"),
+            )
+        except Exception as e:
+            logger.warning(f"[ONBOARDING] Save to My Menu failed: {e}")
+
+    what_else_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✨ What else can YumYummy do?",
+                callback_data="onboarding_what_else",
+            )]
+        ]
+    )
+    await callback.message.answer(MY_MENU_SAVED_INSTRUCTION_TEXT, reply_markup=what_else_kb)
+    await state.set_state(OnboardingStates.my_menu_instruction)
+
+
+# ============ Onboarding Handlers — Phase 1: Hook ============
 
 async def start_onboarding(message: types.Message, state: FSMContext) -> None:
-    """Начать онбординг для нового пользователя"""
     await state.clear()
-    await message.answer(
-        WELCOME_TEXT,
-        reply_markup=get_start_keyboard()
-    )
+    await message.answer(WELCOME_TEXT, reply_markup=get_start_keyboard())
     await state.set_state(OnboardingStates.waiting_for_start)
 
 
 @router.callback_query(F.data == "onboarding_start")
 async def on_onboarding_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Обработка нажатия кнопки 'Начать'"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
-    await callback.message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
+    await callback.message.answer(
+        "Tell me what you had for your last meal — text, voice, or photo all work!"
+    )
+    await state.set_state(OnboardingStates.waiting_for_demo_meal)
+
+
+@router.message(OnboardingStates.waiting_for_demo_meal, F.text)
+async def on_demo_meal_text(message: types.Message, state: FSMContext) -> None:
+    user_text = message.text.strip()
+    if not user_text:
+        await message.answer(
+            "Please describe your meal — for example: "
+            "'cappuccino and a croissant at Starbucks'"
+        )
+        return
+
+    tg_id = message.from_user.id
+
+    # Start agent search in background
+    await _start_demo_meal_agent(tg_id, user_text)
+
+    # Pivot to questionnaire while agent searches
+    await message.answer(DEMO_MEAL_PIVOT_TEXT)
+    await message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
+    await state.update_data(is_onboarding_demo=True)
     await state.set_state(OnboardingStates.waiting_for_goal)
 
 
+@router.message(OnboardingStates.waiting_for_demo_meal, F.voice)
+async def on_demo_meal_voice(message: types.Message, state: FSMContext) -> None:
+    await message.answer(
+        "Voice input will work great after setup! "
+        "For this first demo, please type your meal.\n\n"
+        "Example: \"cappuccino and a croissant at Starbucks\""
+    )
+
+
+@router.message(OnboardingStates.waiting_for_demo_meal, F.photo)
+async def on_demo_meal_photo(message: types.Message, state: FSMContext) -> None:
+    tg_id = message.from_user.id
+
+    try:
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        bio = await message.bot.download_file(file.file_path)
+        photo_bytes = bio.read()
+    except Exception as e:
+        logger.error(f"[ONBOARDING] Error downloading photo: {e}")
+        await message.answer(
+            "Could not download photo. Please try again or type your meal instead.\n\n"
+            "Example: \"cappuccino and a croissant at Starbucks\""
+        )
+        return
+
+    if not photo_bytes:
+        await message.answer(
+            "Photo appears to be empty. Please try again or type your meal instead."
+        )
+        return
+
+    b64 = base64.b64encode(photo_bytes).decode("utf-8")
+    image_data_uri = f"data:image/jpeg;base64,{b64}"
+
+    text = (message.caption or "").strip() or "Identify what's in the photo and estimate macros"
+
+    await _start_demo_meal_agent(tg_id, text, image_url=image_data_uri)
+
+    await message.answer(DEMO_MEAL_PIVOT_TEXT)
+    await message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
+    await state.update_data(is_onboarding_demo=True)
+    await state.set_state(OnboardingStates.waiting_for_goal)
+
+
+# ============ Onboarding Handlers — Phase 2: Personalization ============
+
 @router.callback_query(F.data.startswith("goal_"))
 async def on_goal_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Обработка выбора цели"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
+
     goal_type = callback.data.replace("goal_", "")
     await state.update_data(goal_type=goal_type)
-    
+
     await callback.message.answer(GENDER_TEXT, reply_markup=get_gender_keyboard())
     await state.set_state(OnboardingStates.waiting_for_gender)
 
 
 @router.callback_query(F.data.startswith("gender_"))
 async def on_gender_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Обработка выбора пола"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
+
     gender = callback.data.replace("gender_", "")
     await state.update_data(gender=gender)
-    
+
     await callback.message.answer(PARAMS_TEXT)
     await state.set_state(OnboardingStates.waiting_for_params)
 
 
 @router.message(OnboardingStates.waiting_for_params)
 async def on_params_received(message: types.Message, state: FSMContext) -> None:
-    """Обработка ввода параметров (возраст, рост, вес)"""
     text = message.text.strip()
-    
-    # Парсим числа из текста
+
     numbers = re.findall(r"[\d.]+", text)
-    
+
     if len(numbers) < 3:
         await message.answer(
             "Couldn't parse your data. Please send it in this format:\n"
@@ -494,21 +796,20 @@ async def on_params_received(message: types.Message, state: FSMContext) -> None:
             "Example: 28, 175, 72"
         )
         return
-    
+
     try:
         age = int(float(numbers[0]))
         height_cm = int(float(numbers[1]))
         weight_kg = float(numbers[2])
-        
-        # Валидация
+
         if age < 14 or age > 100:
             raise ValueError("Age must be between 14 and 100")
         if height_cm < 100 or height_cm > 250:
             raise ValueError("Height must be between 100 and 250 cm")
         if weight_kg < 30 or weight_kg > 300:
             raise ValueError("Weight must be between 30 and 300 kg")
-            
-    except (ValueError, IndexError) as e:
+
+    except (ValueError, IndexError):
         await message.answer(
             "These values look invalid. Check ranges:\n"
             "• Age: 14-100 years\n"
@@ -517,26 +818,23 @@ async def on_params_received(message: types.Message, state: FSMContext) -> None:
             "Try again: 28, 175, 72"
         )
         return
-    
+
     await state.update_data(age=age, height_cm=height_cm, weight_kg=weight_kg)
-    
+
     await message.answer(ACTIVITY_TEXT, reply_markup=get_activity_keyboard())
     await state.set_state(OnboardingStates.waiting_for_activity)
 
 
 @router.callback_query(F.data.startswith("activity_"))
 async def on_activity_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Обработка выбора уровня активности и расчёт КБЖУ"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
+
     activity_level = callback.data.replace("activity_", "")
     await state.update_data(activity_level=activity_level)
-    
-    # Получаем все данные из state
+
     data = await state.get_data()
-    
-    # Рассчитываем КБЖУ
+
     targets = calculate_targets(
         gender=data["gender"],
         weight_kg=data["weight_kg"],
@@ -545,17 +843,16 @@ async def on_activity_selected(callback: types.CallbackQuery, state: FSMContext)
         activity_level=activity_level,
         goal_type=data["goal_type"],
     )
-    
+
     await state.update_data(**targets)
-    
-    # Показываем результаты
+
     presentation_text = get_targets_presentation_text(
         targets["target_calories"],
         targets["target_protein_g"],
         targets["target_fat_g"],
         targets["target_carbs_g"],
     )
-    
+
     await callback.message.answer(
         presentation_text,
         reply_markup=get_goal_confirmation_keyboard()
@@ -565,14 +862,12 @@ async def on_activity_selected(callback: types.CallbackQuery, state: FSMContext)
 
 @router.callback_query(F.data == "goals_confirm")
 async def on_goals_confirmed(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Пользователь подтвердил цели КБЖУ"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
-    # Сохраняем данные в backend
+
     data = await state.get_data()
     telegram_id = callback.from_user.id
-    
+
     result = await update_user(
         telegram_id,
         goal_type=data.get("goal_type"),
@@ -586,12 +881,11 @@ async def on_goals_confirmed(callback: types.CallbackQuery, state: FSMContext) -
         target_fat_g=data.get("target_fat_g"),
         target_carbs_g=data.get("target_carbs_g"),
     )
-    
+
     if not result:
         await callback.message.answer(tr("onboarding.save_error", LANG))
         return
-    
-    # Переходим к выбору часового пояса
+
     await callback.message.answer(
         tr("onboarding.timezone_prompt", LANG),
         reply_markup=get_timezone_keyboard()
@@ -601,20 +895,18 @@ async def on_goals_confirmed(callback: types.CallbackQuery, state: FSMContext) -
 
 @router.callback_query(F.data == "goals_manual")
 async def on_goals_manual(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Пользователь хочет ввести свои цели вручную"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
+
     await callback.message.answer(MANUAL_KBJU_TEXT)
     await state.set_state(OnboardingStates.waiting_for_manual_kbju)
 
 
 @router.message(OnboardingStates.waiting_for_manual_kbju)
 async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> None:
-    """Обработка ручного ввода КБЖУ в онбординге"""
     text = message.text.strip()
     numbers = re.findall(r"[\d.]+", text)
-    
+
     if len(numbers) < 4:
         await message.answer(
             "Couldn't parse your data. Please send it in this format:\n"
@@ -622,14 +914,13 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
             "Example: 2000, 150, 65, 200"
         )
         return
-    
+
     try:
         target_calories = float(numbers[0])
         target_protein_g = float(numbers[1])
         target_fat_g = float(numbers[2])
         target_carbs_g = float(numbers[3])
-        
-        # Валидация
+
         if target_calories < 1000 or target_calories > 10000:
             raise ValueError("Invalid calories")
         if target_protein_g < 0 or target_protein_g > 500:
@@ -638,7 +929,7 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
             raise ValueError("Invalid fat")
         if target_carbs_g < 0 or target_carbs_g > 1000:
             raise ValueError("Invalid carbs")
-            
+
     except (ValueError, IndexError):
         await message.answer(
             "These values look invalid. Check ranges:\n"
@@ -649,18 +940,17 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
             "Try again: 2000, 150, 65, 200"
         )
         return
-    
+
     await state.update_data(
         target_calories=target_calories,
         target_protein_g=target_protein_g,
         target_fat_g=target_fat_g,
         target_carbs_g=target_carbs_g,
     )
-    
-    # Сохраняем данные в backend
+
     data = await state.get_data()
     telegram_id = message.from_user.id
-    
+
     result = await update_user(
         telegram_id,
         goal_type=data.get("goal_type"),
@@ -674,12 +964,11 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
         target_fat_g=target_fat_g,
         target_carbs_g=target_carbs_g,
     )
-    
+
     if not result:
         await message.answer(tr("onboarding.save_error", LANG))
         return
-    
-    # Переходим к выбору часового пояса
+
     await message.answer(
         tr("onboarding.timezone_prompt", LANG),
         reply_markup=get_timezone_keyboard()
@@ -687,39 +976,35 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
     await state.set_state(OnboardingStates.waiting_for_timezone)
 
 
-@router.callback_query(F.data.startswith("tz:"))
+@router.callback_query(OnboardingStates.waiting_for_timezone, F.data.startswith("tz:"))
 async def on_timezone_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Обработка выбора часового пояса"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
+
     tz_value = callback.data.split(":", 1)[1]
-    
+
     if tz_value == "other":
         await callback.message.answer(
             tr("onboarding.timezone_other", LANG)
         )
         await state.set_state(OnboardingStates.waiting_for_timezone_text)
         return
-    
-    # Save timezone
+
     telegram_id = callback.from_user.id
     await update_user(telegram_id, timezone=tz_value)
-    
-    # Переходим к туториалу
-    await callback.message.answer(
-        TUTORIAL_STEP1_TEXT,
-        reply_markup=get_tutorial_next_keyboard()
-    )
-    await state.set_state(OnboardingStates.tutorial_step_1)
+
+    data = await state.get_data()
+    if data.get("is_onboarding_demo"):
+        await _deliver_combined_result(callback.message, state, telegram_id)
+    else:
+        await _send_feature_guide(callback.message, state)
 
 
 @router.message(OnboardingStates.waiting_for_timezone_text)
 async def on_timezone_text_received(message: types.Message, state: FSMContext) -> None:
-    """Обработка ручного ввода часового пояса"""
     import pytz
     tz_text = message.text.strip()
-    
+
     try:
         pytz.timezone(tz_text)
     except pytz.exceptions.UnknownTimeZoneError:
@@ -727,46 +1012,78 @@ async def on_timezone_text_received(message: types.Message, state: FSMContext) -
             tr("onboarding.timezone_invalid", LANG, tz=tz_text)
         )
         return
-    
+
     telegram_id = message.from_user.id
     await update_user(telegram_id, timezone=tz_text)
-    
-    await message.answer(
-        TUTORIAL_STEP1_TEXT,
-        reply_markup=get_tutorial_next_keyboard()
-    )
-    await state.set_state(OnboardingStates.tutorial_step_1)
+
+    data = await state.get_data()
+    if data.get("is_onboarding_demo"):
+        await _deliver_combined_result(message, state, telegram_id)
+    else:
+        await _send_feature_guide(message, state)
 
 
-@router.callback_query(F.data == "tutorial_next")
-async def on_tutorial_step2(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Переход ко второму шагу туториала"""
+# ============ Onboarding Handlers — Phase 3: Feature Guide + Trial ============
+
+@router.callback_query(F.data == "onboarding_what_else")
+async def on_what_else(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User tapped 'What else can YumYummy do?' — send feature guide + trial CTA."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
-    await callback.message.answer(
-        TUTORIAL_STEP2_TEXT,
-        reply_markup=get_tutorial_finish_keyboard()
+
+    await callback.message.answer(FEATURE_GUIDE_TEXT)
+
+    trial_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Start my 3-day free trial",
+                callback_data="onboarding_start_trial",
+            )]
+        ]
     )
-    await state.set_state(OnboardingStates.tutorial_step_2)
+    await callback.message.answer(TRIAL_CTA_TEXT, reply_markup=trial_kb)
+    await state.set_state(OnboardingStates.trial_activation)
 
 
-@router.callback_query(F.data == "tutorial_finish")
-async def on_tutorial_finish(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Завершение туториала и онбординга"""
+async def _send_feature_guide(message: types.Message, state: FSMContext) -> None:
+    """Legacy path for profile recalculation flow."""
+    await message.answer(FEATURE_GUIDE_TEXT)
+
+    continue_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Continue...", callback_data="onboarding_feature_guide_next")]
+        ]
+    )
+    await message.answer("Ready to finish setup?", reply_markup=continue_kb)
+    await state.set_state(OnboardingStates.feature_guide)
+
+
+@router.callback_query(F.data == "onboarding_feature_guide_next")
+async def on_feature_guide_next(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
+
+    trial_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Start my 3-day free trial", callback_data="onboarding_start_trial")]
+        ]
+    )
+    await callback.message.answer(TRIAL_CTA_TEXT, reply_markup=trial_kb)
+    await state.set_state(OnboardingStates.trial_activation)
+
+
+@router.callback_query(F.data == "onboarding_start_trial")
+async def on_start_trial(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
     telegram_id = callback.from_user.id
-    
-    # Отмечаем онбординг как завершённый
+
+    await start_trial(telegram_id)
     await update_user(telegram_id, onboarding_completed=True)
 
-    # Auto-start free trial
-    await start_trial(telegram_id)
-    
     await callback.message.answer(
-        FINAL_TEXT + "\n\n" + tr("onboarding.trial_activated", LANG),
+        TRIAL_ACTIVATED_TEXT,
         reply_markup=get_main_menu_keyboard()
     )
     await state.clear()
@@ -776,30 +1093,28 @@ async def on_tutorial_finish(callback: types.CallbackQuery, state: FSMContext) -
 
 @router.message(F.text == "📊 Today")
 async def on_menu_today(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Сегодня'"""
     await state.clear()
-    
+
     if not await check_onboarding_completed(message):
         return
     if not await check_billing_access(message):
         return
-    
+
     telegram_id = message.from_user.id
-    
+
     user = await get_user(telegram_id)
     if not user:
         await message.answer("Could not find your profile. Try /start")
         return
-    
-    today = date_type.today()
+
+    today = today_for_user(user)
     day_summary = await get_day_summary(user["id"], today)
-    
-    # Целевые значения
+
     target_cal = user.get("target_calories") or 2000
     target_prot = user.get("target_protein_g") or 150
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
-    
+
     if day_summary:
         current_cal = day_summary.get("total_calories", 0)
         current_prot = day_summary.get("total_protein_g", 0)
@@ -807,22 +1122,19 @@ async def on_menu_today(message: types.Message, state: FSMContext) -> None:
         current_carbs = day_summary.get("total_carbs_g", 0)
     else:
         current_cal = current_prot = current_fat = current_carbs = 0
-    
-    # Прогресс-бары
+
     bar_cal = build_progress_bar(current_cal, target_cal)
     bar_prot = build_progress_bar(current_prot, target_prot)
     bar_fat = build_progress_bar(current_fat, target_fat)
     bar_carbs = build_progress_bar(current_carbs, target_carbs)
-    
-    # Остаток в читаемом формате
+
     rem_cal = format_remaining(current_cal, target_cal, "kcal")
     rem_prot = format_remaining(current_prot, target_prot, "g")
     rem_fat = format_remaining(current_fat, target_fat, "g")
     rem_carbs = format_remaining(current_carbs, target_carbs, "g")
-    
-    # Число приёмов пищи
+
     meals_count = len(day_summary.get("meals", [])) if day_summary else 0
-    
+
     text = f"""📊 Today, {today.strftime('%d.%m.%Y')}
 
 Calories: {current_cal:.0f} / {target_cal:.0f} kcal
@@ -842,50 +1154,48 @@ Carbs: {current_carbs:.0f} / {target_carbs:.0f} g
 <i>{rem_carbs}</i>
 
 Meals logged: {meals_count}"""
-    
+
     await message.answer(text, parse_mode="HTML", reply_markup=get_day_actions_keyboard(today.isoformat(), from_today=True))
 
 
 @router.message(F.text == "📈 Week")
 async def on_menu_week(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Неделя'"""
     await state.clear()
-    
+
     if not await check_onboarding_completed(message):
         return
     if not await check_billing_access(message):
         return
-    
+
     telegram_id = message.from_user.id
-    
+
     user = await get_user(telegram_id)
     if not user:
         await message.answer("Could not find your profile. Try /start")
         return
-    
-    # Целевые значения
+
     target_cal = user.get("target_calories") or 2000
     target_prot = user.get("target_protein_g") or 150
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
-    
-    today = date_type.today()
+
+    today = today_for_user(user)
     week_data = []
     total_cal = 0
     total_prot = 0
     total_fat = 0
     total_carbs = 0
     days_with_data = 0
-    
+
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    
+
     for i in range(7):
         day = today - timedelta(days=6-i)
         day_summary = await get_day_summary(user["id"], day)
-        
+
         day_name = day_names[day.weekday()]
         marker = "📍" if day == today else "  "
-        
+
         if day_summary:
             cal = day_summary.get("total_calories", 0)
             prot = day_summary.get("total_protein_g", 0)
@@ -897,7 +1207,7 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
             total_carbs += carbs
             if cal > 0:
                 days_with_data += 1
-            
+
             if cal == 0:
                 status = "⚪"
                 week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: —")
@@ -907,12 +1217,12 @@ async def on_menu_week(message: types.Message, state: FSMContext) -> None:
                 week_data.append(f"{marker}{status} {day_name} {day.day:02d}.{day.month:02d}: {cal:.0f} kcal ({pct:.0f}%)")
         else:
             week_data.append(f"{marker}⚪ {day_name} {day.day:02d}.{day.month:02d}: —")
-    
+
     avg_cal = total_cal / max(days_with_data, 1)
     avg_prot = total_prot / max(days_with_data, 1)
     avg_fat = total_fat / max(days_with_data, 1)
     avg_carbs = total_carbs / max(days_with_data, 1)
-    
+
     legend = "🟢 within target · 🟡 over target"
 
     text = f"""📈 Weekly stats
@@ -928,13 +1238,12 @@ Daily average ({days_with_data} days):
 • Carbs: {avg_carbs:.0f} / {target_carbs:.0f} g
 
 Tap a day to view details:"""
-    
-    await message.answer(text, reply_markup=get_week_days_keyboard())
+
+    await message.answer(text, reply_markup=get_week_days_keyboard(user))
 
 
 @router.message(F.text == "🍽 My Menu")
 async def on_menu_my_meals(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Моё меню'"""
     await state.clear()
 
     if not await check_onboarding_completed(message):
@@ -993,7 +1302,6 @@ async def on_menu_my_meals(message: types.Message, state: FSMContext) -> None:
 
 @router.message(F.text == "🤔 What should I eat?")
 async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Что съесть?' -- входит в режим food advice на один запрос."""
     await state.clear()
 
     if not await check_onboarding_completed(message):
@@ -1008,7 +1316,7 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
         await message.answer("Could not find your profile. Try /start")
         return
 
-    today = date_type.today()
+    today = today_for_user(user)
     day_summary = await get_day_summary(user["id"], today)
 
     target_cal = user.get("target_calories") or 2000
@@ -1050,7 +1358,7 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
     prompt = (
         f"🤔 What should I eat?\n\n"
         f"📊 Remaining today:\n"
-        f"• 🔥 {remaining_cal:.0f} kcal\n"
+        f"• {remaining_cal:.0f} kcal\n"
         f"• 🥩 {remaining_prot:.0f} g protein\n"
         f"• 🥑 {remaining_fat:.0f} g fat\n"
         f"• 🍞 {remaining_carbs:.0f} g carbs\n\n"
@@ -1062,30 +1370,29 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
 
 @router.message(F.text == "👤 Profile")
 async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Профиль'"""
     await state.clear()
-    
+
     if not await check_onboarding_completed(message):
         return
-    
+
     telegram_id = message.from_user.id
-    
+
     user = await get_user(telegram_id)
     if not user:
         await message.answer("Could not find your profile. Try /start")
         return
-    
+
     goal_names = {
         "lose": "🔻 Lose weight",
         "maintain": "⚖️ Maintain weight",
         "gain": "💪 Gain muscle",
     }
-    
+
     gender_names = {
         "male": "👨 Male",
         "female": "👩 Female",
     }
-    
+
     activity_names = {
         "sedentary": "🛋 Minimal",
         "light": "🚶 Light",
@@ -1093,20 +1400,30 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
         "high": "🏋️ High",
         "very_high": "⚡ Very high",
     }
-    
+
     goal = goal_names.get(user.get("goal_type"), "Not set")
     gender = gender_names.get(user.get("gender"), "Not set")
     activity = activity_names.get(user.get("activity_level"), "Not set")
-    
+
     age = user.get("age") or "—"
     height = user.get("height_cm") or "—"
     weight = user.get("weight_kg") or "—"
-    
+
     target_cal = user.get("target_calories") or 2000
     target_prot = user.get("target_protein_g") or 150
     target_fat = user.get("target_fat_g") or 65
     target_carbs = user.get("target_carbs_g") or 200
-    
+
+    tz_name = user.get("timezone") or "Europe/Moscow"
+    try:
+        import pytz as _pytz
+        _tz = _pytz.timezone(tz_name)
+        from datetime import datetime as _dt
+        _now = _dt.now(_tz)
+        tz_display = f"{tz_name} (UTC{_now.strftime('%z')[:3]}:{_now.strftime('%z')[3:]})"
+    except Exception:
+        tz_display = tz_name
+
     billing = await get_billing_status(telegram_id)
     billing_section = ""
     if billing:
@@ -1142,31 +1459,30 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
 • Weight: {weight} kg
 • Activity: {activity}
 
-🎯 Goal: {goal}
+Goal: {goal}
 
 📊 Daily targets:
-• 🔥 Calories: {target_cal:.0f} kcal
+• Calories: {target_cal:.0f} kcal
 • 🥩 Protein: {target_prot:.0f} g
 • 🥑 Fat: {target_fat:.0f} g
-• 🍞 Carbs: {target_carbs:.0f} g{billing_section}"""
-    
+• 🍞 Carbs: {target_carbs:.0f} g
+
+🌍 Timezone: {tz_display}{billing_section}"""
+
     await message.answer(text, reply_markup=get_profile_keyboard())
 
 
 @router.callback_query(F.data == "profile_recalculate")
 async def on_profile_recalculate(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Пересчитать КБЖУ по формуле"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
-    # Запускаем онбординг заново
+
     await callback.message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
     await state.set_state(OnboardingStates.waiting_for_goal)
 
 
 @router.callback_query(F.data == "profile_manage_sub")
 async def on_profile_manage_sub(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Show subscription status and management options."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
 
@@ -1281,7 +1597,6 @@ def _get_churn_reason_keyboard() -> InlineKeyboardMarkup:
 
 @router.callback_query(F.data == "cancel_sub_start")
 async def on_cancel_sub_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Start the churn survey before cancellation."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
 
@@ -1295,7 +1610,6 @@ async def on_cancel_sub_start(callback: types.CallbackQuery, state: FSMContext) 
 
 @router.callback_query(CancelFlowStates.waiting_for_reason, F.data == "churn:nevermind")
 async def on_churn_nevermind(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """User decided not to cancel."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
     await state.clear()
@@ -1307,7 +1621,6 @@ async def on_churn_nevermind(callback: types.CallbackQuery, state: FSMContext) -
 
 @router.callback_query(CancelFlowStates.waiting_for_reason, F.data.startswith("churn:"))
 async def on_churn_reason_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """User selected a cancellation reason."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
 
@@ -1332,7 +1645,6 @@ async def on_churn_reason_selected(callback: types.CallbackQuery, state: FSMCont
 
 @router.callback_query(CancelFlowStates.waiting_for_comment, F.data == "churn_comment:skip")
 async def on_churn_comment_skip(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """User skipped the free-text comment."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
     await _finish_churn_survey(callback.from_user.id, state, callback.message)
@@ -1340,7 +1652,6 @@ async def on_churn_comment_skip(callback: types.CallbackQuery, state: FSMContext
 
 @router.message(CancelFlowStates.waiting_for_comment)
 async def on_churn_comment_received(message: types.Message, state: FSMContext) -> None:
-    """User typed a free-text comment."""
     comment = message.text.strip()[:1000] if message.text else None
     await state.update_data(churn_comment=comment)
     await _finish_churn_survey(message.from_user.id, state, message)
@@ -1351,7 +1662,6 @@ async def _finish_churn_survey(
     state: FSMContext,
     message: types.Message,
 ) -> None:
-    """Save the survey and show the actual cancel link."""
     data = await state.get_data()
     reason = data.get("churn_reason", "other")
     comment = data.get("churn_comment")
@@ -1400,22 +1710,88 @@ async def _finish_churn_survey(
 
 @router.callback_query(F.data == "profile_manual_kbju")
 async def on_profile_manual_kbju(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Ручной ввод КБЖУ из профиля"""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
-    
+
     await state.clear()
-    
+
     await callback.message.answer(MANUAL_KBJU_TEXT)
     await state.set_state(ProfileStates.waiting_for_manual_kbju)
 
 
+@router.callback_query(F.data == "profile_change_tz")
+async def on_profile_change_tz(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    telegram_id = callback.from_user.id
+    user = await get_user(telegram_id)
+    current_tz = (user.get("timezone") or "Europe/Moscow") if user else "Europe/Moscow"
+
+    await callback.message.answer(
+        f"Your current timezone: <b>{current_tz}</b>\n\n"
+        "Choose a new timezone:",
+        parse_mode="HTML",
+        reply_markup=get_timezone_keyboard(),
+    )
+    await state.update_data(tz_change_from_profile=True)
+    await state.set_state(ProfileStates.waiting_for_timezone_change)
+
+
+@router.callback_query(ProfileStates.waiting_for_timezone_change, F.data.startswith("tz:"))
+async def on_profile_timezone_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    tz_value = callback.data.split(":", 1)[1]
+
+    if tz_value == "other":
+        await callback.message.answer(
+            tr("onboarding.timezone_other", LANG)
+        )
+        await state.set_state(ProfileStates.waiting_for_timezone_text_change)
+        return
+
+    telegram_id = callback.from_user.id
+    await update_user(telegram_id, timezone=tz_value)
+    await state.clear()
+
+    await callback.message.answer(
+        f"✅ Timezone updated to <b>{tz_value}</b>",
+        parse_mode="HTML",
+        reply_markup=get_main_menu_keyboard(),
+    )
+
+
+@router.message(ProfileStates.waiting_for_timezone_text_change)
+async def on_profile_timezone_text_received(message: types.Message, state: FSMContext) -> None:
+    import pytz
+    tz_text = message.text.strip()
+
+    try:
+        pytz.timezone(tz_text)
+    except pytz.exceptions.UnknownTimeZoneError:
+        await message.answer(
+            tr("onboarding.timezone_invalid", LANG, tz=tz_text)
+        )
+        return
+
+    telegram_id = message.from_user.id
+    await update_user(telegram_id, timezone=tz_text)
+    await state.clear()
+
+    await message.answer(
+        f"✅ Timezone updated to <b>{tz_text}</b>",
+        parse_mode="HTML",
+        reply_markup=get_main_menu_keyboard(),
+    )
+
+
 @router.message(ProfileStates.waiting_for_manual_kbju)
 async def on_profile_manual_kbju_received(message: types.Message, state: FSMContext) -> None:
-    """Обработка ручного ввода КБЖУ из профиля"""
     text = message.text.strip()
     numbers = re.findall(r"[\d.]+", text)
-    
+
     if len(numbers) < 4:
         await message.answer(
             "Couldn't parse your data. Please send it in this format:\n"
@@ -1423,14 +1799,13 @@ async def on_profile_manual_kbju_received(message: types.Message, state: FSMCont
             "Example: 2000, 150, 65, 200"
         )
         return
-    
+
     try:
         target_calories = float(numbers[0])
         target_protein_g = float(numbers[1])
         target_fat_g = float(numbers[2])
         target_carbs_g = float(numbers[3])
-        
-        # Валидация
+
         if target_calories < 1000 or target_calories > 10000:
             raise ValueError("Invalid calories")
         if target_protein_g < 0 or target_protein_g > 500:
@@ -1439,7 +1814,7 @@ async def on_profile_manual_kbju_received(message: types.Message, state: FSMCont
             raise ValueError("Invalid fat")
         if target_carbs_g < 0 or target_carbs_g > 1000:
             raise ValueError("Invalid carbs")
-            
+
     except (ValueError, IndexError):
         await message.answer(
             "These values look invalid. Check ranges:\n"
@@ -1450,10 +1825,9 @@ async def on_profile_manual_kbju_received(message: types.Message, state: FSMCont
             "Try again: 2000, 150, 65, 200"
         )
         return
-    
+
     telegram_id = message.from_user.id
-    
-    # Сохраняем данные в backend
+
     result = await update_user(
         telegram_id,
         target_calories=target_calories,
@@ -1461,11 +1835,11 @@ async def on_profile_manual_kbju_received(message: types.Message, state: FSMCont
         target_fat_g=target_fat_g,
         target_carbs_g=target_carbs_g,
     )
-    
+
     if not result:
         await message.answer(tr("onboarding.save_error", LANG))
         return
-    
+
     await message.answer(
         f"✅ Targets updated!\n\n"
         f"🔥 Calories: {target_calories:.0f} kcal\n"
@@ -1474,29 +1848,28 @@ async def on_profile_manual_kbju_received(message: types.Message, state: FSMCont
         f"🍞 Carbs: {target_carbs_g:.0f} g",
         reply_markup=get_main_menu_keyboard()
     )
-    
+
     await state.clear()
 
 
 @router.message(F.text == "📤 Export")
 async def on_menu_export(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Экспорт'"""
     await state.clear()
-    
+
     if not await check_onboarding_completed(message):
         return
     if not await check_billing_access(message):
         return
-    
+
     telegram_id = message.from_user.id
-    
+
     user = await get_user(telegram_id)
     if not user:
         await message.answer("Could not find your profile. Try /start")
         return
-    
+
     export_url = await get_user_export_url(telegram_id)
-    
+
     text = f"""📤 Data export
 
 You can download all your nutrition logs as CSV.
@@ -1507,15 +1880,14 @@ This file opens in Excel, Google Sheets, or Numbers.
 {export_url}
 
 The link works only for your data."""
-    
+
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
 
 @router.message(F.text == "💬 Support")
 async def on_menu_support(message: types.Message, state: FSMContext) -> None:
-    """Обработчик кнопки 'Поддержка'"""
     await state.clear()
-    
+
     text = f"""💬 Support
 
 If you have any questions, issues, or ideas - message me directly!
@@ -1523,5 +1895,13 @@ If you have any questions, issues, or ideas - message me directly!
 👤 Telegram: @{SUPPORT_USERNAME}
 
 I'll do my best to reply as soon as possible 🙌"""
-    
+
     await message.answer(text, reply_markup=get_main_menu_keyboard())
+
+
+@router.message(F.text == "📖 How to Use")
+async def on_menu_how_to_use(message: types.Message, state: FSMContext) -> None:
+    await state.clear()
+    if not await check_onboarding_completed(message):
+        return
+    await message.answer(FEATURE_GUIDE_TEXT, reply_markup=get_main_menu_keyboard())

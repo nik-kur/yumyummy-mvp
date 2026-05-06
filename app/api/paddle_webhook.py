@@ -3,19 +3,30 @@ Paddle Billing webhook handler.
 
 Paddle sends JSON POST requests signed with Paddle-Signature header.
 Events handled:
-  - transaction.completed  → activate / renew subscription
-  - subscription.activated → store paddle subscription ID
-  - subscription.canceled  → mark auto_renew = False
-  - subscription.updated   → update plan if changed
-  - transaction.refunded (adjustment.created with action=refund) → revoke access
+  - transaction.completed   → activate / renew subscription, set ends_at from
+                              billing_period.ends_at (Paddle is source of truth)
+  - subscription.activated  → store paddle subscription ID + end date
+  - subscription.updated    → sync end date / plan / auto_renew (also fires
+                              on resume after a pause and on plan changes)
+  - subscription.canceled   → mark auto_renew = False (access stays until
+                              period end)
+  - subscription.paused     → revoke access immediately
+  - subscription.resumed    → restore end date from Paddle
+  - subscription.past_due   → mark auto_renew off + notify user
+  - adjustment.created (action=refund|chargeback) → revoke access
 
 Signature verification uses HMAC-SHA256 with the webhook secret (h1= scheme).
+
+The handler always trusts Paddle's `current_billing_period.ends_at` /
+`next_billed_at` for the end date — never local "+30 days" arithmetic — so
+calendar-month subscriptions don't drift earlier than the actual renewal date.
 """
 
 import hashlib
 import hmac
 import json
 import logging
+from datetime import datetime
 from typing import Optional
 
 import httpx
@@ -29,8 +40,10 @@ from app.billing.service import (
     apply_subscription_payment,
     apply_cancellation,
     apply_refund,
+    sync_subscription_state,
     DuplicateEvent,
 )
+from app.external.paddle_client import parse_paddle_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +114,30 @@ def _extract_amount_cents(data: dict) -> Optional[int]:
 
 def _extract_currency(data: dict) -> str:
     return data.get("data", {}).get("currency_code", "USD")
+
+
+def _extract_period_ends_at(data: dict) -> Optional[datetime]:
+    """
+    Pull the canonical period-end datetime from a Paddle event payload.
+
+    Order of preference matches `paddle_client.extract_period_ends_at`:
+      1. ``billing_period.ends_at`` (transaction.completed)
+      2. ``current_billing_period.ends_at`` (subscription.* events)
+      3. ``next_billed_at`` (subscription.* events)
+    """
+    body = data.get("data", {})
+
+    billing_period = body.get("billing_period") or {}
+    ends = parse_paddle_datetime(billing_period.get("ends_at"))
+    if ends:
+        return ends
+
+    current_period = body.get("current_billing_period") or {}
+    ends = parse_paddle_datetime(current_period.get("ends_at"))
+    if ends:
+        return ends
+
+    return parse_paddle_datetime(body.get("next_billed_at"))
 
 
 def _find_user(db: Session, data: dict) -> Optional[User]:
@@ -196,19 +233,102 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
 
     elif event_type == "subscription.activated":
         sub_id = data.get("data", {}).get("id")
+        period_ends = _extract_period_ends_at(data)
+        plan_id = _extract_plan_id(data)
         if sub_id and not user.subscription_paddle_id:
             user.subscription_paddle_id = sub_id
             db.commit()
             logger.info("[PADDLE] Stored paddle subscription_id=%s for user_id=%s", sub_id, user.id)
+        sync_subscription_state(
+            db, user,
+            provider="paddle",
+            period_ends_at=period_ends,
+            auto_renew=True,
+            plan_id=plan_id,
+            paddle_subscription_id=sub_id,
+        )
         status = "subscription_stored"
 
+    elif event_type == "subscription.updated":
+        # Fires on plan change AND on resume-after-pause AND on schedule
+        # changes — sync everything we can deduce.
+        period_ends = _extract_period_ends_at(data)
+        plan_id = _extract_plan_id(data)
+        sub_status = data.get("data", {}).get("status")
+        scheduled = data.get("data", {}).get("scheduled_change") or {}
+        scheduled_action = scheduled.get("action")
+
+        # If a cancel/pause is scheduled but not yet effective, keep access
+        # until then — set auto_renew accordingly.
+        auto_renew: Optional[bool]
+        if scheduled_action in ("cancel", "pause"):
+            auto_renew = False
+        elif sub_status in ("active", "trialing"):
+            auto_renew = True
+        else:
+            auto_renew = None  # leave unchanged
+
+        sync_subscription_state(
+            db, user,
+            provider="paddle",
+            period_ends_at=period_ends,
+            auto_renew=auto_renew,
+            plan_id=plan_id,
+            paddle_subscription_id=subscription_id,
+        )
+        status = "subscription_synced"
+
     elif event_type == "subscription.canceled":
+        # Access remains until the end of the paid period; refresh that date
+        # from Paddle so we don't trust stale arithmetic.
+        period_ends = _extract_period_ends_at(data)
+        if period_ends:
+            sync_subscription_state(
+                db, user,
+                provider="paddle",
+                period_ends_at=period_ends,
+                auto_renew=False,
+            )
         status = apply_cancellation(
             db, user,
             provider="paddle",
             provider_event_id=event_id,
             raw_payload=raw_payload,
         )
+
+    elif event_type == "subscription.paused":
+        # Paused = no further charges and access should stop immediately
+        # (Paddle's typical use case for pause is "stop providing service
+        # but keep the customer relationship"). Revoke now.
+        sync_subscription_state(
+            db, user,
+            provider="paddle",
+            revoke=True,
+        )
+        await _notify_user(
+            user.telegram_id,
+            "\u23f8\ufe0f <b>Subscription paused</b>\n\n"
+            "Your access has been paused. "
+            "Resume anytime from your billing portal.",
+        )
+        status = "paused"
+
+    elif event_type == "subscription.resumed":
+        # Sub came back online after a pause — Paddle has the new period.
+        period_ends = _extract_period_ends_at(data)
+        sync_subscription_state(
+            db, user,
+            provider="paddle",
+            period_ends_at=period_ends,
+            auto_renew=True,
+            paddle_subscription_id=subscription_id,
+        )
+        await _notify_user(
+            user.telegram_id,
+            "\u25b6\ufe0f <b>Subscription resumed</b>\n\n"
+            "Welcome back — your access is active again.",
+        )
+        status = "resumed"
 
     elif event_type == "subscription.past_due":
         status = apply_cancellation(
@@ -251,14 +371,6 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
         else:
             status = "ignored"
 
-    elif event_type == "subscription.updated":
-        new_plan = _extract_plan_id(data)
-        if new_plan != user.subscription_plan_id:
-            user.subscription_plan_id = new_plan
-            db.commit()
-            logger.info("[PADDLE] Plan updated to %s for user_id=%s", new_plan, user.id)
-        status = "plan_updated"
-
     else:
         logger.info("[PADDLE] Ignoring event_type=%s", event_type)
         status = "ignored"
@@ -279,6 +391,7 @@ def _handle_transaction_completed(
     plan_id = _extract_plan_id(data)
     amount_cents = _extract_amount_cents(data)
     currency = _extract_currency(data)
+    period_ends_at = _extract_period_ends_at(data)
 
     billing_period = data.get("data", {}).get("billing_period", {})
     is_recurring = billing_period.get("starts_at") is not None
@@ -296,6 +409,7 @@ def _handle_transaction_completed(
             currency=currency,
             event_type="purchase",
             is_recurring=is_recurring,
+            period_ends_at=period_ends_at,
             raw_payload=raw_payload,
         )
         return status

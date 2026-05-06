@@ -51,6 +51,7 @@ def apply_subscription_payment(
     invoice_payload: Optional[str] = None,
     raw_payload: Optional[str] = None,
     subscription_expiration_date: Optional[int] = None,
+    period_ends_at: Optional[datetime] = None,
     period_days_override: Optional[int] = None,
     **kwargs,
 ) -> str:
@@ -59,6 +60,16 @@ def apply_subscription_payment(
 
     Returns status string: 'activated' | 'renewed' | 'already_processed'.
     Raises DuplicateEvent if the same event was already ingested.
+
+    Source of truth for `subscription_ends_at` (in priority order):
+      1. ``period_ends_at`` — explicit datetime from the payment provider
+         (e.g. Paddle's ``current_billing_period.ends_at``).
+      2. ``subscription_expiration_date`` — unix timestamp (Telegram Stars).
+      3. Existing-end + ``period_days`` arithmetic (only used when the provider
+         did not supply an exact end date, e.g. Gumroad / Telegram fallback).
+
+    Always trust an authoritative date from the provider over calendar math:
+    a Paddle "monthly" cycle is a calendar month (28-31 days), not 30 days.
     """
     if _is_duplicate(db, provider=provider, provider_event_id=provider_event_id,
                      telegram_charge_id=telegram_payment_charge_id,
@@ -96,7 +107,9 @@ def apply_subscription_payment(
     now = datetime.now(timezone.utc)
     period_days = period_days_override or plan.period_days
 
-    if subscription_expiration_date:
+    if period_ends_at is not None:
+        sub_ends = _ensure_utc(period_ends_at)
+    elif subscription_expiration_date:
         sub_ends = datetime.fromtimestamp(subscription_expiration_date, tz=timezone.utc)
     else:
         existing_ends = _ensure_utc(user.subscription_ends_at)
@@ -131,6 +144,76 @@ def apply_subscription_payment(
         status, provider, user.id, plan_id, user.subscription_ends_at,
     )
     return status
+
+
+def sync_subscription_state(
+    db: Session,
+    user: User,
+    *,
+    provider: str,
+    period_ends_at: Optional[datetime] = None,
+    auto_renew: Optional[bool] = None,
+    plan_id: Optional[str] = None,
+    paddle_subscription_id: Optional[str] = None,
+    revoke: bool = False,
+) -> str:
+    """
+    Mirror provider-side state changes onto the local user record.
+
+    Use this for events that aren't payments — e.g. ``subscription.updated``,
+    ``subscription.paused``, ``subscription.resumed``, or a periodic
+    reconciliation against Paddle's API.
+
+    Only fields with a non-``None`` argument are touched. ``revoke=True`` sets
+    ``subscription_ends_at`` to *now* and disables auto-renew (used for
+    paused subs that should lose access immediately).
+
+    Returns: 'updated' | 'unchanged' | 'no_subscription'.
+    """
+    if not user.subscription_plan_id and not paddle_subscription_id:
+        return "no_subscription"
+
+    changed = False
+    now = datetime.now(timezone.utc)
+
+    if revoke:
+        user.subscription_ends_at = now
+        user.subscription_auto_renew = False
+        changed = True
+    else:
+        if period_ends_at is not None:
+            new_ends = _ensure_utc(period_ends_at)
+            existing = _ensure_utc(user.subscription_ends_at)
+            if existing != new_ends:
+                user.subscription_ends_at = new_ends
+                changed = True
+        if auto_renew is not None and user.subscription_auto_renew != auto_renew:
+            user.subscription_auto_renew = auto_renew
+            changed = True
+
+    if plan_id is not None and plan_id != user.subscription_plan_id:
+        if get_active_plan(plan_id) is not None:
+            user.subscription_plan_id = plan_id
+            changed = True
+
+    if paddle_subscription_id and not user.subscription_paddle_id:
+        user.subscription_paddle_id = paddle_subscription_id
+        changed = True
+
+    if provider and not user.subscription_provider:
+        user.subscription_provider = provider
+        changed = True
+
+    if not changed:
+        return "unchanged"
+
+    db.commit()
+    db.refresh(user)
+    logger.info(
+        "[BILLING] Synced %s state for user_id=%s ends_at=%s auto_renew=%s revoke=%s",
+        provider, user.id, user.subscription_ends_at, user.subscription_auto_renew, revoke,
+    )
+    return "updated"
 
 
 def apply_cancellation(
