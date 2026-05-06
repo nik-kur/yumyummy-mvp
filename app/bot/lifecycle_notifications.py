@@ -27,7 +27,7 @@ SCHEDULER_INTERVAL_SECONDS = 1800  # 30 minutes
 # Message templates
 # ─────────────────────────────────────────────────────────────────────────────
 
-DAY0_FIRST_MEAL = """✅ First meal tracked!
+DAY0_FIRST_MEAL = """✅ First meal logged.
 
 Come back after your next meal or snack — I'm keeping count.
 
@@ -67,13 +67,13 @@ Even if you don't track every meal, logging at least one helps you stay aware of
 
 Try this: just tell me everything you remember eating today, all at once. I'll sort it out."""
 
-DAY2_MORNING_STREAK = """🔥 2-day streak!
+DAY2_MORNING_LOGGED_YESTERDAY = """👋 Day 2 — back at it.
 
-You're building momentum. What's for breakfast?"""
+What's for breakfast?"""
 
-DAY2_MORNING_NOSTREAK = """👋 Hey! Quick reminder — even one logged meal per day keeps you on track.
+DAY2_MORNING_NOT_LOGGED_YESTERDAY = """👋 Hey — even one logged meal a day still gives you a useful picture.
 
-What did you eat so far today? I'll take it from here."""
+What've you had so far? I'll take it from here."""
 
 DAY2_FEATURE_BARCODE = """💡 Pro tip for packaged food:
 
@@ -89,7 +89,7 @@ Quick insight: over the last 2 days, your average daily intake is {avg_cal:.0f} 
 
 Patterns like this are exactly why tracking works — awareness changes behavior."""
 
-DAY3_MORNING_ACTIVE = """🔥 Day 3 — you're on a roll!
+DAY3_MORNING_ACTIVE = """👌 Day 3, and you're rolling.
 
 Here's something to try today: before your next meal, tap [🤔 What should I eat?]
 
@@ -104,13 +104,13 @@ When you're ready, just tell me what you're eating — text, voice, or photo. I'
 DAY3_EVENING_ACTIVE = """📊 Your 3-day YumYummy report:
 
 ─────────────────
-🍽 Meals tracked: {meals_count}
+🍽 Meals logged: {meals_count}
 📅 Active days: {active_days} out of 3
-🎯 Within calorie target: {on_target_pct}% of days
+Within calorie target: {on_target_pct}% of days
 🥩 Avg protein: {avg_protein:.0f}g / {target_protein:.0f}g target
 ─────────────────
 
-In 3 days, you've built the foundation of a nutrition tracking habit — something most people never manage with traditional apps.
+In 3 days, you've logged more than most people manage in their first month with a traditional app.
 
 Your data, your targets, your saved meals — everything is set up and working.
 
@@ -136,7 +136,7 @@ Keep your access:"""
 
 WINBACK_T0_ACTIVE = """⏰ Your trial has ended.
 
-In {trial_days} days you tracked {meals_count} meals and logged {active_days} days of data. That's more consistent than 92% of people who try calorie counting!
+In {trial_days} days you logged {meals_count} meals across {active_days} days. That's more consistent than 92% of people who try calorie counting.
 
 Your data and saved meals are preserved — subscribe to keep your access and continue building on your progress.
 
@@ -246,10 +246,10 @@ WEEKLY_SUMMARY_ACTIVE = (
     "📈 Your week in review ({date_range}):\n\n"
     "🍽 Meals logged: {meals_count}\n"
     "📅 Active days: {active_days}/7\n"
-    "🎯 At or below calorie target: {on_target_pct}% of days\n"
+    "At or below calorie target: {on_target_pct}% of days\n"
     "🥩 Avg protein: {avg_protein}g / {protein_target}g target\n\n"
     "{trend_message}\n\n"
-    "Keep it up next week! 💪"
+    "See you next Sunday."
 )
 
 WEEKLY_SUMMARY_INACTIVE = (
@@ -384,7 +384,7 @@ def _build_day_summary_text(db, user: User, target_date: Optional[date] = None) 
     t_carbs = user.target_carbs_g or 250
 
     return (
-        f"🔥 Calories: {cal:.0f} / {t_cal:.0f} kcal\n"
+        f"Calories: {cal:.0f} / {t_cal:.0f} kcal\n"
         f"🥩 Protein: {prot:.0f} / {t_prot:.0f} g\n"
         f"🧈 Fat: {fat:.0f} / {t_fat:.0f} g\n"
         f"🍞 Carbs: {carbs:.0f} / {t_carbs:.0f} g"
@@ -648,10 +648,10 @@ async def _process_trial_notifications(
         # Morning (9 AM window)
         if 9 <= hour < 11:
             if _logged_yesterday(db, user) and not _was_sent(db, tg_id, "day2_morning_streak"):
-                if await _send_notification(bot, int(tg_id), DAY2_MORNING_STREAK):
+                if await _send_notification(bot, int(tg_id), DAY2_MORNING_LOGGED_YESTERDAY):
                     _record_sent(db, tg_id, "day2_morning_streak")
             elif not _logged_yesterday(db, user) and not _was_sent(db, tg_id, "day2_morning_nostreak"):
-                if await _send_notification(bot, int(tg_id), DAY2_MORNING_NOSTREAK):
+                if await _send_notification(bot, int(tg_id), DAY2_MORNING_NOT_LOGGED_YESTERDAY):
                     _record_sent(db, tg_id, "day2_morning_nostreak")
 
         # Feature tip: barcode (2 PM window: hours 14–16)
@@ -665,7 +665,7 @@ async def _process_trial_notifications(
             target_cal = user.target_calories or 2000
             diff = avg_cal - target_cal
             if abs(diff) < target_cal * 0.05:
-                status = "right on target 🎯"
+                status = "right on target"
             elif diff > 0:
                 status = f"{diff:.0f} kcal above target"
             else:

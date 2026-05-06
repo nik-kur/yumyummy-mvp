@@ -48,12 +48,12 @@ PAYWALL_SUB_EXPIRED_TEXT = (
 # Delayed follow-up shown 30 seconds after the subscription confirmation, to
 # give new subscribers a quick "how to get the most out of this" orientation.
 POST_PURCHASE_MESSAGE = (
-    "💪 Welcome to the club\n\n"
+    "🙌 Welcome to the club\n\n"
     "Here's how to get the most out of YumYummy:\n\n"
     "1. Log at least 1 meal per day — consistency beats perfection\n"
     "2. Try \"🤔 What should I eat?\" when you're deciding on lunch\n"
     "3. Save your go-to meals to My Menu — 2-tap logging from then on\n\n"
-    "Your first weekly summary arrives in 7 days. Let's build some data!"
+    "Your first weekly summary lands in 7 days. Let's start logging."
 )
 
 POST_PURCHASE_DELAY_SECONDS = 30

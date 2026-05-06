@@ -167,7 +167,7 @@ WELCOME_TEXT = (
     "🔍 Real data — I search the web for official nutrition info from restaurants and brands. Not a guess from a database.\n"
     "⚡ 10 seconds — just describe your meal in any way. No searching, no scrolling, no manual entry.\n"
     "💬 Right here in Telegram — no app to download.\n\n"
-    "🚀 Let's try it right now. Tell me your last meal.\n"
+    "Let's try it right now. Tell me your last meal.\n"
     "Example: \"cappuccino and a croissant at Starbucks\""
 )
 
@@ -210,7 +210,7 @@ MANUAL_KBJU_TEXT = tr("onboarding.manual_kbju", LANG)
 FEATURE_GUIDE_TEXT = """📖 Here's everything YumYummy can do for you:
 
 ─────────────────
-⚡ 10-Second Meal Logging — Any Format
+⏱ 10-Second Meal Logging — Any Format
 
 Text — "2 eggs, toast with avocado, black coffee"
 Voice — send a voice message describing your meal
@@ -253,7 +253,7 @@ I'll suggest the best choice for your remaining daily budget.
 
 💡 This guide is always available — tap 📖 How to Use in the menu anytime."""
 
-TRIAL_CTA_TEXT = """🎉 You're all set!
+TRIAL_CTA_TEXT = """You're all set.
 
 Activate your free trial:
 
@@ -263,7 +263,7 @@ Activate your free trial:
 
 Just text, speak, or snap what you eat — I'll handle the rest."""
 
-TRIAL_ACTIVATED_TEXT = """🎉 Free trial activated! Full access for 3 days.
+TRIAL_ACTIVATED_TEXT = """Free trial activated 👌  Full access for 3 days.
 
 Your next step: log your next meal whenever you're ready. I'm here 24/7."""
 
@@ -286,7 +286,7 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
 def get_start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🚀 Let's try it!", callback_data="onboarding_start")]
+            [InlineKeyboardButton(text="👋 Let's go", callback_data="onboarding_start")]
         ]
     )
 
@@ -398,9 +398,9 @@ def get_targets_presentation_text(
     target_fat_g: float,
     target_carbs_g: float,
 ) -> str:
-    return f"""🎯 Your personal targets are ready!
+    return f"""Your personal targets are set 👌
 
-🔥 Calories:  {target_calories:.0f} kcal
+Calories:  {target_calories:.0f} kcal
 🥩 Protein:   {target_protein_g:.0f} g
 🥑 Fat:       {target_fat_g:.0f} g
 🍞 Carbs:     {target_carbs_g:.0f} g
@@ -515,7 +515,7 @@ async def _deliver_combined_result(
             "There was an issue analyzing your demo meal, but no worries — "
             "you can log it again anytime.\n\n"
             f"Your daily targets are set:\n"
-            f"🔥 {target_cal:.0f} kcal · 🥩 {target_prot:.0f} g · "
+            f"{target_cal:.0f} kcal · 🥩 {target_prot:.0f} g · "
             f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g"
         )
         await message.answer(fallback)
@@ -546,7 +546,7 @@ async def _deliver_combined_result(
     today = today_for_user(user)
 
     combined = (
-        f"Your first meal analysis is ready 🎉\n\n"
+        f"Your first meal analysis is ready 👌\n\n"
         f"{meal_text}\n\n"
         f"─────────────────\n"
         f"📊 This meal is {pct}% of your daily calorie target\n\n"
@@ -1036,7 +1036,7 @@ async def on_what_else(callback: types.CallbackQuery, state: FSMContext) -> None
     trial_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(
-                text="🚀 Start my free trial",
+                text="Start my 3-day free trial",
                 callback_data="onboarding_start_trial",
             )]
         ]
@@ -1065,7 +1065,7 @@ async def on_feature_guide_next(callback: types.CallbackQuery, state: FSMContext
 
     trial_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🚀 Start my free trial", callback_data="onboarding_start_trial")]
+            [InlineKeyboardButton(text="Start my 3-day free trial", callback_data="onboarding_start_trial")]
         ]
     )
     await callback.message.answer(TRIAL_CTA_TEXT, reply_markup=trial_kb)
@@ -1358,7 +1358,7 @@ async def on_menu_advice(message: types.Message, state: FSMContext) -> None:
     prompt = (
         f"🤔 What should I eat?\n\n"
         f"📊 Remaining today:\n"
-        f"• 🔥 {remaining_cal:.0f} kcal\n"
+        f"• {remaining_cal:.0f} kcal\n"
         f"• 🥩 {remaining_prot:.0f} g protein\n"
         f"• 🥑 {remaining_fat:.0f} g fat\n"
         f"• 🍞 {remaining_carbs:.0f} g carbs\n\n"
@@ -1459,10 +1459,10 @@ async def on_menu_profile(message: types.Message, state: FSMContext) -> None:
 • Weight: {weight} kg
 • Activity: {activity}
 
-🎯 Goal: {goal}
+Goal: {goal}
 
 📊 Daily targets:
-• 🔥 Calories: {target_cal:.0f} kcal
+• Calories: {target_cal:.0f} kcal
 • 🥩 Protein: {target_prot:.0f} g
 • 🥑 Fat: {target_fat:.0f} g
 • 🍞 Carbs: {target_carbs:.0f} g

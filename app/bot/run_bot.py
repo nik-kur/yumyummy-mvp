@@ -918,7 +918,7 @@ async def cmd_barcode(message: types.Message) -> None:
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     # 2) Просим backend найти продукт по штрихкоду
     parsed = await product_parse_meal_by_barcode(barcode)
@@ -1068,7 +1068,7 @@ async def cmd_product(message: types.Message) -> None:
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     # 2) Просим backend найти продукт по названию
     parsed = await product_parse_meal_by_name(name, brand=brand, store=store)
@@ -1191,7 +1191,7 @@ async def cmd_ai_log(message: types.Message) -> None:
     user_id = user["id"]
 
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     # 2) Просим backend/LLM оценить КБЖУ
     parsed = await ai_parse_meal(raw_text)
@@ -1309,7 +1309,7 @@ async def cmd_eatout(message: types.Message) -> None:
     user_id = user["id"]
     
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     # 2) Просим backend найти блюдо из ресторана по свободному тексту
     parsed = await restaurant_parse_text(text=raw_text)
@@ -1430,7 +1430,7 @@ async def cmd_eatout_a(message: types.Message) -> None:
     user_id = user["id"]
     
     # Отправляем немедленный ответ, что запрос получен
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     # 2) Просим backend найти блюдо из ресторана через OpenAI web search
     parsed = await restaurant_parse_text_openai(text=raw_text)
@@ -2265,7 +2265,7 @@ async def _process_food_advice_input(
 
     await state.clear()
 
-    processing_msg = await message.answer("🤔 Thinking about the best recommendation - back in 1-2 minutes!")
+    processing_msg = await message.answer("🤔 Thinking about the best pick — back in 1-2 minutes.")
 
     try:
         result = await agent_run_workflow(
@@ -2613,7 +2613,7 @@ async def handle_voice(message: types.Message, state: FSMContext) -> None:
         await message.answer("Could not recognize speech. Please try again 🙏")
         return
 
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
 
     try:
         result = await agent_run_workflow(
@@ -2917,7 +2917,7 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
         return
     
     # Send processing message
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     try:
         # Call agent/run endpoint
@@ -3055,7 +3055,7 @@ async def handle_plain_text(message: types.Message, state: FSMContext) -> None:
         return
     
     # Send processing message
-    processing_msg = await message.answer("⏳ Processing request - this may take 1-2 minutes. I'll send results as soon as they're ready!")
+    processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     try:
         user = await ensure_user(message.from_user.id)
@@ -3286,7 +3286,7 @@ async def handle_repeat_meal(query: types.CallbackQuery, state: FSMContext) -> N
     text = (
         f"🔁 Logged again:\n\n"
         f"{desc}\n"
-        f"🔥 {cal} kcal · 🥩 {prot}g · 🧈 {fat}g · 🍞 {carbs}g"
+        f"{cal} kcal · 🥩 {prot}g · 🧈 {fat}g · 🍞 {carbs}g"
     )
 
     new_meal_id = new_meal.get("id")
