@@ -15,8 +15,14 @@ class Settings(BaseSettings):
     # чтобы .env мог содержать ключ, даже если фича временно не используется
     tavily_api_key: Optional[str] = None
     
-    # Internal API token for agent tools
+    # Internal API token for agent tools (also reused by /admin/billing)
     internal_api_token: Optional[str] = None
+
+    # Internal API token used between the Telegram bot and FastAPI backend
+    # (for /billing/*, /agent/run, /ai/agent). Kept separate from
+    # internal_api_token to avoid colliding with the admin token already
+    # provisioned on Render.
+    internal_api_token_backend: Optional[str] = None
 
     # Billing / Telegram Stars
     billing_trial_days: int = 3
@@ -33,6 +39,11 @@ class Settings(BaseSettings):
     gumroad_claim_secret: Optional[str] = None
     gumroad_monthly_price_cents: int = 999
     gumroad_yearly_price_cents: int = 8999
+
+    # Sentry / observability
+    sentry_dsn: Optional[str] = None
+    sentry_environment: Optional[str] = None  # e.g. "production" / "staging" / "dev"
+    sentry_traces_sample_rate: float = 0.0    # 0.0 disables perf tracing; bump later if needed
 
     # Billing / Paddle
     paddle_enabled: bool = False

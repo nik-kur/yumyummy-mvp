@@ -9,11 +9,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
+from app.core.sentry import init_sentry
 from app.i18n import DEFAULT_LANG, tr
+
+init_sentry("backend")
 
 logger = logging.getLogger(__name__)
 LANG = DEFAULT_LANG
-from app.deps import get_db
+from app.deps import get_db, verify_internal_token
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.user_day import UserDay
@@ -1098,7 +1101,11 @@ async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
 
 
 @app.post("/ai/agent", response_model=AgentResponse)
-async def ai_agent(payload: AgentRequest, db: Session = Depends(get_db)):
+async def ai_agent(
+    payload: AgentRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_internal_token),
+):
     """
     Agentic mode endpoint using OpenAI Responses API with tools.
     Understands user intent and can log meals, show summaries, etc.
@@ -1127,7 +1134,10 @@ async def ai_agent(payload: AgentRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/agent/run", response_model=WorkflowRunResponse)
-async def agent_run(payload: WorkflowRunRequest):
+async def agent_run(
+    payload: WorkflowRunRequest,
+    _: str = Depends(verify_internal_token),
+):
     """
     Run the YumYummy Agent Builder workflow.
     Returns the final JSON with intent, message_text, confidence, totals, items, source_url.

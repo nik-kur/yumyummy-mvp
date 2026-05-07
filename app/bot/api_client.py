@@ -9,6 +9,16 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _internal_headers() -> Dict[str, str]:
+    """Return the X-Internal-Token header for backend auth.
+
+    Empty dict when the token isn't configured so local/dev setups still work
+    against backends that don't enforce auth (e.g. before the rollout completes).
+    """
+    token = settings.internal_api_token_backend
+    return {"X-Internal-Token": token} if token else {}
+
+
 async def ping_backend() -> Optional[Dict[str, Any]]:
     """
     Бьём в /health backend'а.
@@ -16,7 +26,7 @@ async def ping_backend() -> Optional[Dict[str, Any]]:
     """
     url = f"{settings.backend_base_url}/health"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.get(url)
             resp.raise_for_status()
             return resp.json()
@@ -34,7 +44,7 @@ async def ensure_user(telegram_id: int) -> Optional[Dict[str, Any]]:
     payload = {"telegram_id": str(telegram_id)}  # наша схема ждёт str
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -72,7 +82,7 @@ async def create_meal(
         payload["source_provider"] = source_provider
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -87,7 +97,7 @@ async def get_day_summary(user_id: int, day: date) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/day/{user_id}/{day.isoformat()}"
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.get(url)
             if resp.status_code == 404:
                 return None
@@ -125,7 +135,7 @@ async def update_meal(
         payload["eaten_at"] = eaten_at
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.patch(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -136,7 +146,7 @@ async def update_meal(
 async def get_meal_by_id(meal_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/meals/{meal_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.get(url)
             if resp.status_code == 404:
                 return None
@@ -153,7 +163,7 @@ async def delete_meal(meal_id: int) -> bool:
     """
     url = f"{settings.backend_base_url}/meals/{meal_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.delete(url)
             if resp.status_code == 404:
                 return False
@@ -173,7 +183,7 @@ async def ai_parse_meal(text: str) -> Optional[Dict[str, Any]]:
     payload = {"text": text}
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -192,7 +202,7 @@ async def product_parse_meal_by_barcode(barcode: str) -> Optional[Dict[str, Any]
     payload = {"barcode": barcode}
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -219,7 +229,7 @@ async def product_parse_meal_by_name(
         payload["store"] = store
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -238,7 +248,7 @@ async def voice_parse_meal(audio_bytes: bytes) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/ai/voice_parse_meal"
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=30.0) as client:
             files = {"audio": ("voice.ogg", audio_bytes, "audio/ogg")}
             resp = await client.post(url, files=files)
             resp.raise_for_status()
@@ -261,7 +271,7 @@ async def restaurant_parse_meal(restaurant: str, dish: str) -> Optional[Dict[str
     }
     
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -282,7 +292,7 @@ async def restaurant_parse_text(text: str) -> Optional[Dict[str, Any]]:
     }
     
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=15.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -304,7 +314,7 @@ async def restaurant_parse_text_openai(text: str) -> Optional[Dict[str, Any]]:
     }
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:  # Longer timeout for OpenAI API
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=30.0) as client:  # Longer timeout for OpenAI API
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -337,7 +347,7 @@ async def agent_query(user_id: int, text: str, date: Optional[str] = None, conve
         payload["conversation_context"] = conversation_context
     
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for agent processing
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=60.0) as client:  # Longer timeout for agent processing
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -381,7 +391,7 @@ async def agent_run_workflow(
     timeout = httpx.Timeout(180.0)
     
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=timeout) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             result = resp.json()
@@ -427,7 +437,7 @@ async def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/users/{telegram_id}"
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.get(url)
             if resp.status_code == 404:
                 return None
@@ -448,7 +458,7 @@ async def update_user(telegram_id: int, **kwargs) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/users/{telegram_id}"
     
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.patch(url, json=kwargs)
             resp.raise_for_status()
             return resp.json()
@@ -487,7 +497,7 @@ async def create_saved_meal(
         "items": items or [],
     }
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -501,7 +511,7 @@ async def get_saved_meals(
 ) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/saved-meals/by-user/{telegram_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.get(url, params={"page": page, "per_page": per_page})
             if resp.status_code == 404:
                 return None
@@ -515,7 +525,7 @@ async def get_saved_meals(
 async def get_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.get(url)
             if resp.status_code == 404:
                 return None
@@ -529,7 +539,7 @@ async def get_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
 async def update_saved_meal(saved_meal_id: int, **kwargs) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.patch(url, json=kwargs)
             resp.raise_for_status()
             return resp.json()
@@ -541,7 +551,7 @@ async def update_saved_meal(saved_meal_id: int, **kwargs) -> Optional[Dict[str, 
 async def delete_saved_meal(saved_meal_id: int) -> bool:
     url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.delete(url)
             if resp.status_code == 404:
                 return False
@@ -555,7 +565,7 @@ async def delete_saved_meal(saved_meal_id: int) -> bool:
 async def use_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/saved-meals/{saved_meal_id}/use"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url)
             resp.raise_for_status()
             return resp.json()
@@ -567,7 +577,7 @@ async def use_saved_meal(saved_meal_id: int) -> Optional[Dict[str, Any]]:
 async def repeat_meal(meal_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/meals/{meal_id}/repeat"
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
             resp = await client.post(url)
             resp.raise_for_status()
             return resp.json()
@@ -582,7 +592,7 @@ async def repeat_meal(meal_id: int) -> Optional[Dict[str, Any]]:
 async def get_billing_status(telegram_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/billing/status/{telegram_id}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.get(url)
             if resp.status_code == 404:
                 return None
@@ -597,7 +607,7 @@ async def start_trial(telegram_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/billing/trial/start"
     payload = {"telegram_id": str(telegram_id)}
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -633,7 +643,7 @@ async def record_payment_success(
     if subscription_expiration_date is not None:
         data["subscription_expiration_date"] = subscription_expiration_date
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
             resp = await client.post(url, json=data)
             resp.raise_for_status()
             return resp.json()
@@ -646,7 +656,7 @@ async def cancel_subscription(telegram_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/billing/subscription/cancel"
     payload = {"telegram_id": str(telegram_id)}
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -659,7 +669,7 @@ async def get_gumroad_checkout_url(telegram_id: int, plan_id: str) -> Optional[D
     url = f"{settings.backend_base_url}/billing/gumroad/checkout"
     payload = {"telegram_id": str(telegram_id), "plan_id": plan_id}
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -671,7 +681,7 @@ async def get_gumroad_checkout_url(telegram_id: int, plan_id: str) -> Optional[D
 async def get_paddle_portal_url(telegram_id: int) -> Optional[Dict[str, Any]]:
     url = f"{settings.backend_base_url}/billing/paddle/portal/{telegram_id}"
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
             resp = await client.get(url)
             if resp.status_code == 404:
                 return None
@@ -686,7 +696,7 @@ async def get_paddle_checkout_url(telegram_id: int, plan_id: str) -> Optional[Di
     url = f"{settings.backend_base_url}/billing/paddle/checkout"
     payload = {"telegram_id": str(telegram_id), "plan_id": plan_id}
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()
@@ -706,7 +716,7 @@ async def submit_churn_survey(
     if comment:
         payload["comment"] = comment
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             return resp.json()

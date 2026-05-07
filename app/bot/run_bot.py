@@ -13,6 +13,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.core.config import settings
+from app.core.sentry import init_sentry
+
+init_sentry("bot")
 
 logger = logging.getLogger(__name__)
 from app.bot.api_client import (

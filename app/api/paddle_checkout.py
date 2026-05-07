@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.deps import get_db
+from app.deps import get_db, verify_internal_token
 from app.models.user import User
 from app.billing.plans import get_active_plan
 from app.billing.claim_token import create_claim_token
@@ -23,7 +23,11 @@ from app.schemas.billing import PaddleCheckoutRequest, PaddleCheckoutResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/billing", tags=["billing"])
+router = APIRouter(
+    prefix="/billing",
+    tags=["billing"],
+    dependencies=[Depends(verify_internal_token)],
+)
 
 
 @router.post("/paddle/checkout", response_model=PaddleCheckoutResponse)

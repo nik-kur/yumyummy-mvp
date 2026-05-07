@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.deps import get_db
+from app.deps import get_db, verify_internal_token
 from app.models.user import User
 from app.billing.access import compute_access_status, trial_days_remaining, check_usage_cap, get_usage_cap_usd
 from app.billing.plans import TRIAL_DAYS, get_active_plan
@@ -26,7 +26,11 @@ from app.schemas.billing import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/billing", tags=["billing"])
+router = APIRouter(
+    prefix="/billing",
+    tags=["billing"],
+    dependencies=[Depends(verify_internal_token)],
+)
 
 
 @router.get("/status/{telegram_id}", response_model=BillingStatusResponse)
