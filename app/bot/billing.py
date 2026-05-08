@@ -147,6 +147,7 @@ async def _build_paywall_keyboard(
     plans = get_plans()
 
     if _card_payments_enabled():
+        card_button_count = 0
         for plan in plans.values():
             if not plan.is_active:
                 continue
@@ -177,6 +178,27 @@ async def _build_paywall_keyboard(
                         url=checkout_url,
                     )
                 ])
+                card_button_count += 1
+            else:
+                logger.warning(
+                    "[BILLING] paywall card button skipped: tg_id=%s plan_id=%s "
+                    "(paddle_enabled=%s gumroad_enabled=%s) — backend returned no checkout_url",
+                    tg_id,
+                    plan.id,
+                    settings.paddle_enabled,
+                    settings.gumroad_enabled,
+                )
+
+        if card_button_count == 0:
+            # Backend failed to produce any card checkout URL. Surface a
+            # "Try again" button instead of silently leaving the paywall
+            # with only the Stars option, which makes the UX look broken.
+            buttons.append([
+                types.InlineKeyboardButton(
+                    text=tr("billing.retry_btn", LANG),
+                    callback_data="billing:retry_paywall",
+                )
+            ])
 
         # "Pay with Telegram Stars" callback button
         buttons.append([
@@ -294,6 +316,35 @@ async def handle_start_trial(query: types.CallbackQuery) -> None:
 # ---------------------------------------------------------------------------
 # Show Telegram Stars payment options
 # ---------------------------------------------------------------------------
+
+@router.callback_query(F.data == "billing:retry_paywall")
+async def handle_retry_paywall(query: types.CallbackQuery) -> None:
+    """User taps "Try again" when card checkout couldn't be generated.
+    Re-runs the paywall flow — usually transient backend hiccups recover
+    on the second attempt."""
+    await query.answer()
+
+    tg_id = query.from_user.id
+    billing = await get_billing_status(tg_id)
+    status = (billing or {}).get("access_status", "new")
+
+    if _card_payments_enabled():
+        plans_text = _build_plans_text_card()
+    else:
+        plans_text = _build_plans_text_stars()
+
+    if status == "new":
+        text = PAYWALL_TRIAL_TEXT.format(plans_text=plans_text)
+        kb = await _build_paywall_keyboard(query.bot, tg_id, show_trial=True)
+    elif status == "trial_expired":
+        text = PAYWALL_EXPIRED_TEXT.format(plans_text=plans_text)
+        kb = await _build_paywall_keyboard(query.bot, tg_id, show_trial=False)
+    else:
+        text = PAYWALL_SUB_EXPIRED_TEXT.format(plans_text=plans_text)
+        kb = await _build_paywall_keyboard(query.bot, tg_id, show_trial=False)
+
+    await query.message.answer(text, reply_markup=kb, parse_mode="HTML")
+
 
 @router.callback_query(F.data == "billing:show_stars")
 async def handle_show_stars(query: types.CallbackQuery) -> None:

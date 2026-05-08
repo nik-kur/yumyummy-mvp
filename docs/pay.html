@@ -7,6 +7,17 @@
   <link rel="stylesheet" href="assets/styles.css" />
   <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
   <style>
+    /* pay.html-local palette aliases. The legal/landing styles.css uses
+       --brand / --olive-* / --n* names, but earlier revisions of this
+       page referenced --accent / --muted / --border, which would resolve
+       to "unset" → invisible white text on the cream background. */
+    :root {
+      --accent: var(--olive-dark, #5A6A3A);
+      --accent-hover: var(--olive-deeper, #4A5A2A);
+      --muted: var(--n500, #8A7B6B);
+      --border: var(--n300, #D8CCB9);
+    }
+
     .pay-hero {
       text-align: center;
       padding: 60px 24px 24px;
@@ -29,11 +40,12 @@
       text-align: center;
       transition: border-color .15s, box-shadow .15s;
       position: relative;
+      background: #fff;
     }
     .plan-card:hover { border-color: var(--accent); }
     .plan-card.popular {
       border-color: var(--accent);
-      box-shadow: 0 4px 20px rgba(79, 70, 229, .12);
+      box-shadow: 0 4px 20px rgba(90, 106, 58, .14);
     }
     .plan-badge {
       position: absolute;
@@ -66,7 +78,7 @@
       text-decoration: none;
     }
     .plan-btn:hover {
-      background: #4338ca;
+      background: var(--accent-hover);
       transform: translateY(-1px);
       text-decoration: none;
       color: #fff;

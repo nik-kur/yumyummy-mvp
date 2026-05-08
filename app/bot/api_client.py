@@ -674,7 +674,12 @@ async def get_gumroad_checkout_url(telegram_id: int, plan_id: str) -> Optional[D
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        logger.error(f"[API] get_gumroad_checkout_url error: {e}")
+        logger.error(
+            "[API] get_gumroad_checkout_url error tg_id=%r plan_id=%r: %s",
+            telegram_id,
+            plan_id,
+            e,
+        )
         return None
 
 
@@ -701,7 +706,12 @@ async def get_paddle_checkout_url(telegram_id: int, plan_id: str) -> Optional[Di
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        logger.error(f"[API] get_paddle_checkout_url error: {e}")
+        logger.error(
+            "[API] get_paddle_checkout_url error tg_id=%r plan_id=%r: %s",
+            telegram_id,
+            plan_id,
+            e,
+        )
         return None
 
 

@@ -40,6 +40,14 @@ def generate_paddle_checkout(payload: PaddleCheckoutRequest, db: Session = Depen
 
     user = db.query(User).filter(User.telegram_id == payload.telegram_id).first()
     if not user:
+        logger.warning(
+            "[PADDLE] /paddle/checkout user not found "
+            "telegram_id=%r (type=%s, len=%d) plan_id=%r",
+            payload.telegram_id,
+            type(payload.telegram_id).__name__,
+            len(payload.telegram_id) if isinstance(payload.telegram_id, str) else -1,
+            payload.plan_id,
+        )
         raise HTTPException(status_code=404, detail="User not found")
 
     plan = get_active_plan(payload.plan_id)
