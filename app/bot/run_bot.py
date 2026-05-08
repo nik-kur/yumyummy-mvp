@@ -2918,12 +2918,26 @@ async def cmd_agent(message: types.Message, state: FSMContext) -> None:
     if not text:
         await message.answer("Usage: /agent <your request>\n\nExample: /agent syrniki from Coffeemania")
         return
-    
+
+    # Enforce paywall / usage caps (cmd_agent previously bypassed this).
+    if not await check_billing_access(message):
+        return
+
     # Send processing message
     processing_msg = await message.answer("⏳ Searching official sources — this can take 1-2 minutes. I'll ping you when it's ready.")
     
     try:
-        # Call agent/run endpoint
+        # Fetch user up front so timezone-aware helpers (today_for_user) work
+        # below when the agent returns a meal-logging intent.
+        user = await ensure_user(message.from_user.id)
+        if user is None:
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            await message.answer("Could not reach backend. Please try again later 🙏")
+            return
+
         logger.info(f"[BOT /agent] Calling agent_run_workflow for telegram_id={tg_id}, text={text[:50]}...")
         result = await agent_run_workflow(telegram_id=tg_id, text=text)
         
