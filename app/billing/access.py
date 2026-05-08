@@ -1,6 +1,14 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+# Per-status spend caps. The "new" cap is intentionally tiny — it only
+# needs to cover the single onboarding demo meal that runs *before* the
+# user activates a trial. Without this, server-side billing enforcement
+# on /agent/run would block the demo and the user would see "Your trial
+# has ended" during their very first interaction with the bot. Capping
+# new users at $0.50 prevents abuse (signing up many fresh accounts to
+# burn through agent runs) while keeping the demo a true wow moment.
+USAGE_CAP_NEW_USD = 0.5
 USAGE_CAP_TRIAL_USD = 2.0
 USAGE_CAP_ACTIVE_USD = 10.0
 
@@ -29,11 +37,22 @@ def compute_access_status(user: Dict[str, Any]) -> str:
 
 
 def has_access(user: Dict[str, Any]) -> bool:
-    return compute_access_status(user) in ("trial", "active") and check_usage_cap(user)
+    """Decide whether the user is allowed to consume an agent run.
+
+    "new" users are allowed a tiny demo budget so the onboarding flow
+    works (the first agent call happens *before* the trial CTA). All
+    other non-paid statuses are rejected.
+    """
+    status = compute_access_status(user)
+    if status in ("trial", "active", "new"):
+        return check_usage_cap(user)
+    return False
 
 
 def get_usage_cap_usd(user: Dict[str, Any]) -> Optional[float]:
     status = compute_access_status(user)
+    if status == "new":
+        return USAGE_CAP_NEW_USD
     if status == "trial":
         return USAGE_CAP_TRIAL_USD
     if status == "active":

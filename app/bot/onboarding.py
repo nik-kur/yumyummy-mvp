@@ -162,13 +162,14 @@ def calculate_targets(
 
 WELCOME_TEXT = (
     "👋 Hi! I'm YumYummy — your AI nutrition tracker in Telegram.\n\n"
-    "Tell me what you ate. Text, voice, or photo — I'll find the real nutrition data in about 10 seconds.\n\n"
-    "What makes this different from other trackers:\n\n"
-    "🔍 Real data — I search the web for official nutrition info from restaurants and brands. Not a guess from a database.\n"
-    "⚡ 10 seconds — just describe your meal in any way. No searching, no scrolling, no manual entry.\n"
+    "What makes this different from others:\n\n"
+    "🔍 Real data — I search the web for official nutrition info from "
+    "brands, shops and restaurants to get best precision possible. "
+    "Not just static databases.\n"
+    "⚡ 10 seconds — just describe your meal in any way "
+    "(text, voice or photo). No searching, no scrolling, no manual entry.\n"
     "💬 Right here in Telegram — no app to download.\n\n"
-    "Let's try it right now. Tell me your last meal.\n"
-    "Example: \"cappuccino and a croissant at Starbucks\""
+    "Let's try it right now, I'll show you how it works!"
 )
 
 DEMO_MEAL_PIVOT_TEXT = """⏳ Got it! I'm searching for official nutrition sources now — this may take 1-2 minutes, as I thoroughly check real data rather than guess.
@@ -212,20 +213,20 @@ FEATURE_GUIDE_TEXT = """📖 Here's everything YumYummy can do for you:
 ─────────────────
 ⏱ 10-Second Meal Logging — Any Format
 
-Text — "2 eggs, toast with avocado, black coffee"
-Voice — send a voice message describing your meal
-Photo — snap your plate and I'll estimate KBJU
-Barcode — photo of a product barcode = exact data
-Nutrition label — photo of a label on packaging
+• Type — "2 eggs, toast with avocado, black coffee"
+• Send a voice message describing your meal
+• Send a photo of your plate — I'll estimate KBJU
+• Send a photo of a product barcode — for exact packaged-product data
+• Send a photo of a nutrition label — when there's no barcode
 
 ─────────────────
 🔬 Nerd-Level Precision — Not Just Rough Estimates
 
 Mention a brand or restaurant:
-"Cappuccino at Starbucks" → I search for official Starbucks nutrition data
-"Epica yogurt 6%" → I find the manufacturer's numbers
-"Tom Yum at Wagamama" → I look up the restaurant menu
-No context? I estimate from known averages for that dish.
+• "Cappuccino at Starbucks" → I search for official Starbucks nutrition data
+• "Epica yogurt 6%" → I find the manufacturer's numbers
+• "Tom Yum at Wagamama" → I look up the restaurant menu
+• No context? I estimate from known averages for that dish.
 
 ─────────────────
 🍽 My Menu — Your Favorites on Speed-Dial
@@ -236,18 +237,19 @@ You already tried this during setup!
 ─────────────────
 🤔 What Should I Eat — Nutrition Advisor in Your Pocket
 
-Not sure what to pick? Tell me your options:
-"I'm at McDonald's, what should I order?"
-"Need a snack, 300 kcal left"
-"What should I cook for dinner? Need protein"
+Not sure what to pick? First activate "🤔 What should I eat?" mode via the button in the menu, then tell me your options:
+• "I'm at McDonald's, what should I order?"
+• "Need a snack, 300 kcal left"
+• "What should I cook for dinner? Need protein"
+
 I'll suggest the best choice for your remaining daily budget.
 
 ─────────────────
 📊 Track Your Progress
 
-📊 Today — what you ate, what's left, progress bars
-📈 Week — 7-day stats, daily averages, trends
-📤 Export — download all your data as CSV
+• Today — what you ate, what's left, progress bars
+• Week — 7-day stats, daily averages, trends
+• Export — download all your data as CSV
 
 ─────────────────
 
@@ -286,7 +288,7 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
 def get_start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="👋 Let's go", callback_data="onboarding_start")]
+            [InlineKeyboardButton(text="✨ Let's try", callback_data="onboarding_start")]
         ]
     )
 
@@ -685,7 +687,8 @@ async def on_onboarding_start(callback: types.CallbackQuery, state: FSMContext) 
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(
-        "Tell me what you had for your last meal — text, voice, or photo all work!"
+        "Tell me what you had for your last meal — text, voice, or photo all work.\n"
+        "Example: \"cappuccino and a croissant at Starbucks\""
     )
     await state.set_state(OnboardingStates.waiting_for_demo_meal)
 
