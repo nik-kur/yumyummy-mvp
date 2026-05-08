@@ -9,6 +9,7 @@ from app.models.user import User
 from app.billing.access import compute_access_status, trial_days_remaining, check_usage_cap, get_usage_cap_usd
 from app.billing.plans import TRIAL_DAYS, get_active_plan
 from app.billing.service import apply_subscription_payment, DuplicateEvent
+from app.core import posthog_client
 from app.models.churn_survey import ChurnSurvey
 from app.schemas.billing import (
     BillingStatusResponse,
@@ -89,6 +90,16 @@ def start_trial(payload: TrialStartRequest, db: Session = Depends(get_db)):
     db.refresh(user)
 
     logger.info(f"[BILLING] Trial started for telegram_id={payload.telegram_id}, ends_at={user.trial_ends_at}")
+
+    posthog_client.capture(
+        "trial_started",
+        telegram_id=payload.telegram_id,
+        posthog_distinct_id=user.posthog_distinct_id,
+        properties={
+            "trial_days": TRIAL_DAYS,
+            "acquisition_source": user.acquisition_source,
+        },
+    )
 
     return TrialStartResponse(
         telegram_id=payload.telegram_id,

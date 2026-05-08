@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.payment_event import PaymentEvent
 from app.billing.plans import get_active_plan
+from app.core import posthog_client
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,34 @@ def apply_subscription_payment(
         "[BILLING] Payment %s via %s for user_id=%s, plan=%s, ends_at=%s",
         status, provider, user.id, plan_id, user.subscription_ends_at,
     )
+
+    revenue_usd: Optional[float] = None
+    if amount_cents is not None:
+        revenue_usd = round(amount_cents / 100.0, 2)
+
+    posthog_client.capture(
+        "subscription_purchased" if is_new else "subscription_renewed",
+        telegram_id=user.telegram_id,
+        posthog_distinct_id=user.posthog_distinct_id,
+        properties={
+            "provider": provider,
+            "plan_id": plan_id,
+            "currency": currency,
+            "amount_cents": amount_cents,
+            "amount_xtr": amount_xtr,
+            "revenue": revenue_usd,
+            "is_recurring": is_recurring,
+            "is_first_recurring": is_first_recurring,
+            "event_type": event_type,
+            "acquisition_source": user.acquisition_source,
+            "subscription_ends_at": user.subscription_ends_at.isoformat() if user.subscription_ends_at else None,
+        },
+        set_properties={
+            "subscription_plan_id": plan_id,
+            "subscription_provider": provider,
+            "is_subscriber": True,
+        },
+    )
     return status
 
 
@@ -253,6 +282,18 @@ def apply_cancellation(
     logger.info(
         "[BILLING] Subscription cancelled via %s for user_id=%s, access until %s",
         provider, user.id, user.subscription_ends_at,
+    )
+    posthog_client.capture(
+        "subscription_cancelled",
+        telegram_id=user.telegram_id,
+        posthog_distinct_id=user.posthog_distinct_id,
+        properties={
+            "provider": provider,
+            "plan_id": user.subscription_plan_id,
+            "acquisition_source": user.acquisition_source,
+            "subscription_ends_at": user.subscription_ends_at.isoformat() if user.subscription_ends_at else None,
+        },
+        set_properties={"subscription_auto_renew": False},
     )
     return "cancelled"
 

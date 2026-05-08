@@ -58,6 +58,13 @@ class User(Base):
     # the acquisition_events table.
     acquisition_source = Column(String, nullable=True)
 
+    # PostHog distinct_id captured from the marketing site (yumyummy.ai)
+    # via the ``?start=<distinct_id>`` deep link or a separate ``phid``
+    # query parameter. We use this on the backend when sending PostHog
+    # events so the entire funnel (web pageview → trial → subscription)
+    # is attributed to the same person inside PostHog.
+    posthog_distinct_id = Column(String, nullable=True, index=True)
+
     # Связи
     days = relationship("UserDay", back_populates="user")
     meals = relationship("MealEntry", back_populates="user")

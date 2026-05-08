@@ -16,3 +16,4 @@ python-multipart
 anyio
 pytz
 sentry-sdk[fastapi]>=2.18.0
+posthog>=3.7.0

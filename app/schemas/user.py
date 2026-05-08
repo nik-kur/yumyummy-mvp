@@ -15,6 +15,12 @@ class UserCreate(UserBase):
     # ``^[A-Za-z0-9_-]{1,64}$`` (Telegram's deep-link allowed charset).
     acquisition_source: Optional[str] = None
 
+    # Optional PostHog distinct_id forwarded from the marketing site so
+    # the backend can attribute funnel events (trial, subscription, …) to
+    # the same person who pageview'd the LP. Validated against the same
+    # charset as ``acquisition_source``.
+    posthog_distinct_id: Optional[str] = None
+
 
 class UserUpdate(BaseModel):
     """Схема для обновления профиля пользователя"""
@@ -71,5 +77,6 @@ class UserRead(UserBase):
     features_used: Optional[str] = None
     meals_count_trial: Optional[int] = None
     acquisition_source: Optional[str] = None
+    posthog_distinct_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

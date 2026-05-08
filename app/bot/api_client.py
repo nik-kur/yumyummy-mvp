@@ -37,6 +37,7 @@ async def ping_backend() -> Optional[Dict[str, Any]]:
 async def ensure_user(
     telegram_id: int,
     acquisition_source: Optional[str] = None,
+    posthog_distinct_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Гарантируем, что пользователь с таким telegram_id есть в backend.
@@ -49,12 +50,20 @@ async def ensure_user(
       - always append a row to ``acquisition_events`` for multi-touch
         analysis.
 
+    If ``posthog_distinct_id`` is provided, the backend stores it on
+    ``users.posthog_distinct_id`` (first-touch wins) and uses it to
+    attribute backend-emitted PostHog events to the same web visitor
+    so the funnel ``LP pageview → bot signup → trial → subscription``
+    is queryable as one person inside PostHog.
+
     Возвращает JSON-данные пользователя или None, если ошибка.
     """
     url = f"{settings.backend_base_url}/users"
     payload: Dict[str, Any] = {"telegram_id": str(telegram_id)}
     if acquisition_source:
         payload["acquisition_source"] = acquisition_source
+    if posthog_distinct_id:
+        payload["posthog_distinct_id"] = posthog_distinct_id
 
     try:
         async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:

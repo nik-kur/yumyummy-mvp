@@ -19,6 +19,13 @@
 
 <link rel="icon" type="image/png" href="assets/logo.png" />
 
+<!-- ===== Analytics & Tracking Pixels ===== -->
+<!-- PostHog Analytics + UTM passthrough to Telegram bot -->
+<script defer src="assets/analytics.js"></script>
+<!-- TikTok Pixel placeholder — Step 4 -->
+<!-- Meta Pixel placeholder — Step 5 -->
+<!-- ===== End Analytics & Tracking ===== -->
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -285,7 +292,8 @@
       <a href="#accuracy">How it works</a>
       <a href="#features">Features</a>
       <a href="#faq">FAQ</a>
-      <a class="btn btn-primary nav-cta" href="https://t.me/yum_yummybot" target="_blank" rel="noopener">
+      <a class="btn btn-primary nav-cta" href="https://t.me/yum_yummybot" target="_blank" rel="noopener"
+         data-cta-id="open_bot" data-cta-location="nav">
         <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"></path></svg>
         Open in Telegram
       </a>
@@ -310,7 +318,8 @@
           <span><span class="pi">💬</span> Right inside Telegram — no app to download</span>
         </div>
         <div class="hero-actions">
-          <a class="btn btn-primary lg" href="https://t.me/yum_yummybot" target="_blank" rel="noopener">
+          <a class="btn btn-primary lg" href="https://t.me/yum_yummybot" target="_blank" rel="noopener"
+             data-cta-id="try_free" data-cta-location="hero">
             <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"></path></svg>
             Try free for 3 days — no card needed
           </a>
@@ -457,7 +466,8 @@
         <p>YumYummy was built by someone who lived this cycle for years — eating at airports, client sites, hotels in different cities every week. <strong>An ex-McKinsey manager who tried every tracker on the market</strong> and hit the same wall every time: the tools were either fast but inaccurate, or accurate but painfully slow.</p>
         <p>So this one was built from scratch. Battle-tested on every meal, every day, for over two months — across restaurants, cafes, airports, and home kitchens. Not as a side project. As the tracker its creator actually wanted to use.</p>
         <div class="story-cta">
-          <a class="btn btn-primary lg" href="https://t.me/yum_yummybot" target="_blank" rel="noopener" style="background:var(--cream);color:var(--ink)">
+          <a class="btn btn-primary lg" href="https://t.me/yum_yummybot" target="_blank" rel="noopener" style="background:var(--cream);color:var(--ink)"
+             data-cta-id="try_free" data-cta-location="story">
             <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"></path></svg>
             Try free for 3 days — no card needed
           </a>
@@ -521,7 +531,8 @@
   <div class="cta-inner">
     <h2>Try it right now —<br>zero commitment</h2>
     <p>No credit card, no email, no account. Just tap Start in Telegram and see how YumYummy tracks your meals in seconds.</p>
-    <a class="btn btn-primary lg" href="https://t.me/yum_yummybot" target="_blank" rel="noopener">
+    <a class="btn btn-primary lg" href="https://t.me/yum_yummybot" target="_blank" rel="noopener"
+       data-cta-id="try_free" data-cta-location="cta_section">
       <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"></path></svg>
       Try free for 3 days — no card needed
     </a>
@@ -595,7 +606,7 @@
         <li><a href="#accuracy">How it works</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#faq">FAQ</a></li>
-        <li><a href="https://t.me/yum_yummybot" target="_blank" rel="noopener">Open in Telegram</a></li>
+        <li><a href="https://t.me/yum_yummybot" target="_blank" rel="noopener" data-cta-id="open_bot" data-cta-location="footer">Open in Telegram</a></li>
       </ul>
     </div>
     <div class="foot-col">

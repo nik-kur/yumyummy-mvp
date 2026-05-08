@@ -13,6 +13,17 @@ from urllib.parse import urlparse
 # garbage after /start manually.
 _ACQUISITION_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
+# When the marketing site (yumyummy.ai) builds the bot link it puts
+# the visitor's PostHog distinct_id into ``?start=``. PostHog's default
+# distinct_id is a UUID (8-4-4-4-12 with dashes). We use this regex to
+# decide whether the deep-link arg is a "PostHog identity" (carry it
+# through to the backend so all events stitch to the same person) or
+# a human-readable UTM source slug (store as acquisition_source).
+_POSTHOG_DID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
@@ -617,12 +628,22 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     deeplink_arg = args[1].strip() if len(args) > 1 else ""
 
     # Built-in deep-link commands we already handle. Anything else that's
-    # 1-64 chars of [A-Za-z0-9_-] is treated as an acquisition source
-    # (UTM-style attribution) and forwarded to the backend.
+    # 1-64 chars of [A-Za-z0-9_-] is either:
+    #   - a UUID (PostHog distinct_id forwarded by the marketing site
+    #     so we can stitch web identity to bot events), or
+    #   - a human-readable UTM source slug (e.g. "tiktok_q2", "ig_bio")
+    #     stored as acquisition_source for in-DB attribution.
     _RESERVED_DEEPLINKS = {"reset_onboarding", "billing_check"}
     acquisition_source: Optional[str] = None
+    posthog_distinct_id: Optional[str] = None
     if deeplink_arg and deeplink_arg not in _RESERVED_DEEPLINKS:
-        if _ACQUISITION_RE.fullmatch(deeplink_arg):
+        if _POSTHOG_DID_RE.fullmatch(deeplink_arg):
+            posthog_distinct_id = deeplink_arg
+            logger.info(
+                "[ATTR] /start deep-link tg_id=%s phid=%s",
+                tg_id, posthog_distinct_id,
+            )
+        elif _ACQUISITION_RE.fullmatch(deeplink_arg):
             acquisition_source = deeplink_arg
             logger.info(
                 "[ATTR] /start deep-link tg_id=%s source=%s",
@@ -662,7 +683,11 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             )
             return
 
-    user = await ensure_user(tg_id, acquisition_source=acquisition_source)
+    user = await ensure_user(
+        tg_id,
+        acquisition_source=acquisition_source,
+        posthog_distinct_id=posthog_distinct_id,
+    )
 
     if user is None:
         await message.answer(

@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     sentry_environment: Optional[str] = None  # e.g. "production" / "staging" / "dev"
     sentry_traces_sample_rate: float = 0.0    # 0.0 disables perf tracing; bump later if needed
 
+    # PostHog / product analytics. Same project key as the marketing
+    # site so backend-emitted events land on the same user profiles
+    # captured on the LP. Leave ``posthog_api_key`` unset in dev to
+    # disable backend capture (the SDK will no-op).
+    posthog_api_key: Optional[str] = None
+    posthog_host: str = "https://eu.i.posthog.com"
+
     # Billing / Paddle
     paddle_enabled: bool = False
     paddle_environment: str = "sandbox"  # "sandbox" | "production"

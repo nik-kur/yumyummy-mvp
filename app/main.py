@@ -48,6 +48,7 @@ from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.services.agent_persist import persist_agent_result
 from app.services.usage_guardrails import record_usage_for_telegram_user
 from app.billing.access import has_access, compute_access_status
+from app.core import posthog_client
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
@@ -126,6 +127,11 @@ async def stop_paddle_reconcile_loop():
         except (asyncio.CancelledError, Exception):
             pass
         _paddle_reconcile_task = None
+
+
+@app.on_event("shutdown")
+async def flush_posthog():
+    posthog_client.shutdown()
 
 
 # Include context API router for agent tools
@@ -1425,28 +1431,49 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     event row.
     """
     source = _normalise_acquisition_source(user_in.acquisition_source)
+    phid = _normalise_acquisition_source(user_in.posthog_distinct_id)
 
     existing = db.query(User).filter(User.telegram_id == user_in.telegram_id).first()
     if existing:
+        changed = False
         if source:
             if existing.acquisition_source is None:
                 existing.acquisition_source = source
+                changed = True
             db.add(AcquisitionEvent(
                 telegram_id=user_in.telegram_id,
                 source=source,
             ))
+            changed = True
+        if phid and not existing.posthog_distinct_id:
+            existing.posthog_distinct_id = phid
+            changed = True
+        if changed:
             db.commit()
             db.refresh(existing)
             logger.info(
-                "[ATTR] tg_id=%s source=%s first_touch=%s status=existing",
-                user_in.telegram_id, source,
-                existing.acquisition_source == source,
+                "[ATTR] tg_id=%s source=%s phid=%s status=existing",
+                user_in.telegram_id, source, phid,
+            )
+        if source or phid:
+            posthog_client.capture(
+                "bot_started",
+                telegram_id=user_in.telegram_id,
+                posthog_distinct_id=existing.posthog_distinct_id or phid,
+                properties={
+                    "acquisition_source": existing.acquisition_source or source,
+                    "is_new_user": False,
+                },
+                set_properties={
+                    "acquisition_source": existing.acquisition_source or source,
+                },
             )
         return existing
 
     user = User(
         telegram_id=user_in.telegram_id,
         acquisition_source=source,
+        posthog_distinct_id=phid,
     )
     db.add(user)
     if source:
@@ -1456,11 +1483,22 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
         ))
     db.commit()
     db.refresh(user)
-    if source:
-        logger.info(
-            "[ATTR] tg_id=%s source=%s first_touch=True status=new_user",
-            user_in.telegram_id, source,
-        )
+    logger.info(
+        "[ATTR] tg_id=%s source=%s phid=%s status=new_user",
+        user_in.telegram_id, source, phid,
+    )
+    posthog_client.capture(
+        "bot_started",
+        telegram_id=user_in.telegram_id,
+        posthog_distinct_id=phid,
+        properties={
+            "acquisition_source": source,
+            "is_new_user": True,
+        },
+        set_properties={
+            "acquisition_source": source,
+        },
+    )
     return user
 
 
@@ -1483,14 +1521,44 @@ def update_user_profile(telegram_id: str, user_update: UserUpdate, db: Session =
     user = db.query(User).filter(User.telegram_id == telegram_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Обновляем только переданные поля
+
     update_data = user_update.model_dump(exclude_unset=True)
+
+    # Detect onboarding_completed flipping False/None -> True so we can
+    # fire a one-shot PostHog event for funnel analytics. Read the
+    # previous value before mutating to avoid double-firing on idempotent
+    # PATCH calls.
+    fire_onboarding_completed = (
+        "onboarding_completed" in update_data
+        and bool(update_data["onboarding_completed"]) is True
+        and not bool(user.onboarding_completed)
+    )
+
     for field, value in update_data.items():
         setattr(user, field, value)
-    
+
     db.commit()
     db.refresh(user)
+
+    if fire_onboarding_completed:
+        posthog_client.capture(
+            "onboarding_completed",
+            telegram_id=telegram_id,
+            posthog_distinct_id=user.posthog_distinct_id,
+            properties={
+                "goal_type": user.goal_type,
+                "gender": user.gender,
+                "age": user.age,
+                "activity_level": user.activity_level,
+                "acquisition_source": user.acquisition_source,
+            },
+            set_properties={
+                "onboarding_completed": True,
+                "goal_type": user.goal_type,
+                "activity_level": user.activity_level,
+            },
+        )
+
     return user
 
 
