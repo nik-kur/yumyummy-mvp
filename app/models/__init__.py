@@ -10,3 +10,4 @@ from app.models.payment_event import PaymentEvent  # noqa
 from app.models.usage_record import UsageRecord  # noqa
 from app.models.churn_survey import ChurnSurvey  # noqa
 from app.models.notification_event import NotificationEvent  # noqa
+from app.models.acquisition_event import AcquisitionEvent  # noqa

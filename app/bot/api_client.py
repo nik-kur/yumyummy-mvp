@@ -34,14 +34,27 @@ async def ping_backend() -> Optional[Dict[str, Any]]:
         return None
 
 
-async def ensure_user(telegram_id: int) -> Optional[Dict[str, Any]]:
+async def ensure_user(
+    telegram_id: int,
+    acquisition_source: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     """
     Гарантируем, что пользователь с таким telegram_id есть в backend.
     Вызывает POST /users.
+
+    If ``acquisition_source`` is provided (e.g. from a ``/start <param>``
+    deep link) the backend will:
+      - set it as first-touch on ``users.acquisition_source`` (only if
+        the column is currently NULL — first-touch wins)
+      - always append a row to ``acquisition_events`` for multi-touch
+        analysis.
+
     Возвращает JSON-данные пользователя или None, если ошибка.
     """
     url = f"{settings.backend_base_url}/users"
-    payload = {"telegram_id": str(telegram_id)}  # наша схема ждёт str
+    payload: Dict[str, Any] = {"telegram_id": str(telegram_id)}
+    if acquisition_source:
+        payload["acquisition_source"] = acquisition_source
 
     try:
         async with httpx.AsyncClient(headers=_internal_headers(), timeout=5.0) as client:

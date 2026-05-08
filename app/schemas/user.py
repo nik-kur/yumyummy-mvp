@@ -8,7 +8,12 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    pass
+    # Optional Telegram deep-link source parameter
+    # (``t.me/<bot>?start=<source>``). Backend stores first-touch on
+    # ``users.acquisition_source`` and appends every click to
+    # ``acquisition_events``. Validated server-side against
+    # ``^[A-Za-z0-9_-]{1,64}$`` (Telegram's deep-link allowed charset).
+    acquisition_source: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
@@ -65,5 +70,6 @@ class UserRead(UserBase):
     first_meal_after_onboarding_at: Optional[datetime] = None
     features_used: Optional[str] = None
     meals_count_trial: Optional[int] = None
+    acquisition_source: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

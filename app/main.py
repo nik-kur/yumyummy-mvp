@@ -23,6 +23,7 @@ from app.models.user import User
 from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
 from app.models.notification_event import NotificationEvent
+from app.models.acquisition_event import AcquisitionEvent
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.meal import MealCreate, MealRead, MealUpdate, DaySummary
 from app.models.saved_meal import SavedMeal
@@ -1389,20 +1390,77 @@ async def agent_run(
 # ---------- USERS ----------
 
 
+_ACQUISITION_SOURCE_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _normalise_acquisition_source(value: Optional[str]) -> Optional[str]:
+    """Validate a Telegram deep-link start parameter against Telegram's
+    allowed charset and length.
+
+    Telegram limits start params to ``[A-Za-z0-9_-]`` and 1-64 chars; we
+    reject anything else silently rather than 400-ing because the bot
+    forwards whatever the user clicked and a malformed value should not
+    abort user creation.
+    """
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if not _ACQUISITION_SOURCE_RE.fullmatch(value):
+        return None
+    return value
+
+
 @app.post("/users", response_model=UserRead)
 def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Создать пользователя по telegram_id.
     Если такой уже есть — возвращаем его (идемпотентно).
+
+    If ``acquisition_source`` is provided we always append a row to
+    ``acquisition_events`` (multi-touch log) and additionally backfill
+    ``users.acquisition_source`` if it is currently NULL — i.e. first-touch
+    attribution wins for the column, but every click still produces an
+    event row.
     """
+    source = _normalise_acquisition_source(user_in.acquisition_source)
+
     existing = db.query(User).filter(User.telegram_id == user_in.telegram_id).first()
     if existing:
+        if source:
+            if existing.acquisition_source is None:
+                existing.acquisition_source = source
+            db.add(AcquisitionEvent(
+                telegram_id=user_in.telegram_id,
+                source=source,
+            ))
+            db.commit()
+            db.refresh(existing)
+            logger.info(
+                "[ATTR] tg_id=%s source=%s first_touch=%s status=existing",
+                user_in.telegram_id, source,
+                existing.acquisition_source == source,
+            )
         return existing
 
-    user = User(telegram_id=user_in.telegram_id)
+    user = User(
+        telegram_id=user_in.telegram_id,
+        acquisition_source=source,
+    )
     db.add(user)
+    if source:
+        db.add(AcquisitionEvent(
+            telegram_id=user_in.telegram_id,
+            source=source,
+        ))
     db.commit()
     db.refresh(user)
+    if source:
+        logger.info(
+            "[ATTR] tg_id=%s source=%s first_touch=True status=new_user",
+            user_in.telegram_id, source,
+        )
     return user
 
 

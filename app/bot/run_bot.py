@@ -2,9 +2,16 @@ import asyncio
 import base64
 import json
 import logging
+import re
 from datetime import date as date_type, datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
+
+# Telegram deep-link start parameters are limited to A-Za-z0-9_- and
+# 1-64 chars (https://core.telegram.org/bots/features#deep-linking).
+# Anything else we ignore as not-a-source — the user probably typed
+# garbage after /start manually.
+_ACQUISITION_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import CommandStart, Command
@@ -609,6 +616,24 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     args = message.text.split(maxsplit=1)
     deeplink_arg = args[1].strip() if len(args) > 1 else ""
 
+    # Built-in deep-link commands we already handle. Anything else that's
+    # 1-64 chars of [A-Za-z0-9_-] is treated as an acquisition source
+    # (UTM-style attribution) and forwarded to the backend.
+    _RESERVED_DEEPLINKS = {"reset_onboarding", "billing_check"}
+    acquisition_source: Optional[str] = None
+    if deeplink_arg and deeplink_arg not in _RESERVED_DEEPLINKS:
+        if _ACQUISITION_RE.fullmatch(deeplink_arg):
+            acquisition_source = deeplink_arg
+            logger.info(
+                "[ATTR] /start deep-link tg_id=%s source=%s",
+                tg_id, acquisition_source,
+            )
+        else:
+            logger.info(
+                "[ATTR] /start deep-link rejected (bad format) tg_id=%s raw=%r",
+                tg_id, deeplink_arg[:100],
+            )
+
     # /start reset_onboarding — developer tool to re-test onboarding
     if deeplink_arg == "reset_onboarding":
         await update_user(tg_id, onboarding_completed=False)
@@ -637,7 +662,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             )
             return
 
-    user = await ensure_user(tg_id)
+    user = await ensure_user(tg_id, acquisition_source=acquisition_source)
 
     if user is None:
         await message.answer(

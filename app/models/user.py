@@ -51,6 +51,13 @@ class User(Base):
     features_used = Column(String, nullable=True)  # JSON: {"voice": false, "barcode": false, "my_menu": false, "what_to_eat": false}
     meals_count_trial = Column(Integer, default=0, nullable=False)
 
+    # Acquisition / attribution
+    # First-touch source captured from /start <param> deep link on the user's
+    # very first /start (or backfilled later if the row was created with no
+    # source and a deep link is clicked later). For multi-touch analysis see
+    # the acquisition_events table.
+    acquisition_source = Column(String, nullable=True)
+
     # Связи
     days = relationship("UserDay", back_populates="user")
     meals = relationship("MealEntry", back_populates="user")
