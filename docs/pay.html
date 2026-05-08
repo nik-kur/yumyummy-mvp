@@ -309,55 +309,64 @@
   var inMiniApp = !!(tgWebApp && tgWebApp.initData);
 
   if (src === "tg" && inMiniApp) {
-    var loadingView = document.getElementById("loading-view");
-    var loadingText = loadingView.querySelector("div:last-child");
-    loadingView.style.display = "block";
-    if (loadingText) {
-      loadingText.textContent = "Opening secure checkout in your browser…";
-    }
+    // iOS / Telegram restricts Telegram.WebApp.openLink() to user-
+    // initiated calls only; a silent auto-redirect on page load is
+    // blocked. So we render a single-tap launcher inside the Mini App
+    // and only fire openLink() from the resulting click handler. We
+    // also bind Telegram's native MainButton to the same handler so
+    // users who reach for it (sticky bottom button, styled by
+    // Telegram) get the same result.
 
-    // Build the same URL but mark it as having been launched in an
-    // external browser so the next visit renders checkout instead of
-    // looping back into Mini App land.
     var extParams = new URLSearchParams(window.location.search);
     extParams.set("src", "ext");
     var externalUrl = window.location.origin + window.location.pathname +
                       "?" + extParams.toString();
 
     try { tgWebApp.ready(); } catch (e) { /* old client */ }
-    try { tgWebApp.openLink(externalUrl); } catch (e) { /* old client */ }
+    try { tgWebApp.expand(); } catch (e) { /* old client */ }
 
-    // Close the Mini App after a short delay so the OS has time to
-    // pick up the openLink request before we tear ourselves down.
-    setTimeout(function () {
-      try { tgWebApp.close(); } catch (e) { /* old client */ }
-    }, 800);
+    var redirectFired = false;
+    function fireRedirect() {
+      if (redirectFired) return;
+      redirectFired = true;
+      try { tgWebApp.openLink(externalUrl); } catch (e) { /* old client */ }
+      // Hold the Mini App open briefly so the OS has time to pick up
+      // the external-open request before we tear ourselves down.
+      // Closing too eagerly cancels the pending open on some clients.
+      setTimeout(function () {
+        try { tgWebApp.close(); } catch (e) { /* old client */ }
+      }, 1500);
+    }
 
-    // Safety fallback: if openLink silently failed or the Mini App
-    // didn't auto-close (very old Telegram clients), surface a manual
-    // "tap here" link after 2 seconds so the user is never stuck.
-    setTimeout(function () {
-      if (loadingView && loadingView.style.display !== "none") {
-        var btn = document.createElement("a");
-        btn.href = externalUrl;
-        btn.target = "_blank";
-        btn.rel = "noopener";
-        btn.textContent = "Tap here if checkout didn't open";
-        btn.style.cssText =
-          "display:inline-block;margin-top:24px;background:var(--accent);" +
-          "color:#fff;padding:12px 28px;border-radius:10px;" +
-          "text-decoration:none;font-weight:600;";
-        btn.addEventListener("click", function (e) {
-          e.preventDefault();
-          try { tgWebApp.openLink(externalUrl); } catch (err) {}
-          try { tgWebApp.close(); } catch (err) {}
-          // Last-resort fallback: in-tab navigation. Apple Pay won't
-          // work here, but at least the user reaches the checkout.
-          window.location.href = externalUrl;
-        });
-        loadingView.appendChild(btn);
-      }
-    }, 2000);
+    document.body.innerHTML =
+      "<div style=\"font-family:var(--sans,system-ui);padding:60px 24px 32px;" +
+      "text-align:center;background:var(--cream,#F7F1E6);" +
+      "min-height:100vh;color:var(--ink,#2A2A2A);box-sizing:border-box;\">" +
+      "<h1 style=\"font-family:var(--serif,Georgia);font-size:1.6rem;" +
+      "margin:0 0 12px;\">Open secure checkout</h1>" +
+      "<p style=\"color:var(--muted,#8A7B6B);max-width:420px;" +
+      "margin:0 auto 32px;line-height:1.5;\">" +
+      "Tap the button below to complete payment in your browser, " +
+      "where Apple Pay and cards work properly." +
+      "</p>" +
+      "<button id=\"cont-btn\" style=\"background:var(--accent,#5A6A3A);" +
+      "color:#fff;padding:16px 36px;border-radius:10px;border:none;" +
+      "font-family:inherit;font-weight:700;font-size:1rem;cursor:pointer;\">" +
+      "Continue to checkout \u2192" +
+      "</button>" +
+      "</div>";
+
+    document.getElementById("cont-btn").addEventListener("click", fireRedirect);
+
+    if (tgWebApp.MainButton) {
+      try {
+        tgWebApp.MainButton.setText("Continue to checkout");
+        tgWebApp.MainButton.color = "#5A6A3A";
+        tgWebApp.MainButton.textColor = "#FFFFFF";
+        tgWebApp.MainButton.show();
+        tgWebApp.MainButton.onClick(fireRedirect);
+      } catch (e) { /* old client */ }
+    }
 
     return;
   }
