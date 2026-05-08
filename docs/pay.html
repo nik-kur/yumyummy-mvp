@@ -358,14 +358,12 @@
 
     document.getElementById("cont-btn").addEventListener("click", fireRedirect);
 
+    // Telegram's native MainButton is intentionally NOT bound here:
+    // showing it on top of the in-page CTA produced two visually
+    // competing buttons (one centred in the viewport, one stuck to
+    // the bottom edge). The single in-page button is enough.
     if (tgWebApp.MainButton) {
-      try {
-        tgWebApp.MainButton.setText("Continue to checkout");
-        tgWebApp.MainButton.color = "#5A6A3A";
-        tgWebApp.MainButton.textColor = "#FFFFFF";
-        tgWebApp.MainButton.show();
-        tgWebApp.MainButton.onClick(fireRedirect);
-      } catch (e) { /* old client */ }
+      try { tgWebApp.MainButton.hide(); } catch (e) { /* old client */ }
     }
 
     return;
