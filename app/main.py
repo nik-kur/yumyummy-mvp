@@ -71,21 +71,10 @@ except ImportError:
 app = FastAPI(title="YumYummy API")
 
 
-@app.on_event("startup")
-def run_migrations():
-    """Auto-apply Alembic migrations on startup."""
-    import subprocess
-    try:
-        result = subprocess.run(
-            ["alembic", "upgrade", "head"],
-            capture_output=True, text=True, timeout=60,
-        )
-        if result.returncode == 0:
-            logger.info(f"[STARTUP] Alembic migrations applied successfully: {result.stdout.strip()}")
-        else:
-            logger.error(f"[STARTUP] Alembic migration failed: {result.stderr.strip()}")
-    except Exception as e:
-        logger.error(f"[STARTUP] Alembic migration error: {e}")
+# Alembic migrations are applied via Render's pre-deploy command
+# (`alembic upgrade head`) so a failed migration aborts the deploy instead
+# of letting the app boot against a stale schema. Pre-deploy runs in its
+# own short-lived container before the new instance starts taking traffic.
 
 
 # ---------- Paddle reconciliation background loop ----------
