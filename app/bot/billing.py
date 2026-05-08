@@ -172,10 +172,17 @@ async def _build_paywall_keyboard(
                     label += "/mo"
                 else:
                     label += "/year"
+                # Use a Mini App (web_app=...) instead of a plain url=...
+                # button. The Mini App at checkout_url is a thin launcher
+                # that calls Telegram.WebApp.openLink() to hand the
+                # checkout URL off to the user's real browser (Safari /
+                # Chrome / default), where Apple Pay / Google Pay JS APIs
+                # actually work. Using url= would force the page into
+                # Telegram's in-app webview, breaking those flows.
                 buttons.append([
                     types.InlineKeyboardButton(
                         text=label,
-                        url=checkout_url,
+                        web_app=types.WebAppInfo(url=checkout_url),
                     )
                 ])
                 card_button_count += 1
