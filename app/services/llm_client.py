@@ -1,11 +1,12 @@
-from typing import Any, Dict, List
+from typing import Dict, List
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from app.core.config import settings
 
-# Инициализируем клиент один раз
-_client = OpenAI(api_key=settings.openai_api_key)
+# Async client so awaits do not block the event loop. Reused as a singleton —
+# AsyncOpenAI manages its own connection pool internally.
+_client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=60.0)
 
 
 async def chat_completion(
@@ -13,23 +14,10 @@ async def chat_completion(
     model: str = "gpt-4.1-mini",
     temperature: float = 0.3,
 ) -> str:
-    """
-    Обёртка над chat-completion.
-    На вход:
-      - messages: список сообщений формата {"role": "...", "content": "..."}
-    На выход:
-      - content первого ответа модели (строка).
-    """
-    # ВНИМАНИЕ: openai v1 клиент синхронный, поэтому здесь можно
-    # либо вызвать его в отдельном потоке, либо пока оставить синхронно.
-    #
-    # Для MVP можно начать с sync-вызова, а потом, если нужно, обернуть в run_in_executor.
-    #
-
-    response = _client.chat.completions.create(
+    """Async chat completion. Returns the content of the first choice."""
+    response = await _client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=temperature,
     )
-    # Берем содержимое первого ответа
     return response.choices[0].message.content or ""

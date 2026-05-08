@@ -5,6 +5,7 @@ from datetime import date as date_type
 from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
@@ -45,6 +46,7 @@ from app.services.agent_runner import run_agent
 from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.services.agent_persist import persist_agent_result
 from app.services.usage_guardrails import record_usage_for_telegram_user
+from app.billing.access import has_access, compute_access_status
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
@@ -162,11 +164,25 @@ app.include_router(billing_admin_router)
 
 
 @app.get("/health")
-async def health_check():
+def health_check(db: Session = Depends(get_db)):
+    """
+    Liveness + readiness probe. Render's healthCheckPath hits this; if it
+    returns non-2xx, Render restarts the instance.
+
+    We deliberately keep the DB roundtrip cheap (`SELECT 1` + a single read of
+    `alembic_version`) so the health check stays under ~50ms in steady state.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+        head = db.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    except Exception as exc:
+        logger.error("[HEALTH] DB unreachable: %s", exc)
+        raise HTTPException(status_code=503, detail=f"DB unreachable: {exc}")
+
     return {
         "status": "ok",
         "app": "YumYummy",
-        "db_url_present": bool(settings.database_url),
+        "alembic_head": head,
     }
 
 @app.get("/ai/test")
@@ -1152,7 +1168,58 @@ async def agent_run(
     image_url = payload.image_url
     force_intent = payload.force_intent
     nutrition_context = payload.nutrition_context
-    
+
+    # ---- Server-side billing enforcement (defense in depth) ----
+    # The bot already calls check_billing_access() before reaching us, but
+    # /agent/run is the most expensive endpoint we have (OpenAI cost), so we
+    # double-check here. If for any reason a request lands here without
+    # access (race with cancellation, internal misuse, leaked token), we
+    # refuse before paying for the workflow.
+    if settings.billing_paywall_enabled:
+        billing_db = SessionLocal()
+        try:
+            user_row = billing_db.query(User).filter(User.telegram_id == telegram_id).first()
+            if user_row is not None:
+                user_dict = {
+                    "trial_started_at": user_row.trial_started_at,
+                    "trial_ends_at": user_row.trial_ends_at,
+                    "subscription_started_at": user_row.subscription_started_at,
+                    "subscription_ends_at": user_row.subscription_ends_at,
+                    "usage_cost_current_period": user_row.usage_cost_current_period or 0.0,
+                }
+                if not has_access(user_dict):
+                    access_status = compute_access_status(user_dict)
+                    logger.info(
+                        "[/agent/run %s] paywalled telegram_id=%s status=%s",
+                        request_id, telegram_id, access_status,
+                    )
+                    return WorkflowRunResponse(
+                        intent="paywall",
+                        message_text="Your trial has ended. Please subscribe in the bot to keep logging meals.",
+                        confidence=None,
+                        totals=WorkflowTotals(calories_kcal=0, protein_g=0, fat_g=0, carbs_g=0),
+                        items=[],
+                        source_url=None,
+                    )
+        except Exception as billing_exc:
+            # If the billing check itself fails (DB outage, etc.) we fail
+            # closed by returning a service-unavailable style response rather
+            # than handing out a free agent run.
+            logger.exception(
+                "[/agent/run %s] billing check failed for telegram_id=%s: %s",
+                request_id, telegram_id, billing_exc,
+            )
+            return WorkflowRunResponse(
+                intent="error",
+                message_text="Service is temporarily unavailable, please try again in a moment.",
+                confidence=None,
+                totals=WorkflowTotals(calories_kcal=0, protein_g=0, fat_g=0, carbs_g=0),
+                items=[],
+                source_url=None,
+            )
+        finally:
+            billing_db.close()
+
     try:
         # Run the workflow WITHOUT DB connection
         result = await run_yumyummy_workflow(

@@ -232,7 +232,12 @@ async def check_billing_access(message: types.Message) -> bool:
 
     billing = await get_billing_status(message.from_user.id)
     if billing is None:
-        return True  # fail open on backend error
+        # Fail closed: if we cannot reach the backend, refuse access rather
+        # than handing out unmetered agent runs. The user sees a transient
+        # error and can retry; legitimate users on flaky networks lose at
+        # most one message, but we never give the paywall a free pass.
+        await message.answer("Service is temporarily unavailable, please try again in a moment.")
+        return False
 
     status = billing.get("access_status", "new")
     usage_exceeded = bool(billing.get("usage_exceeded", False))
