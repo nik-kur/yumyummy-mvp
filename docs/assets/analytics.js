@@ -35,6 +35,48 @@
     'utm_term', 'utm_content', 'gclid', 'fbclid', 'ttclid'
   ];
 
+  // Meta Pixel sets two cookies that we want to keep alongside our
+  // PostHog person profile:
+  //   _fbp — browser-level Facebook id, set on the very first
+  //          PageView fire and persisted across pages.
+  //   _fbc — click id, set when the visitor lands with ?fbclid=...
+  //          and used by Meta to attribute later conversions back
+  //          to the originating ad click.
+  // Stashing them on the PostHog person profile means that when we
+  // later wire up the Meta Conversions API server-side (to send
+  // `Subscribe`/`StartTrial` from the bot backend) we can look up
+  // the right fbp/fbc by posthog_distinct_id and properly
+  // deduplicate browser + server events.
+  function readFbCookies() {
+    var out = {};
+    try {
+      document.cookie.split(';').forEach(function (c) {
+        var idx = c.indexOf('=');
+        if (idx === -1) return;
+        var name = c.slice(0, idx).trim();
+        if (name === '_fbp' || name === '_fbc') {
+          out[name] = decodeURIComponent(c.slice(idx + 1));
+        }
+      });
+    } catch (e) {}
+    return out;
+  }
+
+  function syncFbToPostHog() {
+    if (!window.posthog || typeof posthog.register !== 'function') return;
+    var fb = readFbCookies();
+    var props = {};
+    if (fb._fbp) props.$fbp = fb._fbp;
+    if (fb._fbc) props.$fbc = fb._fbc;
+    if (!Object.keys(props).length) return;
+    try {
+      posthog.register(props);
+      if (typeof posthog.setPersonProperties === 'function') {
+        posthog.setPersonProperties(props);
+      }
+    } catch (e) {}
+  }
+
   // Persist UTMs from the first landing URL into sessionStorage so
   // they survive in-page navigation. Telegram bot links across the
   // site (CTA buttons, footer links, etc.) all read from this cache,
@@ -145,16 +187,31 @@
           var isBot = href ? BOT_HOST_RE.test(href) : false;
           var isTagged = el.hasAttribute && (el.hasAttribute('data-cta') || el.hasAttribute('data-cta-id'));
           if (isBot || isTagged) {
+            var ctaId = inferCtaId(el);
+            var ctaLocation = inferCtaLocation(el);
             try {
               window.posthog && posthog.capture && posthog.capture('cta_clicked', Object.assign({
-                cta_id: inferCtaId(el),
-                cta_location: inferCtaLocation(el),
+                cta_id: ctaId,
+                cta_location: ctaLocation,
                 cta_text: (el.textContent || '').trim().slice(0, 120),
                 cta_href: href,
                 target_is_bot: isBot,
                 page_path: window.location.pathname,
               }, currentUtms));
             } catch (e) {}
+            // Mirror the conversion to Meta as a `Lead` event so the
+            // ads algorithm can optimize toward bot-link clicks. Meta
+            // never sees the actual signup (it happens in Telegram),
+            // so this is the strongest in-browser signal we can give
+            // it until we add server-side Conversions API.
+            if (window.fbq) {
+              try {
+                fbq('track', 'Lead', {
+                  content_name: ctaId,
+                  content_category: ctaLocation,
+                });
+              } catch (e) {}
+            }
           }
           break;
         }
@@ -184,14 +241,21 @@
         ? posthog.get_distinct_id() : null;
       if (did) {
         rewriteBotLinks(did);
+        syncFbToPostHog();
         return;
       }
       if (attempts++ < 20) {
         setTimeout(tryRewrite, 100);
       } else {
         rewriteBotLinks(null);
+        syncFbToPostHog();
       }
     }
     tryRewrite();
+
+    // Meta Pixel sets _fbp/_fbc asynchronously after fbevents.js
+    // loads, so re-sync once more after the script has had time to
+    // settle. Belt + suspenders.
+    setTimeout(syncFbToPostHog, 1500);
   });
 })();
