@@ -204,6 +204,17 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
 
     logger.info("[PADDLE] Webhook: event_type=%s event_id=%s", event_type, event_id)
 
+    # Paddle fans out a lot of entity-level events (customer.created,
+    # address.created, business.*, payment_method.*, etc.) that we have no
+    # use for and that intentionally don't carry telegram_id in
+    # custom_data — only transaction.* and subscription.* events do.
+    # Short-circuit them before _find_user to avoid bogus
+    # "Could not resolve user" warnings filling Sentry.
+    _RELEVANT_PREFIXES = ("transaction.", "subscription.", "adjustment.")
+    if not any(event_type.startswith(p) for p in _RELEVANT_PREFIXES):
+        logger.info("[PADDLE] Skipping unrelated event_type=%s", event_type)
+        return {"status": "skipped", "event_id": event_id}
+
     user = _find_user(db, data)
     if user is None:
         logger.warning("[PADDLE] Could not resolve user for event %s", event_id)
