@@ -35,26 +35,33 @@
     'utm_term', 'utm_content', 'gclid', 'fbclid', 'ttclid'
   ];
 
-  // Meta Pixel sets two cookies that we want to keep alongside our
-  // PostHog person profile:
-  //   _fbp — browser-level Facebook id, set on the very first
-  //          PageView fire and persisted across pages.
-  //   _fbc — click id, set when the visitor lands with ?fbclid=...
-  //          and used by Meta to attribute later conversions back
-  //          to the originating ad click.
-  // Stashing them on the PostHog person profile means that when we
-  // later wire up the Meta Conversions API server-side (to send
-  // `Subscribe`/`StartTrial` from the bot backend) we can look up
-  // the right fbp/fbc by posthog_distinct_id and properly
-  // deduplicate browser + server events.
-  function readFbCookies() {
+  // Meta and TikTok pixels each drop browser-level cookies that we
+  // want to keep alongside our PostHog person profile:
+  //   _fbp  — Meta browser id, set on the very first PageView and
+  //           persisted across pages.
+  //   _fbc  — Meta click id, set when the visitor lands with
+  //           ?fbclid=... and used to attribute later conversions
+  //           back to the originating ad click.
+  //   _ttp  — TikTok browser id, set on the very first ttq.page()
+  //           and persisted across pages.
+  //   ttclid — TikTok click id, only present in the URL when the
+  //           visitor lands from a TikTok ad. Captured into our
+  //           sessionStorage UTM cache (UTM_KEYS) so we don't need
+  //           to read it from a cookie.
+  // Stashing these on the PostHog person profile means that when we
+  // later wire up the Meta Conversions API and TikTok Events API
+  // server-side (to send `Subscribe`/`StartTrial` from the bot
+  // backend), we can look up the right fbp/fbc/ttp by
+  // posthog_distinct_id and properly deduplicate browser + server
+  // events.
+  function readPixelCookies() {
     var out = {};
     try {
       document.cookie.split(';').forEach(function (c) {
         var idx = c.indexOf('=');
         if (idx === -1) return;
         var name = c.slice(0, idx).trim();
-        if (name === '_fbp' || name === '_fbc') {
+        if (name === '_fbp' || name === '_fbc' || name === '_ttp') {
           out[name] = decodeURIComponent(c.slice(idx + 1));
         }
       });
@@ -62,12 +69,14 @@
     return out;
   }
 
-  function syncFbToPostHog() {
+  function syncPixelsToPostHog() {
     if (!window.posthog || typeof posthog.register !== 'function') return;
-    var fb = readFbCookies();
+    var ck = readPixelCookies();
     var props = {};
-    if (fb._fbp) props.$fbp = fb._fbp;
-    if (fb._fbc) props.$fbc = fb._fbc;
+    if (ck._fbp) props.$fbp = ck._fbp;
+    if (ck._fbc) props.$fbc = ck._fbc;
+    if (ck._ttp) props.$ttp = ck._ttp;
+    if (currentUtms.ttclid) props.$ttclid = currentUtms.ttclid;
     if (!Object.keys(props).length) return;
     try {
       posthog.register(props);
@@ -212,6 +221,20 @@
                 });
               } catch (e) {}
             }
+            // Same idea for TikTok: fire a standard `Lead` event on
+            // every CTA click so TikTok ads can optimize for it. The
+            // actual trial/subscription happens in the Telegram bot
+            // and will be sent server-side later via the TikTok
+            // Events API using $ttp/$ttclid stored on the PostHog
+            // person profile.
+            if (window.ttq && typeof window.ttq.track === 'function') {
+              try {
+                window.ttq.track('Lead', {
+                  content_name: ctaId,
+                  content_category: ctaLocation,
+                });
+              } catch (e) {}
+            }
           }
           break;
         }
@@ -241,21 +264,21 @@
         ? posthog.get_distinct_id() : null;
       if (did) {
         rewriteBotLinks(did);
-        syncFbToPostHog();
+        syncPixelsToPostHog();
         return;
       }
       if (attempts++ < 20) {
         setTimeout(tryRewrite, 100);
       } else {
         rewriteBotLinks(null);
-        syncFbToPostHog();
+        syncPixelsToPostHog();
       }
     }
     tryRewrite();
 
-    // Meta Pixel sets _fbp/_fbc asynchronously after fbevents.js
-    // loads, so re-sync once more after the script has had time to
-    // settle. Belt + suspenders.
-    setTimeout(syncFbToPostHog, 1500);
+    // Meta + TikTok pixels set their cookies asynchronously after
+    // their respective SDK scripts load, so re-sync once more after
+    // they've had time to settle. Belt + suspenders.
+    setTimeout(syncPixelsToPostHog, 1500);
   });
 })();
