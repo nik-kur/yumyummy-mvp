@@ -15,6 +15,15 @@ from app.i18n import DEFAULT_LANG, tr
 
 init_sentry("backend")
 
+# Make our own logger.info() calls visible in Render. Without this,
+# only uvicorn's access logs surface in stdout because Python's root
+# logger defaults to WARNING+ when nothing else configures it.
+# Idempotent — safe even if uvicorn reconfigures handlers later.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 logger = logging.getLogger(__name__)
 LANG = DEFAULT_LANG
 from app.deps import get_db, verify_internal_token
