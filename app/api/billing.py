@@ -9,7 +9,7 @@ from app.models.user import User
 from app.billing.access import compute_access_status, trial_days_remaining, check_usage_cap, get_usage_cap_usd
 from app.billing.plans import TRIAL_DAYS, get_active_plan
 from app.billing.service import apply_subscription_payment, DuplicateEvent
-from app.core import posthog_client
+from app.core import posthog_client, tiktok_events_client
 from app.models.churn_survey import ChurnSurvey
 from app.schemas.billing import (
     BillingStatusResponse,
@@ -99,6 +99,12 @@ def start_trial(payload: TrialStartRequest, db: Session = Depends(get_db)):
             "trial_days": TRIAL_DAYS,
             "acquisition_source": user.acquisition_source,
         },
+    )
+    tiktok_events_client.send_start_trial(
+        user_id=user.id,
+        telegram_id=payload.telegram_id,
+        posthog_distinct_id=user.posthog_distinct_id,
+        trial_days=TRIAL_DAYS,
     )
 
     return TrialStartResponse(

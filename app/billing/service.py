@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.payment_event import PaymentEvent
 from app.billing.plans import get_active_plan
-from app.core import posthog_client
+from app.core import posthog_client, tiktok_events_client
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +171,20 @@ def apply_subscription_payment(
             "subscription_provider": provider,
             "is_subscriber": True,
         },
+    )
+    # Mirror the same event to TikTok Events API as `CompletePayment`
+    # so the ads algorithm sees real revenue, not just LP clicks.
+    # We fire on both first purchases and renewals — TikTok caps the
+    # signal weight on renewals automatically, but seeing them helps
+    # the algo learn that paying users keep paying.
+    tiktok_events_client.send_complete_payment(
+        user_id=user.id,
+        telegram_id=user.telegram_id,
+        posthog_distinct_id=user.posthog_distinct_id,
+        plan_id=plan_id,
+        revenue_usd=revenue_usd,
+        currency=currency,
+        is_first_payment=is_new,
     )
     return status
 

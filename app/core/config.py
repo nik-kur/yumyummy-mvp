@@ -52,6 +52,25 @@ class Settings(BaseSettings):
     posthog_api_key: Optional[str] = None
     posthog_host: str = "https://eu.i.posthog.com"
 
+    # PostHog Persons API — used by the ad-platform server-side
+    # bridges (TikTok Events API, Meta Conversions API) to look up a
+    # user's $ttp / $ttclid / $fbp / $fbc that the LP captured into
+    # their PostHog person profile. Different from posthog_api_key:
+    # this needs a *personal* API key with read access to persons.
+    posthog_personal_api_key: Optional[str] = None
+    posthog_project_id: Optional[str] = None  # numeric, e.g. "175093"
+
+    # TikTok Events API — server-side counterpart to the browser
+    # TikTok pixel installed on yumyummy.ai. We send
+    # CompleteRegistration / StartTrial / CompletePayment events
+    # straight from the FastAPI backend so the TikTok ads algorithm
+    # can optimize toward real paid conversions (which happen inside
+    # the Telegram bot, where the browser pixel can't reach).
+    # Disabled (no-op) unless both pixel_code AND access_token are set.
+    tiktok_pixel_code: Optional[str] = None      # same id as the browser pixel
+    tiktok_access_token: Optional[str] = None    # from TikTok Events Manager
+    tiktok_test_event_code: Optional[str] = None  # optional: route to TT Test Events
+
     # Billing / Paddle
     paddle_enabled: bool = False
     paddle_environment: str = "sandbox"  # "sandbox" | "production"
