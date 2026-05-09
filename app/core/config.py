@@ -71,6 +71,18 @@ class Settings(BaseSettings):
     tiktok_access_token: Optional[str] = None    # from TikTok Events Manager
     tiktok_test_event_code: Optional[str] = None  # optional: route to TT Test Events
 
+    # Meta Conversions API — server-side counterpart to the browser
+    # Meta Pixel installed on yumyummy.ai. Same role as the TikTok
+    # bridge above: emits CompleteRegistration / StartTrial /
+    # Subscribe straight from the FastAPI backend so Meta's ads
+    # algorithm can optimize for real paid conversions instead of
+    # only optimizing for the LP `Lead` event.
+    # Disabled (no-op) unless both pixel_id AND access_token are set.
+    meta_pixel_id: Optional[str] = None           # same as browser pixel id
+    meta_access_token: Optional[str] = None       # from Meta Events Manager
+    meta_capi_test_event_code: Optional[str] = None  # optional: TEST_xxx code
+    meta_api_version: str = "v21.0"               # Graph API version
+
     # Billing / Paddle
     paddle_enabled: bool = False
     paddle_environment: str = "sandbox"  # "sandbox" | "production"

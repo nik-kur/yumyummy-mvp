@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.payment_event import PaymentEvent
 from app.billing.plans import get_active_plan
-from app.core import posthog_client, tiktok_events_client
+from app.core import posthog_client, tiktok_events_client, meta_capi_client
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +178,18 @@ def apply_subscription_payment(
     # signal weight on renewals automatically, but seeing them helps
     # the algo learn that paying users keep paying.
     tiktok_events_client.send_complete_payment(
+        user_id=user.id,
+        telegram_id=user.telegram_id,
+        posthog_distinct_id=user.posthog_distinct_id,
+        plan_id=plan_id,
+        revenue_usd=revenue_usd,
+        currency=currency,
+        is_first_payment=is_new,
+    )
+    # And the same for Meta — Meta uses `Subscribe` for recurring
+    # revenue (vs `Purchase` for one-time). predicted_ltv on the
+    # first payment helps Meta's algo bid for similar high-LTV users.
+    meta_capi_client.send_subscribe(
         user_id=user.id,
         telegram_id=user.telegram_id,
         posthog_distinct_id=user.posthog_distinct_id,

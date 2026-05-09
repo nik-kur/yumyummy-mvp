@@ -57,7 +57,7 @@ from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.services.agent_persist import persist_agent_result
 from app.services.usage_guardrails import record_usage_for_telegram_user
 from app.billing.access import has_access, compute_access_status
-from app.core import posthog_client, tiktok_events_client
+from app.core import posthog_client, tiktok_events_client, meta_capi_client
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
@@ -1514,6 +1514,14 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     # the only signal TikTok gets that an ad click became a real
     # signup.
     tiktok_events_client.send_complete_registration(
+        user_id=user.id,
+        telegram_id=user_in.telegram_id,
+        posthog_distinct_id=phid,
+        acquisition_source=source,
+    )
+    # Same idea for Meta Conversions API — gated by env vars, no-op
+    # when unconfigured.
+    meta_capi_client.send_complete_registration(
         user_id=user.id,
         telegram_id=user_in.telegram_id,
         posthog_distinct_id=phid,
