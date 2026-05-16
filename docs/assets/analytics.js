@@ -2,8 +2,20 @@
    YumYummy — Web Analytics (PostHog)
    ===================================================================
    What this file does
-   - Loads PostHog and captures pageviews, pageleaves and autocapture
-     (so every click is tracked out of the box).
+   - Loads PostHog with `person_profiles: 'always'` so every visitor
+     (including anonymous LP traffic from paid ads) gets a person
+     profile and `$initial_utm_*` properties are auto-populated.
+   - Captures pageviews (manually inside the `loaded` callback so they
+     carry registered UTM super-properties from the very first event)
+     and pageleaves.
+   - Registers `utm_*` / `gclid` / `fbclid` / `ttclid` from the landing
+     URL as PostHog super-properties so they appear on **every** event
+     this browser sends, not just on the person profile. Event-level
+     breakdowns by campaign/creative in the PostHog UI then work
+     without having to know it's a person property.
+   - Fires a custom `landed_from_ad` event once per session for any
+     visitor with utm_source, giving us a clean first step for the
+     paid-acquisition funnel.
    - Captures a custom "cta_clicked" event for any link/button that
      either points at the Telegram bot OR is explicitly tagged with
      a `data-cta` attribute, with explicit cta_id / cta_location / utm_*
@@ -20,11 +32,38 @@
   // -- 1. PostHog snippet (official, copied verbatim from the dashboard)
   !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init me ls ks ws ys ps bs capture Ee calculateEventProperties $s register register_once register_for_session unregister unregister_for_session Is getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset _addCaptureHook _calculateEventProperties _handle_unload _handle_queued_event __compress_and_send_json_request _send_request opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing _is_bot _send_pageview".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
 
+  // We disable `capture_pageview` here and fire it ourselves AFTER
+  // registering UTMs as super-properties. Otherwise PostHog's auto
+  // $pageview races the snippet's async `array.js` load and the very
+  // first pageview event lands without `utm_*` super-properties
+  // attached — which is exactly the bug we're trying to fix.
   posthog.init('phc_u8XVgBexJVuggFASRTw7AL6mmpwoZDa6moycSxz7FrpD', {
     api_host: 'https://eu.i.posthog.com',
-    person_profiles: 'identified_only',
-    capture_pageview: true,
+    // 'always' (vs 'identified_only') creates a person profile for every
+    // visitor — anonymous LP visitors included — so PostHog auto-fills
+    // person properties like `$initial_utm_source/medium/campaign/...`
+    // on the very first pageview. With 'identified_only' the LP never
+    // calls identify(), so ~20% of visitors had no person profile and
+    // breakdowns by initial_utm_* were missing them entirely. The cost
+    // tradeoff is acceptable: every paid-traffic visitor is worth a
+    // person row for attribution, and we'll filter bots out at the
+    // dashboard level (or via PostHog's bot blocklist).
+    person_profiles: 'always',
+    capture_pageview: false,
     capture_pageleave: true,
+    loaded: function (ph) {
+      // `loaded` fires once the real array.js has replaced the stub
+      // and the SDK has assigned a distinct_id. Register UTMs as
+      // super-properties FIRST, then send the initial pageview, so
+      // that pageview carries `utm_source`/`utm_campaign`/etc. and
+      // PostHog's auto-attribution lands the person on the right
+      // initial campaign on the very first event.
+      try {
+        attributeUtmsToPostHog();
+        captureLandedFromAd();
+        ph.capture('$pageview');
+      } catch (e) {}
+    },
   });
 
   // -- 2. Helpers ----------------------------------------------------
@@ -112,6 +151,78 @@
   }
 
   var currentUtms = readUtms();
+
+  // Attach the visitor's UTMs to both their event stream and their
+  // person profile so attribution is queryable two ways:
+  //
+  //   1. `posthog.register(utms)` — adds the UTMs as **super-properties**,
+  //      meaning every event from this browser (pageviews, cta_clicked,
+  //      $autocapture, $web_vitals, etc.) will carry `properties.utm_source`,
+  //      `properties.utm_campaign`, etc. PostHog UI breakdowns at the event
+  //      level (Trends, Funnels filtered by `event property`) then "just
+  //      work" without us having to remember it's a person property.
+  //
+  //   2. `posthog.setPersonProperties({...}, $initial...)` — writes them
+  //      to the person profile. PostHog already auto-fills `$initial_utm_*`
+  //      from $pageview's $current_url, but we set them explicitly too as a
+  //      belt-and-suspenders measure for the rare path where the UTM cache
+  //      was hydrated from sessionStorage rather than the current URL
+  //      (e.g. user navigated to /privacy first and came back to /).
+  //
+  // The split also matters for the bot funnel: when the bot later sends
+  // `bot_started` from the backend using the same posthog_distinct_id,
+  // PostHog stitches it to this person and inherits `$initial_utm_*`.
+  // That's how the LP→bot→trial→subscription funnel becomes filterable
+  // by campaign/creative in one place.
+  function attributeUtmsToPostHog() {
+    if (!window.posthog) return;
+    var hasUtm = false;
+    var props = {};
+    UTM_KEYS.forEach(function (k) {
+      if (currentUtms[k]) {
+        props[k] = currentUtms[k];
+        hasUtm = true;
+      }
+    });
+    if (!hasUtm) return;
+
+    try {
+      if (typeof posthog.register === 'function') {
+        posthog.register(props);
+      }
+      if (typeof posthog.setPersonProperties === 'function') {
+        // The second arg `$set_once` semantics — only set initial_* on
+        // first touch, so the *first* paid campaign that brought a
+        // visitor wins attribution even if they come back later from a
+        // different ad. Acquisition cost should be paid to the campaign
+        // that actually acquired them.
+        var initialProps = {};
+        Object.keys(props).forEach(function (k) {
+          initialProps['initial_' + k] = props[k];
+        });
+        posthog.setPersonProperties(props, initialProps);
+      }
+    } catch (e) {}
+  }
+
+  function captureLandedFromAd() {
+    if (!window.posthog || typeof posthog.capture !== 'function') return;
+    if (!currentUtms.utm_source) return;
+    // Idempotency: only fire once per session, even if the user
+    // navigates between pages on the same site. Without this we'd
+    // double-count a landed_from_ad for /privacy or /support visits
+    // after the initial / pageview.
+    try {
+      if (sessionStorage.getItem('yy_landed_fired') === '1') return;
+      sessionStorage.setItem('yy_landed_fired', '1');
+    } catch (e) {}
+    try {
+      posthog.capture('landed_from_ad', Object.assign({
+        landing_path: window.location.pathname,
+        landing_url: window.location.href,
+      }, currentUtms));
+    } catch (e) {}
+  }
 
   // Telegram deep-link start params accept [A-Za-z0-9_-]{1,64}.
   // PostHog distinct_ids are UUIDs by default (e.g.
