@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Opening YumYummy in Telegram…</title>
+
+<!--
+  /open is the "deep-link bridge" page that solves TikTok / Meta / Twitter
+  in-app browser hostility toward t.me universal links.
+
+  Flow:
+    1. CTA on the landing page sends the user here with ?ref=<location>,
+       optional ?phid=<posthog_distinct_id>, and any utm_*.
+    2. open.js fires `tg://resolve?domain=yum_yummybot&start=<phid_or_ref>`
+       which works in TikTok/Meta webviews (they don't intercept the
+       native scheme the way they intercept https universal links).
+    3. If we're still on this page 1500 ms later, we show a fallback
+       UI with a big "Open Telegram" button pointing at t.me/yum_yummybot.
+    4. If JavaScript is broken entirely, the <meta http-equiv="refresh">
+       below sends the user to t.me/yum_yummybot after 5 s, so worst-case
+       behaviour matches the pre-fix LP behaviour exactly. We never make
+       things worse than they are today.
+
+  Analytics contract — what fires on /open vs the LP:
+    LP:    landed_from_ad, $pageview, cta_clicked, fbq Lead, ttq Lead
+    /open: $pageview, fbq PageView, ttq.page, bot_open_attempted,
+           bot_open_fallback_shown (only if fallback UI appears).
+    Lead is NEVER refired on /open — TikTok/Meta optimization keeps a
+    single canonical Lead per CTA click on the LP. cta_clicked on the
+    fallback button uses cta_id="open_bot_fallback", a different id from
+    the LP "try_free" / "open_bot" CTAs, so PostHog funnel steps stay
+    disjoint and we can measure the tg://→t.me fallback rate.
+-->
+
+<meta http-equiv="refresh" content="5;url=https://t.me/yum_yummybot">
+
+<link rel="canonical" href="https://yumyummy.ai/open" />
+<meta name="robots" content="noindex,nofollow" />
+<link rel="preconnect" href="https://t.me" />
+
+<link rel="icon" type="image/png" href="/assets/logo.png" />
+<link rel="stylesheet" href="/open/style.css" />
+
+<!-- ===== Analytics & Tracking Pixels =====
+     We deliberately load the SAME analytics.js as the LP so:
+       - PostHog re-init is a no-op (same project key, distinct_id is
+         already in localStorage from the LP visit).
+       - UTM super-properties get re-registered from the ?utm_* query
+         params we forwarded from the LP, so $pageview on /open is
+         correctly attributed to the source campaign.
+       - `landed_from_ad` is idempotent via sessionStorage('yy_landed_fired')
+         set on the LP, so it WON'T re-fire here for normal LP→/open
+         traffic. It WILL fire if someone deep-links straight to
+         /open?utm_source=... (e.g. a QR code), which is the correct
+         behaviour.
+       - The fallback "Open Telegram" link below has data-no-rewrite so
+         the rewriteBotLinks() helper does NOT loop it back through /open.
+-->
+<script defer src="/assets/analytics.js"></script>
+
+<!-- TikTok Pixel — same id as LP. ttq.load is idempotent (guards on _i[e]),
+     so this is a true page-tracking event for /open, not a duplicate load.
+     We DO send ttq.page() but DO NOT send another ttq.track('Lead') — the
+     Lead event already fired on the LP CTA click and we don't want to
+     double-count it for TikTok ads optimization. -->
+<script>
+!function (w, d, t) {
+  w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
+var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
+;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+
+  ttq.load('D7VL2IRC77U2TFGF81J0');
+  ttq.page();
+}(window, document, 'ttq');
+</script>
+
+<!-- Meta Pixel — same id as LP. fbq guards on f.fbq so re-running the
+     snippet is a no-op except for the explicit fbq('track','PageView')
+     call below, which is the standard event for the /open pageview. -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '826914203808503');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=826914203808503&ev=PageView&noscript=1"
+/></noscript>
+<!-- ===== End Analytics & Tracking ===== -->
+
+</head>
+<body>
+
+<main class="open-card" role="main">
+  <a class="brand" href="/" aria-label="YumYummy home">
+    <img src="/assets/logo.png" alt="" width="48" height="48" />
+    <span>YumYummy</span>
+  </a>
+
+  <div id="state-opening" class="state">
+    <div class="spinner" aria-hidden="true"></div>
+    <h1>Opening Telegram…</h1>
+    <p>If Telegram doesn't open in a moment, use the button below.</p>
+  </div>
+
+  <div id="state-fallback" class="state hidden">
+    <svg class="tg-logo" viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#2AABEE"/>
+      <path fill="#FFF" d="M34.6 14.9l-3.4 16c-.25 1.13-.93 1.4-1.87.87l-5.17-3.81-2.5 2.41c-.28.27-.51.5-1.05.5l.37-5.27 9.6-8.67c.42-.37-.09-.58-.65-.21l-11.86 7.47-5.11-1.6c-1.11-.34-1.13-1.1.23-1.64L33.13 13.5c.92-.34 1.74.22 1.47 1.4z"/>
+    </svg>
+    <h1>Still here?</h1>
+    <p>Tap the button to open Telegram and start chatting with YumYummy.</p>
+    <a id="open-tg-btn"
+       class="btn-primary"
+       href="https://t.me/yum_yummybot"
+       data-no-rewrite
+       data-cta-id="open_bot_fallback"
+       data-cta-location="open_page">
+      <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"></path>
+      </svg>
+      Open Telegram
+    </a>
+    <details class="tip">
+      <summary>Telegram doesn't open?</summary>
+      <ol>
+        <li>You may be inside an in-app browser (TikTok, Instagram, Facebook). Tap the <strong>⋮</strong> menu in the top-right and choose <strong>Open in Safari/Chrome</strong>.</li>
+        <li>Then come back here and tap <strong>Open Telegram</strong> again.</li>
+        <li>Don't have Telegram yet? <a href="https://telegram.org/" target="_blank" rel="noopener">Download it here</a>, then return.</li>
+      </ol>
+    </details>
+  </div>
+
+  <noscript>
+    <div class="state">
+      <h1>Open YumYummy in Telegram</h1>
+      <p>Click the button to start a chat with our bot.</p>
+      <a class="btn-primary" href="https://t.me/yum_yummybot" data-no-rewrite>Open Telegram</a>
+    </div>
+  </noscript>
+
+  <p class="legal">
+    <a href="/">← Back to yumyummy.ai</a>
+    <span aria-hidden="true">·</span>
+    <a href="/privacy.html">Privacy</a>
+    <span aria-hidden="true">·</span>
+    <a href="/terms.html">Terms</a>
+  </p>
+</main>
+
+<script src="/open/open.js"></script>
+</body>
+</html>

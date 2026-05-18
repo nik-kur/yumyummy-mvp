@@ -68,7 +68,30 @@
 
   // -- 2. Helpers ----------------------------------------------------
 
-  var BOT_HOST_RE = /^https?:\/\/(?:t|telegram)\.me\/yum_yummybot/i;
+  // Anything that ultimately lands the user in the Telegram bot:
+  //   1. Direct t.me/yum_yummybot links (legacy CTAs, footer links,
+  //      hard-coded links inside the bot fallback UI).
+  //   2. Our own /open deep-link bridge page, which then fires
+  //      tg://resolve and falls back to t.me. Introduced to bypass
+  //      TikTok / Meta / Twitter in-app webviews that intercept
+  //      universal links on t.me/*.
+  //
+  // We treat both forms as "bot target" for two purposes:
+  //   - rewriteBotLinks() — appends ?phid, ?start, and ?utm_* so the
+  //     bot (or /open) has full attribution context.
+  //   - bindCtaTracking() — fires cta_clicked with target_is_bot:true
+  //     and mirrors the click to Meta+TikTok as a Lead.
+  var DIRECT_BOT_RE = /^https?:\/\/(?:t|telegram)\.me\/yum_yummybot/i;
+  var OPEN_PAGE_RE = /^(?:\/open(?:[\/?#]|$)|https?:\/\/(?:[^/]*\.)?yumyummy\.ai\/open(?:[\/?#]|$))/i;
+  // Kept for backwards-compat with any inline call site that might
+  // still reference the original name.
+  var BOT_HOST_RE = DIRECT_BOT_RE;
+
+  function isBotTarget(href) {
+    if (!href) return false;
+    return DIRECT_BOT_RE.test(href) || OPEN_PAGE_RE.test(href);
+  }
+
   var UTM_KEYS = [
     'utm_source', 'utm_medium', 'utm_campaign',
     'utm_term', 'utm_content', 'gclid', 'fbclid', 'ttclid'
@@ -247,31 +270,63 @@
     return null;
   }
 
+  // Decorate every "bot-bound" anchor on the page with attribution
+  // params so the funnel is reconstructable end-to-end:
+  //
+  //   - LP CTA  ->  /open?ref=hero  (after rewrite: /open?ref=hero&phid=<id>&utm_*=...)
+  //   - /open page fires tg://resolve?domain=yum_yummybot&start=<id>
+  //   - Telegram /start handler reads the start payload and stitches
+  //     the bot user to the PostHog person row identified by <id>.
+  //
+  // We also still rewrite raw t.me/yum_yummybot links (footer link,
+  // any legacy CTA) for backward compatibility — even if the user
+  // somehow bypasses /open (e.g. shared link, deep link from email),
+  // the bot still gets a usable ?start= payload.
+  //
+  // Elements tagged with `data-no-rewrite` are skipped. This is
+  // critical for the fallback "Open Telegram" button on /open itself,
+  // which is the LAST chance to reach the bot when tg:// has been
+  // blocked — rewriting it back to /open would loop the user.
   function rewriteBotLinks(distinctId) {
     var anchors = document.querySelectorAll('a[href]');
     var startParam = pickStartParam(distinctId);
     anchors.forEach(function (a) {
+      if (a.hasAttribute('data-no-rewrite')) return;
       var href = a.getAttribute('href') || '';
-      if (!BOT_HOST_RE.test(href)) return;
+      var direct = DIRECT_BOT_RE.test(href);
+      var bridge = OPEN_PAGE_RE.test(href);
+      if (!direct && !bridge) return;
       try {
         var url = new URL(href, window.location.href);
-        // Don't clobber an explicit start that the page author set.
-        if (!url.searchParams.get('start') && startParam) {
-          url.searchParams.set('start', startParam);
-        }
-        // Always carry distinct_id as a separate param so the bot
-        // can pick it up even if `start` already contained a UTM
-        // source slug.
+
+        // distinct_id propagates to BOTH targets. /open reads it from
+        // ?phid; direct t.me links carry it both as ?phid (informational)
+        // and as the Telegram /start payload below.
         if (distinctId && !url.searchParams.get('phid')) {
           url.searchParams.set('phid', distinctId);
         }
-        // Also forward UTMs as standard query params for any
-        // reporting that reads them server-side later.
+
+        // ?start= is only meaningful for DIRECT t.me links — Telegram
+        // strips unknown query params on the bot landing page but
+        // honours `start`. On /open we don't set ?start because the
+        // /open page itself prefers ?phid over ?start when constructing
+        // the tg:// URL, and forcing ?start= here would unnecessarily
+        // expose the distinct_id in the URL bar of the bridge page.
+        if (direct && startParam && !url.searchParams.get('start')) {
+          url.searchParams.set('start', startParam);
+        }
+
+        // Forward UTMs as standard query params so:
+        //   - /open's $pageview is correctly attributed by PostHog's
+        //     auto-UTM logic (without depending on sessionStorage).
+        //   - any server-side reporting on the bot side that inspects
+        //     the bridge URL has the campaign context.
         UTM_KEYS.forEach(function (k) {
           if (currentUtms[k] && !url.searchParams.get(k)) {
             url.searchParams.set(k, currentUtms[k]);
           }
         });
+
         a.setAttribute('href', url.toString());
       } catch (e) {}
     });
@@ -293,7 +348,7 @@
     var explicit = el.getAttribute('data-cta-id');
     if (explicit) return explicit;
     var href = el.getAttribute('href') || '';
-    if (BOT_HOST_RE.test(href)) return 'open_bot';
+    if (isBotTarget(href)) return 'open_bot';
     return (el.textContent || '').trim().slice(0, 60).toLowerCase().replace(/\s+/g, '_') || 'unknown';
   }
 
@@ -304,7 +359,12 @@
         if (el.tagName === 'A' || el.tagName === 'BUTTON' ||
             el.hasAttribute('data-cta') || el.hasAttribute('data-cta-id')) {
           var href = (el.getAttribute && el.getAttribute('href')) || null;
-          var isBot = href ? BOT_HOST_RE.test(href) : false;
+          // "Bot-bound" now includes both direct t.me links and the
+          // /open deep-link bridge. The Lead event still fires once
+          // per CTA click — the click happens on the LP, and the
+          // /open page deliberately does NOT refire it (see
+          // docs/open/index.html for the rationale).
+          var isBot = isBotTarget(href);
           var isTagged = el.hasAttribute && (el.hasAttribute('data-cta') || el.hasAttribute('data-cta-id'));
           if (isBot || isTagged) {
             var ctaId = inferCtaId(el);
@@ -319,32 +379,38 @@
                 page_path: window.location.pathname,
               }, currentUtms));
             } catch (e) {}
-            // Mirror the conversion to Meta as a `Lead` event so the
-            // ads algorithm can optimize toward bot-link clicks. Meta
-            // never sees the actual signup (it happens in Telegram),
-            // so this is the strongest in-browser signal we can give
-            // it until we add server-side Conversions API.
-            if (window.fbq) {
-              try {
-                fbq('track', 'Lead', {
-                  content_name: ctaId,
-                  content_category: ctaLocation,
-                });
-              } catch (e) {}
-            }
-            // Same idea for TikTok: fire a standard `Lead` event on
-            // every CTA click so TikTok ads can optimize for it. The
-            // actual trial/subscription happens in the Telegram bot
-            // and will be sent server-side later via the TikTok
-            // Events API using $ttp/$ttclid stored on the PostHog
-            // person profile.
-            if (window.ttq && typeof window.ttq.track === 'function') {
-              try {
-                window.ttq.track('Lead', {
-                  content_name: ctaId,
-                  content_category: ctaLocation,
-                });
-              } catch (e) {}
+            // Mirror the conversion to Meta + TikTok as a `Lead`
+            // event so the ads algorithms can optimize toward
+            // bot-link clicks. Ads platforms never see the actual
+            // signup (it happens inside Telegram), so this is the
+            // strongest in-browser signal we can give them until
+            // the server-side Conversions / Events APIs deliver
+            // CompleteRegistration / StartTrial.
+            //
+            // We deliberately suppress Lead for `open_bot_fallback`:
+            // that CTA only fires on /open AFTER the user has
+            // already triggered the canonical Lead on the LP. Firing
+            // a second Lead for the same intent would double-count
+            // the conversion in the ads platform and degrade
+            // optimization. cta_clicked above still fires for
+            // PostHog so our funnel can measure the fallback rate.
+            if (ctaId !== 'open_bot_fallback') {
+              if (window.fbq) {
+                try {
+                  fbq('track', 'Lead', {
+                    content_name: ctaId,
+                    content_category: ctaLocation,
+                  });
+                } catch (e) {}
+              }
+              if (window.ttq && typeof window.ttq.track === 'function') {
+                try {
+                  window.ttq.track('Lead', {
+                    content_name: ctaId,
+                    content_category: ctaLocation,
+                  });
+                } catch (e) {}
+              }
             }
           }
           break;
