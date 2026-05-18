@@ -1,39 +1,53 @@
 /* ===================================================================
-   YumYummy — /open deep-link bridge logic
+   YumYummy — /open v2: environment-aware deep-link bridge
    ===================================================================
-   Purpose: bypass TikTok / Meta / Twitter in-app webviews that
-   intercept t.me universal links and trap the user inside their own
-   browser. We fire the native tg:// URI scheme (which these webviews
-   do NOT intercept) and fall back to a t.me link if Telegram never
-   takes over.
+   v1 tried to fire tg://resolve via window.location.replace and hoped
+   the OS would intercept it. It worked in regular browsers but failed
+   silently in TikTok / Instagram / Facebook webviews, because Apple
+   requires a *user-initiated tap* for Universal Link interception and
+   programmatic redirects don't count (Linkrunner article, Mar 2026).
+   The user landed on a t.me page inside the same webview, tapped
+   "Start Bot", and that button used a Universal Link too — also
+   blocked. Dead end.
 
-   Why a separate file (not inline analytics.js):
-     - analytics.js handles PostHog/UTM/pixel plumbing and is shared
-       with the LP. We don't want it to grow conditional /open logic.
-     - The deep-link redirect timing is sensitive (we want tg:// to
-       fire as early as possible). Keeping it in its own short script
-       makes the critical path obvious.
+   v2 splits behaviour by environment:
 
-   Coexistence with analytics.js:
-     - analytics.js runs `defer` so DOM is ready when it executes. It
-       registers UTM super-properties from window.location.search and
-       calls posthog.capture('$pageview') in PostHog's `loaded`
-       callback. By the time analytics.js's PostHog instance is ready,
-       open.js has already queued its custom events on posthog (the
-       PostHog stub queues calls until the SDK loads), so order
-       doesn't matter for event delivery.
-     - This script never re-registers pixels — analytics.js already
-       picked them up via the inline TikTok/Meta snippets in
-       open/index.html.
-     - The fallback "Open Telegram" button has data-no-rewrite so
-       analytics.js's rewriteBotLinks() does NOT loop it back through
-       /open. This is critical — without it the page would spin.
+     - Normal browser:
+         Same auto-tg:// path as v1. tg:// is intercepted by the OS
+         and Telegram opens. Fallback button shows after 1.5 s if
+         Telegram isn't installed.
+
+     - Known in-app webview (TikTok/Instagram/Facebook/Twitter/etc.):
+         Skip the auto-redirect entirely (it doesn't work, and
+         spinning a "Opening Telegram…" message is misleading).
+         Show the webview escape UI immediately with:
+           1. A real <a href> "Open Telegram" tap that some webviews
+              still honour as a user-initiated click.
+           2. A "Copy bot link" button (universal escape, copies the
+              t.me URL with attribution preserved).
+           3. Step-by-step instructions to use the platform's
+              "Open in browser" menu.
+           4. On Android, an extra intent:// anchor that forces
+              Chrome's Android intent handler to launch Telegram
+              by package name.
+
+   Analytics additions over v1:
+     - bot_open_webview_detected   — fires once on load when we know
+                                     we're inside an in-app webview.
+     - bot_open_copy_link_clicked  — user used the universal escape.
+     - bot_open_intent_clicked     — Android intent:// link tap.
+     - cta_clicked (existing event, fires via analytics.js) — captures
+       open_bot_fallback / open_bot_webview_try / open_bot_android_intent /
+       copy_bot_link so the PostHog funnel can compare conversion of
+       each remedy.
    =================================================================== */
 
 (function () {
   'use strict';
 
   // -- Helpers ------------------------------------------------------
+
+  function $(id) { return document.getElementById(id); }
 
   function getParam(name) {
     try {
@@ -43,17 +57,11 @@
     }
   }
 
-  // Same validation as analytics.js: Telegram /start params accept
-  // [A-Za-z0-9_-]{1,64}. Reject anything else so we don't ship a
-  // broken deep-link that Telegram silently drops.
   function isValidStartParam(s) {
     return typeof s === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(s);
   }
 
   function safePostHog(fn) {
-    // PostHog's official snippet replaces window.posthog with a stub
-    // that queues calls until array.js loads. Calling capture/register
-    // before load is safe and the call will execute when ready.
     try {
       if (window.posthog && typeof window.posthog.capture === 'function') {
         fn(window.posthog);
@@ -61,188 +69,269 @@
     } catch (e) {}
   }
 
-  // -- 1. Read incoming attribution params --------------------------
+  // -- 1. Detect environment FIRST (before any redirect attempt) ---
 
-  // Priority for the bot /start payload (must be Telegram-safe):
-  //   1. ?phid=<posthog_distinct_id> — preferred, propagated by
-  //      analytics.js when the user clicks a CTA on the LP.
-  //   2. ?start=<value> — if the caller passes an explicit Telegram
-  //      start payload, honour it.
-  //   3. ?ref=<location> — landed-CTA-source slug like "hero" or
-  //      "footer". Helpful for ad campaigns that link directly to
-  //      /open?ref=tiktok_video1 without going through the LP.
-  //   4. utm_source — last-resort campaign-level slug.
-  //   5. null — open the bot without a /start payload. Telegram will
-  //      show the bot intro and the user can tap Start manually.
+  // We treat the following as "in-app webviews" where the auto-tg://
+  // redirect is known to fail:
+  //   - TikTok: ad UA "trill_*" (Android) / BytedanceWebview (iOS) /
+  //             generic "TikTok" UA segment
+  //   - Instagram: "Instagram"
+  //   - Facebook: FBAN, FBAV, FB_IAB, FBIOS markers
+  //   - Twitter/X: "Twitter" segment
+  //   - Snapchat: "Snapchat"
+  //   - LINE: "Line/" segment
+  // Anything else (Safari/Chrome/Firefox/Edge/Telegram Desktop) is
+  // treated as a "regular browser" and gets the auto-redirect path.
+  function detectWebview() {
+    var ua = (navigator.userAgent || '').toLowerCase();
+    if (/trill_|bytedancewebview|bytedance|musical_ly|tiktok/.test(ua))
+      return { id: 'tiktok', label: 'TikTok' };
+    if (/instagram/.test(ua))
+      return { id: 'instagram', label: 'Instagram' };
+    if (/fbav|fban|fb_iab|fbios|fbss|facebook/.test(ua))
+      return { id: 'facebook', label: 'Facebook' };
+    if (/\btwitter\b/.test(ua))
+      return { id: 'twitter', label: 'X (Twitter)' };
+    if (/snapchat/.test(ua))
+      return { id: 'snapchat', label: 'Snapchat' };
+    if (/line\//.test(ua))
+      return { id: 'line', label: 'LINE' };
+    if (/pinterest/.test(ua))
+      return { id: 'pinterest', label: 'Pinterest' };
+    return null;
+  }
+
+  function detectPlatform() {
+    var ua = (navigator.userAgent || '').toLowerCase();
+    if (/android/.test(ua)) return 'android';
+    if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+    return 'desktop';
+  }
+
+  var webview = detectWebview();
+  var platform = detectPlatform();
+
+  // -- 2. Read attribution params ----------------------------------
+
   var phid    = getParam('phid');
   var startQ  = getParam('start');
   var refQ    = getParam('ref');
   var utmSrc  = getParam('utm_source');
 
   var startPayload = null;
-  if (isValidStartParam(phid))   startPayload = phid;
-  else if (isValidStartParam(startQ)) startPayload = startQ;
-  else if (isValidStartParam(refQ))   startPayload = refQ;
-  else if (isValidStartParam(utmSrc)) startPayload = utmSrc;
+  var startKind = 'none';
+  if (isValidStartParam(phid))       { startPayload = phid;   startKind = 'phid'; }
+  else if (isValidStartParam(startQ)){ startPayload = startQ; startKind = 'start'; }
+  else if (isValidStartParam(refQ))  { startPayload = refQ;   startKind = 'ref'; }
+  else if (isValidStartParam(utmSrc)){ startPayload = utmSrc; startKind = 'utm_source'; }
 
-  // -- 2. Build the deep-link + fallback URLs -----------------------
+  // -- 3. Build the various URL forms we might need -----------------
 
   var BOT_DOMAIN = 'yum_yummybot';
 
-  // tg://resolve is the native Telegram URI scheme. Crucially this
-  // is NOT a universal link, so in-app webviews can't intercept it
-  // the way they intercept https://t.me/...
   function buildTgUrl() {
     var u = 'tg://resolve?domain=' + BOT_DOMAIN;
     if (startPayload) u += '&start=' + encodeURIComponent(startPayload);
     return u;
   }
 
-  // t.me/<bot>?start=<payload> is the HTTPS fallback. Telegram's
-  // landing page detects the OS, offers a native-app handoff, and
-  // the ?start= param survives the handoff to /start the bot with
-  // the correct payload.
   function buildTmeUrl() {
     var u = 'https://t.me/' + BOT_DOMAIN;
     if (startPayload) u += '?start=' + encodeURIComponent(startPayload);
     return u;
   }
 
-  // -- 3. UA / environment detection (for analytics only — we don't
-  //       branch the redirect on it, the redirect strategy is the
-  //       same everywhere because tg:// works in all the webviews
-  //       we care about) ----------------------------------------------
-
-  function detectEnv() {
-    var ua = (navigator.userAgent || '').toLowerCase();
-    var inApp = 'browser';
-    // TikTok in-app browser identifies as "trill" (Android) or
-    // BytedanceWebview (iOS).
-    if (/trill_|bytedance|bytedancewebview|tiktok/.test(ua))      inApp = 'tiktok';
-    else if (/instagram/.test(ua))                                 inApp = 'instagram';
-    else if (/\bfb_iab|fb_iab|fban|fbav|facebook/.test(ua))        inApp = 'facebook';
-    else if (/twitter|twitterandroid/.test(ua))                    inApp = 'twitter';
-    else if (/snapchat/.test(ua))                                  inApp = 'snapchat';
-    else if (/line\//.test(ua))                                    inApp = 'line';
-
-    var platform = 'desktop';
-    if (/android/.test(ua))           platform = 'android';
-    else if (/iphone|ipad|ipod/.test(ua)) platform = 'ios';
-
-    return { in_app_browser: inApp, platform: platform };
+  // Android's intent:// scheme. Chrome and most Android system
+  // WebView builds will:
+  //   1. Try to launch the activity for `tg://resolve?...` in the
+  //      org.telegram.messenger package.
+  //   2. If Telegram isn't installed (or the webview blocks it),
+  //      navigate to browser_fallback_url instead.
+  // We URL-encode the fallback so & inside it doesn't break the
+  // intent string. TikTok's Android WebView honours this in many
+  // builds where plain tg:// is silently dropped — it's a cheap
+  // win to offer as an Android-only escape hatch.
+  function buildIntentUrl() {
+    var tgPath = 'resolve?domain=' + BOT_DOMAIN;
+    if (startPayload) tgPath += '&start=' + encodeURIComponent(startPayload);
+    var fallback = encodeURIComponent(buildTmeUrl());
+    return 'intent://' + tgPath
+      + '#Intent;scheme=tg;package=org.telegram.messenger'
+      + ';S.browser_fallback_url=' + fallback
+      + ';end';
   }
 
-  var env = detectEnv();
+  // -- 4. Shared analytics emit -------------------------------------
 
-  // -- 4. Fire the deep-link --------------------------------------
-
-  // Update the fallback link's href to include the start payload BEFORE
-  // we navigate. This way even if the user is fast-thumbed and taps
-  // the button while the page is still rendering, the start param is
-  // already attached. We also gate the analytics.js rewriteBotLinks
-  // on data-no-rewrite, so we set the canonical href here ourselves.
-  var fallbackBtn = document.getElementById('open-tg-btn');
-  if (fallbackBtn) {
-    fallbackBtn.setAttribute('href', buildTmeUrl());
-  }
-
-  var tgUrl = buildTgUrl();
-  var redirectFiredAt = 0;
-
-  function fireTgRedirect() {
-    redirectFiredAt = Date.now();
+  function emit(event, props) {
     safePostHog(function (ph) {
-      ph.capture('bot_open_attempted', {
+      ph.capture(event, Object.assign({
         ref: refQ || null,
         phid_present: !!phid,
-        start_payload_kind: startPayload ? (
-          startPayload === phid ? 'phid' :
-          startPayload === startQ ? 'start' :
-          startPayload === refQ ? 'ref' :
-          startPayload === utmSrc ? 'utm_source' : 'other'
-        ) : 'none',
-        in_app_browser: env.in_app_browser,
-        platform: env.platform,
-        tg_url: tgUrl,
-        fallback_url: fallbackBtn ? fallbackBtn.getAttribute('href') : null,
-      });
+        start_payload_kind: startKind,
+        in_app_browser: webview ? webview.id : 'browser',
+        platform: platform,
+      }, props || {}));
     });
-    // window.location.replace (instead of .href) so the user can hit
-    // Back from Telegram and NOT land on /open again (which would
-    // re-fire the redirect in a loop on some browsers).
-    try {
-      window.location.replace(tgUrl);
-    } catch (e) {
-      try { window.location.href = tgUrl; } catch (e2) {}
+  }
+
+  // -- 5. Two distinct flows ----------------------------------------
+
+  var openingEl   = $('state-opening');
+  var fallbackEl  = $('state-fallback');
+  var webviewEl   = $('state-webview');
+
+  // 5a. WEBVIEW FLOW ------------------------------------------------
+  if (webview) {
+    renderWebviewFlow();
+  } else {
+    renderRegularBrowserFlow();
+  }
+
+  // ---- helpers used by both flows ----
+
+  function setFallbackHref() {
+    var btns = ['open-tg-btn', 'webview-try-anyway'];
+    btns.forEach(function (id) {
+      var el = $(id);
+      if (el) el.setAttribute('href', buildTmeUrl());
+    });
+    var intentBtn = $('webview-android-intent');
+    if (intentBtn) intentBtn.setAttribute('href', buildIntentUrl());
+  }
+
+  function showToast(msg) {
+    var t = $('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.hidden = false;
+    t.classList.add('show');
+    setTimeout(function () {
+      t.classList.remove('show');
+      setTimeout(function () { t.hidden = true; }, 250);
+    }, 2200);
+  }
+
+  // ---- 5b. REGULAR BROWSER FLOW ----
+  function renderRegularBrowserFlow() {
+    setFallbackHref();
+
+    // tg:// works in regular browsers — fire it shortly after load
+    // so the inline pixel snippets in <head> have time to enqueue
+    // their initial events (PostHog $pageview, fbq PageView, ttq.page).
+    setTimeout(function () {
+      emit('bot_open_attempted', {
+        tg_url: buildTgUrl(),
+        fallback_url: buildTmeUrl(),
+      });
+      try {
+        window.location.replace(buildTgUrl());
+      } catch (e) {
+        try { window.location.href = buildTgUrl(); } catch (e2) {}
+      }
+    }, 250);
+
+    // If we're still here after 1.5 s, Telegram didn't take over.
+    // Most likely the app isn't installed. Swap to the fallback
+    // state which is just the "Open Telegram" button (it opens
+    // t.me, which then offers a "Download Telegram" path).
+    setTimeout(function () {
+      if (document.hidden) return; // user handed off to Telegram
+      if (!fallbackEl) return;
+      if (openingEl) openingEl.classList.add('hidden');
+      fallbackEl.classList.remove('hidden');
+      emit('bot_open_fallback_shown', {});
+    }, 1500);
+
+    // Visibility-change as a proxy for "Telegram took over"
+    document.addEventListener('visibilitychange', function onVis() {
+      if (!document.hidden) return;
+      emit('bot_open_handoff', {});
+      document.removeEventListener('visibilitychange', onVis);
+    });
+  }
+
+  // ---- 5c. IN-APP WEBVIEW FLOW ----
+  function renderWebviewFlow() {
+    setFallbackHref();
+
+    if (openingEl) openingEl.classList.add('hidden');
+    if (webviewEl) webviewEl.classList.remove('hidden');
+
+    // Personalize the screen with the detected app name so the
+    // user sees "You're inside TikTok" rather than the generic
+    // "in-app browser" placeholder.
+    var nameEl = $('webview-name');
+    if (nameEl && webview.label) nameEl.textContent = webview.label + "'s in-app browser";
+
+    // Surface the Android-only intent:// button only on Android.
+    var intentBtn = $('webview-android-intent');
+    if (intentBtn && platform === 'android') {
+      intentBtn.classList.remove('hidden');
+    }
+
+    emit('bot_open_webview_detected', {
+      tme_url: buildTmeUrl(),
+      intent_url: buildIntentUrl(),
+    });
+
+    // Wire up the copy-link button. We copy the t.me URL with full
+    // attribution preserved so even if the user pastes it into
+    // Telegram chat or browser address bar, the bot still receives
+    // the right ?start= payload.
+    var copyBtn = $('copy-link-btn');
+    var labelEl = $('copy-link-label');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var url = buildTmeUrl();
+        var done = function (ok) {
+          if (labelEl) {
+            labelEl.textContent = ok ? 'Copied!' : 'Copy failed — long-press the link instead';
+            setTimeout(function () {
+              labelEl.textContent = 'Copy bot link';
+            }, 2200);
+          }
+          if (ok) showToast('Link copied. Paste it in Telegram or your browser.');
+          emit('bot_open_copy_link_clicked', { ok: ok, copied_url: url });
+        };
+        // Prefer the modern Clipboard API, fall back to a hidden
+        // textarea + execCommand for older webviews that don't
+        // expose navigator.clipboard inside an in-app browser.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(
+            function () { done(true); },
+            function () { done(legacyCopy(url)); }
+          );
+        } else {
+          done(legacyCopy(url));
+        }
+      });
+    }
+
+    // Track the Android intent button click so we can measure
+    // conversion uplift from offering it.
+    if (intentBtn) {
+      intentBtn.addEventListener('click', function () {
+        emit('bot_open_intent_clicked', { intent_url: intentBtn.href });
+      });
     }
   }
 
-  // -- 5. Fallback UI -----------------------------------------------
-
-  var FALLBACK_AFTER_MS = 1500;
-  var openingEl = document.getElementById('state-opening');
-  var fallbackEl = document.getElementById('state-fallback');
-
-  function showFallback() {
-    // Skip if Telegram already opened — when the OS hands off to
-    // Telegram, the page becomes hidden. If we're hidden, we did
-    // our job; don't pollute analytics with a fallback_shown event.
-    if (document.hidden) return;
-    if (!fallbackEl || !fallbackEl.classList.contains('hidden')) return;
-
-    if (openingEl) openingEl.classList.add('hidden');
-    fallbackEl.classList.remove('hidden');
-
-    safePostHog(function (ph) {
-      ph.capture('bot_open_fallback_shown', {
-        ref: refQ || null,
-        in_app_browser: env.in_app_browser,
-        platform: env.platform,
-        ms_since_attempt: redirectFiredAt ? (Date.now() - redirectFiredAt) : null,
-      });
-    });
+  // Hidden-textarea copy fallback for legacy webviews.
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'absolute';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
   }
-
-  // Mark a successful handoff: if the document goes hidden within a
-  // few seconds of firing tg://, the user is most likely now inside
-  // Telegram. Useful for measuring the real tg:// success rate per
-  // in_app_browser segment without needing server-side correlation.
-  function onVisibilityChange() {
-    if (!document.hidden) return;
-    if (!redirectFiredAt) return;
-    var dt = Date.now() - redirectFiredAt;
-    if (dt > 10000) return; // ignore unrelated tab switches later on
-    safePostHog(function (ph) {
-      ph.capture('bot_open_handoff', {
-        ref: refQ || null,
-        in_app_browser: env.in_app_browser,
-        platform: env.platform,
-        ms_since_attempt: dt,
-      });
-    });
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-  }
-
-  document.addEventListener('visibilitychange', onVisibilityChange);
-
-  // -- 6. Wire it up ------------------------------------------------
-
-  // Timing trade-off for the redirect:
-  //   - Too soon: PostHog's array.js may not have replaced the stub
-  //     yet, so `bot_open_attempted` (and the $pageview that
-  //     analytics.js fires in its `loaded` callback) are queued on
-  //     the stub. They'll be flushed via sendBeacon at pagehide,
-  //     which works on every modern browser but is "best effort".
-  //   - Too late: the user stares at "Opening Telegram…" longer than
-  //     necessary, which (a) feels broken and (b) lets meta-refresh
-  //     creep up on us.
-  // 250 ms is the sweet spot we've validated: enough for the inline
-  // pixel snippets in <head> to enqueue their initial events, short
-  // enough that the redirect feels instant.
-  setTimeout(fireTgRedirect, 250);
-
-  // After 1.5 s, if we're still here, the in-app browser swallowed
-  // the tg:// scheme. Show the user the explicit "Open Telegram"
-  // button so they have an out.
-  setTimeout(showFallback, FALLBACK_AFTER_MS);
 })();

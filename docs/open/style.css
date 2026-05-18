@@ -1,6 +1,6 @@
 /* ===================================================================
-   YumYummy — /open deep-link bridge styles
-   Self-contained (does not depend on the LP stylesheet) so this page
+   YumYummy — /open v2 deep-link bridge styles
+   Self-contained (no dependency on the LP stylesheet) so this page
    renders correctly even if the main CSS bundle is blocked. Mirrors
    the brand palette from docs/index.html.
    =================================================================== */
@@ -8,6 +8,7 @@
 :root {
   --brand: #B85A3A;
   --brand-dark: #9A4628;
+  --brand-subtle: #EFDFD1;
   --ink: #2A2A2A;
   --cream: #F7F1E6;
   --n50: #FAF8F5;
@@ -20,8 +21,11 @@
   --olive-dark: #5A6A3A;
   --olive-deeper: #4A5A2A;
   --tg-blue: #2AABEE;
+  --tg-blue-dark: #1f95d4;
+  --warn: #C97B2A;
   --serif: 'Fraunces', Georgia, serif;
   --sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --shadow-sm: 0 1px 2px rgba(42, 28, 14, .06);
   --shadow-md: 0 4px 8px rgba(42, 28, 14, .08), 0 1px 3px rgba(42, 28, 14, .04);
   --shadow-lg: 0 8px 20px rgba(42, 28, 14, .10), 0 2px 6px rgba(42, 28, 14, .06);
 }
@@ -51,11 +55,11 @@ body {
 
 .open-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
   background: #FFFFFF;
   border: 1px solid var(--n200);
   border-radius: 20px;
-  padding: 36px 28px 28px;
+  padding: 32px 26px 24px;
   box-shadow: var(--shadow-lg);
   text-align: center;
 }
@@ -64,15 +68,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   text-decoration: none;
   color: var(--ink);
 }
-.brand img {
-  width: 40px;
-  height: 40px;
-  display: block;
-}
+.brand img { width: 40px; height: 40px; display: block; }
 .brand span {
   font-family: var(--serif);
   font-weight: 700;
@@ -91,12 +91,20 @@ body {
 .state p {
   color: var(--n600);
   font-size: 15px;
-  margin: 0 0 24px;
+  margin: 0 0 20px;
+}
+.state .lead {
+  font-size: 15.5px;
+  line-height: 1.55;
+  margin: 0 0 20px;
+}
+.state .lead strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
-.state.hidden {
-  display: none;
-}
+.state.hidden { display: none; }
+.hidden { display: none !important; }
 
 /* Spinner for the initial "opening" state */
 .spinner {
@@ -105,12 +113,10 @@ body {
   border-radius: 50%;
   border: 3px solid var(--n200);
   border-top-color: var(--brand);
-  margin: 0 auto 20px;
+  margin: 0 auto 18px;
   animation: spin .9s linear infinite;
 }
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: none; border-top-color: var(--brand); }
 }
@@ -118,19 +124,20 @@ body {
 .tg-logo {
   width: 56px;
   height: 56px;
-  margin: 0 auto 18px;
+  margin: 0 auto 16px;
   display: block;
 }
 
-.btn-primary {
+/* -- Buttons ------------------------------------------------------- */
+
+.btn-primary,
+.btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 16px 24px;
-  background: var(--tg-blue);
-  color: #FFFFFF;
+  padding: 16px 20px;
   border-radius: 12px;
   font-family: var(--sans);
   font-weight: 600;
@@ -142,8 +149,13 @@ body {
   transition: transform .12s ease, box-shadow .18s ease, background .18s ease;
   box-shadow: var(--shadow-md);
 }
+
+.btn-primary {
+  background: var(--tg-blue);
+  color: #FFFFFF;
+}
 .btn-primary:hover {
-  background: #1f95d4;
+  background: var(--tg-blue-dark);
   text-decoration: none;
   color: #FFFFFF;
   transform: translateY(-1px);
@@ -153,51 +165,153 @@ body {
   outline: 3px solid rgba(42, 171, 238, .35);
   outline-offset: 3px;
 }
-.btn-primary:active {
-  transform: translateY(0);
+.btn-primary:active { transform: translateY(0); }
+
+.btn-primary.subdued {
+  background: #FFFFFF;
+  color: var(--tg-blue-dark);
+  border: 1.5px solid var(--tg-blue);
+  box-shadow: none;
+  margin-top: 12px;
 }
-.tg-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+.btn-primary.subdued:hover {
+  background: rgba(42, 171, 238, .08);
+  color: var(--tg-blue-dark);
 }
 
-.tip {
-  margin-top: 22px;
-  background: var(--n100);
-  border: 1px solid var(--n200);
-  border-radius: 12px;
-  text-align: left;
-  font-size: 14px;
-}
-.tip summary {
-  padding: 12px 16px;
-  cursor: pointer;
-  color: var(--n700);
-  font-weight: 500;
-  list-style: none;
-}
-.tip summary::-webkit-details-marker { display: none; }
-.tip summary::after {
-  content: '＋';
-  float: right;
-  color: var(--n500);
-  font-weight: 400;
-}
-.tip[open] summary::after { content: '－'; }
-.tip ol {
-  margin: 0;
-  padding: 0 18px 14px 34px;
-  color: var(--n600);
-  line-height: 1.55;
-}
-.tip ol li {
-  margin-bottom: 6px;
-  font-size: 13.5px;
-}
-.tip a {
+.btn-secondary {
+  background: var(--brand-subtle);
   color: var(--brand-dark);
+  margin-bottom: 4px;
+  box-shadow: none;
+  border: 1px solid var(--brand-subtle);
 }
+.btn-secondary:hover {
+  background: #e6d2c0;
+  color: var(--brand-dark);
+  transform: translateY(-1px);
+}
+.btn-secondary:focus-visible {
+  outline: 3px solid rgba(184, 90, 58, .35);
+  outline-offset: 3px;
+}
+
+.tg-icon { width: 20px; height: 20px; flex-shrink: 0; }
+
+/* -- Howto card (webview instruction screen) ----------------------- */
+
+.howto-card {
+  position: relative;
+  background: linear-gradient(180deg, var(--brand-subtle) 0%, #f4e3d1 100%);
+  border: 1px solid var(--n200);
+  border-radius: 14px;
+  padding: 18px 18px 14px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.howto-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 14.5px;
+  color: var(--n700);
+  line-height: 1.5;
+}
+.howto-step:last-of-type { margin-bottom: 4px; }
+
+.step-num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #FFFFFF;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.howto-step .kebab {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: 6px;
+  padding: 1px 8px 3px;
+  margin: 0 2px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+/* Floating animated arrow pointing toward the top-right corner
+   (where the kebab menu lives in most in-app browsers). It's
+   absolutely positioned outside the card so it visually leads
+   the eye out of the page toward the system menu chrome. */
+.howto-arrow {
+  position: absolute;
+  top: -22px;
+  right: -8px;
+  font-size: 38px;
+  line-height: 1;
+  color: var(--brand);
+  font-weight: 700;
+  text-shadow: 0 2px 6px rgba(184, 90, 58, .3);
+  animation: arrow-bob 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes arrow-bob {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50%      { transform: translateY(-6px) rotate(-4deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .howto-arrow { animation: none; }
+}
+
+.webview-note {
+  font-size: 13px;
+  color: var(--n500);
+  margin-top: 14px;
+  line-height: 1.5;
+}
+.webview-note a {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
+/* -- Toast --------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--cream);
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transition: opacity .2s ease, transform .2s ease;
+  pointer-events: none;
+  z-index: 1000;
+  max-width: 90vw;
+  text-align: center;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* -- Footer / legal ------------------------------------------------ */
 
 .legal {
   margin-top: 22px;
@@ -219,8 +333,13 @@ body {
 
 @media (max-width: 420px) {
   .open-card {
-    padding: 28px 20px 22px;
+    padding: 26px 18px 20px;
     border-radius: 16px;
   }
   .state h1 { font-size: 22px; }
+  .state .lead { font-size: 14.5px; }
+  .howto-step { font-size: 13.5px; }
+  .howto-card { padding: 16px 14px 12px; }
+  .howto-arrow { font-size: 32px; top: -18px; right: -4px; }
+  .btn-primary, .btn-secondary { padding: 14px 18px; font-size: 15.5px; }
 }

@@ -6,33 +6,36 @@
 <title>Opening YumYummy in Telegram…</title>
 
 <!--
-  /open is the "deep-link bridge" page that solves TikTok / Meta / Twitter
-  in-app browser hostility toward t.me universal links.
+  /open v2 — environment-aware deep-link bridge.
 
-  Flow:
-    1. CTA on the landing page sends the user here with ?ref=<location>,
-       optional ?phid=<posthog_distinct_id>, and any utm_*.
-    2. open.js fires `tg://resolve?domain=yum_yummybot&start=<phid_or_ref>`
-       which works in TikTok/Meta webviews (they don't intercept the
-       native scheme the way they intercept https universal links).
-    3. If we're still on this page 1500 ms later, we show a fallback
-       UI with a big "Open Telegram" button pointing at t.me/yum_yummybot.
-    4. If JavaScript is broken entirely, the <meta http-equiv="refresh">
-       below sends the user to t.me/yum_yummybot after 5 s, so worst-case
-       behaviour matches the pre-fix LP behaviour exactly. We never make
-       things worse than they are today.
+  Why v1 didn't work in TikTok webview (and most other in-app browsers):
+  Apple specifically requires a *user-initiated* tap for Universal Link
+  interception (Linkrunner, Mar 2026). Any `window.location` assignment
+  to either an https://t.me URL or a tg:// URI scheme is treated as a
+  programmatic redirect and silently ignored by iOS in WKWebView. TikTok
+  also actively hides the "Open in browser" affordance in many of its
+  newer ad webviews, so users have no obvious escape hatch.
 
-  Analytics contract — what fires on /open vs the LP:
-    LP:    landed_from_ad, $pageview, cta_clicked, fbq Lead, ttq Lead
-    /open: $pageview, fbq PageView, ttq.page, bot_open_attempted,
-           bot_open_fallback_shown (only if fallback UI appears).
-    Lead is NEVER refired on /open — TikTok/Meta optimization keeps a
-    single canonical Lead per CTA click on the LP. cta_clicked on the
-    fallback button uses cta_id="open_bot_fallback", a different id from
-    the LP "try_free" / "open_bot" CTAs, so PostHog funnel steps stay
-    disjoint and we can measure the tg://→t.me fallback rate.
+  v2 takes a different approach:
+
+    - Normal browser (Safari, Chrome, Telegram Desktop, etc.):
+        Same auto-tg:// redirect as v1 — it works there.
+    - Known in-app webview (TikTok, Instagram, Facebook, Twitter,
+      Snapchat, LINE):
+        Skip auto-redirect entirely. Show an instructional UI that
+        explains the situation, offers three escape hatches:
+          1. "Open Telegram" button — a real <a href> click is a
+             user-initiated tap and *can* trigger Universal Link
+             interception in some webviews.
+          2. "Copy bot link" — universal escape. The user pastes the
+             link into Telegram, Safari, or anywhere they want.
+          3. Step-by-step instructions to use the platform's menu.
+        On Android we also surface an intent:// scheme link that
+        forces the system to launch Telegram if installed.
+
+  The meta-refresh below still ships as a hard safety net: if all the
+  JS above fails to load, the user is at least sent to t.me after 5 s.
 -->
-
 <meta http-equiv="refresh" content="5;url=https://t.me/yum_yummybot">
 
 <link rel="canonical" href="https://yumyummy.ai/open" />
@@ -42,28 +45,13 @@
 <link rel="icon" type="image/png" href="/assets/logo.png" />
 <link rel="stylesheet" href="/open/style.css" />
 
-<!-- ===== Analytics & Tracking Pixels =====
-     We deliberately load the SAME analytics.js as the LP so:
-       - PostHog re-init is a no-op (same project key, distinct_id is
-         already in localStorage from the LP visit).
-       - UTM super-properties get re-registered from the ?utm_* query
-         params we forwarded from the LP, so $pageview on /open is
-         correctly attributed to the source campaign.
-       - `landed_from_ad` is idempotent via sessionStorage('yy_landed_fired')
-         set on the LP, so it WON'T re-fire here for normal LP→/open
-         traffic. It WILL fire if someone deep-links straight to
-         /open?utm_source=... (e.g. a QR code), which is the correct
-         behaviour.
-       - The fallback "Open Telegram" link below has data-no-rewrite so
-         the rewriteBotLinks() helper does NOT loop it back through /open.
--->
+<!-- Shared analytics.js: same PostHog project + UTM/distinct_id
+     continuity with the LP. See its own header for the full
+     analytics contract. -->
 <script defer src="/assets/analytics.js"></script>
 
-<!-- TikTok Pixel — same id as LP. ttq.load is idempotent (guards on _i[e]),
-     so this is a true page-tracking event for /open, not a duplicate load.
-     We DO send ttq.page() but DO NOT send another ttq.track('Lead') — the
-     Lead event already fired on the LP CTA click and we don't want to
-     double-count it for TikTok ads optimization. -->
+<!-- TikTok Pixel: page-view only, NO additional Lead. The canonical
+     Lead already fired on the LP at CTA click. -->
 <script>
 !function (w, d, t) {
   w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
@@ -75,9 +63,7 @@ var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n
 }(window, document, 'ttq');
 </script>
 
-<!-- Meta Pixel — same id as LP. fbq guards on f.fbq so re-running the
-     snippet is a no-op except for the explicit fbq('track','PageView')
-     call below, which is the standard event for the /open pageview. -->
+<!-- Meta Pixel: page-view only. -->
 <script>
 !function(f,b,e,v,n,t,s)
 {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -93,7 +79,6 @@ fbq('track', 'PageView');
 <noscript><img height="1" width="1" style="display:none"
 src="https://www.facebook.com/tr?id=826914203808503&ev=PageView&noscript=1"
 /></noscript>
-<!-- ===== End Analytics & Tracking ===== -->
 
 </head>
 <body>
@@ -104,12 +89,20 @@ src="https://www.facebook.com/tr?id=826914203808503&ev=PageView&noscript=1"
     <span>YumYummy</span>
   </a>
 
+  <!-- State A: "regular browser" — auto-redirect path.
+       Shown immediately on load. If the user is in a normal browser,
+       open.js fires tg:// and the page becomes hidden. If they're
+       still here after 1.5 s, we swap them to state B (auto-fallback)
+       which is just the "Open Telegram" button. -->
   <div id="state-opening" class="state">
     <div class="spinner" aria-hidden="true"></div>
     <h1>Opening Telegram…</h1>
     <p>If Telegram doesn't open in a moment, use the button below.</p>
   </div>
 
+  <!-- State B: regular-browser fallback. tg:// fired but Telegram
+       didn't take over — most often because Telegram isn't installed
+       on this device. -->
   <div id="state-fallback" class="state hidden">
     <svg class="tg-logo" viewBox="0 0 48 48" aria-hidden="true">
       <circle cx="24" cy="24" r="24" fill="#2AABEE"/>
@@ -128,14 +121,88 @@ src="https://www.facebook.com/tr?id=826914203808503&ev=PageView&noscript=1"
       </svg>
       Open Telegram
     </a>
-    <details class="tip">
-      <summary>Telegram doesn't open?</summary>
-      <ol>
-        <li>You may be inside an in-app browser (TikTok, Instagram, Facebook). Tap the <strong>⋮</strong> menu in the top-right and choose <strong>Open in Safari/Chrome</strong>.</li>
-        <li>Then come back here and tap <strong>Open Telegram</strong> again.</li>
-        <li>Don't have Telegram yet? <a href="https://telegram.org/" target="_blank" rel="noopener">Download it here</a>, then return.</li>
-      </ol>
-    </details>
+  </div>
+
+  <!-- State C: in-app webview detected (TikTok/Instagram/Facebook/etc.).
+       This is the screen that turns "broken" into "you have a clear
+       way out". Shown INSTEAD of state A when detectWebview() returns
+       a non-null value — no spinner, no waiting. -->
+  <div id="state-webview" class="state hidden">
+    <h1>Almost there!</h1>
+    <p class="lead">
+      You're inside <strong id="webview-name">an in-app browser</strong>,
+      which blocks Telegram from opening directly.
+      <strong>Open this page in your normal browser</strong> to continue.
+    </p>
+
+    <!-- Visual hint: arrow pointing at where the "open in browser"
+         option lives in TikTok/IG/FB (top-right kebab menu). -->
+    <div class="howto-card">
+      <div class="howto-step">
+        <span class="step-num">1</span>
+        <span>Tap the <strong class="kebab" aria-label="three dots menu">⋯</strong> menu in the top‑right corner of this screen.</span>
+      </div>
+      <div class="howto-step">
+        <span class="step-num">2</span>
+        <span>Choose <strong>"Open in browser"</strong> (or "Open in Safari" / "Open in Chrome").</span>
+      </div>
+      <div class="howto-step">
+        <span class="step-num">3</span>
+        <span>This page will reload, and YumYummy will open in Telegram automatically.</span>
+      </div>
+      <div class="howto-arrow" aria-hidden="true">↗</div>
+    </div>
+
+    <!-- Universal escape hatch #1: copy the bot link. Works on every
+         platform. The user can paste it into Telegram's chat search,
+         Safari's address bar, or anywhere else. -->
+    <button id="copy-link-btn"
+            class="btn-secondary"
+            type="button"
+            data-cta-id="copy_bot_link"
+            data-cta-location="open_page_webview">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <span id="copy-link-label">Copy bot link</span>
+    </button>
+
+    <!-- Universal escape hatch #2: try anyway. This is a real <a>
+         click (user-initiated tap), which is the ONLY thing Apple's
+         click-gate behaviour accepts for Universal Link interception
+         from within a WebView. Some webviews still honour it, so it
+         costs us nothing to offer. -->
+    <a id="webview-try-anyway"
+       class="btn-primary subdued"
+       href="https://t.me/yum_yummybot"
+       data-no-rewrite
+       data-cta-id="open_bot_webview_try"
+       data-cta-location="open_page_webview">
+      <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"></path>
+      </svg>
+      Try opening Telegram anyway
+    </a>
+
+    <!-- Android-only intent:// link, injected by open.js when the
+         platform is detected as android. This is a separate anchor
+         from the iOS path because the URL format differs (intent
+         scheme isn't a no-op on iOS, it just shows an ugly error). -->
+    <a id="webview-android-intent"
+       class="btn-primary subdued hidden"
+       href="#"
+       data-no-rewrite
+       data-cta-id="open_bot_android_intent"
+       data-cta-location="open_page_webview">
+      Open with Telegram app (Android)
+    </a>
+
+    <p class="webview-note">
+      Don't have Telegram yet?
+      <a href="https://telegram.org/" target="_blank" rel="noopener">Download it here</a>,
+      then come back and tap the button above.
+    </p>
   </div>
 
   <noscript>
@@ -154,6 +221,9 @@ src="https://www.facebook.com/tr?id=826914203808503&ev=PageView&noscript=1"
     <a href="/terms.html">Terms</a>
   </p>
 </main>
+
+<!-- Toast surface for "Link copied!" confirmation -->
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="/open/open.js"></script>
 </body>
