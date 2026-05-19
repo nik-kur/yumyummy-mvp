@@ -387,22 +387,14 @@
             // the server-side Conversions / Events APIs deliver
             // CompleteRegistration / StartTrial.
             //
-            // We deliberately suppress Lead for every CTA that
-            // fires on the /open bridge page (any of the fallback
-            // / webview escape buttons). Those CTAs only fire AFTER
-            // the user has already triggered the canonical Lead on
-            // the LP. Firing a second Lead for the same intent
-            // would double-count the conversion in Meta/TikTok ads
-            // and degrade optimization. cta_clicked above still
-            // fires for PostHog so our funnel can measure the
-            // per-button rescue rate.
-            var SUPPRESS_LEAD_FOR = [
-              'open_bot_fallback',        // /open regular-browser fallback button
-              'open_bot_webview_try',     // /open webview "try anyway" anchor
-              'open_bot_android_intent',  // /open webview Android intent:// anchor
-              'copy_bot_link',            // /open webview copy-link button
-            ];
-            if (SUPPRESS_LEAD_FOR.indexOf(ctaId) === -1) {
+            // We deliberately suppress Lead for `open_bot_fallback`:
+            // that CTA only fires on /open AFTER the user has
+            // already triggered the canonical Lead on the LP. Firing
+            // a second Lead for the same intent would double-count
+            // the conversion in the ads platform and degrade
+            // optimization. cta_clicked above still fires for
+            // PostHog so our funnel can measure the fallback rate.
+            if (ctaId !== 'open_bot_fallback') {
               if (window.fbq) {
                 try {
                   fbq('track', 'Lead', {
