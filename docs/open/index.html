@@ -15,8 +15,12 @@
     2. open.js fires `tg://resolve?domain=yum_yummybot&start=<phid_or_ref>`
        which works in TikTok/Meta webviews (they don't intercept the
        native scheme the way they intercept https universal links).
-    3. If we're still on this page 1500 ms later, we show a fallback
+    3. If we're still on this page 2000 ms later, we show a fallback
        UI with a big "Open Telegram" button pointing at t.me/yum_yummybot.
+       (Originally 1500 ms — bumped after May 20 session replays showed
+       Android Chrome users on slow networks routinely take 3–7 s to
+       hand off to Telegram, and the early fallback was making them
+       rage-tap the button mid-handoff and break the OS intent.)
     4. If JavaScript is broken entirely, the <meta http-equiv="refresh">
        below sends the user to t.me/yum_yummybot after 5 s, so worst-case
        behaviour matches the pre-fix LP behaviour exactly. We never make
@@ -104,10 +108,20 @@ src="https://www.facebook.com/tr?id=826914203808503&ev=PageView&noscript=1"
     <span>YumYummy</span>
   </a>
 
+  <!--
+    Opening state: shown for the first 2000 ms while the OS processes
+    the tg:// handoff. We deliberately do NOT mention the fallback
+    button here. Session-replay evidence from the May 20 Meta launch
+    showed users panic-tapping when they read "if it doesn't open"
+    while the handoff was still in progress (3–7 s on slow Android
+    networks), which caused the OS to drop the tg:// intent. Keep the
+    message reassuring and forward-looking; the fallback UI takes
+    over only if we're truly still on the page after 2 s.
+  -->
   <div id="state-opening" class="state">
     <div class="spinner" aria-hidden="true"></div>
     <h1>Opening Telegram…</h1>
-    <p>If Telegram doesn't open in a moment, use the button below.</p>
+    <p>Hang tight, taking you to YumYummy.</p>
   </div>
 
   <div id="state-fallback" class="state hidden">

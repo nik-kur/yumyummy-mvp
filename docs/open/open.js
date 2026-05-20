@@ -179,7 +179,15 @@
 
   // -- 5. Fallback UI -----------------------------------------------
 
-  var FALLBACK_AFTER_MS = 1500;
+  // Session-replay evidence (May 20): on Android Chrome the OS handoff
+  // to Telegram routinely takes 3–7 seconds end-to-end. With the old
+  // 1500 ms timer the fallback button appeared mid-handoff, users tapped
+  // it, the OS got two competing intents, and Telegram never opened.
+  // 2000 ms is the longest we can wait before users start to *feel*
+  // the page is broken (UX research baseline for "this isn't loading"
+  // sits around 2–3 s) while still giving the OS enough head-room to
+  // process tg:// on slow mobile networks.
+  var FALLBACK_AFTER_MS = 2000;
   var openingEl = document.getElementById('state-opening');
   var fallbackEl = document.getElementById('state-fallback');
 

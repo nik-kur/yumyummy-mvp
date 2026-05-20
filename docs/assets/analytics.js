@@ -32,6 +32,62 @@
   // -- 1. PostHog snippet (official, copied verbatim from the dashboard)
   !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init me ls ks ws ys ps bs capture Ee calculateEventProperties $s register register_once register_for_session unregister unregister_for_session Is getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset _addCaptureHook _calculateEventProperties _handle_unload _handle_queued_event __compress_and_send_json_request _send_request opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing _is_bot _send_pageview".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
 
+  // -- 1a. Pre-allocate a stable distinct_id BEFORE PostHog finishes
+  //        loading. Why: rewriteBotLinks() needs ?phid=<id> on the CTA
+  //        href at the moment the user taps it. On slow Android Chrome
+  //        on tier-3 mobile networks PostHog's array.js can take >2 s
+  //        to load and assign a distinct_id, so the original retry loop
+  //        (20 × 100 ms) would expire and CTAs would ship without phid.
+  //        May 20 Meta launch replays showed 4 of 6 handoffs hit /open
+  //        with no phid, which broke the LP→bot→trial identity
+  //        stitching in PostHog.
+  //
+  //        Solution: we generate a UUID v4 ourselves, persist it in
+  //        localStorage, and pass it to posthog.init as
+  //        `bootstrap.distinctID`. PostHog then adopts our id as its
+  //        own distinct_id (no random reassignment), so the same
+  //        identity is used end-to-end: web events, /open ?phid=,
+  //        Telegram /start payload, and bot_started server event.
+  function uuidv4() {
+    try {
+      if (window.crypto && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+    } catch (e) {}
+    var rnd = new Array(16);
+    if (window.crypto && typeof crypto.getRandomValues === 'function') {
+      var buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      for (var i = 0; i < 16; i++) rnd[i] = buf[i];
+    } else {
+      for (var j = 0; j < 16; j++) rnd[j] = Math.floor(Math.random() * 256);
+    }
+    rnd[6] = (rnd[6] & 0x0f) | 0x40;
+    rnd[8] = (rnd[8] & 0x3f) | 0x80;
+    var hex = rnd.map(function (b) { return (b + 0x100).toString(16).slice(1); });
+    return (hex[0]+hex[1]+hex[2]+hex[3]+'-'+hex[4]+hex[5]+'-'+
+            hex[6]+hex[7]+'-'+hex[8]+hex[9]+'-'+
+            hex[10]+hex[11]+hex[12]+hex[13]+hex[14]+hex[15]);
+  }
+
+  function getOrCreatePhid() {
+    // Telegram bot /start payload accepts [A-Za-z0-9_-]{1,64}.
+    // A canonical UUID v4 is 36 chars with [0-9a-f-], well within the
+    // allowed alphabet, so we can reuse the same value for both the
+    // PostHog distinct_id and the Telegram start payload.
+    try {
+      var existing = window.localStorage && localStorage.getItem('yy_phid');
+      if (existing && /^[A-Za-z0-9_-]{1,64}$/.test(existing)) return existing;
+    } catch (e) {}
+    var fresh = uuidv4();
+    try {
+      if (window.localStorage) localStorage.setItem('yy_phid', fresh);
+    } catch (e) {}
+    return fresh;
+  }
+
+  var bootstrapPhid = getOrCreatePhid();
+
   // We disable `capture_pageview` here and fire it ourselves AFTER
   // registering UTMs as super-properties. Otherwise PostHog's auto
   // $pageview races the snippet's async `array.js` load and the very
@@ -39,6 +95,12 @@
   // attached — which is exactly the bug we're trying to fix.
   posthog.init('phc_u8XVgBexJVuggFASRTw7AL6mmpwoZDa6moycSxz7FrpD', {
     api_host: 'https://eu.i.posthog.com',
+    // Hand PostHog our pre-allocated distinct_id so it doesn't generate
+    // its own UUID v7 and we end up with two identities for the same
+    // person (one on /, one on /open). The PostHog SDK persists this
+    // value in its own localStorage key on first load and reuses it
+    // for every subsequent event from this browser.
+    bootstrap: { distinctID: bootstrapPhid },
     // 'always' (vs 'identified_only') creates a person profile for every
     // visitor — anonymous LP visitors included — so PostHog auto-fills
     // person properties like `$initial_utm_source/medium/campaign/...`
@@ -352,6 +414,39 @@
     return (el.textContent || '').trim().slice(0, 60).toLowerCase().replace(/\s+/g, '_') || 'unknown';
   }
 
+  // Just-in-time href refresher for bot-target anchors. Runs in the
+  // click event's CAPTURE phase BEFORE the browser navigates, so any
+  // mutation we make to the href is honoured by the navigation that
+  // follows synchronously.
+  //
+  // Why we need this on top of the page-load rewrite: the page-load
+  // rewrite uses `bootstrapPhid`, but PostHog (especially for returning
+  // visitors) may load and report a *different* distinct_id a few
+  // hundred ms later. Without this hook a user who taps a CTA inside
+  // that window would carry the stale bootstrap id to /open and the
+  // bot, then PostHog would emit web events under the canonical id —
+  // splitting the LP→bot identity. Refreshing at click time guarantees
+  // the freshest id is used regardless of timing.
+  function refreshBotHrefAtClick(el, isBot, href) {
+    if (!isBot || !href || el.tagName !== 'A') return;
+    if (el.hasAttribute('data-no-rewrite')) return;
+    var live = window.posthog && typeof posthog.get_distinct_id === 'function'
+      ? posthog.get_distinct_id() : null;
+    var startParam = pickStartParam(live || bootstrapPhid);
+    if (!live && !startParam) return;
+    try {
+      var url = new URL(href, window.location.href);
+      var direct = DIRECT_BOT_RE.test(href);
+      if (live && url.searchParams.get('phid') !== live) {
+        url.searchParams.set('phid', live);
+      }
+      if (direct && startParam && url.searchParams.get('start') !== startParam) {
+        url.searchParams.set('start', startParam);
+      }
+      el.setAttribute('href', url.toString());
+    } catch (e) {}
+  }
+
   function bindCtaTracking() {
     document.addEventListener('click', function (ev) {
       var el = ev.target;
@@ -367,6 +462,12 @@
           var isBot = isBotTarget(href);
           var isTagged = el.hasAttribute && (el.hasAttribute('data-cta') || el.hasAttribute('data-cta-id'));
           if (isBot || isTagged) {
+            // Synchronously refresh phid before the browser follows
+            // the link. Must run in the same tick as the click; the
+            // PostHog .capture below is fire-and-forget and won't
+            // delay navigation.
+            refreshBotHrefAtClick(el, isBot, href);
+            href = (el.getAttribute && el.getAttribute('href')) || href;
             var ctaId = inferCtaId(el);
             var ctaLocation = inferCtaLocation(el);
             try {
@@ -430,28 +531,43 @@
   ready(function () {
     bindCtaTracking();
 
-    // PostHog assigns distinct_id synchronously after init, but the
-    // SDK script itself is loaded async via `array.js`. We retry up
-    // to ~2s so the very first page render still gets the right
-    // start= param. If posthog never loads (ad-blocker, offline) we
-    // fall back to UTM-only attribution and skip the phid param.
+    // Stage 1 — synchronous rewrite with the pre-allocated phid. This
+    // is the critical path: even if PostHog's array.js never loads
+    // (ad-blocker, offline, slow network) the CTA buttons already
+    // carry ?phid=<bootstrapPhid> and the bot can stitch the user to
+    // a PostHog person row by that same id once posthog.identify runs
+    // anywhere in the funnel.
+    rewriteBotLinks(bootstrapPhid);
+
+    // Stage 2 — re-rewrite once posthog.get_distinct_id() agrees with
+    // bootstrapPhid (sanity check) and pixel cookies have settled.
+    // This is mostly a no-op for phid (we already wrote it in stage 1)
+    // but lets syncPixelsToPostHog pick up _fbp/_fbc/_ttp once Meta
+    // and TikTok pixels have populated their cookies.
     var attempts = 0;
-    function tryRewrite() {
+    function tryFinalize() {
       var did = window.posthog && typeof posthog.get_distinct_id === 'function'
         ? posthog.get_distinct_id() : null;
       if (did) {
-        rewriteBotLinks(did);
+        if (did !== bootstrapPhid) {
+          // Returning visitor who had a PostHog distinct_id from before
+          // this bootstrap code shipped. PostHog wins (it's the
+          // canonical id used in their existing person rows); adopt
+          // it as the new yy_phid so cross-page rewrites and future
+          // visits stay consistent.
+          try {
+            if (window.localStorage) localStorage.setItem('yy_phid', did);
+          } catch (e) {}
+          bootstrapPhid = did;
+          rewriteBotLinks(did);
+        }
         syncPixelsToPostHog();
         return;
       }
-      if (attempts++ < 20) {
-        setTimeout(tryRewrite, 100);
-      } else {
-        rewriteBotLinks(null);
-        syncPixelsToPostHog();
-      }
+      if (attempts++ < 20) setTimeout(tryFinalize, 100);
+      else syncPixelsToPostHog();
     }
-    tryRewrite();
+    tryFinalize();
 
     // Meta + TikTok pixels set their cookies asynchronously after
     // their respective SDK scripts load, so re-sync once more after
