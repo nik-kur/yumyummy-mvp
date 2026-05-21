@@ -122,6 +122,7 @@
       // initial campaign on the very first event.
       try {
         attributeUtmsToPostHog();
+        syncDeviceContextToPostHog();
         captureLandedFromAd();
         ph.capture('$pageview');
       } catch (e) {}
@@ -207,6 +208,34 @@
       if (typeof posthog.setPersonProperties === 'function') {
         posthog.setPersonProperties(props);
       }
+    } catch (e) {}
+  }
+
+  // Server-side ad attribution (Meta CAPI, TikTok EAPI) needs the raw
+  // User-Agent and the actual landing URL — Meta's match-quality scoring
+  // weighs these heavily (~+2 EMQ points combined). PostHog auto-captures
+  // a parsed $browser / $os but NOT the raw UA string, so we stash it
+  // ourselves on the person profile as `raw_user_agent`. We also keep
+  // the first landing URL with full UTM/fbclid in `initial_landing_url`
+  // so the backend can pass it as `event_source_url` instead of the
+  // homepage default.
+  function syncDeviceContextToPostHog() {
+    if (!window.posthog || typeof posthog.setPersonProperties !== 'function') return;
+    try {
+      var ua = navigator && navigator.userAgent ? String(navigator.userAgent) : '';
+      var url = '';
+      try { url = window.location && window.location.href ? String(window.location.href) : ''; } catch (e) {}
+      var props = {};
+      if (ua) props.raw_user_agent = ua;
+      if (url) props.initial_landing_url = url;
+      if (!Object.keys(props).length) return;
+      // $set_once-style: only the first landing URL wins (so attribution
+      // sticks to the very first ad click, not the most recent visit).
+      var initialOnly = {};
+      if (url) initialOnly.initial_landing_url = url;
+      // raw_user_agent we keep refreshed because the same person can
+      // legitimately switch browser/device between sessions.
+      posthog.setPersonProperties(props, initialOnly);
     } catch (e) {}
   }
 

@@ -130,3 +130,42 @@ def fetch_pixel_ids(distinct_id: Optional[str]) -> Dict[str, Optional[str]]:
         "fbp": props.get("$fbp"),
         "fbc": props.get("$fbc"),
     }
+
+
+def fetch_device_context(distinct_id: Optional[str]) -> Dict[str, Optional[str]]:
+    """Return device + landing context PostHog stashed for this person.
+
+    Meta CAPI / TikTok EAPI use these to lift Event Match Quality:
+
+      - ``client_ip_address``: PostHog stores the visitor IP as ``$ip``
+        on the person profile (from the ingestion request that captured
+        their pageview). Meta dedupes & cross-references it.
+      - ``client_user_agent``: stashed by ``analytics.js`` as
+        ``raw_user_agent`` because PostHog's auto-captured fields parse
+        the UA but don't keep the raw string.
+      - ``event_source_url``: the actual landing URL with UTMs / fbclid,
+        not the hard-coded homepage default.
+
+    Output shape (any field can be ``None``)::
+
+        {"ip": "...", "user_agent": "...", "event_source_url": "..."}
+    """
+    empty: Dict[str, Optional[str]] = {
+        "ip": None,
+        "user_agent": None,
+        "event_source_url": None,
+    }
+    if not distinct_id:
+        return empty
+    props = fetch_person_properties(distinct_id)
+    if not props:
+        return empty
+    return {
+        "ip": props.get("$ip"),
+        "user_agent": props.get("raw_user_agent") or props.get("$raw_user_agent"),
+        "event_source_url": (
+            props.get("initial_landing_url")
+            or props.get("$initial_current_url")
+            or props.get("$current_url")
+        ),
+    }

@@ -33,7 +33,7 @@ from typing import Any, Dict, Optional
 import httpx
 
 from app.core.config import settings
-from app.core.posthog_persons import fetch_pixel_ids
+from app.core.posthog_persons import fetch_device_context, fetch_pixel_ids
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +127,7 @@ def _send(
         return
 
     pixel_ids = fetch_pixel_ids(posthog_distinct_id)
+    device_ctx = fetch_device_context(posthog_distinct_id)
     external_id_raw = posthog_distinct_id or (
         f"tg_{telegram_id}" if telegram_id else None
     )
@@ -140,13 +141,27 @@ def _send(
         user_data["fbp"] = pixel_ids["fbp"]
     if pixel_ids.get("fbc"):
         user_data["fbc"] = pixel_ids["fbc"]
+    # IP + UA lift Event Match Quality by ~2-3 points each — Meta's
+    # spec recommends them as the primary cross-device identifiers
+    # when hashed PII (email/phone) isn't available. Captured by the
+    # LP pixel and stashed on the PostHog person profile.
+    if device_ctx.get("ip"):
+        user_data["client_ip_address"] = device_ctx["ip"]
+    if device_ctx.get("user_agent"):
+        user_data["client_user_agent"] = device_ctx["user_agent"]
+
+    # Prefer the actual landing URL (with UTMs + fbclid) over the
+    # hard-coded homepage so Meta can stitch the conversion to the
+    # exact ad click. Falls back to "/" for users we have no LP touch
+    # for (rare — bot-only acquisition without web visit).
+    source_url = device_ctx.get("event_source_url") or _EVENT_SOURCE_URL
 
     event_obj: Dict[str, Any] = {
         "event_name": event_name,
         "event_time": int(time.time()),
         "event_id": event_id,
         "action_source": _ACTION_SOURCE,
-        "event_source_url": _EVENT_SOURCE_URL,
+        "event_source_url": source_url,
         "user_data": user_data,
     }
     if custom_data:
