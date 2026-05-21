@@ -36,6 +36,7 @@ from app.bot.api_client import (
     agent_run_workflow,
 )
 from app.bot.billing import check_billing_access
+from app.core import posthog_client
 from app.core.config import settings
 from app.i18n import DEFAULT_LANG, tr
 from app.services.user_time import today_for_user
@@ -46,6 +47,40 @@ router = Router()
 LANG = DEFAULT_LANG
 
 SUPPORT_USERNAME = "nik_kur"
+
+
+# ============ Onboarding step analytics ============
+# Funnel granularity for PostHog: we fire one event per onboarding step so
+# we can see exactly where users drop. The PostHog distinct_id is fetched
+# lazily once per session and cached in FSM state to avoid extra DB roundtrips.
+
+async def _track_onboarding_step(
+    state: FSMContext,
+    telegram_id: int,
+    event: str,
+    **properties,
+) -> None:
+    """Send a funnel event for the current onboarding step.
+
+    Caches the user's posthog_distinct_id in FSM state so we don't hit the
+    DB on every callback. Silent on any failure — analytics never blocks UX.
+    """
+    try:
+        data = await state.get_data()
+        phid = data.get("posthog_distinct_id")
+        if not phid:
+            user = await get_user(telegram_id)
+            phid = (user or {}).get("posthog_distinct_id")
+            if phid:
+                await state.update_data(posthog_distinct_id=phid)
+        posthog_client.capture(
+            event,
+            telegram_id=str(telegram_id),
+            posthog_distinct_id=phid,
+            properties={"funnel": "onboarding", **properties},
+        )
+    except Exception as exc:
+        logger.debug("[onboarding-analytics] %s failed: %s", event, exc)
 
 
 def _get_run_bot_helpers():
@@ -521,6 +556,12 @@ async def _deliver_combined_result(
             f"🥑 {target_fat:.0f} g · 🍞 {target_carbs:.0f} g"
         )
         await message.answer(fallback)
+        await _track_onboarding_step(
+            state,
+            telegram_id,
+            "onboarding_demo_result_failed",
+            step="10_demo_result_failed",
+        )
         await _prompt_my_menu_save(message, state, telegram_id, meal_id=None)
         return
 
@@ -591,6 +632,15 @@ async def _deliver_combined_result(
 
     reply_markup = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
     await message.answer(combined, reply_markup=reply_markup, parse_mode="HTML")
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_demo_result_shown",
+        step="10_demo_result_shown",
+        meal_calories=meal_cal,
+        meal_pct_of_target=pct,
+        target_calories=target_cal,
+    )
 
     # Prompt user to save to My Menu (manual click)
     meal_id = await get_latest_meal_id(telegram_id)
@@ -615,6 +665,13 @@ async def _prompt_my_menu_save(
         )
         await message.answer(SAVE_TO_MENU_TEXT, reply_markup=save_kb)
         await state.set_state(OnboardingStates.my_menu_instruction)
+        await _track_onboarding_step(
+            state,
+            telegram_id,
+            "onboarding_save_menu_prompted",
+            step="11_save_menu_prompted",
+            meal_id=meal_id,
+        )
     else:
         # No meal to save — skip directly to "What else?"
         what_else_kb = InlineKeyboardMarkup(
@@ -630,6 +687,14 @@ async def _prompt_my_menu_save(
             reply_markup=what_else_kb,
         )
         await state.set_state(OnboardingStates.my_menu_instruction)
+        await _track_onboarding_step(
+            state,
+            telegram_id,
+            "onboarding_what_else_prompted",
+            step="11_what_else_prompted",
+            meal_id=None,
+            skipped_save=True,
+        )
 
 
 @router.callback_query(F.data.startswith("onboarding_save_meal:"))
@@ -637,6 +702,12 @@ async def on_onboarding_save_meal(callback: types.CallbackQuery, state: FSMConte
     """User tapped Save to My Menu — perform the save, show confirmation + what else."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_save_meal_clicked",
+        step="12_save_meal_clicked",
+    )
 
     parts = callback.data.split(":", 1)
     try:
@@ -680,6 +751,14 @@ async def start_onboarding(message: types.Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(WELCOME_TEXT, reply_markup=get_start_keyboard())
     await state.set_state(OnboardingStates.waiting_for_start)
+    lang_code = (message.from_user.language_code or "").lower() if message.from_user else ""
+    await _track_onboarding_step(
+        state,
+        message.from_user.id,
+        "onboarding_welcome_shown",
+        step="01_welcome",
+        telegram_language_code=lang_code,
+    )
 
 
 @router.callback_query(F.data == "onboarding_start")
@@ -691,6 +770,12 @@ async def on_onboarding_start(callback: types.CallbackQuery, state: FSMContext) 
         "Example: \"cappuccino and a croissant at Starbucks\""
     )
     await state.set_state(OnboardingStates.waiting_for_demo_meal)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_demo_meal_prompted",
+        step="02_demo_meal_prompt",
+    )
 
 
 @router.message(OnboardingStates.waiting_for_demo_meal, F.text)
@@ -713,6 +798,14 @@ async def on_demo_meal_text(message: types.Message, state: FSMContext) -> None:
     await message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
     await state.update_data(is_onboarding_demo=True)
     await state.set_state(OnboardingStates.waiting_for_goal)
+    await _track_onboarding_step(
+        state,
+        tg_id,
+        "onboarding_demo_meal_submitted",
+        step="03_demo_meal_submitted",
+        input_type="text",
+        text_length=len(user_text),
+    )
 
 
 @router.message(OnboardingStates.waiting_for_demo_meal, F.voice)
@@ -721,6 +814,12 @@ async def on_demo_meal_voice(message: types.Message, state: FSMContext) -> None:
         "Voice input will work great after setup! "
         "For this first demo, please type your meal.\n\n"
         "Example: \"cappuccino and a croissant at Starbucks\""
+    )
+    await _track_onboarding_step(
+        state,
+        message.from_user.id,
+        "onboarding_demo_meal_voice_blocked",
+        step="03_demo_meal_voice_blocked",
     )
 
 
@@ -758,6 +857,14 @@ async def on_demo_meal_photo(message: types.Message, state: FSMContext) -> None:
     await message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
     await state.update_data(is_onboarding_demo=True)
     await state.set_state(OnboardingStates.waiting_for_goal)
+    await _track_onboarding_step(
+        state,
+        tg_id,
+        "onboarding_demo_meal_submitted",
+        step="03_demo_meal_submitted",
+        input_type="photo",
+        has_caption=bool((message.caption or "").strip()),
+    )
 
 
 # ============ Onboarding Handlers — Phase 2: Personalization ============
@@ -772,6 +879,13 @@ async def on_goal_selected(callback: types.CallbackQuery, state: FSMContext) -> 
 
     await callback.message.answer(GENDER_TEXT, reply_markup=get_gender_keyboard())
     await state.set_state(OnboardingStates.waiting_for_gender)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_goal_selected",
+        step="04_goal_selected",
+        goal_type=goal_type,
+    )
 
 
 @router.callback_query(F.data.startswith("gender_"))
@@ -784,6 +898,13 @@ async def on_gender_selected(callback: types.CallbackQuery, state: FSMContext) -
 
     await callback.message.answer(PARAMS_TEXT)
     await state.set_state(OnboardingStates.waiting_for_params)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_gender_selected",
+        step="05_gender_selected",
+        gender=gender,
+    )
 
 
 @router.message(OnboardingStates.waiting_for_params)
@@ -797,6 +918,14 @@ async def on_params_received(message: types.Message, state: FSMContext) -> None:
             "Couldn't parse your data. Please send it in this format:\n"
             "Age, Height (cm), Weight (kg)\n\n"
             "Example: 28, 175, 72"
+        )
+        await _track_onboarding_step(
+            state,
+            message.from_user.id,
+            "onboarding_params_invalid",
+            step="06_params_invalid",
+            reason="not_enough_numbers",
+            numbers_found=len(numbers),
         )
         return
 
@@ -812,7 +941,7 @@ async def on_params_received(message: types.Message, state: FSMContext) -> None:
         if weight_kg < 30 or weight_kg > 300:
             raise ValueError("Weight must be between 30 and 300 kg")
 
-    except (ValueError, IndexError):
+    except (ValueError, IndexError) as exc:
         await message.answer(
             "These values look invalid. Check ranges:\n"
             "• Age: 14-100 years\n"
@@ -820,12 +949,26 @@ async def on_params_received(message: types.Message, state: FSMContext) -> None:
             "• Weight: 30-300 kg\n\n"
             "Try again: 28, 175, 72"
         )
+        await _track_onboarding_step(
+            state,
+            message.from_user.id,
+            "onboarding_params_invalid",
+            step="06_params_invalid",
+            reason="out_of_range",
+        )
         return
 
     await state.update_data(age=age, height_cm=height_cm, weight_kg=weight_kg)
 
     await message.answer(ACTIVITY_TEXT, reply_markup=get_activity_keyboard())
     await state.set_state(OnboardingStates.waiting_for_activity)
+    await _track_onboarding_step(
+        state,
+        message.from_user.id,
+        "onboarding_params_submitted",
+        step="06_params_submitted",
+        age=age,
+    )
 
 
 @router.callback_query(F.data.startswith("activity_"))
@@ -861,6 +1004,14 @@ async def on_activity_selected(callback: types.CallbackQuery, state: FSMContext)
         reply_markup=get_goal_confirmation_keyboard()
     )
     await state.set_state(OnboardingStates.waiting_for_goals_confirmation)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_activity_selected",
+        step="07_activity_selected",
+        activity_level=activity_level,
+        target_calories=targets["target_calories"],
+    )
 
 
 @router.callback_query(F.data == "goals_confirm")
@@ -887,6 +1038,12 @@ async def on_goals_confirmed(callback: types.CallbackQuery, state: FSMContext) -
 
     if not result:
         await callback.message.answer(tr("onboarding.save_error", LANG))
+        await _track_onboarding_step(
+            state,
+            telegram_id,
+            "onboarding_goals_save_error",
+            step="08_goals_save_error",
+        )
         return
 
     await callback.message.answer(
@@ -894,6 +1051,12 @@ async def on_goals_confirmed(callback: types.CallbackQuery, state: FSMContext) -
         reply_markup=get_timezone_keyboard()
     )
     await state.set_state(OnboardingStates.waiting_for_timezone)
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_goals_confirmed",
+        step="08_goals_confirmed",
+    )
 
 
 @router.callback_query(F.data == "goals_manual")
@@ -903,6 +1066,12 @@ async def on_goals_manual(callback: types.CallbackQuery, state: FSMContext) -> N
 
     await callback.message.answer(MANUAL_KBJU_TEXT)
     await state.set_state(OnboardingStates.waiting_for_manual_kbju)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_goals_manual_chosen",
+        step="08_goals_manual_chosen",
+    )
 
 
 @router.message(OnboardingStates.waiting_for_manual_kbju)
@@ -970,6 +1139,13 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
 
     if not result:
         await message.answer(tr("onboarding.save_error", LANG))
+        await _track_onboarding_step(
+            state,
+            telegram_id,
+            "onboarding_goals_save_error",
+            step="08_goals_save_error",
+            mode="manual_kbju",
+        )
         return
 
     await message.answer(
@@ -977,6 +1153,12 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
         reply_markup=get_timezone_keyboard()
     )
     await state.set_state(OnboardingStates.waiting_for_timezone)
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_manual_kbju_submitted",
+        step="08_manual_kbju_submitted",
+    )
 
 
 @router.callback_query(OnboardingStates.waiting_for_timezone, F.data.startswith("tz:"))
@@ -991,10 +1173,24 @@ async def on_timezone_selected(callback: types.CallbackQuery, state: FSMContext)
             tr("onboarding.timezone_other", LANG)
         )
         await state.set_state(OnboardingStates.waiting_for_timezone_text)
+        await _track_onboarding_step(
+            state,
+            callback.from_user.id,
+            "onboarding_timezone_other_chosen",
+            step="09_timezone_other_chosen",
+        )
         return
 
     telegram_id = callback.from_user.id
     await update_user(telegram_id, timezone=tz_value)
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_timezone_selected",
+        step="09_timezone_selected",
+        timezone=tz_value,
+        input_method="preset",
+    )
 
     data = await state.get_data()
     if data.get("is_onboarding_demo"):
@@ -1014,10 +1210,24 @@ async def on_timezone_text_received(message: types.Message, state: FSMContext) -
         await message.answer(
             tr("onboarding.timezone_invalid", LANG, tz=tz_text)
         )
+        await _track_onboarding_step(
+            state,
+            message.from_user.id,
+            "onboarding_timezone_invalid",
+            step="09_timezone_invalid",
+        )
         return
 
     telegram_id = message.from_user.id
     await update_user(telegram_id, timezone=tz_text)
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_timezone_selected",
+        step="09_timezone_selected",
+        timezone=tz_text,
+        input_method="text",
+    )
 
     data = await state.get_data()
     if data.get("is_onboarding_demo"):
@@ -1033,6 +1243,12 @@ async def on_what_else(callback: types.CallbackQuery, state: FSMContext) -> None
     """User tapped 'What else can YumYummy do?' — send feature guide + trial CTA."""
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_what_else_clicked",
+        step="13_what_else_clicked",
+    )
 
     await callback.message.answer(FEATURE_GUIDE_TEXT)
 
@@ -1046,6 +1262,12 @@ async def on_what_else(callback: types.CallbackQuery, state: FSMContext) -> None
     )
     await callback.message.answer(TRIAL_CTA_TEXT, reply_markup=trial_kb)
     await state.set_state(OnboardingStates.trial_activation)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_trial_cta_shown",
+        step="14_trial_cta_shown",
+    )
 
 
 async def _send_feature_guide(message: types.Message, state: FSMContext) -> None:
@@ -1059,6 +1281,13 @@ async def _send_feature_guide(message: types.Message, state: FSMContext) -> None
     )
     await message.answer("Ready to finish setup?", reply_markup=continue_kb)
     await state.set_state(OnboardingStates.feature_guide)
+    await _track_onboarding_step(
+        state,
+        message.from_user.id if message.from_user else 0,
+        "onboarding_feature_guide_shown",
+        step="13_feature_guide_shown",
+        path="legacy_recalc",
+    )
 
 
 @router.callback_query(F.data == "onboarding_feature_guide_next")
@@ -1073,6 +1302,13 @@ async def on_feature_guide_next(callback: types.CallbackQuery, state: FSMContext
     )
     await callback.message.answer(TRIAL_CTA_TEXT, reply_markup=trial_kb)
     await state.set_state(OnboardingStates.trial_activation)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_trial_cta_shown",
+        step="14_trial_cta_shown",
+        path="legacy_recalc",
+    )
 
 
 @router.callback_query(F.data == "onboarding_start_trial")
@@ -1082,7 +1318,16 @@ async def on_start_trial(callback: types.CallbackQuery, state: FSMContext) -> No
 
     telegram_id = callback.from_user.id
 
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_trial_button_clicked",
+        step="15_trial_button_clicked",
+    )
+
     await start_trial(telegram_id)
+    # Setting onboarding_completed=True here will also fire the
+    # `onboarding_completed` event via the backend (see app/main.py).
     await update_user(telegram_id, onboarding_completed=True)
 
     await callback.message.answer(
