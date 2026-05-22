@@ -647,6 +647,64 @@ async def _deliver_combined_result(
     await _prompt_my_menu_save(message, state, telegram_id, meal_id)
 
 
+async def _deliver_skipped_summary(
+    message: types.Message, state: FSMContext, telegram_id: int
+) -> None:
+    """Compact post-questionnaire path for users who skipped the demo meal.
+
+    Shows daily targets + a 'What else?' button (no meal result, no
+    'Save to My Menu' step). Phase 3 (feature guide → trial CTA) is
+    triggered by the same `onboarding_what_else` callback as the
+    normal flow, so nothing downstream changes.
+    """
+    data = await state.get_data()
+    target_cal = data.get("target_calories", 2000)
+    target_prot = data.get("target_protein_g", 150)
+    target_fat = data.get("target_fat_g", 65)
+    target_carbs = data.get("target_carbs_g", 200)
+
+    summary = (
+        "You're all set 🎯\n\n"
+        "Your daily targets:\n"
+        f"🔥 {target_cal:.0f} kcal\n"
+        f"🥩 Protein: {target_prot:.0f} g\n"
+        f"🥑 Fat: {target_fat:.0f} g\n"
+        f"🍞 Carbs: {target_carbs:.0f} g\n\n"
+        "You can adjust these any time in Profile."
+    )
+    await message.answer(summary)
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_skipped_summary_shown",
+        step="10_skipped_summary_shown",
+        target_calories=target_cal,
+    )
+
+    what_else_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✨ What else can YumYummy do?",
+                callback_data="onboarding_what_else",
+            )]
+        ]
+    )
+    await message.answer(
+        "Want to see what else I can do for you?",
+        reply_markup=what_else_kb,
+    )
+    await state.set_state(OnboardingStates.my_menu_instruction)
+    await _track_onboarding_step(
+        state,
+        telegram_id,
+        "onboarding_what_else_prompted",
+        step="11_what_else_prompted",
+        meal_id=None,
+        skipped_save=True,
+        via="demo_skipped",
+    )
+
+
 async def _prompt_my_menu_save(
     message: types.Message,
     state: FSMContext,
@@ -765,9 +823,24 @@ async def start_onboarding(message: types.Message, state: FSMContext) -> None:
 async def on_onboarding_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
+    # Offer a "Skip for now" exit because the demo-meal request is the
+    # single biggest drop in the funnel (~71% of users who tap Start
+    # do not actually send a meal). Skipping bypasses the agent demo
+    # but still routes through goals → targets → feature guide → trial
+    # — i.e. the rest of onboarding stays smooth.
+    skip_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="↪ Skip for now",
+                callback_data="onboarding_demo_meal_skip",
+            )]
+        ]
+    )
     await callback.message.answer(
         "Tell me what you had for your last meal — text, voice, or photo all work.\n"
-        "Example: \"cappuccino and a croissant at Starbucks\""
+        "Example: \"cappuccino and a croissant at Starbucks\"\n\n"
+        "Or skip and I'll set up your daily targets first.",
+        reply_markup=skip_kb,
     )
     await state.set_state(OnboardingStates.waiting_for_demo_meal)
     await _track_onboarding_step(
@@ -775,6 +848,32 @@ async def on_onboarding_start(callback: types.CallbackQuery, state: FSMContext) 
         callback.from_user.id,
         "onboarding_demo_meal_prompted",
         step="02_demo_meal_prompt",
+    )
+
+
+@router.callback_query(F.data == "onboarding_demo_meal_skip")
+async def on_demo_meal_skip(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Skip the demo-meal step and jump straight to the goal questionnaire.
+
+    Sets `demo_skipped=True` (without `is_onboarding_demo`) so that the
+    timezone handler routes to `_deliver_skipped_summary` instead of
+    `_deliver_combined_result` (which waits for a non-existent agent
+    result). All later steps (feature guide, trial CTA) stay unchanged.
+    """
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(
+        "No problem — let's set up your daily targets first. "
+        "You can log meals any time after that."
+    )
+    await callback.message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
+    await state.update_data(demo_skipped=True, is_onboarding_demo=False)
+    await state.set_state(OnboardingStates.waiting_for_goal)
+    await _track_onboarding_step(
+        state,
+        callback.from_user.id,
+        "onboarding_demo_meal_skipped",
+        step="03_demo_meal_skipped",
     )
 
 
@@ -1046,6 +1145,24 @@ async def on_goals_confirmed(callback: types.CallbackQuery, state: FSMContext) -
         )
         return
 
+    # Recalc path (entered from Profile → "Recalculate targets") stops
+    # here. The user just wanted updated KBJU; we must not re-run
+    # timezone / feature guide / trial CTA for an existing user.
+    if data.get("recalc_mode"):
+        await callback.message.answer(
+            "✅ Targets updated.",
+            reply_markup=get_main_menu_keyboard(),
+        )
+        await _track_onboarding_step(
+            state,
+            telegram_id,
+            "profile_targets_recalculated",
+            step="recalc_done",
+            mode="calculated",
+        )
+        await state.clear()
+        return
+
     await callback.message.answer(
         tr("onboarding.timezone_prompt", LANG),
         reply_markup=get_timezone_keyboard()
@@ -1148,6 +1265,23 @@ async def on_manual_kbju_received(message: types.Message, state: FSMContext) -> 
         )
         return
 
+    # Same recalc short-circuit as goals_confirmed: existing users
+    # who entered via Profile shouldn't be re-onboarded.
+    if data.get("recalc_mode"):
+        await message.answer(
+            "✅ Targets updated.",
+            reply_markup=get_main_menu_keyboard(),
+        )
+        await _track_onboarding_step(
+            state,
+            telegram_id,
+            "profile_targets_recalculated",
+            step="recalc_done",
+            mode="manual_kbju",
+        )
+        await state.clear()
+        return
+
     await message.answer(
         tr("onboarding.timezone_prompt", LANG),
         reply_markup=get_timezone_keyboard()
@@ -1196,7 +1330,10 @@ async def on_timezone_selected(callback: types.CallbackQuery, state: FSMContext)
     if data.get("is_onboarding_demo"):
         await _deliver_combined_result(callback.message, state, telegram_id)
     else:
-        await _send_feature_guide(callback.message, state)
+        # Skip path (or any non-demo path) shows a compact targets
+        # summary and routes into the same Phase 3 (feature guide →
+        # trial CTA) via the "What else?" button.
+        await _deliver_skipped_summary(callback.message, state, telegram_id)
 
 
 @router.message(OnboardingStates.waiting_for_timezone_text)
@@ -1233,7 +1370,7 @@ async def on_timezone_text_received(message: types.Message, state: FSMContext) -
     if data.get("is_onboarding_demo"):
         await _deliver_combined_result(message, state, telegram_id)
     else:
-        await _send_feature_guide(message, state)
+        await _deliver_skipped_summary(message, state, telegram_id)
 
 
 # ============ Onboarding Handlers — Phase 3: Feature Guide + Trial ============
@@ -1725,6 +1862,12 @@ async def on_profile_recalculate(callback: types.CallbackQuery, state: FSMContex
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
 
+    # Reuse the onboarding questionnaire (goal → gender → params →
+    # activity → goals_confirm) but mark it as a recalc so the handlers
+    # stop after saving targets instead of continuing into timezone +
+    # trial CTA, which would re-run full onboarding for an existing user.
+    await state.clear()
+    await state.update_data(recalc_mode=True)
     await callback.message.answer(GOAL_TEXT, reply_markup=get_goal_keyboard())
     await state.set_state(OnboardingStates.waiting_for_goal)
 
