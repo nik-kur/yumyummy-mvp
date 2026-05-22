@@ -82,7 +82,7 @@ def _build_event_id(event_kind: str, user_id: int, suffix: str = "") -> str:
     return ":".join(parts)
 
 
-def _post_event_blocking(body: Dict[str, Any], event: str) -> None:
+def _post_event_blocking(body: Dict[str, Any], event: str, match_keys: str) -> None:
     """The actual HTTPS call. Runs inside the dispatcher thread."""
     try:
         resp = httpx.post(
@@ -108,9 +108,98 @@ def _post_event_blocking(body: Dict[str, Any], event: str) -> None:
         if not payload.get("events_received"):
             logger.warning("[meta-capi] %s -> unexpected response %s", event, payload)
             return
-        logger.info("[meta-capi] %s sent OK", event)
+        # `match_keys` summarises which Meta match parameters we
+        # actually populated for this event (e.g. "fbp,fbc,ip,ua").
+        # Tracking this in logs lets us spot Event Match Quality
+        # regressions before they nuke campaign attribution. A line
+        # with `match_keys=external_id` only is the canonical "this
+        # event will not attribute" signature.
+        logger.info("[meta-capi] %s sent OK match_keys=%s", event, match_keys or "none")
     except Exception as exc:
         logger.debug("[meta-capi] %s send failed: %s", event, exc)
+
+
+# How long to wait inside the daemon thread before lookup, to give
+# PostHog's person-profile pipeline time to ingest the just-arrived
+# pageview / fbp / fbc / IP. ~4 seconds is a conservative middle ground
+# between "before PostHog has indexed the user" (≤2s = nothing) and "the
+# attribution window starts to close" (Meta is fine with up to 24h late
+# events, so any further delay buys nothing).
+_LOOKUP_DELAY_SECONDS = 4.0
+
+
+def _collect_user_data(
+    *,
+    posthog_distinct_id: Optional[str],
+    telegram_id: Optional[str],
+) -> tuple[Dict[str, Any], Optional[str], list[str]]:
+    """Fetch match keys from PostHog and assemble Meta's user_data.
+
+    Returns (user_data, event_source_url, match_keys) so callers can log
+    which signals the event actually carried.
+    """
+    pixel_ids = fetch_pixel_ids(posthog_distinct_id)
+    device_ctx = fetch_device_context(posthog_distinct_id)
+    external_id_raw = posthog_distinct_id or (
+        f"tg_{telegram_id}" if telegram_id else None
+    )
+
+    user_data: Dict[str, Any] = {}
+    match_keys: list[str] = []
+    if external_id_raw:
+        user_data["external_id"] = _sha256(external_id_raw)
+        match_keys.append("external_id")
+    if pixel_ids.get("fbp"):
+        user_data["fbp"] = pixel_ids["fbp"]
+        match_keys.append("fbp")
+    if pixel_ids.get("fbc"):
+        user_data["fbc"] = pixel_ids["fbc"]
+        match_keys.append("fbc")
+    if device_ctx.get("ip"):
+        user_data["client_ip_address"] = device_ctx["ip"]
+        match_keys.append("ip")
+    if device_ctx.get("user_agent"):
+        user_data["client_user_agent"] = device_ctx["user_agent"]
+        match_keys.append("ua")
+
+    source_url = device_ctx.get("event_source_url")
+    return user_data, source_url, match_keys
+
+
+def _dispatch(
+    body: Dict[str, Any],
+    event_name: str,
+    event_obj: Dict[str, Any],
+    posthog_distinct_id: Optional[str],
+    telegram_id: Optional[str],
+    initial_match_keys: list[str],
+) -> None:
+    """Daemon-thread body: optionally re-query PostHog (to pick up just-
+    ingested fbp/fbc), patch user_data, then POST to Meta CAPI.
+
+    The re-query is gated on the first call returning a weak match-key
+    set (external_id only). For users we already matched on fbp/fbc we
+    skip the delay entirely and send immediately.
+    """
+    weak_match = not any(k in initial_match_keys for k in ("fbp", "fbc", "ip"))
+    final_match_keys = list(initial_match_keys)
+
+    if weak_match and posthog_distinct_id:
+        time.sleep(_LOOKUP_DELAY_SECONDS)
+        new_user_data, new_source_url, new_match_keys = _collect_user_data(
+            posthog_distinct_id=posthog_distinct_id,
+            telegram_id=telegram_id,
+        )
+        # Only swap in the retry's user_data if it actually picked up
+        # additional signals — otherwise keep the original to avoid
+        # accidentally regressing (e.g. retry returns an empty dict).
+        if any(k in new_match_keys for k in ("fbp", "fbc", "ip", "ua")):
+            event_obj["user_data"] = new_user_data
+            if new_source_url:
+                event_obj["event_source_url"] = new_source_url
+            final_match_keys = new_match_keys
+
+    _post_event_blocking(body, event_name, ",".join(final_match_keys))
 
 
 def _send(
@@ -126,42 +215,17 @@ def _send(
     if not _enabled():
         return
 
-    pixel_ids = fetch_pixel_ids(posthog_distinct_id)
-    device_ctx = fetch_device_context(posthog_distinct_id)
-    external_id_raw = posthog_distinct_id or (
-        f"tg_{telegram_id}" if telegram_id else None
+    user_data, source_url, match_keys = _collect_user_data(
+        posthog_distinct_id=posthog_distinct_id,
+        telegram_id=telegram_id,
     )
-
-    user_data: Dict[str, Any] = {}
-    if external_id_raw:
-        # Meta accepts either a single string or an array. Single
-        # string is fine for one identifier.
-        user_data["external_id"] = _sha256(external_id_raw)
-    if pixel_ids.get("fbp"):
-        user_data["fbp"] = pixel_ids["fbp"]
-    if pixel_ids.get("fbc"):
-        user_data["fbc"] = pixel_ids["fbc"]
-    # IP + UA lift Event Match Quality by ~2-3 points each — Meta's
-    # spec recommends them as the primary cross-device identifiers
-    # when hashed PII (email/phone) isn't available. Captured by the
-    # LP pixel and stashed on the PostHog person profile.
-    if device_ctx.get("ip"):
-        user_data["client_ip_address"] = device_ctx["ip"]
-    if device_ctx.get("user_agent"):
-        user_data["client_user_agent"] = device_ctx["user_agent"]
-
-    # Prefer the actual landing URL (with UTMs + fbclid) over the
-    # hard-coded homepage so Meta can stitch the conversion to the
-    # exact ad click. Falls back to "/" for users we have no LP touch
-    # for (rare — bot-only acquisition without web visit).
-    source_url = device_ctx.get("event_source_url") or _EVENT_SOURCE_URL
 
     event_obj: Dict[str, Any] = {
         "event_name": event_name,
         "event_time": int(time.time()),
         "event_id": event_id,
         "action_source": _ACTION_SOURCE,
-        "event_source_url": source_url,
+        "event_source_url": source_url or _EVENT_SOURCE_URL,
         "user_data": user_data,
     }
     if custom_data:
@@ -172,8 +236,8 @@ def _send(
         body["test_event_code"] = settings.meta_capi_test_event_code
 
     threading.Thread(
-        target=_post_event_blocking,
-        args=(body, event_name),
+        target=_dispatch,
+        args=(body, event_name, event_obj, posthog_distinct_id, telegram_id, match_keys),
         daemon=True,
         name=f"meta-capi-{event_name}",
     ).start()

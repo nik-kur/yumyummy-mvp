@@ -54,6 +54,14 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 30 * 60
+# PostHog person profiles are eventually consistent — fbp/fbc/ip can take
+# 10-30s to surface after the first LP pageview. If our first lookup is
+# faster than that, we'd otherwise pin an empty dict for the full 30 min
+# and starve Meta CAPI / TikTok EAPI of match keys for the entire user
+# lifecycle. Cache empty results for only a minute so the next CAPI event
+# (StartTrial, Subscribe) gets a fresh chance to pull the now-populated
+# properties.
+_EMPTY_CACHE_TTL_SECONDS = 60
 _cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 
 
@@ -81,8 +89,11 @@ def fetch_person_properties(distinct_id: str) -> Dict[str, Any]:
 
     now = time.time()
     cached = _cache.get(distinct_id)
-    if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
-        return cached[1]
+    if cached:
+        cached_at, cached_props = cached
+        ttl = _CACHE_TTL_SECONDS if cached_props else _EMPTY_CACHE_TTL_SECONDS
+        if (now - cached_at) < ttl:
+            return cached_props
 
     url = f"{_api_base()}/api/projects/{settings.posthog_project_id}/persons/"
     try:
@@ -106,7 +117,10 @@ def fetch_person_properties(distinct_id: str) -> Dict[str, Any]:
 
     _cache[distinct_id] = (now, props)
     logger.debug(
-        "[posthog-persons] cached %d props for %s", len(props), distinct_id
+        "[posthog-persons] cached %d props for %s (ttl=%ds)",
+        len(props),
+        distinct_id,
+        _CACHE_TTL_SECONDS if props else _EMPTY_CACHE_TTL_SECONDS,
     )
     return props
 
