@@ -50,6 +50,50 @@
     return typeof s === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(s);
   }
 
+  // Duplicated from analytics.js so that open.js — which runs BEFORE
+  // analytics.js's deferred script — can seed the same yy_phid value.
+  // The first direct-to-bot visitor lands here with no ?phid= on the
+  // URL and no localStorage either; if we don't generate one
+  // synchronously we'd ship the tg:// link with utm_source / ref as
+  // the start payload, the bot would treat it as acquisition_source
+  // (not posthog_distinct_id), and the CAPI client wouldn't be able
+  // to look up the landing_attribution row that analytics.js writes
+  // a few hundred ms later. Generating here keeps the bot's
+  // posthog_distinct_id and our DB row keyed by the same id.
+  function uuidv4() {
+    try {
+      if (window.crypto && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+    } catch (e) {}
+    var rnd = new Array(16);
+    if (window.crypto && typeof crypto.getRandomValues === 'function') {
+      var buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      for (var i = 0; i < 16; i++) rnd[i] = buf[i];
+    } else {
+      for (var j = 0; j < 16; j++) rnd[j] = Math.floor(Math.random() * 256);
+    }
+    rnd[6] = (rnd[6] & 0x0f) | 0x40;
+    rnd[8] = (rnd[8] & 0x3f) | 0x80;
+    var hex = rnd.map(function (b) { return (b + 0x100).toString(16).slice(1); });
+    return (hex[0]+hex[1]+hex[2]+hex[3]+'-'+hex[4]+hex[5]+'-'+
+            hex[6]+hex[7]+'-'+hex[8]+hex[9]+'-'+
+            hex[10]+hex[11]+hex[12]+hex[13]+hex[14]+hex[15]);
+  }
+
+  function getOrCreateStoredPhid() {
+    try {
+      var existing = window.localStorage && localStorage.getItem('yy_phid');
+      if (existing && /^[A-Za-z0-9_-]{1,64}$/.test(existing)) return existing;
+    } catch (e) {}
+    var fresh = uuidv4();
+    try {
+      if (window.localStorage) localStorage.setItem('yy_phid', fresh);
+    } catch (e) {}
+    return fresh;
+  }
+
   function safePostHog(fn) {
     // PostHog's official snippet replaces window.posthog with a stub
     // that queues calls until array.js loads. Calling capture/register
@@ -64,26 +108,34 @@
   // -- 1. Read incoming attribution params --------------------------
 
   // Priority for the bot /start payload (must be Telegram-safe):
-  //   1. ?phid=<posthog_distinct_id> — preferred, propagated by
-  //      analytics.js when the user clicks a CTA on the LP.
-  //   2. ?start=<value> — if the caller passes an explicit Telegram
-  //      start payload, honour it.
-  //   3. ?ref=<location> — landed-CTA-source slug like "hero" or
+  //   1. ?phid=<posthog_distinct_id> — preferred, set by analytics.js
+  //      when the user clicked a CTA on the LP (LP-first traffic).
+  //   2. localStorage('yy_phid') — direct-to-bot ads that target /open
+  //      directly arrive without ?phid= on the URL. We seed the same
+  //      yy_phid analytics.js will later use, so the bot's
+  //      posthog_distinct_id matches the key we write to
+  //      landing_attribution. Without this, CAPI lookups by phid
+  //      would miss the row for every direct-to-bot ad click.
+  //   3. ?start=<value> — explicit Telegram start payload override
+  //      (kept for backwards compat with hand-crafted deep-links).
+  //   4. ?ref=<location> — landed-CTA-source slug like "hero" or
   //      "footer". Helpful for ad campaigns that link directly to
-  //      /open?ref=tiktok_video1 without going through the LP.
-  //   4. utm_source — last-resort campaign-level slug.
-  //   5. null — open the bot without a /start payload. Telegram will
+  //      /open?ref=tiktok_video1 without using utm_source.
+  //   5. utm_source — last-resort campaign-level slug.
+  //   6. null — open the bot without a /start payload. Telegram will
   //      show the bot intro and the user can tap Start manually.
   var phid    = getParam('phid');
   var startQ  = getParam('start');
   var refQ    = getParam('ref');
   var utmSrc  = getParam('utm_source');
+  var storedPhid = getOrCreateStoredPhid();
 
   var startPayload = null;
-  if (isValidStartParam(phid))   startPayload = phid;
-  else if (isValidStartParam(startQ)) startPayload = startQ;
-  else if (isValidStartParam(refQ))   startPayload = refQ;
-  else if (isValidStartParam(utmSrc)) startPayload = utmSrc;
+  if (isValidStartParam(phid))         startPayload = phid;
+  else if (isValidStartParam(storedPhid)) startPayload = storedPhid;
+  else if (isValidStartParam(startQ))  startPayload = startQ;
+  else if (isValidStartParam(refQ))    startPayload = refQ;
+  else if (isValidStartParam(utmSrc))  startPayload = utmSrc;
 
   // -- 2. Build the deep-link + fallback URLs -----------------------
 
@@ -156,10 +208,11 @@
         ref: refQ || null,
         phid_present: !!phid,
         start_payload_kind: startPayload ? (
-          startPayload === phid ? 'phid' :
-          startPayload === startQ ? 'start' :
-          startPayload === refQ ? 'ref' :
-          startPayload === utmSrc ? 'utm_source' : 'other'
+          startPayload === phid      ? 'phid' :
+          startPayload === storedPhid ? 'stored_phid' :
+          startPayload === startQ    ? 'start' :
+          startPayload === refQ      ? 'ref' :
+          startPayload === utmSrc    ? 'utm_source' : 'other'
         ) : 'none',
         in_app_browser: env.in_app_browser,
         platform: env.platform,

@@ -1614,6 +1614,24 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     source = _normalise_acquisition_source(user_in.acquisition_source)
     phid = _normalise_acquisition_source(user_in.posthog_distinct_id)
 
+    # Direct-to-bot ad clicks now land on /open with a phid as the
+    # /start payload (so CAPI can later match by phid → landing_attribution).
+    # That means the bot has no acquisition_source slug to pass. We
+    # recover it server-side from the same landing_attribution row the
+    # LP wrote, falling back to utm_source → utm_campaign.
+    if source is None and phid:
+        try:
+            la = (
+                db.query(LandingAttribution)
+                .filter(LandingAttribution.phid == phid)
+                .first()
+            )
+        except Exception:
+            la = None
+        if la is not None:
+            candidate = la.utm_source or la.utm_campaign
+            source = _normalise_acquisition_source(candidate)
+
     existing = db.query(User).filter(User.telegram_id == user_in.telegram_id).first()
     if existing:
         changed = False
