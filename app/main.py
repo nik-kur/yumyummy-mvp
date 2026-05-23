@@ -4,7 +4,8 @@ import re
 from datetime import date as date_type
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
@@ -33,6 +34,7 @@ from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
 from app.models.notification_event import NotificationEvent
 from app.models.acquisition_event import AcquisitionEvent
+from app.models.landing_attribution import LandingAttribution
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.meal import MealCreate, MealRead, MealUpdate, DaySummary
 from app.models.saved_meal import SavedMeal
@@ -57,7 +59,12 @@ from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.services.agent_persist import persist_agent_result
 from app.services.usage_guardrails import record_usage_for_telegram_user
 from app.billing.access import has_access, compute_access_status
-from app.core import posthog_client, tiktok_events_client, meta_capi_client
+from app.core import (
+    posthog_client,
+    tiktok_events_client,
+    meta_capi_client,
+    landing_attribution as landing_attribution_cache,
+)
 from app.ai.stt_client import transcribe_audio
 from anyio import to_thread
 from openai import OpenAI
@@ -80,6 +87,28 @@ except ImportError:
             pass
 
 app = FastAPI(title="YumYummy API")
+
+
+# CORS — needed for the marketing site (yumyummy.ai) to POST attribution
+# data to /api/v1/landing-attribution from the browser. We only allow the
+# specific origins that serve our LP; everything else stays same-origin /
+# server-to-server and doesn't need cross-origin permissions.
+#
+# We deliberately keep methods/headers narrow because the only browser
+# request hitting this API today is the landing-attribution POST. If
+# more public endpoints get added later they should call out their own
+# requirements rather than us opening the surface up here.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://yumyummy.ai",
+        "https://www.yumyummy.ai",
+    ],
+    allow_credentials=False,
+    allow_methods=["POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+    max_age=86400,
+)
 
 
 # Alembic migrations are applied via Render's pre-deploy command
@@ -1400,6 +1429,149 @@ async def agent_run(
             items=[],
             source_url=None,
         )
+
+
+# ---------- LANDING ATTRIBUTION (Meta CAPI / TikTok EAPI match keys) ----------
+#
+# Called from the marketing site whenever it has match keys to share
+# (fbp/fbc cookies, ttp, fbclid, etc.). Body is small, request is
+# fire-and-forget from the LP side via navigator.sendBeacon().
+#
+# Server captures IP and UA from request headers, then UPSERTs by phid.
+# Subsequent CAPI events for the same phid pull from this table instead
+# of (or in addition to) PostHog's Persons API, which gives us:
+#
+#   - Reliable client IP for Meta EMQ (PostHog stores $ip on the event
+#     row, not the person row, so Persons API returns null for it).
+#   - No 10-30s PostHog ingestion lag.
+#   - No ad-block / iOS-cookie blast radius — IP/UA come from the HTTP
+#     request itself.
+#
+# This endpoint is intentionally unauthenticated. The data shape (cookie
+# values, IP, UA, URL) is already visible to anyone running the LP, and
+# the only effect of spoofing is poisoning a single phid's CAPI match
+# quality — there's no PII to leak and no state to mutate beyond a
+# single row.
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# Same charset & length as Telegram deep-link start params so a phid
+# accepted here can also be passed verbatim to t.me/<bot>?start=<phid>.
+_PHID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+class LandingAttributionPayload(BaseModel):
+    """Match keys the LP scrapes from the browser before passing to us."""
+
+    phid: str = Field(..., min_length=1, max_length=64)
+
+    # Meta match keys captured from document.cookie / query string.
+    fbp: Optional[str] = Field(default=None, max_length=255)
+    fbc: Optional[str] = Field(default=None, max_length=1024)
+    fbclid: Optional[str] = Field(default=None, max_length=1024)
+
+    # TikTok match keys.
+    ttp: Optional[str] = Field(default=None, max_length=255)
+    ttclid: Optional[str] = Field(default=None, max_length=1024)
+
+    # Optional client-supplied URL — we still trust the request's
+    # headers for IP/UA, but the browser knows the actual landing URL
+    # better than we do (proxies / CDNs rewrite Referer).
+    landing_url: Optional[str] = Field(default=None, max_length=2048)
+
+    utm_source: Optional[str] = Field(default=None, max_length=255)
+    utm_medium: Optional[str] = Field(default=None, max_length=255)
+    utm_campaign: Optional[str] = Field(default=None, max_length=255)
+    utm_term: Optional[str] = Field(default=None, max_length=255)
+    utm_content: Optional[str] = Field(default=None, max_length=255)
+
+    model_config = ConfigDict(extra="ignore")
+
+
+def _client_ip_from_request(request: Request) -> Optional[str]:
+    """Pull the real visitor IP from proxy headers (Render fronts us
+    with a Cloudflare-style proxy that always sets X-Forwarded-For).
+
+    We take the **first** entry in X-Forwarded-For because that's the
+    leftmost (most-original) client IP per the RFC 7239 / de facto
+    convention. Render's load balancer appends its own IP after, so
+    splitting on comma and trimming whitespace gives us the right one.
+    """
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        first = xff.split(",")[0].strip()
+        if first:
+            return first
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return None
+
+
+@app.post("/api/v1/landing-attribution", status_code=204)
+def upsert_landing_attribution(
+    payload: LandingAttributionPayload,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """UPSERT a landing_attribution row keyed by phid.
+
+    Idempotent: same phid pushing again merges fresh non-null values
+    into the existing row (we never overwrite a previously-set value
+    with NULL — the second push might be a returning visitor without
+    the original fbclid, and we don't want to lose attribution).
+    """
+    if not _PHID_RE.fullmatch(payload.phid):
+        # Bad phid is the only thing we hard-reject; everything else is
+        # best-effort. 422 from FastAPI's validator would be louder but
+        # since the LP fires this in the background we want it quiet.
+        raise HTTPException(status_code=400, detail="Invalid phid")
+
+    ip = _client_ip_from_request(request)
+    ua = request.headers.get("user-agent")
+
+    existing = (
+        db.query(LandingAttribution)
+        .filter(LandingAttribution.phid == payload.phid)
+        .first()
+    )
+
+    incoming = {
+        "fbp": payload.fbp,
+        "fbc": payload.fbc,
+        "fbclid": payload.fbclid,
+        "ttp": payload.ttp,
+        "ttclid": payload.ttclid,
+        "ip": ip,
+        "user_agent": ua,
+        "landing_url": payload.landing_url,
+        "utm_source": payload.utm_source,
+        "utm_medium": payload.utm_medium,
+        "utm_campaign": payload.utm_campaign,
+        "utm_term": payload.utm_term,
+        "utm_content": payload.utm_content,
+    }
+
+    if existing is None:
+        row = LandingAttribution(phid=payload.phid, **incoming)
+        db.add(row)
+    else:
+        # Merge: only overwrite when the new value is non-null. This
+        # keeps the very-first fbclid / utm_source on file even if a
+        # returning visitor lands on the LP organically later.
+        for field, value in incoming.items():
+            if value is not None and value != "":
+                setattr(existing, field, value)
+
+    db.commit()
+    # Drop the negative cache entry that may have been pinned during
+    # a CAPI lookup that raced this write. The next /start → CAPI
+    # event will then hit the DB and pick up the fresh row.
+    landing_attribution_cache.invalidate_cache(payload.phid)
+    return None
 
 
 # ---------- USERS ----------

@@ -211,6 +211,90 @@
     } catch (e) {}
   }
 
+  // -- Server-side attribution push --------------------------------
+  //
+  // Meta CAPI scores every server event by Event Match Quality (EMQ).
+  // The strongest match keys are fbp/fbc (set by the browser pixel) plus
+  // client IP and User-Agent. PostHog's Persons API can surface fbp/fbc
+  // (we already stash them on the person profile in syncPixelsToPostHog)
+  // but NOT IP — PostHog stores `$ip` on the event row, not the person
+  // row, so the lookup our backend does for CAPI sees a null IP every
+  // time. Result: EMQ ~2-3/10 and zero campaign attribution.
+  //
+  // To fix that, we POST the same match keys (+ landing URL + UTMs)
+  // straight to our backend so it can persist them in `landing_attribution`
+  // keyed by phid. The backend grabs the real client IP from the request
+  // headers (Render fronts us with X-Forwarded-For) and the UA from the
+  // request headers — both of which the browser can't reliably tell us
+  // and PostHog can't reliably forward. When the same user then hits
+  // /start in the bot, the Meta CAPI client looks up that row by phid
+  // and ships fbp + fbc + IP + UA + external_id in user_data, lifting
+  // EMQ to ~7+/10.
+  //
+  // The push is fire-and-forget via navigator.sendBeacon so it survives
+  // page unloads (critical: the user typically taps the CTA right after
+  // the LP loads). Idempotent on the server side — same phid pushing
+  // again merges fresh non-null values without overwriting earlier
+  // signals (e.g. fbclid that was on the LP URL but isn't on
+  // subsequent in-app navigations).
+  var ATTRIBUTION_API_URL = 'https://yumyummy-mvp-eu.onrender.com/api/v1/landing-attribution';
+  var lastAttributionHash = null;
+
+  function pushLandingAttribution() {
+    if (!bootstrapPhid) return;
+    var ck = readPixelCookies();
+    var url = '';
+    try { url = window.location && window.location.href ? String(window.location.href) : ''; } catch (e) {}
+    var payload = {
+      phid: bootstrapPhid,
+      fbp: ck._fbp || null,
+      fbc: ck._fbc || null,
+      fbclid: currentUtms.fbclid || null,
+      ttp: ck._ttp || null,
+      ttclid: currentUtms.ttclid || null,
+      landing_url: url || null,
+      utm_source: currentUtms.utm_source || null,
+      utm_medium: currentUtms.utm_medium || null,
+      utm_campaign: currentUtms.utm_campaign || null,
+      utm_term: currentUtms.utm_term || null,
+      utm_content: currentUtms.utm_content || null,
+    };
+    var body;
+    try { body = JSON.stringify(payload); } catch (e) { return; }
+    // De-duplicate: only fire when something actually changed since the
+    // last push. Without this we'd send 3-4 identical requests per page
+    // load (initial sync, pixel settle timer, pre-CTA refresh).
+    if (body === lastAttributionHash) return;
+    try {
+      if (navigator && typeof navigator.sendBeacon === 'function') {
+        // sendBeacon with an application/json Blob triggers a CORS
+        // preflight, which the backend accepts via the CORSMiddleware
+        // it enables for yumyummy.ai. The preflight cost is paid once
+        // per origin (browser caches OPTIONS for 24h).
+        var blob = new Blob([body], { type: 'application/json' });
+        var ok = navigator.sendBeacon(ATTRIBUTION_API_URL, blob);
+        if (ok) {
+          lastAttributionHash = body;
+          return;
+        }
+      }
+      // Fallback for browsers without sendBeacon, or when the beacon
+      // queue is full. `keepalive` lets the request finish even after
+      // the page navigates away (same survivability as sendBeacon).
+      if (typeof fetch === 'function') {
+        fetch(ATTRIBUTION_API_URL, {
+          method: 'POST',
+          body: body,
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          mode: 'cors',
+          credentials: 'omit',
+        }).catch(function () {});
+        lastAttributionHash = body;
+      }
+    } catch (e) {}
+  }
+
   // Server-side ad attribution (Meta CAPI, TikTok EAPI) needs the raw
   // User-Agent and the actual landing URL — Meta's match-quality scoring
   // weighs these heavily (~+2 EMQ points combined). PostHog auto-captures
@@ -497,6 +581,13 @@
             // delay navigation.
             refreshBotHrefAtClick(el, isBot, href);
             href = (el.getAttribute && el.getAttribute('href')) || href;
+            // Last-chance push of match keys before the user leaves the
+            // page. sendBeacon survives navigation; this is critical for
+            // the bot-bound CTA because the next event our backend sees
+            // for this user is /start, and CAPI fires within milliseconds
+            // of that — so we want the freshest fbp/fbc/UTMs on file
+            // BEFORE the user even reaches Telegram.
+            try { pushLandingAttribution(); } catch (e) {}
             var ctaId = inferCtaId(el);
             var ctaLocation = inferCtaLocation(el);
             try {
@@ -568,6 +659,12 @@
     // anywhere in the funnel.
     rewriteBotLinks(bootstrapPhid);
 
+    // First attribution push — fires immediately with whatever we have
+    // (phid + UTMs + any pixel cookies already set on returning
+    // visitors). Subsequent pushes (below) refine the payload as Meta
+    // and TikTok pixels finish setting their cookies.
+    pushLandingAttribution();
+
     // Stage 2 — re-rewrite once posthog.get_distinct_id() agrees with
     // bootstrapPhid (sanity check) and pixel cookies have settled.
     // This is mostly a no-op for phid (we already wrote it in stage 1)
@@ -591,16 +688,29 @@
           rewriteBotLinks(did);
         }
         syncPixelsToPostHog();
+        pushLandingAttribution();
         return;
       }
       if (attempts++ < 20) setTimeout(tryFinalize, 100);
-      else syncPixelsToPostHog();
+      else {
+        syncPixelsToPostHog();
+        pushLandingAttribution();
+      }
     }
     tryFinalize();
 
     // Meta + TikTok pixels set their cookies asynchronously after
     // their respective SDK scripts load, so re-sync once more after
     // they've had time to settle. Belt + suspenders.
-    setTimeout(syncPixelsToPostHog, 1500);
+    setTimeout(function () {
+      syncPixelsToPostHog();
+      pushLandingAttribution();
+    }, 1500);
+
+    // Final attribution push at 4s: catches pixel cookies that finished
+    // settling after the 1.5s tick (slow tier-3 mobile networks where
+    // Meta/TikTok SDK loads take >2s). After this point the CTA click
+    // hook below is the only remaining touchpoint.
+    setTimeout(pushLandingAttribution, 4000);
   });
 })();

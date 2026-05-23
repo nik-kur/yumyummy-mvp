@@ -33,6 +33,10 @@ from typing import Any, Dict, Optional
 import httpx
 
 from app.core.config import settings
+from app.core.landing_attribution import (
+    fetch_landing_attribution,
+    invalidate_cache as invalidate_landing_cache,
+)
 from app.core.posthog_persons import fetch_device_context, fetch_pixel_ids
 
 logger = logging.getLogger(__name__)
@@ -133,11 +137,26 @@ def _collect_user_data(
     posthog_distinct_id: Optional[str],
     telegram_id: Optional[str],
 ) -> tuple[Dict[str, Any], Optional[str], list[str]]:
-    """Fetch match keys from PostHog and assemble Meta's user_data.
+    """Assemble Meta's ``user_data`` payload from every signal source.
 
-    Returns (user_data, event_source_url, match_keys) so callers can log
-    which signals the event actually carried.
+    Returns ``(user_data, event_source_url, match_keys)`` so callers can
+    log which match parameters the event actually carried.
+
+    Source precedence (highest match quality first):
+
+    1. ``landing_attribution`` table — server-captured IP/UA + browser-
+       reported fbp/fbc, written when the visitor first hit yumyummy.ai.
+       Always reliable because IP comes from the HTTP request itself.
+    2. PostHog Persons API — fallback for legacy users (signed up
+       before the landing_attribution endpoint shipped) or direct-to-bot
+       users who never hit the LP. PostHog stores ``$ip`` event-scoped
+       so this often misses the IP field.
+
+    For each match key we use the first non-null value across the two
+    sources. ``external_id`` is always derived (phid > tg_<id>) so it's
+    independent of these lookups.
     """
+    landing = fetch_landing_attribution(posthog_distinct_id)
     pixel_ids = fetch_pixel_ids(posthog_distinct_id)
     device_ctx = fetch_device_context(posthog_distinct_id)
     external_id_raw = posthog_distinct_id or (
@@ -146,23 +165,38 @@ def _collect_user_data(
 
     user_data: Dict[str, Any] = {}
     match_keys: list[str] = []
+
     if external_id_raw:
         user_data["external_id"] = _sha256(external_id_raw)
         match_keys.append("external_id")
-    if pixel_ids.get("fbp"):
-        user_data["fbp"] = pixel_ids["fbp"]
+
+    fbp = landing.get("fbp") or pixel_ids.get("fbp")
+    if fbp:
+        user_data["fbp"] = fbp
         match_keys.append("fbp")
-    if pixel_ids.get("fbc"):
-        user_data["fbc"] = pixel_ids["fbc"]
+
+    fbc = landing.get("fbc") or pixel_ids.get("fbc")
+    if fbc:
+        user_data["fbc"] = fbc
         match_keys.append("fbc")
-    if device_ctx.get("ip"):
-        user_data["client_ip_address"] = device_ctx["ip"]
+
+    # IP comes from landing_attribution (server-captured from HTTP
+    # headers). PostHog's $ip is event-scoped so the Persons API only
+    # exposes it sporadically; we keep the fallback for legacy users
+    # who pre-date the landing_attribution table.
+    ip = landing.get("ip") or device_ctx.get("ip")
+    if ip:
+        user_data["client_ip_address"] = ip
         match_keys.append("ip")
-    if device_ctx.get("user_agent"):
-        user_data["client_user_agent"] = device_ctx["user_agent"]
+
+    ua = landing.get("user_agent") or device_ctx.get("user_agent")
+    if ua:
+        user_data["client_user_agent"] = ua
         match_keys.append("ua")
 
-    source_url = device_ctx.get("event_source_url")
+    # Prefer the LP-captured landing URL (it has the original fbclid /
+    # UTMs) over PostHog's reconstruction.
+    source_url = landing.get("landing_url") or device_ctx.get("event_source_url")
     return user_data, source_url, match_keys
 
 
@@ -186,6 +220,11 @@ def _dispatch(
 
     if weak_match and posthog_distinct_id:
         time.sleep(_LOOKUP_DELAY_SECONDS)
+        # Drop the negative cache entry pinned by the first lookup so the
+        # retry actually hits PostHog / the landing_attribution table.
+        # Without this the in-process cache short-circuits the retry and
+        # we never pick up data that landed during the 4s sleep.
+        invalidate_landing_cache(posthog_distinct_id)
         new_user_data, new_source_url, new_match_keys = _collect_user_data(
             posthog_distinct_id=posthog_distinct_id,
             telegram_id=telegram_id,

@@ -11,3 +11,4 @@ from app.models.usage_record import UsageRecord  # noqa
 from app.models.churn_survey import ChurnSurvey  # noqa
 from app.models.notification_event import NotificationEvent  # noqa
 from app.models.acquisition_event import AcquisitionEvent  # noqa
+from app.models.landing_attribution import LandingAttribution  # noqa
