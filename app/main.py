@@ -1512,23 +1512,39 @@ def _client_ip_from_request(request: Request) -> Optional[str]:
 
 
 @app.post("/api/v1/landing-attribution", status_code=204)
-def upsert_landing_attribution(
-    payload: LandingAttributionPayload,
+async def upsert_landing_attribution(
     request: Request,
     db: Session = Depends(get_db),
 ):
     """UPSERT a landing_attribution row keyed by phid.
+
+    Reads the body as raw bytes and parses JSON manually. This lets
+    the LP / /open page POST with Content-Type=text/plain via
+    `navigator.sendBeacon`, which avoids the CORS preflight that
+    Meta/Instagram in-app browsers were dropping during the 250 ms
+    handoff to `tg://`. We still accept application/json for older
+    clients and tests — the parser doesn't care about the header.
 
     Idempotent: same phid pushing again merges fresh non-null values
     into the existing row (we never overwrite a previously-set value
     with NULL — the second push might be a returning visitor without
     the original fbclid, and we don't want to lose attribution).
     """
+    try:
+        raw = await request.body()
+        if not raw:
+            return None
+        data = json.loads(raw.decode("utf-8", errors="replace"))
+        if not isinstance(data, dict):
+            return None
+        payload = LandingAttributionPayload(**data)
+    except Exception:
+        # Quiet failure — the LP fires this in the background and we
+        # don't want a 422/400 surfaced to a beacon the user never sees.
+        return None
+
     if not _PHID_RE.fullmatch(payload.phid):
-        # Bad phid is the only thing we hard-reject; everything else is
-        # best-effort. 422 from FastAPI's validator would be louder but
-        # since the LP fires this in the background we want it quiet.
-        raise HTTPException(status_code=400, detail="Invalid phid")
+        return None
 
     ip = _client_ip_from_request(request)
     ua = request.headers.get("user-agent")

@@ -267,11 +267,16 @@
     if (body === lastAttributionHash) return;
     try {
       if (navigator && typeof navigator.sendBeacon === 'function') {
-        // sendBeacon with an application/json Blob triggers a CORS
-        // preflight, which the backend accepts via the CORSMiddleware
-        // it enables for yumyummy.ai. The preflight cost is paid once
-        // per origin (browser caches OPTIONS for 24h).
-        var blob = new Blob([body], { type: 'application/json' });
+        // CRITICAL: type must stay 'text/plain'. text/plain is one of
+        // the three CORS "simple" content types so the browser skips
+        // the OPTIONS preflight entirely. Using 'application/json' here
+        // (the natural choice) made every Meta/Instagram in-app browser
+        // drop the request — the preflight never completed before
+        // open.js redirected to tg://, the OS suspended the webview,
+        // and our success rate sat at ~1.7% (May 23–24 production
+        // data). The server reads the raw body regardless of
+        // Content-Type and parses it as JSON.
+        var blob = new Blob([body], { type: 'text/plain' });
         var ok = navigator.sendBeacon(ATTRIBUTION_API_URL, blob);
         if (ok) {
           lastAttributionHash = body;
@@ -281,11 +286,13 @@
       // Fallback for browsers without sendBeacon, or when the beacon
       // queue is full. `keepalive` lets the request finish even after
       // the page navigates away (same survivability as sendBeacon).
+      // Same Content-Type discipline as above — keep it simple to skip
+      // the preflight.
       if (typeof fetch === 'function') {
         fetch(ATTRIBUTION_API_URL, {
           method: 'POST',
           body: body,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           keepalive: true,
           mode: 'cors',
           credentials: 'omit',

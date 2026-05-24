@@ -105,6 +105,80 @@
     } catch (e) {}
   }
 
+  // Read a single cookie by name. Used to grab Meta/TikTok pixel ids
+  // (_fbp, _fbc, _ttp) which are how the server-side CAPI/EAPI clients
+  // match a Telegram /start back to the original ad click.
+  function readCookie(name) {
+    try {
+      var raw = document.cookie || '';
+      var prefix = name + '=';
+      var parts = raw.split(';');
+      for (var i = 0; i < parts.length; i++) {
+        var c = parts[i].trim();
+        if (c.indexOf(prefix) === 0) return c.substring(prefix.length);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // Synchronous landing_attribution push.
+  //
+  // analytics.js also pushes the same payload a few ms later (it's a
+  // deferred script, runs after the parser finishes <body>). The catch
+  // is that /open redirects to `tg://` 250 ms after this script
+  // executes, so on slow mobile networks the deferred script's push
+  // may race the page transition. Firing here, *synchronously at the
+  // top of the critical path*, buys us the full 250 ms of grace before
+  // the OS suspends the webview.
+  //
+  // Content-Type stays 'text/plain' on purpose — it's one of the three
+  // CORS simple types, so the browser skips the OPTIONS preflight that
+  // Meta/Instagram in-app browsers would otherwise drop during the
+  // tg:// handoff. The server reads the raw body and parses JSON,
+  // ignoring the header.
+  var ATTRIBUTION_API_URL = 'https://yumyummy-mvp-eu.onrender.com/api/v1/landing-attribution';
+
+  function pushLandingAttributionEarly(phidValue) {
+    if (!phidValue) return;
+    var params = null;
+    try { params = new URLSearchParams(window.location.search); } catch (e) {}
+    function q(key) { return params ? (params.get(key) || null) : null; }
+    var payload = {
+      phid: phidValue,
+      fbp: readCookie('_fbp'),
+      fbc: readCookie('_fbc'),
+      fbclid: q('fbclid'),
+      ttp: readCookie('_ttp'),
+      ttclid: q('ttclid'),
+      landing_url: (function () {
+        try { return window.location.href || null; } catch (e) { return null; }
+      })(),
+      utm_source: q('utm_source'),
+      utm_medium: q('utm_medium'),
+      utm_campaign: q('utm_campaign'),
+      utm_term: q('utm_term'),
+      utm_content: q('utm_content'),
+    };
+    var body;
+    try { body = JSON.stringify(payload); } catch (e) { return; }
+    try {
+      if (navigator && typeof navigator.sendBeacon === 'function') {
+        var blob = new Blob([body], { type: 'text/plain' });
+        if (navigator.sendBeacon(ATTRIBUTION_API_URL, blob)) return;
+      }
+      if (typeof fetch === 'function') {
+        fetch(ATTRIBUTION_API_URL, {
+          method: 'POST',
+          body: body,
+          headers: { 'Content-Type': 'text/plain' },
+          keepalive: true,
+          mode: 'cors',
+          credentials: 'omit',
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+
   // -- 1. Read incoming attribution params --------------------------
 
   // Priority for the bot /start payload (must be Telegram-safe):
@@ -136,6 +210,16 @@
   else if (isValidStartParam(startQ))  startPayload = startQ;
   else if (isValidStartParam(refQ))    startPayload = refQ;
   else if (isValidStartParam(utmSrc))  startPayload = utmSrc;
+
+  // Fire the attribution beacon NOW — synchronously, before the 250 ms
+  // tg:// timer below. Direct-to-bot Meta ads land on /open and the
+  // OS suspends the webview during the handoff to Telegram; the
+  // deferred analytics.js push would race that suspension and lose
+  // ~98% of writes on Meta in-app browsers (May 23–24 production).
+  // We key by whichever phid we actually pass to the bot, so the CAPI
+  // client's later `fetch_landing_attribution(users.posthog_distinct_id)`
+  // matches this exact row.
+  pushLandingAttributionEarly(phid || storedPhid);
 
   // -- 2. Build the deep-link + fallback URLs -----------------------
 
