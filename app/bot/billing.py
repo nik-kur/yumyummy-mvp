@@ -10,13 +10,16 @@ from typing import Optional
 
 from aiogram import Bot, Router, types, F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
 
 from app.core.config import settings
 from app.billing.plans import get_plans, get_active_plan, SUBSCRIPTION_PERIOD_SECONDS
+from app.core import posthog_client
 from app.i18n import DEFAULT_LANG, tr
 from app.bot.api_client import (
     get_billing_status,
+    get_user,
     start_trial,
     record_payment_success,
     cancel_subscription,
@@ -290,9 +293,52 @@ async def check_billing_access(message: types.Message) -> bool:
 # ---------------------------------------------------------------------------
 
 @router.callback_query(F.data == "billing:start_trial")
-async def handle_start_trial(query: types.CallbackQuery) -> None:
+async def handle_start_trial(query: types.CallbackQuery, state: FSMContext) -> None:
     await query.answer()
     tg_id = query.from_user.id
+
+    # Guard: do not let users grab a trial via the paywall without completing
+    # onboarding first. This callback is reachable from the paywall the bot
+    # shows when an unsetup user sends any plain text/voice/photo, and the
+    # original implementation just called start_trial() — which set
+    # trial_started_at without any goals/targets/timezone, leaving the user
+    # in a permanently broken "trial active but no profile" state.
+    #
+    # Two real users hit this lazy path from Meta ads on 2026-05-26 (PT, QA),
+    # both with onboarding_completed=False and all profile fields NULL after
+    # the trial fired. We now redirect them into start_onboarding(), which
+    # itself exposes a "↪ Skip for now" button at the demo-meal step so a
+    # user who truly doesn't want to onboard still has an escape hatch
+    # without bypassing goals/targets setup entirely.
+    user = await get_user(tg_id)
+    if user is not None and not user.get("onboarding_completed", False):
+        logger.info(
+            "[BILLING] paywall trial redirected to onboarding tg_id=%s "
+            "(onboarding_completed=False, prevents profile-less trial)",
+            tg_id,
+        )
+        posthog_client.capture(
+            "paywall_trial_redirected_to_onboarding",
+            telegram_id=tg_id,
+            posthog_distinct_id=user.get("posthog_distinct_id"),
+            properties={
+                "acquisition_source": user.get("acquisition_source"),
+            },
+        )
+        try:
+            await query.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await query.message.answer(
+            "Let's set up your goals first — takes about 30 seconds, and "
+            "your trial activates right at the end."
+        )
+        # Lazy import: app.bot.onboarding imports check_billing_access from
+        # this module, so a top-level import would create a cycle.
+        from app.bot.onboarding import start_onboarding
+        await start_onboarding(query.message, state)
+        return
+
     result = await start_trial(tg_id)
     if result is None:
         await query.message.answer(tr("billing.activate_trial_error", LANG))
