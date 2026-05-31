@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     meta_capi_test_event_code: Optional[str] = None  # optional: TEST_xxx code
     meta_api_version: str = "v21.0"               # Graph API version
 
+    # Internal developer allowlist. Comma-separated Telegram numeric IDs
+    # allowed to run hidden dev/QA commands (e.g. /forceonboarding). When
+    # unset, nobody is authorized and those commands silently no-op, so they
+    # can't be discovered or abused by real users.
+    dev_telegram_ids: Optional[str] = None
+
     # Billing / Paddle
     paddle_enabled: bool = False
     paddle_environment: str = "sandbox"  # "sandbox" | "production"
@@ -91,6 +97,18 @@ class Settings(BaseSettings):
     paddle_client_side_token: Optional[str] = None
     paddle_price_id_monthly: Optional[str] = None
     paddle_price_id_yearly: Optional[str] = None
+
+    @property
+    def dev_telegram_id_set(self) -> set[int]:
+        """Parsed set of authorized developer Telegram IDs."""
+        if not self.dev_telegram_ids:
+            return set()
+        out: set[int] = set()
+        for part in self.dev_telegram_ids.split(","):
+            part = part.strip()
+            if part.isdigit():
+                out.add(int(part))
+        return out
 
     model_config = SettingsConfigDict(
         env_file=".env",

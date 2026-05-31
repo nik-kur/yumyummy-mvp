@@ -753,6 +753,31 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
 
+@router.message(Command("forceonboarding"))
+async def cmd_force_onboarding(message: types.Message, state: FSMContext) -> None:
+    """Hidden developer/QA command: replay the full onboarding flow from the
+    welcome message, regardless of the user's current onboarding state.
+
+    Gated to the Telegram IDs in settings.dev_telegram_ids. For anyone not on
+    the allowlist (including when no allowlist is configured) the handler stays
+    completely silent — no reply, no hint that the command exists — so it can't
+    be discovered or abused by real users. It is intentionally NOT registered
+    in the bot's command menu or /help for the same reason.
+    """
+    tg_id = message.from_user.id
+    if tg_id not in settings.dev_telegram_id_set:
+        logger.info("[DEV] /forceonboarding denied for tg_id=%s", tg_id)
+        return
+
+    logger.info("[DEV] /forceonboarding triggered by tg_id=%s", tg_id)
+    # Reset the completion flag and any in-flight FSM state, then ensure the
+    # backend profile exists before replaying onboarding from the welcome step.
+    await update_user(tg_id, onboarding_completed=False)
+    await state.clear()
+    await ensure_user(tg_id)
+    await start_onboarding(message, state)
+
+
 @router.message(Command("help"))
 async def cmd_help(message: types.Message) -> None:
     text = (
