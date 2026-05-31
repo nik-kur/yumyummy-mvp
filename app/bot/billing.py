@@ -20,6 +20,7 @@ from app.i18n import DEFAULT_LANG, tr
 from app.bot.api_client import (
     get_billing_status,
     get_user,
+    ensure_user,
     start_trial,
     record_payment_success,
     cancel_subscription,
@@ -138,6 +139,16 @@ async def _create_plan_button(bot, plan, tg_id: int) -> types.InlineKeyboardButt
 async def _build_paywall_keyboard(
     bot, tg_id: int, show_trial: bool,
 ) -> types.InlineKeyboardMarkup:
+    # The paywall can be reached from entry points that never created a
+    # backend profile (e.g. `/subscribe` typed before `/start`, or after a
+    # data deletion). When that happens the per-plan checkout calls below hit
+    # `/billing/{paddle,gumroad}/checkout`, which return 404 "User not found"
+    # and leave the user with broken/missing card buttons (see Sentry
+    # YUMYUMMY-BOT-7 / BOT-8). `ensure_user` is an idempotent upsert
+    # (first-touch attribution wins), so this guarantees a profile exists
+    # before we request any checkout URL.
+    await ensure_user(tg_id)
+
     buttons = []
     if show_trial:
         buttons.append([

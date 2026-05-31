@@ -561,6 +561,17 @@ async def _check_and_send_notifications(bot: Bot):
         ).all()
 
         for user in users:
+            # Skip synthetic/E2E test accounts whose telegram_id is not a
+            # real numeric Telegram ID (e.g. '224534233_e2e_test_20260508_b').
+            # Downstream notification sending does int(tg_id), which would
+            # otherwise raise ValueError on every scheduler pass and flood
+            # Sentry (see YUMYUMMY-BOT-5: 207 occurrences, 0 real users).
+            if not str(user.telegram_id).isdigit():
+                logger.debug(
+                    "Skipping notifications for non-numeric telegram_id=%r (test account)",
+                    user.telegram_id,
+                )
+                continue
             try:
                 await _process_user_notifications(bot, db, user)
             except Exception as e:
