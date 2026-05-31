@@ -9,6 +9,7 @@ import json
 import re
 import logging
 from datetime import date as date_type, timedelta
+from pathlib import Path
 from typing import Optional
 
 from aiogram import Router, types, F
@@ -19,6 +20,7 @@ from aiogram.types import (
     KeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    FSInputFile,
 )
 
 from app.bot.api_client import (
@@ -194,6 +196,44 @@ def calculate_targets(
 
 
 # ============ Texts ============
+
+ONBOARDING_VIDEO_PATH = Path(__file__).parent / "assets" / "onboarding_video.mp4"
+
+ONBOARDING_VIDEO_CAPTION = "🎬 New here? Here's a quick 40-sec look at how YumYummy works."
+
+# Telegram returns a reusable file_id after the first upload. We cache it
+# in-process so every subsequent welcome message reuses the already-uploaded
+# video instead of re-streaming ~4 MB from disk on each /start.
+_onboarding_video_file_id: Optional[str] = None
+
+
+async def _send_onboarding_video(message: types.Message) -> None:
+    """Send the onboarding intro video, caching Telegram's file_id.
+
+    Best-effort: any failure (missing file, network, etc.) is swallowed so
+    the welcome flow always proceeds to the text + 'Let's try' button.
+    """
+    global _onboarding_video_file_id
+    try:
+        if _onboarding_video_file_id:
+            video = _onboarding_video_file_id
+        else:
+            if not ONBOARDING_VIDEO_PATH.exists():
+                logger.warning(
+                    "[onboarding] intro video missing at %s", ONBOARDING_VIDEO_PATH
+                )
+                return
+            video = FSInputFile(ONBOARDING_VIDEO_PATH)
+
+        sent = await message.answer_video(
+            video=video,
+            caption=ONBOARDING_VIDEO_CAPTION,
+        )
+        if sent and sent.video and not _onboarding_video_file_id:
+            _onboarding_video_file_id = sent.video.file_id
+    except Exception as exc:
+        logger.warning("[onboarding] failed to send intro video: %s", exc)
+
 
 WELCOME_TEXT = (
     "👋 Hi! I'm YumYummy — your AI nutrition tracker in Telegram.\n\n"
@@ -807,6 +847,10 @@ async def on_onboarding_save_meal(callback: types.CallbackQuery, state: FSMConte
 
 async def start_onboarding(message: types.Message, state: FSMContext) -> None:
     await state.clear()
+    # Show the intro video first so the welcome text + "Let's try" button stay
+    # the last (and freshest) message users act on. Best-effort: if the video
+    # can't be sent, onboarding still continues with the text below.
+    await _send_onboarding_video(message)
     await message.answer(WELCOME_TEXT, reply_markup=get_start_keyboard())
     await state.set_state(OnboardingStates.waiting_for_start)
     lang_code = (message.from_user.language_code or "").lower() if message.from_user else ""
