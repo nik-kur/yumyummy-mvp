@@ -1,6 +1,8 @@
 from app.db.base import Base
 
 # Импорты моделей, чтобы Alembic их видел
+from app.models.account import Account, Identity  # noqa
+from app.models.auth_code import AuthOneTimeCode  # noqa
 from app.models.user import User  # noqa
 from app.models.user_day import UserDay  # noqa
 from app.models.meal_entry import MealEntry  # noqa

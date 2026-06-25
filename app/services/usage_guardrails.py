@@ -21,17 +21,17 @@ def _as_float(value: Any) -> float:
         return 0.0
 
 
-def record_usage_for_telegram_user(
+def record_usage_for_user(
     db: Session,
-    telegram_id: str,
+    user: Optional[User],
     usage_data: Optional[Dict[str, Any]],
     intent: Optional[str] = None,
 ) -> Optional[UsageRecord]:
-    if not usage_data:
-        return None
+    """Record an agent run's cost/tokens against an already-resolved ``User``.
 
-    user = db.query(User).filter(User.telegram_id == telegram_id).first()
-    if not user:
+    Shared core for both the Telegram path and the mobile-app path.
+    """
+    if not usage_data or user is None:
         return None
 
     cost_info = usage_data.get("cost", {}) if isinstance(usage_data, dict) else {}
@@ -64,3 +64,19 @@ def record_usage_for_telegram_user(
     db.refresh(usage_record)
     db.refresh(user)
     return usage_record
+
+
+def record_usage_for_telegram_user(
+    db: Session,
+    telegram_id: str,
+    usage_data: Optional[Dict[str, Any]],
+    intent: Optional[str] = None,
+) -> Optional[UsageRecord]:
+    if not usage_data:
+        return None
+
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        return None
+
+    return record_usage_for_user(db, user, usage_data, intent=intent)

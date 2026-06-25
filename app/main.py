@@ -196,6 +196,23 @@ app.include_router(paddle_webhook_router)
 from app.api.billing_admin import router as billing_admin_router
 app.include_router(billing_admin_router)
 
+# ---- Mobile app (cross-platform identity, JWT auth) ----
+# Auth (Sign in with Apple/Google, email magic-code, Telegram linking)
+from app.api.auth import router as auth_router
+app.include_router(auth_router)
+
+# Account-scoped, JWT-authenticated app API (profile, diary, meals, agent)
+from app.api.app_api import router as app_api_router
+app.include_router(app_api_router)
+
+# Meal-photo upload presign (R2/S3)
+from app.api.uploads import router as uploads_router
+app.include_router(uploads_router)
+
+# Adapty webhook (App Store / Play entitlement -> account)
+from app.api.adapty_webhook import router as adapty_webhook_router
+app.include_router(adapty_webhook_router)
+
 
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):

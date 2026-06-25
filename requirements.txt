@@ -17,3 +17,8 @@ anyio
 pytz
 sentry-sdk[fastapi]>=2.18.0
 posthog>=3.7.0
+# Mobile app: JWT auth (our access tokens + verifying Apple/Google identity
+# tokens via JWKS). The [crypto] extra pulls in `cryptography` for RS256.
+PyJWT[crypto]>=2.8.0
+# Mobile app: object storage (Cloudflare R2 / AWS S3) for meal photos
+boto3>=1.34.0

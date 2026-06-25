@@ -62,3 +62,19 @@ def get_active_plan(plan_id: str) -> Optional[Plan]:
     if plan and plan.is_active:
         return plan
     return None
+
+
+def resolve_trial_days(requested: Optional[int] = None) -> int:
+    """Resolve the trial length for an app sign-up.
+
+    Adapty drives the cohort (we A/B-test 3 vs 7), so the value is passed in
+    from the client. We validate it against the configured allow-list and
+    fall back to the default to prevent a tampered client from minting an
+    arbitrarily long free trial.
+    """
+    from app.core.config import settings
+
+    allowed = settings.app_trial_days_allowed_set
+    if requested is not None and requested in allowed:
+        return requested
+    return settings.app_trial_days_default

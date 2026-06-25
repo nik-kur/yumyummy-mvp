@@ -98,6 +98,76 @@ class Settings(BaseSettings):
     paddle_price_id_monthly: Optional[str] = None
     paddle_price_id_yearly: Optional[str] = None
 
+    # ------------------------------------------------------------------
+    # Mobile app — authentication (JWT)
+    # ------------------------------------------------------------------
+    # HS256 signing secret for the access tokens we mint for the iOS/Android
+    # app. Leave unset in environments that don't serve the app (the auth
+    # endpoints will return 503 rather than mint insecure tokens).
+    jwt_secret: Optional[str] = None
+    jwt_access_ttl_days: int = 30
+
+    # Sign in with Apple / Google — the `aud` we expect in the provider's
+    # identity/ID token. Comma-separated values are accepted (e.g. an iOS
+    # client id plus a web client id for Google).
+    apple_client_id: Optional[str] = None   # iOS bundle id / Apple Services ID
+    google_client_id: Optional[str] = None
+
+    # Passwordless email login (one-time 6-digit code).
+    auth_email_code_ttl_minutes: int = 15
+    # DEV ONLY: when true, the request endpoint returns the code in its JSON
+    # response so flows can be tested before an email provider is wired up.
+    auth_email_debug_return_code: bool = False
+
+    # Telegram <-> app linking code lifetime.
+    auth_link_code_ttl_minutes: int = 15
+
+    # ------------------------------------------------------------------
+    # Mobile app — trial & Adapty
+    # ------------------------------------------------------------------
+    # Default free-trial length for app sign-ups. Adapty drives the actual
+    # value per A/B cohort (we currently test 3 vs 7), validated against the
+    # allow-list below.
+    app_trial_days_default: int = 3
+    app_trial_days_allowed: str = "3,7"
+
+    adapty_enabled: bool = False
+    # Shared secret Adapty sends in the webhook's Authorization header.
+    adapty_webhook_secret: Optional[str] = None
+    # Map Adapty vendor product ids -> our internal plan ids.
+    adapty_product_monthly: Optional[str] = None
+    adapty_product_yearly: Optional[str] = None
+
+    # ------------------------------------------------------------------
+    # Object storage (Cloudflare R2 / AWS S3) for meal photos
+    # ------------------------------------------------------------------
+    storage_enabled: bool = False
+    storage_bucket: Optional[str] = None
+    storage_region: Optional[str] = None
+    storage_endpoint_url: Optional[str] = None   # set this for Cloudflare R2
+    storage_access_key_id: Optional[str] = None
+    storage_secret_access_key: Optional[str] = None
+    storage_public_base_url: Optional[str] = None  # CDN / public read base
+    storage_presign_ttl_seconds: int = 900
+
+    @property
+    def app_trial_days_allowed_set(self) -> set[int]:
+        out: set[int] = set()
+        for part in (self.app_trial_days_allowed or "").split(","):
+            part = part.strip()
+            if part.isdigit():
+                out.add(int(part))
+        out.add(self.app_trial_days_default)
+        return out
+
+    @property
+    def apple_client_id_set(self) -> set[str]:
+        return {p.strip() for p in (self.apple_client_id or "").split(",") if p.strip()}
+
+    @property
+    def google_client_id_set(self) -> set[str]:
+        return {p.strip() for p in (self.google_client_id or "").split(",") if p.strip()}
+
     @property
     def dev_telegram_id_set(self) -> set[int]:
         """Parsed set of authorized developer Telegram IDs."""

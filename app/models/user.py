@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, func
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, func
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -8,7 +8,16 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    telegram_id = Column(String, unique=True, index=True, nullable=False)
+    # Nullable since the introduction of the cross-platform identity model:
+    # app-only users (Sign in with Apple/Google/email) have no Telegram id.
+    # Still unique — Postgres allows many NULLs under a UNIQUE index, so the
+    # bot's one-row-per-telegram-id guarantee is preserved.
+    telegram_id = Column(String, unique=True, index=True, nullable=True)
+
+    # Links this diary/profile container to its owning Account. Nullable for
+    # backwards-compatibility; backfilled 1:1 for every pre-existing user by
+    # the ``add_accounts_identities`` migration.
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True, index=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -66,6 +75,7 @@ class User(Base):
     posthog_distinct_id = Column(String, nullable=True, index=True)
 
     # Связи
+    account = relationship("Account", back_populates="users")
     days = relationship("UserDay", back_populates="user")
     meals = relationship("MealEntry", back_populates="user")
     saved_meals = relationship("SavedMeal", back_populates="user")
