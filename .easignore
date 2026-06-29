@@ -1,0 +1,44 @@
+# EAS Build archive ignore list.
+# IMPORTANT: when this file exists, EAS uses it INSTEAD of .gitignore, so it
+# must be complete. Goal: upload only the mobile/ app source (native projects
+# and node_modules are regenerated in the cloud), not the backend or media.
+
+# --- Dependencies & build artifacts (regenerated during the build) ---
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# --- Generated native projects (Expo prebuild recreates them in CI) ---
+/mobile/ios/
+/mobile/android/
+
+# --- Python caches / virtualenvs ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- Secrets & local-only files (env vars come from eas.json build profiles) ---
+.env
+.env*.local
+.DS_Store
+.idea/
+.vscode/
+
+# --- Heavy media / docs not needed to build the iOS app (anchored to repo root) ---
+/Demos/
+/docs/
+/evals/
+/yumyummy-mvp-strategy/
+/landing-backup/
+*.xlsx
+*.pdf
+
+# --- Python backend: not part of the mobile build (anchored so it never
+#     matches mobile/src/app, which is the expo-router screens directory) ---
+/app/
+/alembic/
+/tests/
+/scripts/
+dummy.db

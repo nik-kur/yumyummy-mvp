@@ -1,0 +1,178 @@
+/**
+ * TypeScript mirrors of the Phase 1 backend schemas
+ * (`app/schemas/app_api.py`, `app/schemas/auth.py`, `app/schemas/meal.py`,
+ * `app/schemas/saved_meal.py`, `app/schemas/ai.py`).
+ */
+
+export type AccessStatus =
+  | 'new'
+  | 'trial'
+  | 'active'
+  | 'trial_expired'
+  | 'expired';
+
+export type AccuracyLevel = 'EXACT' | 'ESTIMATE' | 'APPROX';
+
+export interface BillingSnapshot {
+  access_status: string;
+  trial_started_at?: string | null;
+  trial_ends_at?: string | null;
+  trial_days_remaining?: number | null;
+  subscription_plan_id?: string | null;
+  subscription_ends_at?: string | null;
+  subscription_auto_renew?: boolean | null;
+  subscription_provider?: string | null;
+  usage_cost_current_period: number;
+  usage_cap_usd?: number | null;
+  usage_exceeded: boolean;
+}
+
+export interface AccountProfile {
+  account_id: number;
+  user_id: number;
+  telegram_id?: string | null;
+  linked_providers: string[];
+  goal_type?: string | null;
+  gender?: string | null;
+  age?: number | null;
+  height_cm?: number | null;
+  weight_kg?: number | null;
+  activity_level?: string | null;
+  target_calories?: number | null;
+  target_protein_g?: number | null;
+  target_fat_g?: number | null;
+  target_carbs_g?: number | null;
+  onboarding_completed: boolean;
+  timezone?: string | null;
+  billing: BillingSnapshot;
+}
+
+export interface AccountProfileUpdate {
+  goal_type?: string | null;
+  gender?: string | null;
+  age?: number | null;
+  height_cm?: number | null;
+  weight_kg?: number | null;
+  activity_level?: string | null;
+  target_calories?: number | null;
+  target_protein_g?: number | null;
+  target_fat_g?: number | null;
+  target_carbs_g?: number | null;
+  onboarding_completed?: boolean | null;
+  timezone?: string | null;
+}
+
+export interface MealRead {
+  id: number;
+  eaten_at: string;
+  description_user: string;
+  calories: number;
+  protein_g: number;
+  fat_g: number;
+  carbs_g: number;
+  /** Not returned by the current API MealRead, but used client-side / in mocks. */
+  accuracy_level?: AccuracyLevel;
+  source?: string;
+}
+
+export interface DaySummary {
+  user_id: number;
+  date: string;
+  total_calories: number;
+  total_protein_g: number;
+  total_fat_g: number;
+  total_carbs_g: number;
+  meals: MealRead[];
+}
+
+export interface AppMealCreate {
+  date: string; // YYYY-MM-DD
+  description_user: string;
+  calories: number;
+  protein_g?: number;
+  fat_g?: number;
+  carbs_g?: number;
+  accuracy_level?: AccuracyLevel;
+}
+
+export interface SavedMealListItem {
+  id: number;
+  name: string;
+  total_calories: number;
+  total_protein_g: number;
+  total_fat_g: number;
+  total_carbs_g: number;
+  use_count: number;
+}
+
+export interface SavedMealsListResponse {
+  items: SavedMealListItem[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface WorkflowTotals {
+  calories_kcal: number;
+  protein_g: number;
+  fat_g: number;
+  carbs_g: number;
+}
+
+export interface WorkflowItem {
+  name: string;
+  grams?: number | null;
+  calories_kcal: number;
+  protein_g: number;
+  fat_g: number;
+  carbs_g: number;
+  source_url?: string | null;
+}
+
+export interface WorkflowRunResponse {
+  intent: string;
+  message_text: string;
+  confidence?: string | null;
+  totals: WorkflowTotals;
+  items: WorkflowItem[];
+  source_url?: string | null;
+}
+
+export interface AppAgentRunRequest {
+  text: string;
+  image_url?: string | null;
+  force_intent?: string | null;
+  nutrition_context?: string | null;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  account_id: number;
+  created: boolean;
+}
+
+export interface EmailCodeRequestResponse {
+  sent: boolean;
+  debug_code?: string | null;
+}
+
+export interface TelegramLinkRedeemResponse {
+  status: string; // 'linked' | 'already_linked'
+  account_id: number;
+}
+
+export interface PresignResponse {
+  key: string;
+  upload_url: string;
+  public_url?: string | null;
+  expires_in_seconds: number;
+}
+
+export interface TrialStartResponse {
+  access_status: string;
+  trial_started_at?: string | null;
+  trial_ends_at?: string | null;
+  trial_days: number;
+  already_started: boolean;
+}
