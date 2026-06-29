@@ -61,6 +61,7 @@ from app.bot.api_client import (
     delete_saved_meal,
     use_saved_meal,
     repeat_meal,
+    issue_app_link_code,
 )
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 from app.bot.billing import router as billing_router, check_billing_access, show_paywall
@@ -799,10 +800,49 @@ async def cmd_help(message: types.Message) -> None:
         "3️⃣ Commands:\n"
         "/start - restart bot\n"
         "/help - this help\n"
+        "/linkapp - connect the mobile app\n"
         "/ping - check server connection"
     )
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
+
+
+async def _send_app_link_code(message: types.Message, tg_id: int) -> None:
+    """Mint a one-time code and explain how to enter it in the mobile app."""
+    # Make sure the backend has this user before issuing a code.
+    await ensure_user(tg_id)
+    data = await issue_app_link_code(tg_id)
+    if not data or not data.get("code"):
+        await message.answer(
+            "Couldn't create a link code right now. Please try again in a moment.",
+            reply_markup=get_main_menu_keyboard(),
+        )
+        return
+
+    code = data["code"]
+    minutes = max(1, int(data.get("expires_in_seconds", 600)) // 60)
+    await message.answer(
+        "📱 <b>Connect the YumYummy app</b>\n\n"
+        "1. Open the YumYummy app and sign in (Apple, Google or email).\n"
+        "2. Go to <b>Profile → Connect Telegram</b>.\n"
+        "3. Enter this code:\n\n"
+        f"<code>{code}</code>\n\n"
+        f"The code expires in {minutes} minutes. After linking, your Telegram and "
+        "app meals share one diary — everything you log here shows up in the app too.",
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("linkapp"))
+async def cmd_linkapp(message: types.Message) -> None:
+    """Issue a code the user types into the mobile app to unify their diary."""
+    await _send_app_link_code(message, message.from_user.id)
+
+
+@router.callback_query(F.data == "profile_link_app")
+async def on_profile_link_app(callback: types.CallbackQuery) -> None:
+    await callback.answer()
+    await _send_app_link_code(callback.message, callback.from_user.id)
 
 
 @router.message(Command("ping"))

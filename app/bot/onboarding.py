@@ -434,6 +434,7 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🔄 Recalculate targets", callback_data="profile_recalculate")],
             [InlineKeyboardButton(text="✏️ Enter targets manually", callback_data="profile_manual_kbju")],
             [InlineKeyboardButton(text="🌍 Change timezone", callback_data="profile_change_tz")],
+            [InlineKeyboardButton(text="📱 Connect app", callback_data="profile_link_app")],
             [InlineKeyboardButton(text="💳 Manage subscription", callback_data="profile_manage_sub")],
         ]
     )

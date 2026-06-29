@@ -450,6 +450,33 @@ async def agent_run_workflow(
         return None
 
 
+# ============ App linking ============
+
+
+async def issue_app_link_code(telegram_id: int) -> Optional[Dict[str, Any]]:
+    """Ask the backend to mint a one-time code that links this Telegram user's
+    diary to their mobile-app account.
+
+    Calls POST /auth/link/telegram/issue (internal-token protected). Returns
+    ``{"code": ..., "expires_in_seconds": ...}`` or ``None`` on error.
+    """
+    url = f"{settings.backend_base_url}/auth/link/telegram/issue"
+    payload = {"telegram_id": str(telegram_id)}
+    try:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            f"[API] issue_app_link_code HTTP error: {e.response.status_code} - {e.response.text[:200]}"
+        )
+        return None
+    except Exception as e:
+        logger.error(f"[API] issue_app_link_code error: {e}")
+        return None
+
+
 # ============ Функции для онбординга ============
 
 async def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
