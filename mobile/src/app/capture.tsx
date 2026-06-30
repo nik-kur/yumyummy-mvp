@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   TextInput,
@@ -27,7 +27,7 @@ const EXAMPLES = ['2 eggs & toast', 'Chicken & rice bowl', 'Oat latte', 'Greek s
 
 export default function CaptureScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ prefill?: string }>();
+  const params = useLocalSearchParams<{ prefill?: string; mode?: string }>();
   const { submit } = usePendingMeals();
 
   const [mode, setMode] = useState<Mode>('input');
@@ -91,6 +91,21 @@ export default function CaptureScreen() {
   const onVoice = () => {
     setNote('Voice logging arrives with the next build — type it for now.');
   };
+
+  // Widget/Siri deep links land here with ?mode=… — fire the matching action once.
+  const handledDeepLink = useRef(false);
+  useEffect(() => {
+    if (handledDeepLink.current) return;
+    if (params.mode === 'photo') {
+      handledDeepLink.current = true;
+      onPhoto();
+    } else if (params.mode === 'voice') {
+      handledDeepLink.current = true;
+      onVoice();
+    }
+    // `text` (and any unknown value) just opens the composer — no action needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.mode]);
 
   if (mode === 'accepted') {
     return (

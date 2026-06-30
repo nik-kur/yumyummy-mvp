@@ -14,6 +14,7 @@ import { useAuth } from '@/state/auth';
 import { usePendingMeals, type PendingMeal } from '@/state/pendingMeals';
 import * as api from '@/api/endpoints';
 import type { DaySummary, MealRead } from '@/api/types';
+import { updateWidgetSnapshot } from '@/widgets/snapshot';
 import { formatInt, formatTime } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -100,6 +101,11 @@ export default function TodayScreen() {
   useEffect(() => {
     if (lastSettledAt) load();
   }, [lastSettledAt, load]);
+
+  // Keep the home/lock-screen widgets in sync with today's numbers.
+  useEffect(() => {
+    updateWidgetSnapshot(day, profile);
+  }, [day, profile]);
 
   const onPendingPress = useCallback(
     (item: PendingMeal) => {

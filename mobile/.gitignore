@@ -42,3 +42,8 @@ example
 # generated native folders
 /ios
 /android
+
+# @bacons/apple-targets prebuild-generated artifacts (regenerated from expo-target.config.js)
+targets/*/generated.entitlements
+targets/*/Info.plist
+targets/*/Assets.xcassets/

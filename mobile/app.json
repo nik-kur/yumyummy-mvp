@@ -11,9 +11,13 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.yumyummy.app",
+      "appleTeamId": "WZAXY7M3G5",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.ai.yumyummy.app"]
       }
     },
     "android": {
@@ -52,7 +56,8 @@
           "imageWidth": 96
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": false,
