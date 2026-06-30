@@ -255,16 +255,19 @@ export default function MealDetailScreen() {
         </AppText>
         {sources.length > 0 ? (
           <View style={styles.sourceList}>
+            <AppText variant="overline" color={colors.infoBlue}>
+              {sources.length > 1 ? 'Sources' : 'Source'}
+            </AppText>
             {sources.map((url) => (
               <Pressable
                 key={url}
                 onPress={() => openUrl(url)}
                 style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}
               >
-                <ExternalLink size={15} color={colors.infoBlue} strokeWidth={1.5} />
-                <AppText variant="caption" color={colors.infoBlue} numberOfLines={1} style={styles.flex}>
+                <AppText variant="bodyStrong" color={colors.infoBlue} numberOfLines={1} style={styles.flex}>
                   {hostnameOf(url)}
                 </AppText>
+                <ExternalLink size={18} color={colors.infoBlue} strokeWidth={1.75} />
               </Pressable>
             ))}
           </View>
@@ -319,8 +322,18 @@ const styles = StyleSheet.create({
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairline, marginLeft: space.base },
   method: { marginTop: space.xl, gap: space.sm, backgroundColor: colors.infoBlueSoft, borderColor: colors.infoBlueSoft },
   methodRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  sourceList: { marginTop: space.sm, gap: space.xs },
-  sourceLink: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  sourceList: { marginTop: space.sm, gap: space.sm },
+  sourceLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.infoBlue,
+    paddingVertical: space.md,
+    paddingHorizontal: space.base,
+  },
   actions: { marginTop: 'auto', paddingTop: space.xl, gap: space.sm },
   delete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.md },
 });

@@ -98,6 +98,16 @@ export async function getToday(date?: string): Promise<DaySummary> {
   );
 }
 
+/**
+ * Like {@link getToday} but WITHOUT the mock-on-error fallback. Background
+ * reconciliation (pendingMeals) must see real server state — a silent mock
+ * fallback would make its "did a new meal land?" count comparison meaningless.
+ */
+export async function getTodayStrict(date?: string): Promise<DaySummary> {
+  if (USE_MOCKS) return mock.getMockDay(date);
+  return apiFetch<DaySummary>('/app/today', { query: { date } });
+}
+
 export async function getRecentMeals(limit = 20): Promise<MealRead[]> {
   return readWithFallback(
     () => apiFetch<MealRead[]>('/app/meals/recent', { query: { limit } }),
@@ -181,7 +191,16 @@ export async function agentRun(payload: AppAgentRunRequest): Promise<WorkflowRun
   // fabricated mock food here previously made failed logs look successful (and,
   // combined with the now-removed client-side createMeal, produced phantom or
   // wrong-macro entries).
-  return apiFetch<WorkflowRunResponse>('/app/agent/run', { method: 'POST', body: payload });
+  //
+  // 180s timeout: the source-checked workflow (especially photo meals on a
+  // reasoning model) can run well past the platform default. Even when the
+  // request is dropped, the backend persists the meal — pendingMeals reconciles
+  // against Today so a late-finishing log still clears its chip.
+  return apiFetch<WorkflowRunResponse>('/app/agent/run', {
+    method: 'POST',
+    body: payload,
+    timeoutMs: 180_000,
+  });
 }
 
 export async function presignMealPhoto(

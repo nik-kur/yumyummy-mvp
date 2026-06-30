@@ -1914,11 +1914,12 @@ def create_meal(meal_in: MealCreate, db: Session = Depends(get_db)):
 
     # Определяем accuracy_level: если передан - используем, иначе по умолчанию
     accuracy = meal_in.accuracy_level or "EXACT"
-    # Нормализуем: EXACT / ESTIMATE / APPROX
+    # Нормализуем под словарь приложения: EXACT / ESTIMATE / APPROX.
+    # "HIGH" из web-search означает, что КБЖУ подтверждены официальным источником
+    # -> показываем как EXACT (раньше ошибочно понижалось до ESTIMATE).
     accuracy_upper = accuracy.upper()
     if accuracy_upper == "HIGH":
-        # Если пришло HIGH из web-search, маппим на ESTIMATE
-        accuracy = "ESTIMATE"
+        accuracy = "EXACT"
     elif accuracy_upper not in ("EXACT", "ESTIMATE", "APPROX"):
         accuracy = "ESTIMATE"
     

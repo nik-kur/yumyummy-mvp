@@ -287,12 +287,15 @@ def test_agent_run_stores_breakdown_then_detail_and_repeat(monkeypatch):
     meal_id = meals[0]["id"]
     assert meals[0]["source_url"] == "https://azbukalife.example/syrniki"
     assert len(meals[0]["items"]) == 2
+    # confidence HIGH (source-verified) must store EXACT, not ESTIMATE.
+    assert meals[0]["accuracy_level"] == "EXACT"
 
     # Detail endpoint returns the full breakdown with per-item sources.
     r = client.get(f"/app/meals/{meal_id}", headers=_auth(token))
     assert r.status_code == 200, r.text
     detail = r.json()
     assert detail["calories"] == 372
+    assert detail["accuracy_level"] == "EXACT"
     assert detail["items"][0]["name"] == "Сырники"
     assert detail["items"][0]["source_url"].startswith("https://")
 
@@ -302,6 +305,7 @@ def test_agent_run_stores_breakdown_then_detail_and_repeat(monkeypatch):
     rep = r.json()
     assert rep["id"] != meal_id
     assert rep["calories"] == 372
+    assert rep["accuracy_level"] == "EXACT"  # accuracy copied verbatim
     assert len(rep["items"]) == 2  # breakdown copied verbatim
     assert calls["n"] == 1  # workflow ran once (the original log), not for Repeat
 
@@ -314,6 +318,47 @@ def test_agent_run_stores_breakdown_then_detail_and_repeat(monkeypatch):
     _, other = _make_account_token(provider_id="other@example.com", email="other@example.com")
     assert client.get(f"/app/meals/{meal_id}", headers=_auth(other)).status_code == 404
     assert client.post(f"/app/meals/{meal_id}/repeat", headers=_auth(other)).status_code == 404
+
+
+def test_agent_run_accuracy_from_confidence_and_source(monkeypatch):
+    """accuracy_level maps from the workflow's confidence AND the presence of a
+    source: HIGH or any source_url => EXACT (it was looked up); a source-less
+    estimate (e.g. photo) => ESTIMATE.
+
+    Reproduces the reported bug where an official-source product (lenta.com) the
+    agent returned as confidence=ESTIMATE still showed the "Estimate" badge.
+    """
+
+    def _workflow(result):
+        async def fake(**kwargs):
+            return result
+        return fake
+
+    # Case 1: confidence ESTIMATE but a real source was found -> EXACT.
+    _, t1 = _make_account_token(provider_id="acc1@example.com", email="acc1@example.com")
+    monkeypatch.setattr(app_api_module, "run_yumyummy_workflow", _workflow({
+        "intent": "product", "message_text": "ok", "confidence": "ESTIMATE",
+        "totals": {"calories_kcal": 175, "protein_g": 30, "fat_g": 0, "carbs_g": 15},
+        "items": [{"name": "Bio-Skyr", "grams": 500, "calories_kcal": 175, "protein_g": 30,
+                   "fat_g": 0, "carbs_g": 15, "source_url": "https://lenta.com/skyr"}],
+        "source_url": "https://lenta.com/skyr",
+    }))
+    assert client.post("/app/agent/run", headers=_auth(t1), json={"text": "скир"}).status_code == 200
+    m1 = client.get("/app/meals/recent", headers=_auth(t1)).json()
+    assert m1[0]["accuracy_level"] == "EXACT"
+
+    # Case 2: photo estimate, no source anywhere -> ESTIMATE.
+    _, t2 = _make_account_token(provider_id="acc2@example.com", email="acc2@example.com")
+    monkeypatch.setattr(app_api_module, "run_yumyummy_workflow", _workflow({
+        "intent": "photo_meal", "message_text": "ok", "confidence": "ESTIMATE",
+        "totals": {"calories_kcal": 400, "protein_g": 20, "fat_g": 15, "carbs_g": 40},
+        "items": [{"name": "Plate", "grams": 300, "calories_kcal": 400, "protein_g": 20,
+                   "fat_g": 15, "carbs_g": 40, "source_url": None}],
+        "source_url": None,
+    }))
+    assert client.post("/app/agent/run", headers=_auth(t2), json={"text": "(photo)"}).status_code == 200
+    m2 = client.get("/app/meals/recent", headers=_auth(t2)).json()
+    assert m2[0]["accuracy_level"] == "ESTIMATE"
 
 
 # ===== Telegram linking =====

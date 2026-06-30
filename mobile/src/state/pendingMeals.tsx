@@ -68,6 +68,32 @@ function sumItems(items: WorkflowItem[]) {
   );
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Confirm the backend actually logged the meal even though our request didn't
+ * return a clean success. This is the key fix for photo meals: the source-checked
+ * workflow can outlive the client request (iOS drops it ~60s in), yet the server
+ * finishes and persists the meal. Rather than show a false "Tap to retry" error,
+ * we poll Today for ~30s and treat a new meal beyond the pre-submit baseline as
+ * success. Returns false when we have no baseline (so the caller errors as before).
+ */
+async function confirmLoggedSince(baselineCount: number): Promise<boolean> {
+  if (baselineCount < 0) return false;
+  for (let i = 0; i < 6; i += 1) {
+    await delay(5000);
+    try {
+      const today = await api.getTodayStrict();
+      if ((today.meals?.length ?? 0) > baselineCount) return true;
+    } catch {
+      // Keep polling — a transient failure here shouldn't end reconciliation.
+    }
+  }
+  return false;
+}
+
 export function PendingMealsProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingMeal[]>([]);
   const [lastSettledAt, setLastSettledAt] = useState(0);
@@ -83,6 +109,23 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async (id: string, input: SubmitInput) => {
+      // Snapshot Today's meal count BEFORE we submit. If the request later times
+      // out (common for slow photo workflows), we can still detect that the
+      // backend logged the meal by watching this count grow.
+      let baselineCount = -1;
+      try {
+        const today = await api.getTodayStrict();
+        baselineCount = today.meals?.length ?? -1;
+      } catch {
+        // No baseline -> reconciliation is disabled and a timeout surfaces as a
+        // retryable error (the prior behavior). Best-effort only.
+      }
+
+      const clearAsLogged = () => {
+        delete inputsRef.current[id];
+        removeOrPatch(id); // backend logged it; Today refetches and shows the real meal
+      };
+
       try {
         let imageUrl: string | null = null;
         if (input.localImageUri) {
@@ -97,9 +140,6 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
         // second copy only had summary totals, no breakdown/source). On success
         // we just clear the chip and let Today refetch to show the real entry.
         const intent = (res.intent ?? '').toLowerCase();
-        const totals = sumItems(res.items ?? []);
-        const loggedFood = (res.items?.length ?? 0) > 0 || totals.calories > 0;
-
         if (intent === 'paywall') {
           removeOrPatch(id, {
             status: 'error',
@@ -107,16 +147,34 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
           });
           return;
         }
-        if (!loggedFood) {
-          removeOrPatch(id, {
-            status: 'error',
-            error: res.message_text || "Couldn't read that one. Tap to try again or add details.",
-          });
+
+        const totals = sumItems(res.items ?? []);
+        const loggedFood =
+          (res.items?.length ?? 0) > 0 || totals.calories > 0 || (res.totals?.calories_kcal ?? 0) > 0;
+        if (loggedFood) {
+          clearAsLogged();
           return;
         }
-        delete inputsRef.current[id];
-        removeOrPatch(id); // backend logged it; Today refetches and shows the real meal
+
+        // 200 but no food in the payload — e.g. the backend persisted the meal
+        // then returned a sanitized "help" response (it validates AFTER saving).
+        // Confirm against Today before calling it a failure.
+        if (await confirmLoggedSince(baselineCount)) {
+          clearAsLogged();
+          return;
+        }
+        removeOrPatch(id, {
+          status: 'error',
+          error: res.message_text || "Couldn't read that one. Tap to try again or add details.",
+        });
       } catch (e) {
+        // The (slower) photo workflow frequently finishes server-side AFTER the
+        // client request is dropped, so the meal IS logged. Reconcile against
+        // Today and only show an error if nothing actually landed.
+        if (await confirmLoggedSince(baselineCount)) {
+          clearAsLogged();
+          return;
+        }
         removeOrPatch(id, {
           status: 'error',
           error: e instanceof Error ? e.message : 'Something went wrong. Tap to try again.',

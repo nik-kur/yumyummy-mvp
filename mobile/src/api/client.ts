@@ -54,7 +54,16 @@ export interface RequestOptions {
   body?: unknown;
   auth?: boolean;
   query?: Query;
+  /**
+   * Abort the request after this many ms. Defaults to 30s. The agent run passes
+   * a much larger value because its source-checked workflow (esp. photos) can
+   * legitimately take 1–2 minutes; without a bound a dropped connection would
+   * otherwise hang the caller forever.
+   */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 function buildQuery(query?: Query): string {
   if (!query) return '';
@@ -65,22 +74,28 @@ function buildQuery(query?: Query): string {
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = true, query } = options;
+  const { method = 'GET', body, auth = true, query, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (auth) {
     const token = await getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}${buildQuery(query)}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
   } catch (e) {
-    throw new ApiError(0, e instanceof Error ? e.message : 'Network request failed');
+    const aborted = e instanceof Error && e.name === 'AbortError';
+    throw new ApiError(0, aborted ? 'Request timed out' : e instanceof Error ? e.message : 'Network request failed');
+  } finally {
+    clearTimeout(timer);
   }
 
   const rawText = await res.text();

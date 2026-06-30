@@ -146,12 +146,23 @@ def persist_agent_result_for_user(db: Session, user: User, agent_result: Dict[st
             message_text = agent_result.get("message_text", "")
             description = message_text.split("\n")[0][:100] if message_text else "Meal"
 
-        # Normalize accuracy_level from confidence
-        accuracy_level = "ESTIMATE"  # default
-        if confidence == "HIGH":
-            accuracy_level = "ESTIMATE"
-        elif confidence == "ESTIMATE":
-            accuracy_level = "ESTIMATE"
+        # Map the workflow's confidence onto the accuracy_level the app renders
+        # (vocabulary: EXACT / ESTIMATE / APPROX).
+        #
+        # "HIGH" means the agent verified the macros (clear portions, or a real
+        # source it trusts). But the agent also frequently returns confidence
+        # "ESTIMATE" *with* a source_url (e.g. a marketplace/store listing like
+        # lenta.com for a packaged product) — to the user that is still "found
+        # in a source", not a blind guess. So we treat the presence of ANY source
+        # (top-level or per-item) as source-verified and show EXACT. Only truly
+        # source-less results (incl. photo_meal, which is always ESTIMATE with a
+        # null source) stay ESTIMATE.
+        top_source = agent_result.get("source_url")
+        has_item_source = any(
+            isinstance(it, dict) and it.get("source_url") for it in (items or [])
+        )
+        source_verified = bool(top_source) or has_item_source
+        accuracy_level = "EXACT" if (confidence == "HIGH" or source_verified) else "ESTIMATE"
 
         meal = MealEntry(
             user_id=user.id,

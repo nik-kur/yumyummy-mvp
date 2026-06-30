@@ -74,10 +74,12 @@ def _log_meal_tool(
             db.add(user_day)
             db.flush()
         
-        # Normalize accuracy_level
+        # Normalize accuracy_level. The workflow emits "HIGH" when the macros are
+        # source-verified -> the app renders that as "EXACT" (green). Anything
+        # outside the app's EXACT/ESTIMATE/APPROX vocabulary falls back to ESTIMATE.
         accuracy = accuracy_level.upper() if accuracy_level else "ESTIMATE"
         if accuracy == "HIGH":
-            accuracy = "ESTIMATE"
+            accuracy = "EXACT"
         elif accuracy not in ("EXACT", "ESTIMATE", "APPROX"):
             accuracy = "ESTIMATE"
         
