@@ -38,12 +38,6 @@
       "expo-secure-store",
       "expo-apple-authentication",
       [
-        "expo-notifications",
-        {
-          "color": "#B85A3A"
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "YumYummy uses your photos to log meals from pictures of your food.",
