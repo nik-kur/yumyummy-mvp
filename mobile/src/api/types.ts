@@ -62,6 +62,16 @@ export interface AccountProfileUpdate {
   timezone?: string | null;
 }
 
+export interface MealItem {
+  name: string;
+  grams?: number | null;
+  calories_kcal?: number | null;
+  protein_g?: number | null;
+  fat_g?: number | null;
+  carbs_g?: number | null;
+  source_url?: string | null;
+}
+
 export interface MealRead {
   id: number;
   eaten_at: string;
@@ -70,8 +80,12 @@ export interface MealRead {
   protein_g: number;
   fat_g: number;
   carbs_g: number;
-  /** Not returned by the current API MealRead, but used client-side / in mocks. */
-  accuracy_level?: AccuracyLevel;
+  accuracy_level?: AccuracyLevel | null;
+  /** Primary source the macros were checked against (real meals). */
+  source_url?: string | null;
+  /** Per-ingredient breakdown for AI-logged meals. */
+  items?: MealItem[];
+  /** Display-only source label (mocks); real entries use source_url. */
   source?: string;
 }
 

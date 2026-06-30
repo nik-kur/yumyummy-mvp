@@ -119,6 +119,30 @@ export async function createMeal(payload: AppMealCreate): Promise<MealRead> {
   return apiFetch<MealRead>('/app/meals', { method: 'POST', body: payload });
 }
 
+export async function getMeal(id: number): Promise<MealRead> {
+  if (USE_MOCKS) {
+    const meals = mock.getMockDay().meals;
+    return meals.find((m) => m.id === id) ?? meals[0];
+  }
+  return apiFetch<MealRead>(`/app/meals/${id}`);
+}
+
+/** Re-log a meal verbatim (server copies macros + breakdown; no AI search). */
+export async function repeatMeal(id: number): Promise<MealRead> {
+  if (USE_MOCKS) {
+    const src = mock.getMockDay().meals.find((m) => m.id === id);
+    return mock.addMockMeal({
+      description_user: src?.description_user ?? 'Meal',
+      calories: src?.calories ?? 0,
+      protein_g: src?.protein_g ?? 0,
+      fat_g: src?.fat_g ?? 0,
+      carbs_g: src?.carbs_g ?? 0,
+      accuracy_level: src?.accuracy_level ?? undefined,
+    });
+  }
+  return apiFetch<MealRead>(`/app/meals/${id}/repeat`, { method: 'POST' });
+}
+
 export async function deleteMeal(id: number): Promise<void> {
   if (USE_MOCKS) {
     mock.removeMockMeal(id);
@@ -147,16 +171,17 @@ export async function startTrial(trialDays?: number): Promise<TrialStartResponse
 }
 
 export async function agentRun(payload: AppAgentRunRequest): Promise<WorkflowRunResponse> {
-  const mockReply = () =>
-    payload.force_intent === 'advice'
+  if (USE_MOCKS) {
+    return payload.force_intent === 'advice'
       ? mock.mockAdvisorReply(payload.text)
       : mock.mockAgentRun(payload.text, Boolean(payload.image_url));
-  if (USE_MOCKS) return mockReply();
-  try {
-    return await apiFetch<WorkflowRunResponse>('/app/agent/run', { method: 'POST', body: payload });
-  } catch {
-    return mockReply();
   }
+  // No mock fallback against a real backend: a network/timeout failure must
+  // surface as an error so the caller can show a retry chip. Falling back to
+  // fabricated mock food here previously made failed logs look successful (and,
+  // combined with the now-removed client-side createMeal, produced phantom or
+  // wrong-macro entries).
+  return apiFetch<WorkflowRunResponse>('/app/agent/run', { method: 'POST', body: payload });
 }
 
 export async function presignMealPhoto(

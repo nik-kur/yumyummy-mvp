@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { View, StyleSheet, Pressable, Alert, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, ShieldCheck, Trash2, RotateCcw, ExternalLink } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
-import { SourceBadge, AccuracyBadge } from '@/components/Badges';
+import { AccuracyBadge } from '@/components/Badges';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
-import type { AccuracyLevel } from '@/api/types';
+import type { AccuracyLevel, MealItem, MealRead } from '@/api/types';
 import { formatInt, formatTime } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -20,6 +20,18 @@ function str(v: string | string[] | undefined): string {
 }
 function num(v: string | string[] | undefined): number {
   return Number(str(v)) || 0;
+}
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url.replace(/^https?:\/\//, '').split('/')[0] ?? url;
+  }
+}
+
+function openUrl(url: string) {
+  Linking.openURL(url).catch(() => Alert.alert('Could not open link', url));
 }
 
 function MacroTile({ label, value, color }: { label: string; value: number; color: string }) {
@@ -38,24 +50,107 @@ function MacroTile({ label, value, color }: { label: string; value: number; colo
   );
 }
 
+function ItemRow({ item }: { item: MealItem }) {
+  const grams = item.grams ? `${Math.round(item.grams)} g` : null;
+  const macros = [
+    item.protein_g != null ? `P ${Math.round(item.protein_g)}` : null,
+    item.carbs_g != null ? `C ${Math.round(item.carbs_g)}` : null,
+    item.fat_g != null ? `F ${Math.round(item.fat_g)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <Pressable
+      disabled={!item.source_url}
+      onPress={() => item.source_url && openUrl(item.source_url)}
+      style={({ pressed }) => [styles.itemRow, pressed && item.source_url ? styles.pressed : null]}
+    >
+      <View style={styles.itemInfo}>
+        <View style={styles.itemNameRow}>
+          <AppText variant="bodyStrong" numberOfLines={2} style={styles.flex}>
+            {item.name}
+          </AppText>
+          {item.source_url ? (
+            <ExternalLink size={15} color={colors.infoBlue} strokeWidth={1.5} />
+          ) : null}
+        </View>
+        <AppText variant="caption" color={colors.inkMuted}>
+          {[grams, macros].filter(Boolean).join('  ·  ')}
+        </AppText>
+      </View>
+      {item.calories_kcal != null ? (
+        <View style={styles.itemKcal}>
+          <AppText variant="bodyStrong">{formatInt(item.calories_kcal)}</AppText>
+          <AppText variant="overline" color={colors.inkFaint}>
+            kcal
+          </AppText>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
 export default function MealDetailScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const params = useLocalSearchParams();
 
   const id = num(params.id);
-  const description = str(params.d);
-  const calories = num(params.c);
-  const protein = num(params.p);
-  const fat = num(params.f);
-  const carbs = num(params.cb);
-  const accRaw = str(params.acc);
+
+  // Render instantly from the params the list passed, then hydrate the full
+  // record (with ingredient breakdown + sources) from the API.
+  const [meal, setMeal] = useState<MealRead | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [repeating, setRepeating] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    api
+      .getMeal(id)
+      .then((m) => {
+        if (alive) setMeal(m);
+      })
+      .catch(() => {
+        /* keep param-based fallback */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const description = meal?.description_user || str(params.d);
+  const calories = meal?.calories ?? num(params.c);
+  const protein = meal?.protein_g ?? num(params.p);
+  const fat = meal?.fat_g ?? num(params.f);
+  const carbs = meal?.carbs_g ?? num(params.cb);
+  const accRaw = (meal?.accuracy_level ?? str(params.acc)) || '';
   const accuracy: AccuracyLevel | null =
     accRaw === 'EXACT' || accRaw === 'ESTIMATE' || accRaw === 'APPROX' ? accRaw : null;
-  const source = str(params.src);
-  const time = str(params.t);
+  const time = meal?.eaten_at || str(params.t);
+  const items = meal?.items ?? [];
 
-  const [busy, setBusy] = useState(false);
+  // De-duplicated source links: the meal-level source plus any per-item ones.
+  const sources = useMemo(() => {
+    const urls = new Set<string>();
+    if (meal?.source_url) urls.add(meal.source_url);
+    for (const it of items) if (it.source_url) urls.add(it.source_url);
+    return Array.from(urls);
+  }, [meal?.source_url, items]);
+
+  const onRepeat = async () => {
+    if (!id) return;
+    setRepeating(true);
+    try {
+      await api.repeatMeal(id);
+      Alert.alert('Logged again', 'Added to today exactly as before — no new search.');
+      router.back();
+    } catch {
+      Alert.alert('Could not repeat', 'Please try again.');
+    } finally {
+      setRepeating(false);
+    }
+  };
 
   const onSave = async () => {
     setBusy(true);
@@ -115,10 +210,11 @@ export default function MealDetailScreen() {
         <AppText variant="overline" color={colors.inkMuted}>
           kcal
         </AppText>
-        <View style={styles.badges}>
-          {source ? <SourceBadge source={source} /> : null}
-          {accuracy ? <AccuracyBadge level={accuracy} /> : null}
-        </View>
+        {accuracy ? (
+          <View style={styles.badges}>
+            <AccuracyBadge level={accuracy} />
+          </View>
+        ) : null}
       </Card>
 
       <View style={styles.tiles}>
@@ -126,6 +222,22 @@ export default function MealDetailScreen() {
         <MacroTile label="Carbs" value={carbs} color={colors.carbs} />
         <MacroTile label="Fat" value={fat} color={colors.fat} />
       </View>
+
+      {items.length > 0 ? (
+        <View style={styles.section}>
+          <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
+            Breakdown
+          </AppText>
+          <Card padded={false} style={styles.breakdownCard}>
+            {items.map((it, i) => (
+              <View key={`${it.name}-${i}`}>
+                {i > 0 ? <View style={styles.sep} /> : null}
+                <ItemRow item={it} />
+              </View>
+            ))}
+          </Card>
+        </View>
+      ) : null}
 
       <Card flat style={styles.method}>
         <View style={styles.methodRow}>
@@ -135,25 +247,39 @@ export default function MealDetailScreen() {
           </AppText>
         </View>
         <AppText variant="caption" color={colors.inkMuted}>
-          {source
-            ? `Source: ${source}. `
+          {accuracy ? `Confidence: ${accuracy.toLowerCase()}. ` : ''}
+          Numbers come from the AI workflow’s source‑checked lookup.
+          {sources.length === 0 && items.length === 0
+            ? ' Ingredient‑level breakdown is available for AI‑logged meals.'
             : ''}
-          {accuracy
-            ? `Confidence: ${accuracy.toLowerCase()}. `
-            : ''}
-          Numbers come from the AI workflow’s source‑checked lookup. Ingredient‑level breakdown is
-          available for AI‑logged meals.
         </AppText>
+        {sources.length > 0 ? (
+          <View style={styles.sourceList}>
+            {sources.map((url) => (
+              <Pressable
+                key={url}
+                onPress={() => openUrl(url)}
+                style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}
+              >
+                <ExternalLink size={15} color={colors.infoBlue} strokeWidth={1.5} />
+                <AppText variant="caption" color={colors.infoBlue} numberOfLines={1} style={styles.flex}>
+                  {hostnameOf(url)}
+                </AppText>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </Card>
 
       <View style={styles.actions}>
-        <Button label="Save to My Menu" variant="secondary" loading={busy} onPress={onSave} />
+        <Button label="Repeat this meal" loading={repeating} onPress={onRepeat} />
         <Button
           label="Log similar"
-          variant="ghost"
+          variant="secondary"
           haptic={false}
           onPress={() => router.push({ pathname: '/capture', params: { prefill: description } })}
         />
+        <Button label="Save to My Menu" variant="ghost" loading={busy} onPress={onSave} />
         <Pressable onPress={onDelete} style={styles.delete}>
           <Trash2 size={18} color={colors.error} strokeWidth={1.5} />
           <AppText variant="bodyStrong" color={colors.error}>
@@ -166,6 +292,7 @@ export default function MealDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.sm },
   title: { marginTop: space.base, marginBottom: space.lg },
   hero: { alignItems: 'center', paddingVertical: space.xl, gap: space.xs },
@@ -181,8 +308,19 @@ const styles = StyleSheet.create({
     paddingVertical: space.lg,
     gap: 2,
   },
-  method: { marginTop: space.base, gap: space.sm, backgroundColor: colors.infoBlueSoft, borderColor: colors.infoBlueSoft },
+  section: { marginTop: space.xl },
+  sectionLabel: { marginBottom: space.sm },
+  breakdownCard: { overflow: 'hidden' },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: space.base, padding: space.base },
+  itemInfo: { flex: 1, gap: 3 },
+  itemNameRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  itemKcal: { alignItems: 'flex-end' },
+  pressed: { opacity: 0.6 },
+  sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairline, marginLeft: space.base },
+  method: { marginTop: space.xl, gap: space.sm, backgroundColor: colors.infoBlueSoft, borderColor: colors.infoBlueSoft },
   methodRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  sourceList: { marginTop: space.sm, gap: space.xs },
+  sourceLink: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   actions: { marginTop: 'auto', paddingTop: space.xl, gap: space.sm },
   delete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.md },
 });

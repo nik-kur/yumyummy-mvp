@@ -304,6 +304,68 @@ class TestMerge:
         # Entitlement unified -> active.
         assert compute_account_access_status(db, survivor) == "active"
 
+    def test_link_repoints_history_into_empty_app_account(self, db):
+        """Production repro for the /auth/link/telegram/redeem IntegrityError.
+
+        A brand-new app account (empty diary) links a Telegram account that
+        already has several days of history. Because none of the source days
+        share a date with the (empty) target, every day takes the *re-point*
+        branch (``sd.user_id = target.id``) rather than the same-date *merge*
+        branch the original test exercised. Previously that re-point shared a
+        flush with the source DELETE, so the default ``User.days`` cascade reset
+        ``user_days.user_id`` to NULL and violated its NOT NULL constraint.
+        """
+        # App account B (Apple sign-in) — fresh, empty diary.
+        acct_b, _ = find_or_create_account_for_identity(db, provider="apple", provider_id="apple-2")
+        acct_b_id = acct_b.id
+
+        # Telegram account A with 5 distinct days of history (none shared w/ B).
+        acct_a = Account()
+        db.add(acct_a)
+        db.flush()
+        u_a = User(telegram_id="222", account_id=acct_a.id, onboarding_completed=True, goal_type="gain")
+        db.add(u_a)
+        db.add(Identity(account_id=acct_a.id, provider="telegram", provider_id="222"))
+        db.flush()
+        for i in range(1, 6):
+            ud = UserDay(
+                user_id=u_a.id, date=date(2026, 6, i),
+                total_calories=100 + i, total_protein_g=10, total_fat_g=5, total_carbs_g=8,
+            )
+            db.add(ud)
+            db.flush()
+            db.add(MealEntry(
+                user_id=u_a.id, user_day_id=ud.id, description_user=f"m{i}",
+                calories=100 + i, protein_g=10, fat_g=5, carbs_g=8,
+            ))
+        db.commit()
+        source_user_id = u_a.id
+
+        # Force the source's diary relationship collections to be resident in
+        # memory before the merge. That is the exact condition under which the
+        # old single-flush ``db.delete(source)`` reset user_days.user_id to NULL
+        # (SQLAlchemy treats the in-memory children as the deleted parent's and
+        # disassociates them). Without this the bug doesn't reproduce on SQLite.
+        _ = list(u_a.days)
+        _ = list(u_a.meals)
+
+        # Redeem: telegram account A merges INTO the empty app account B.
+        result = link_telegram_account(db, source_account=acct_a, target_account=acct_b)
+        assert result == "linked"
+
+        # Source account+user gone; B survives with one unified container.
+        assert db.query(Account).filter(Account.id == acct_a.id).first() is None
+        members = account_member_users(db, acct_b_id)
+        assert len(members) == 1
+        primary = members[0]
+        assert primary.telegram_id == "222"
+
+        # All 5 days + 5 meals re-pointed onto the survivor, none orphaned.
+        assert db.query(UserDay).filter(UserDay.user_id == primary.id).count() == 5
+        assert db.query(MealEntry).filter(MealEntry.user_id == primary.id).count() == 5
+        assert db.query(UserDay).filter(UserDay.user_id == source_user_id).count() == 0
+        assert db.query(UserDay).count() == 5  # nothing lost / nullified
+
     def test_link_same_account_is_noop(self, db):
         acct, _ = find_or_create_account_for_identity(db, provider="apple", provider_id="apple-x")
         assert link_telegram_account(db, source_account=acct, target_account=acct) == "already_linked"

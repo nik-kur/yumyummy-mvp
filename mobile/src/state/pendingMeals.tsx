@@ -10,8 +10,7 @@ import {
 
 import * as api from '@/api/endpoints';
 import { uploadMealPhoto } from '@/api/upload';
-import type { AccuracyLevel, WorkflowItem } from '@/api/types';
-import { todayISO } from '@/utils/format';
+import type { WorkflowItem } from '@/api/types';
 
 /**
  * Background meal logging.
@@ -91,31 +90,32 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
         }
         const text = input.text?.trim() || (imageUrl ? '(photo)' : '');
         const res = await api.agentRun({ text, image_url: imageUrl });
-        const items = res.items ?? [];
-        const totals = sumItems(items);
-        const hasFood = items.length > 0 && totals.calories > 0;
-        if (!hasFood) {
+
+        // IMPORTANT: `/app/agent/run` already persisted the meal server-side
+        // (the same source-checked path the Telegram bot uses). We must NOT
+        // create it again here — doing so logged every meal twice (and the
+        // second copy only had summary totals, no breakdown/source). On success
+        // we just clear the chip and let Today refetch to show the real entry.
+        const intent = (res.intent ?? '').toLowerCase();
+        const totals = sumItems(res.items ?? []);
+        const loggedFood = (res.items?.length ?? 0) > 0 || totals.calories > 0;
+
+        if (intent === 'paywall') {
+          removeOrPatch(id, {
+            status: 'error',
+            error: res.message_text || 'Your trial has ended. Subscribe to keep logging meals.',
+          });
+          return;
+        }
+        if (!loggedFood) {
           removeOrPatch(id, {
             status: 'error',
             error: res.message_text || "Couldn't read that one. Tap to try again or add details.",
           });
           return;
         }
-        const description =
-          items.map((it) => it.name).filter(Boolean).join(', ') || input.text?.trim() || 'Meal';
-        const conf = (res.confidence ?? 'ESTIMATE').toUpperCase();
-        const accuracy: AccuracyLevel = conf === 'EXACT' || conf === 'APPROX' ? (conf as AccuracyLevel) : 'ESTIMATE';
-        await api.createMeal({
-          date: todayISO(),
-          description_user: description,
-          calories: Math.round(totals.calories),
-          protein_g: Math.round(totals.protein),
-          fat_g: Math.round(totals.fat),
-          carbs_g: Math.round(totals.carbs),
-          accuracy_level: accuracy,
-        });
         delete inputsRef.current[id];
-        removeOrPatch(id); // remove the chip; Today refetches and shows the real meal
+        removeOrPatch(id); // backend logged it; Today refetches and shows the real meal
       } catch (e) {
         removeOrPatch(id, {
           status: 'error',

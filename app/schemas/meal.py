@@ -24,6 +24,17 @@ class MealUpdate(BaseModel):
     eaten_at: Optional[datetime] = None
 
 
+class MealItemRead(BaseModel):
+    """One ingredient/dish in a meal's breakdown."""
+    name: str
+    grams: Optional[float] = None
+    calories_kcal: Optional[float] = None
+    protein_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+    source_url: Optional[str] = None
+
+
 class MealRead(BaseModel):
     id: int
     eaten_at: datetime
@@ -32,6 +43,9 @@ class MealRead(BaseModel):
     protein_g: float
     fat_g: float
     carbs_g: float
+    accuracy_level: Optional[str] = None
+    source_url: Optional[str] = None
+    items: List[MealItemRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 

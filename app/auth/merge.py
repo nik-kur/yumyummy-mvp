@@ -119,10 +119,26 @@ def merge_users(db: Session, source: User, target: User) -> None:
     # this *after* deleting the source to avoid a transient UNIQUE collision on
     # users.telegram_id (both rows briefly holding the same id).
     inherit_telegram_id = source.telegram_id if (not target.telegram_id and source.telegram_id) else None
+    source_id = source.id
 
-    # 4) Remove the now-empty source container, then inherit its telegram id.
-    db.delete(source)
+    # 4) Persist the re-points *before* the source row goes away.
+    #
+    # Why the explicit flush + Core DELETE instead of ``db.delete(source)``:
+    # ``User.days`` / ``User.meals`` / ``User.saved_meals`` ... are plain
+    # one-to-many relationships with SQLAlchemy's default cascade (no
+    # delete-orphan, no passive_deletes). If the source DELETE shared a single
+    # flush with the "sd.user_id = target.id" re-points above, the unit of work
+    # would treat those (in-memory) children as still belonging to the
+    # soon-to-be-deleted source and reset ``user_days.user_id`` to NULL to
+    # disassociate them — violating its NOT NULL constraint. That is the
+    # IntegrityError we hit in production on /auth/link/telegram/redeem.
+    # Flushing here commits the re-points as plain UPDATEs while the source
+    # still exists; the subsequent Core DELETE then removes an already-childless
+    # row without ever running the ORM relationship cascade.
     db.flush()
+    db.query(User).filter(User.id == source_id).delete(synchronize_session=False)
+    db.flush()
+
     if inherit_telegram_id is not None:
         target.telegram_id = inherit_telegram_id
         db.flush()

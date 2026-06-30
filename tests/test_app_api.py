@@ -251,6 +251,71 @@ def test_agent_run_persists_meal(monkeypatch):
         db.close()
 
 
+def test_agent_run_stores_breakdown_then_detail_and_repeat(monkeypatch):
+    """The AI run stores the ingredient breakdown + source; the detail endpoint
+    returns it; and Repeat re-logs the meal verbatim (no workflow call)."""
+    _, token = _make_account_token(provider_id="bd@example.com", email="bd@example.com")
+
+    calls = {"n": 0}
+
+    async def fake_workflow(**kwargs):
+        calls["n"] += 1
+        return {
+            "intent": "product",
+            "message_text": "Logged",
+            "confidence": "HIGH",
+            "totals": {"calories_kcal": 372, "protein_g": 44, "fat_g": 14, "carbs_g": 18},
+            "items": [
+                {"name": "Сырники", "grams": 140, "calories_kcal": 250, "protein_g": 30,
+                 "fat_g": 9, "carbs_g": 12, "source_url": "https://azbukalife.example/syrniki"},
+                {"name": "Батончик", "grams": 60, "calories_kcal": 122, "protein_g": 14,
+                 "fat_g": 5, "carbs_g": 6, "source_url": "https://exponenta.example/mango"},
+            ],
+            "source_url": "https://azbukalife.example/syrniki",
+        }
+
+    monkeypatch.setattr(app_api_module, "run_yumyummy_workflow", fake_workflow)
+
+    r = client.post("/app/agent/run", headers=_auth(token), json={"text": "сырники и батончик"})
+    assert r.status_code == 200, r.text
+
+    # Exactly one meal persisted (the duplicate bug was the client also POSTing
+    # /app/meals; the backend itself logs once).
+    r = client.get("/app/meals/recent", headers=_auth(token))
+    meals = r.json()
+    assert len(meals) == 1
+    meal_id = meals[0]["id"]
+    assert meals[0]["source_url"] == "https://azbukalife.example/syrniki"
+    assert len(meals[0]["items"]) == 2
+
+    # Detail endpoint returns the full breakdown with per-item sources.
+    r = client.get(f"/app/meals/{meal_id}", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    assert detail["calories"] == 372
+    assert detail["items"][0]["name"] == "Сырники"
+    assert detail["items"][0]["source_url"].startswith("https://")
+
+    # Repeat = verbatim re-log; no new workflow call; today doubles.
+    r = client.post(f"/app/meals/{meal_id}/repeat", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    rep = r.json()
+    assert rep["id"] != meal_id
+    assert rep["calories"] == 372
+    assert len(rep["items"]) == 2  # breakdown copied verbatim
+    assert calls["n"] == 1  # workflow ran once (the original log), not for Repeat
+
+    r = client.get("/app/today", headers=_auth(token))
+    body = r.json()
+    assert body["total_calories"] == 744
+    assert len(body["meals"]) == 2
+
+    # Ownership: a different account can neither read nor repeat the meal.
+    _, other = _make_account_token(provider_id="other@example.com", email="other@example.com")
+    assert client.get(f"/app/meals/{meal_id}", headers=_auth(other)).status_code == 404
+    assert client.post(f"/app/meals/{meal_id}/repeat", headers=_auth(other)).status_code == 404
+
+
 # ===== Telegram linking =====
 
 def test_telegram_link_redeem_merges(monkeypatch):

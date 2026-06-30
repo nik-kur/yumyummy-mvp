@@ -11,9 +11,10 @@ There are two public entry points:
 Both share the same writing logic, so the diary is identical regardless of
 which client logged the meal.
 """
+import json
 import logging
 from datetime import date, datetime
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import pytz
 from sqlalchemy.orm import Session
@@ -27,6 +28,26 @@ logger = logging.getLogger(__name__)
 
 # Intents whose results represent an actual eaten meal we should store.
 MEAL_INTENTS = ["log_meal", "product", "eatout", "barcode", "photo_meal", "nutrition_label"]
+
+# Keys we keep from each workflow item when persisting the breakdown.
+_ITEM_KEYS = ("name", "grams", "calories_kcal", "protein_g", "fat_g", "carbs_g", "source_url")
+
+
+def _serialize_items(items: List[Dict[str, Any]]) -> Optional[str]:
+    """JSON-encode the per-ingredient breakdown for storage (None if empty)."""
+    clean: List[Dict[str, Any]] = []
+    for it in items or []:
+        if not isinstance(it, dict):
+            continue
+        row = {k: it.get(k) for k in _ITEM_KEYS if it.get(k) is not None}
+        if row.get("name"):
+            clean.append(row)
+    if not clean:
+        return None
+    try:
+        return json.dumps(clean, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return None
 
 
 def _get_or_create_user(db: Session, telegram_id: str) -> User:
@@ -143,6 +164,8 @@ def persist_agent_result_for_user(db: Session, user: User, agent_result: Dict[st
             carbs_g=carbs_g,
             uc_type="AGENT",  # Mark as agent-logged
             accuracy_level=accuracy_level,
+            items_json=_serialize_items(items),
+            source_url=agent_result.get("source_url"),
         )
 
         # Update day aggregates

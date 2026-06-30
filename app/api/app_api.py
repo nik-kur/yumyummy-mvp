@@ -226,6 +226,87 @@ def create_meal(
     return MealRead.model_validate(meal)
 
 
+@router.get("/meals/{meal_id}", response_model=MealRead)
+def get_meal(
+    meal_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Single meal with its ingredient-level breakdown + source link."""
+    ids = _member_ids(db, account)
+    meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if meal is None or meal.user_id not in ids:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    return MealRead.model_validate(meal)
+
+
+@router.post("/meals/{meal_id}/repeat", response_model=MealRead)
+def repeat_meal(
+    meal_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Re-log an existing meal *verbatim* onto today — no new AI search.
+
+    Copies the stored macros, ingredient breakdown and source so the repeated
+    entry is byte-for-byte identical (this is the deterministic counterpart to
+    "Log similar", which re-runs the workflow and can return different numbers).
+    """
+    import pytz
+
+    ids = _member_ids(db, account)
+    src = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if src is None or src.user_id not in ids:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    user = get_primary_user(db, account)
+    db.flush()
+
+    tz_name = user.timezone or "Europe/Moscow"
+    try:
+        tz = pytz.timezone(tz_name)
+    except pytz.exceptions.UnknownTimeZoneError:
+        tz = pytz.timezone("Europe/Moscow")
+    now_local = datetime.now(tz)
+    today = now_local.date()
+
+    user_day = (
+        db.query(UserDay)
+        .filter(UserDay.user_id == user.id, UserDay.date == today)
+        .first()
+    )
+    if not user_day:
+        user_day = UserDay(
+            user_id=user.id, date=today,
+            total_calories=0, total_protein_g=0, total_fat_g=0, total_carbs_g=0,
+        )
+        db.add(user_day)
+        db.flush()
+
+    meal = MealEntry(
+        user_id=user.id,
+        user_day_id=user_day.id,
+        eaten_at=now_local,
+        description_user=src.description_user,
+        calories=src.calories or 0,
+        protein_g=src.protein_g or 0,
+        fat_g=src.fat_g or 0,
+        carbs_g=src.carbs_g or 0,
+        uc_type="APP_REPEAT",
+        accuracy_level=src.accuracy_level,
+        items_json=src.items_json,
+        source_url=src.source_url,
+    )
+    user_day.total_calories = (user_day.total_calories or 0) + (src.calories or 0)
+    user_day.total_protein_g = (user_day.total_protein_g or 0) + (src.protein_g or 0)
+    user_day.total_fat_g = (user_day.total_fat_g or 0) + (src.fat_g or 0)
+    user_day.total_carbs_g = (user_day.total_carbs_g or 0) + (src.carbs_g or 0)
+    db.add(meal)
+    db.commit()
+    db.refresh(meal)
+    return MealRead.model_validate(meal)
+
+
 @router.delete("/meals/{meal_id}")
 def delete_meal(
     meal_id: int,
