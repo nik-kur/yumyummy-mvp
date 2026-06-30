@@ -124,3 +124,47 @@ def consume_telegram_link_code(db: Session, code: str) -> Optional[AuthOneTimeCo
     row.consumed_at = _now()
     db.commit()
     return row
+
+
+# --- reverse linking: app -> telegram --------------------------------------
+#
+# Mirror of the telegram_link codes but issued by the *signed-in app* and
+# redeemed by the *bot*. ``account_id`` here is the APP account (the survivor):
+# when the bot redeems the code, the Telegram account merges INTO it. A distinct
+# purpose ("app_link") keeps the two code families from being cross-redeemed.
+
+def create_app_link_code(db: Session, *, account_id: int) -> Tuple[str, AuthOneTimeCode]:
+    code = generate_link_code(8)
+    row = AuthOneTimeCode(
+        purpose="app_link",
+        code_hash=hash_code(code),
+        subject=None,
+        account_id=account_id,
+        expires_at=_now() + timedelta(minutes=settings.auth_link_code_ttl_minutes),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return code, row
+
+
+def consume_app_link_code(db: Session, code: str) -> Optional[AuthOneTimeCode]:
+    """Validate + consume an app-issued link code. Returns the row (with the
+    issuing app ``account_id``) on success, else ``None``."""
+    row = (
+        db.query(AuthOneTimeCode)
+        .filter(
+            AuthOneTimeCode.purpose == "app_link",
+            AuthOneTimeCode.code_hash == hash_code(code),
+            AuthOneTimeCode.consumed_at.is_(None),
+        )
+        .order_by(AuthOneTimeCode.id.desc())
+        .first()
+    )
+    if row is None:
+        return None
+    if _as_utc(row.expires_at) < _now():
+        return None
+    row.consumed_at = _now()
+    db.commit()
+    return row

@@ -370,6 +370,47 @@ class TestMerge:
         acct, _ = find_or_create_account_for_identity(db, provider="apple", provider_id="apple-x")
         assert link_telegram_account(db, source_account=acct, target_account=acct) == "already_linked"
 
+    def test_reverse_link_app_issues_code_bot_redeems(self, db):
+        """Reverse flow (app -> Telegram): the signed-in app mints an ``app_link``
+        code; the bot redeems it for a Telegram user. The Telegram account must
+        merge INTO the app account (app survives), same direction as forward link."""
+        # Signed-in app account (Apple) with a goal already set.
+        app_acct, _ = find_or_create_account_for_identity(db, provider="apple", provider_id="apple-rev")
+        app_user = account_member_users(db, app_acct.id)[0]
+        app_user.goal_type = "maintain"
+        db.commit()
+        app_acct_id = app_acct.id
+
+        # App issues the code.
+        code, row = codes.create_app_link_code(db, account_id=app_acct_id)
+        assert row.purpose == "app_link"
+        assert row.account_id == app_acct_id
+
+        # Bot side: ensure the telegram user/account exists, then redeem.
+        tg_user = User(telegram_id="555")
+        db.add(tg_user)
+        db.flush()
+        tg_acct = ensure_account_for_telegram_user(db, tg_user)
+        db.commit()
+
+        consumed = codes.consume_app_link_code(db, code)
+        assert consumed is not None and consumed.account_id == app_acct_id
+        result = link_telegram_account(db, source_account=tg_acct, target_account=app_acct)
+        assert result == "linked"
+
+        # App account survives and now owns the telegram identity + id.
+        survivor = db.query(Account).filter(Account.id == app_acct_id).first()
+        assert survivor is not None
+        members = account_member_users(db, app_acct_id)
+        assert len(members) == 1
+        assert members[0].telegram_id == "555"
+        assert members[0].goal_type == "maintain"  # app profile preserved
+        providers = {i.provider for i in db.query(Identity).filter(Identity.account_id == app_acct_id).all()}
+        assert providers == {"apple", "telegram"}
+
+        # Code is single-use.
+        assert codes.consume_app_link_code(db, code) is None
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

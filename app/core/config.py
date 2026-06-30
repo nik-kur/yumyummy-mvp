@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     backend_base_url: str
     openai_api_key: str
 
+    # Public @username of the Telegram bot (no @). Used to build t.me deep links
+    # for the reverse app->Telegram linking flow.
+    telegram_bot_username: str = "yum_yummybot"
+
     # чтобы .env мог содержать ключ, даже если фича временно не используется
     tavily_api_key: Optional[str] = None
     

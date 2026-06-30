@@ -62,6 +62,7 @@ from app.bot.api_client import (
     use_saved_meal,
     repeat_meal,
     issue_app_link_code,
+    redeem_app_link_code,
 )
 from app.bot.onboarding import router as onboarding_router, start_onboarding, get_main_menu_keyboard, FoodAdviceState
 from app.bot.billing import router as billing_router, check_billing_access, show_paywall
@@ -627,6 +628,31 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     # Handle deeplink arguments
     args = message.text.split(maxsplit=1)
     deeplink_arg = args[1].strip() if len(args) > 1 else ""
+
+    # /start link_<CODE> — reverse app->Telegram linking. The signed-in app
+    # minted a one-time code and opened this deep link; redeem it so this
+    # Telegram account merges INTO the app account (one shared diary). Handled
+    # before attribution parsing so a link code isn't mistaken for a UTM slug.
+    if deeplink_arg.startswith("link_"):
+        link_code = deeplink_arg[len("link_"):].strip().upper()
+        await ensure_user(tg_id)  # make sure the backend has this telegram user
+        result = await redeem_app_link_code(tg_id, link_code)
+        if result and result.get("status") in ("linked", "already_linked"):
+            await message.answer(
+                "✅ <b>Connected!</b>\n\n"
+                "Your Telegram and the YumYummy app now share one diary — "
+                "everything you log here shows up in the app, and vice versa.",
+                parse_mode="HTML",
+                reply_markup=get_main_menu_keyboard(),
+            )
+        else:
+            await message.answer(
+                "⚠️ That link code is invalid or has expired.\n\n"
+                "Open the app → <b>Profile → Connect Telegram</b> to get a fresh link.",
+                parse_mode="HTML",
+                reply_markup=get_main_menu_keyboard(),
+            )
+        return
 
     # Built-in deep-link commands we already handle. Anything else that's
     # 1-64 chars of [A-Za-z0-9_-] is either:

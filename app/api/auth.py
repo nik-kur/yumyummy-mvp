@@ -39,6 +39,9 @@ from app.schemas.auth import (
     TelegramLinkIssueResponse,
     TelegramLinkRedeemRequest,
     TelegramLinkRedeemResponse,
+    AppLinkIssueResponse,
+    AppLinkRedeemRequest,
+    AppLinkRedeemResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,3 +154,61 @@ def redeem_telegram_link_code(
     result = link_telegram_account(db, source_account=source_account, target_account=account)
     logger.info("[AUTH] telegram link result=%s account_id=%s", result, account.id)
     return TelegramLinkRedeemResponse(status=result, account_id=account.id)
+
+
+# --- reverse linking: app -> telegram --------------------------------------
+
+@router.post("/link/app/issue", response_model=AppLinkIssueResponse)
+def issue_app_link_code(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Called by the signed-in app: mint a one-time code + a t.me deep link. The
+    user opens the link, which sends them into the bot as ``/start link_<code>``;
+    the bot then redeems it (see ``/link/app/redeem``)."""
+    code, _row = codes.create_app_link_code(db, account_id=account.id)
+    username = settings.telegram_bot_username.lstrip("@")
+    deep_link = f"https://t.me/{username}?start=link_{code}"
+    logger.info("[AUTH] app link code issued account_id=%s", account.id)
+    return AppLinkIssueResponse(
+        code=code,
+        expires_in_seconds=settings.auth_link_code_ttl_minutes * 60,
+        bot_username=username,
+        deep_link=deep_link,
+    )
+
+
+@router.post(
+    "/link/app/redeem",
+    response_model=AppLinkRedeemResponse,
+    dependencies=[Depends(verify_internal_token)],
+)
+def redeem_app_link_code(payload: AppLinkRedeemRequest, db: Session = Depends(get_db)):
+    """Called by the bot when a user opens a ``/start link_<code>`` deep link.
+
+    The code's ``account_id`` is the APP account (the survivor); the Telegram
+    account for ``telegram_id`` merges INTO it — same direction as the forward
+    flow, so the app account always wins."""
+    row = codes.consume_app_link_code(db, payload.code)
+    if row is None or row.account_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired code")
+
+    target_account = db.query(Account).filter(Account.id == row.account_id).first()
+    if target_account is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Link target no longer exists")
+
+    # Ensure the Telegram side exists as an account we can merge from. The bot
+    # calls ensure_user() before redeeming, but create defensively just in case.
+    tg_user = db.query(User).filter(User.telegram_id == str(payload.telegram_id)).first()
+    if tg_user is None:
+        tg_user = User(telegram_id=str(payload.telegram_id))
+        db.add(tg_user)
+        db.flush()
+    source_account = ensure_account_for_telegram_user(db, tg_user)
+
+    result = link_telegram_account(db, source_account=source_account, target_account=target_account)
+    logger.info(
+        "[AUTH] app->telegram link result=%s account_id=%s tg_id=%s",
+        result, target_account.id, payload.telegram_id,
+    )
+    return AppLinkRedeemResponse(status=result, account_id=target_account.id)

@@ -51,3 +51,26 @@ class TelegramLinkRedeemRequest(BaseModel):
 class TelegramLinkRedeemResponse(BaseModel):
     status: str  # 'linked' | 'already_linked'
     account_id: int
+
+
+# --- reverse linking: app -> telegram --------------------------------------
+
+class AppLinkIssueResponse(BaseModel):
+    """Returned to the signed-in app. The app opens ``deep_link`` (which sends
+    the user into the bot with ``/start link_<code>``) and shows ``code`` as a
+    manual fallback."""
+    code: str
+    expires_in_seconds: int
+    bot_username: str
+    deep_link: str
+
+
+class AppLinkRedeemRequest(BaseModel):
+    """Sent by the bot when a user opens a ``/start link_<code>`` deep link."""
+    code: str = Field(..., min_length=4, max_length=16)
+    telegram_id: str = Field(..., min_length=1)
+
+
+class AppLinkRedeemResponse(BaseModel):
+    status: str  # 'linked' | 'already_linked'
+    account_id: int

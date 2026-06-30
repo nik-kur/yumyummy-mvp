@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Alert, Linking } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Pressable, TextInput, Alert, Linking, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   CreditCard,
   Send,
+  Bell,
   CircleHelp,
   FileText,
   Lock,
@@ -18,6 +19,7 @@ import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/state/auth';
+import * as api from '@/api/endpoints';
 import { formatInt } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
 import { fonts } from '@/theme/typography';
@@ -57,12 +59,17 @@ function Row({
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, linkTelegram, signOut } = useAuth();
+  const { profile, linkTelegram, refreshProfile, signOut } = useAuth();
 
   const [tgOpen, setTgOpen] = useState(false);
   const [tgCode, setTgCode] = useState('');
   const [tgBusy, setTgBusy] = useState(false);
   const [tgError, setTgError] = useState<string | null>(null);
+  const [tgManual, setTgManual] = useState(false);
+  // Reverse-link (app -> Telegram) state.
+  const [tgConnecting, setTgConnecting] = useState(false);
+  const [tgIssuedCode, setTgIssuedCode] = useState<string | null>(null);
+  const [tgWaiting, setTgWaiting] = useState(false);
 
   const billing = profile?.billing;
   const status = billing?.access_status ?? 'new';
@@ -80,19 +87,79 @@ export default function ProfileScreen() {
   const providersLabel = (profile?.linked_providers ?? []).join(' · ') || 'email';
   const initials = (profile?.telegram_id ?? 'YY').slice(0, 2).toUpperCase();
 
-  const onLinkTelegram = async () => {
+  // Reverse flow: app issues a code + deep link, opens Telegram, then polls for
+  // the bot to confirm (telegram_id appears on the profile).
+  const onConnectTelegram = async () => {
+    setTgError(null);
+    setTgConnecting(true);
+    try {
+      const issued = await api.issueAppTelegramLink();
+      setTgIssuedCode(issued.code);
+      setTgWaiting(true);
+      const opened = await Linking.openURL(issued.deep_link).then(() => true).catch(() => false);
+      if (!opened) {
+        // Telegram not installed / couldn't open — fall back to the code.
+        setTgError('Couldn’t open Telegram. Open @' + issued.bot_username + ' and send the code below.');
+      }
+    } catch (e) {
+      setTgError(e instanceof Error ? e.message : 'Could not start linking');
+      setTgWaiting(false);
+    } finally {
+      setTgConnecting(false);
+    }
+  };
+
+  // While waiting for the bot to confirm, poll the profile. Stop once linked.
+  const waitingRef = useRef(false);
+  waitingRef.current = tgWaiting && !telegramLinked;
+  useEffect(() => {
+    if (!tgWaiting || telegramLinked) return;
+    let attempts = 0;
+    const tick = async () => {
+      attempts += 1;
+      try {
+        await refreshProfile();
+      } catch {
+        /* keep polling */
+      }
+      if (attempts >= 40) setTgWaiting(false); // ~2 min then give up quietly
+    };
+    const interval = setInterval(() => {
+      if (waitingRef.current) void tick();
+    }, 3000);
+    // Re-check immediately when the user switches back from Telegram.
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active' && waitingRef.current) void tick();
+    });
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
+  }, [tgWaiting, telegramLinked, refreshProfile]);
+
+  // Once linked, collapse the connect UI.
+  useEffect(() => {
+    if (telegramLinked) {
+      setTgWaiting(false);
+      setTgOpen(false);
+    }
+  }, [telegramLinked]);
+
+  // Forward flow (fallback): user pastes a code the bot gave them.
+  const onLinkTelegramManual = useCallback(async () => {
     setTgError(null);
     setTgBusy(true);
     try {
       await linkTelegram(tgCode);
       setTgOpen(false);
       setTgCode('');
+      setTgManual(false);
     } catch (e) {
       setTgError(e instanceof Error ? e.message : 'Could not link');
     } finally {
       setTgBusy(false);
     }
-  };
+  }, [linkTelegram, tgCode]);
 
   const onRestore = () =>
     Alert.alert(
@@ -158,12 +225,21 @@ export default function ProfileScreen() {
             </AppText>
           </View>
         </View>
-        <Button
-          label="Adjust goals & targets"
-          variant="secondary"
-          size="md"
-          onPress={() => router.push('/(onboarding)/goal')}
-        />
+        <View style={styles.targetActions}>
+          <Button
+            label="Recalculate from questionnaire"
+            variant="secondary"
+            size="md"
+            onPress={() => router.push('/(onboarding)/goal')}
+          />
+          <Button
+            label="Enter targets manually"
+            variant="ghost"
+            size="md"
+            haptic={false}
+            onPress={() => router.push('/edit-targets')}
+          />
+        </View>
       </Card>
 
       <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
@@ -194,25 +270,61 @@ export default function ProfileScreen() {
       </Card>
       {tgOpen && !telegramLinked ? (
         <Card style={styles.tgCard} flat>
-          <AppText variant="caption" color={colors.inkMuted}>
-            In the bot, tap “Link app” to get a one‑time code, then enter it here.
+          <AppText variant="body" color={colors.ink}>
+            Connect the Telegram bot to log from both places — your diary and
+            targets stay in sync everywhere.
           </AppText>
-          <TextInput
-            style={styles.input}
-            placeholder="Link code"
-            placeholderTextColor={colors.inkFaint}
-            autoCapitalize="characters"
-            value={tgCode}
-            onChangeText={setTgCode}
+          <Button
+            label={tgWaiting ? 'Reopen Telegram' : 'Open Telegram to connect'}
+            size="md"
+            loading={tgConnecting}
+            onPress={onConnectTelegram}
           />
+          {tgWaiting ? (
+            <View style={styles.tgWaiting}>
+              <AppText variant="caption" color={colors.inkMuted}>
+                Finish in Telegram, then come back — this updates automatically.
+              </AppText>
+              {tgIssuedCode ? (
+                <AppText variant="caption" color={colors.inkFaint}>
+                  Code: <AppText variant="caption" color={colors.ink}>{tgIssuedCode}</AppText>
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
           {tgError ? (
             <AppText variant="caption" color={colors.error}>
               {tgError}
             </AppText>
           ) : null}
-          <Button label="Link Telegram" size="md" loading={tgBusy} onPress={onLinkTelegram} />
+
+          <Pressable onPress={() => setTgManual((v) => !v)} hitSlop={8}>
+            <AppText variant="caption" color={colors.infoBlue}>
+              {tgManual ? 'Hide' : 'Already have a code from the bot?'}
+            </AppText>
+          </Pressable>
+          {tgManual ? (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Link code"
+                placeholderTextColor={colors.inkFaint}
+                autoCapitalize="characters"
+                value={tgCode}
+                onChangeText={setTgCode}
+              />
+              <Button label="Link with code" size="md" loading={tgBusy} onPress={onLinkTelegramManual} />
+            </>
+          ) : null}
         </Card>
       ) : null}
+
+      <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
+        Preferences
+      </AppText>
+      <Card padded={false}>
+        <Row icon={Bell} label="Notifications" onPress={() => router.push('/notifications')} last />
+      </Card>
 
       <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
         Support
@@ -267,8 +379,10 @@ const styles = StyleSheet.create({
   targetsCard: { gap: space.base },
   targetsTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   targetMacros: { alignItems: 'flex-end', gap: 4 },
+  targetActions: { gap: space.xs },
   subActions: { gap: space.sm, marginTop: space.md },
   tgCard: { marginTop: space.sm, gap: space.md },
+  tgWaiting: { gap: space.xs },
   input: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,

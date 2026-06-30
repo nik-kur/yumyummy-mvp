@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { AuthProvider } from '@/state/auth';
 import { PendingMealsProvider } from '@/state/pendingMeals';
+import { NotificationsBridge } from '@/notifications/NotificationsBridge';
 import { useAppFonts } from '@/theme/useAppFonts';
 import { colors } from '@/theme/tokens';
 
@@ -27,6 +28,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <PendingMealsProvider>
+            <NotificationsBridge />
             <Stack
               screenOptions={{
                 headerShown: false,
@@ -37,6 +39,8 @@ export default function RootLayout() {
               <Stack.Screen name="advisor" options={{ presentation: 'modal' }} />
               <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
               <Stack.Screen name="meal/[id]" options={{ presentation: 'card' }} />
+              <Stack.Screen name="edit-targets" options={{ presentation: 'card' }} />
+              <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
             </Stack>
           </PendingMealsProvider>
         </AuthProvider>

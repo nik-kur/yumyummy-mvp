@@ -477,6 +477,30 @@ async def issue_app_link_code(telegram_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+async def redeem_app_link_code(telegram_id: int, code: str) -> Optional[Dict[str, Any]]:
+    """Redeem an app-issued link code on behalf of this Telegram user (reverse
+    linking). The user opened ``/start link_<code>`` in the bot.
+
+    Calls POST /auth/link/app/redeem (internal-token protected). Returns
+    ``{"status": 'linked'|'already_linked', "account_id": ...}`` or ``None`` on error.
+    """
+    url = f"{settings.backend_base_url}/auth/link/app/redeem"
+    payload = {"code": code, "telegram_id": str(telegram_id)}
+    try:
+        async with httpx.AsyncClient(headers=_internal_headers(), timeout=15.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            f"[API] redeem_app_link_code HTTP error: {e.response.status_code} - {e.response.text[:200]}"
+        )
+        return None
+    except Exception as e:
+        logger.error(f"[API] redeem_app_link_code error: {e}")
+        return None
+
+
 # ============ Функции для онбординга ============
 
 async def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:

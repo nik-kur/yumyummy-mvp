@@ -176,6 +176,15 @@ export interface TelegramLinkRedeemResponse {
   account_id: number;
 }
 
+/** Reverse linking: the signed-in app mints a code + a t.me deep link the user
+ *  opens to connect their Telegram bot. */
+export interface AppLinkIssueResponse {
+  code: string;
+  expires_in_seconds: number;
+  bot_username: string;
+  deep_link: string;
+}
+
 export interface PresignResponse {
   key: string;
   upload_url: string;

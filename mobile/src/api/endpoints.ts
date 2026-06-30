@@ -9,6 +9,7 @@ import type {
   AccountProfile,
   AccountProfileUpdate,
   AppAgentRunRequest,
+  AppLinkIssueResponse,
   AppMealCreate,
   AuthTokenResponse,
   BillingSnapshot,
@@ -78,6 +79,20 @@ export async function redeemTelegramLink(code: string): Promise<TelegramLinkRede
     method: 'POST',
     body: { code },
   });
+}
+
+/** Reverse linking: mint a code + t.me deep link so the user can connect their
+ *  Telegram bot from inside the (signed-in) app. */
+export async function issueAppTelegramLink(): Promise<AppLinkIssueResponse> {
+  if (USE_MOCKS) {
+    return {
+      code: 'YUM12345',
+      expires_in_seconds: 900,
+      bot_username: 'yum_yummybot',
+      deep_link: 'https://t.me/yum_yummybot?start=link_YUM12345',
+    };
+  }
+  return apiFetch<AppLinkIssueResponse>('/auth/link/app/issue', { method: 'POST' });
 }
 
 // ---- Account / diary ----------------------------------------------------
