@@ -139,6 +139,7 @@ class Settings(BaseSettings):
     # Shared secret Adapty sends in the webhook's Authorization header.
     adapty_webhook_secret: Optional[str] = None
     # Map Adapty vendor product ids -> our internal plan ids.
+    adapty_product_weekly: Optional[str] = None
     adapty_product_monthly: Optional[str] = None
     adapty_product_yearly: Optional[str] = None
 

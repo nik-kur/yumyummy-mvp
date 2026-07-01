@@ -64,13 +64,19 @@ def _parse_dt(value) -> Optional[datetime]:
 
 
 def _map_plan_id(vendor_product_id: Optional[str]) -> str:
-    if vendor_product_id and settings.adapty_product_yearly and vendor_product_id == settings.adapty_product_yearly:
+    vid = vendor_product_id or ""
+    if settings.adapty_product_yearly and vid == settings.adapty_product_yearly:
         return "yearly"
-    if vendor_product_id and settings.adapty_product_monthly and vendor_product_id == settings.adapty_product_monthly:
+    if settings.adapty_product_monthly and vid == settings.adapty_product_monthly:
         return "monthly"
+    if settings.adapty_product_weekly and vid == settings.adapty_product_weekly:
+        return "weekly"
     # Fall back on a substring hint, else monthly.
-    if vendor_product_id and "year" in vendor_product_id.lower():
+    low = vid.lower()
+    if "year" in low or "annual" in low:
         return "yearly"
+    if "week" in low:
+        return "weekly"
     return "monthly"
 
 
