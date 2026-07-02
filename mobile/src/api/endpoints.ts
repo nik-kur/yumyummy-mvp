@@ -106,6 +106,15 @@ export async function updateMe(update: AccountProfileUpdate): Promise<AccountPro
   return apiFetch<AccountProfile>('/app/me', { method: 'PATCH', body: update });
 }
 
+/**
+ * Permanently delete the signed-in account and all its data (App Store Review
+ * Guideline 5.1.1(v)). The caller is responsible for signing out afterwards.
+ */
+export async function deleteAccount(): Promise<void> {
+  if (USE_MOCKS) return;
+  await apiFetch<{ status: string }>('/app/me', { method: 'DELETE' });
+}
+
 export async function getToday(date?: string): Promise<DaySummary> {
   return readWithFallback(
     () => apiFetch<DaySummary>('/app/today', { query: { date } }),

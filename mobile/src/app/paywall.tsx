@@ -1,19 +1,35 @@
-import { useState } from 'react';
-import { View, StyleSheet, Pressable, Switch, Linking, ActivityIndicator } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Pressable, Linking, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { X, CircleCheck, LockOpen, Bell, Star, Users, type LucideIcon } from 'lucide-react-native';
+import { X, CircleCheck, LockOpen, Bell, Star, type LucideIcon } from 'lucide-react-native';
+import { adapty, AdaptyPaywallView } from 'react-native-adapty';
+import type { AdaptyPaywall, EventHandlers } from 'react-native-adapty';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import * as api from '@/api/endpoints';
+import { useAuth } from '@/state/auth';
+import {
+  activateAdapty,
+  isAdaptyConfigured,
+  ADAPTY_PLACEMENT_MAIN,
+  PREMIUM_ACCESS_LEVEL,
+} from '@/billing/adapty';
 import { colors, radius, space } from '@/theme/tokens';
 
 /**
- * Remote-config-shaped paywall. In production every field below is driven by an
- * Adapty paywall + A/B test (headline, benefits, price block, trial length,
- * social-proof + trial-timeline toggles). Here it's local so the founder can
- * preview variants; see TODO(adapty).
+ * Paywall screen.
+ *
+ * Primary path: fetch the `main` placement from Adapty and, when it carries a
+ * Paywall Builder view configuration, render it with `AdaptyPaywallView`. Adapty
+ * handles the StoreKit purchase, the App Store free-trial intro offer, receipt
+ * validation and restore; we just react to events and refresh our account.
+ *
+ * Fallback path (Expo Go / no SDK key / offline / no view config): the static
+ * marketing UI below keeps the screen usable. In dev (no key) its CTA starts the
+ * backend trial so the rest of the app stays testable; when Adapty is configured
+ * it attempts a direct product purchase.
  */
 interface PriceOption {
   id: 'yearly' | 'monthly';
@@ -26,33 +42,35 @@ interface PaywallConfig {
   headline: string;
   subhead: string;
   benefits: string[];
-  trialDays: number; // A/B: 3 vs 7, set by Adapty cohort
   showTrialTimeline: boolean;
-  showSocialProof: boolean;
-  socialProof: string;
   prices: PriceOption[];
 }
 
-// TODO(adapty): replace this static config with the Adapty paywall payload, and
-// match `prices` to the same products/pricing as the Telegram bot.
+// Fallback-only copy. The live paywall (design, prices, trial length, A/B) is
+// driven by Adapty; StoreKit supplies localized prices there. These values just
+// mirror the current pricing decision for the degraded/offline view.
 const DEFAULT_PAYWALL: PaywallConfig = {
   headline: 'Know exactly what you eat',
   subhead: 'Accurate, source‑checked nutrition — by text, voice or photo.',
   benefits: [
-    'Unlimited AI meal logging',
+    'AI meal logging by text, voice & photo',
     'Source‑checked calories & macros',
     'Personal AI nutrition advisor',
     'Synced across app & Telegram',
   ],
-  trialDays: 3,
   showTrialTimeline: true,
-  showSocialProof: true,
-  socialProof: 'Trusted by 12,000+ people logging smarter',
   prices: [
-    { id: 'yearly', title: 'Yearly', price: '$39.99 / yr', perDay: '≈ $0.11 / day', badge: 'Best value' },
-    { id: 'monthly', title: 'Monthly', price: '$4.99 / mo', perDay: '≈ $0.16 / day' },
+    { id: 'yearly', title: 'Yearly', price: '$89.99 / yr', perDay: '≈ $0.25 / day', badge: 'Best value' },
+    { id: 'monthly', title: 'Monthly', price: '$9.99 / mo', perDay: '≈ $0.33 / day' },
   ],
 };
+
+/** Free-trial length per plan, mirroring the App Store Connect intro offers
+ *  (yearly = 7 days, monthly = 3 days). The live Adapty paywall uses the real
+ *  StoreKit offer; this only feeds the degraded/offline fallback copy. */
+const TRIAL_DAYS: Record<PriceOption['id'], number> = { yearly: 7, monthly: 3 };
+
+type Phase = 'loading' | 'adapty' | 'fallback';
 
 function TimelineStep({ icon: Icon, title, subtitle, last }: { icon: LucideIcon; title: string; subtitle: string; last?: boolean }) {
   return (
@@ -75,32 +93,159 @@ function TimelineStep({ icon: Icon, title, subtitle, last }: { icon: LucideIcon;
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const config = DEFAULT_PAYWALL;
 
-  const [selected, setSelected] = useState<PriceOption['id']>('yearly');
-  const [showTimeline, setShowTimeline] = useState(config.showTrialTimeline);
-  const [showSocial, setShowSocial] = useState(config.showSocialProof);
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<Phase>('loading');
+  const paywallRef = useRef<AdaptyPaywall | null>(null);
 
-  const onStart = async () => {
+  const [selected, setSelected] = useState<PriceOption['id']>('yearly');
+  const [busy, setBusy] = useState(false);
+  const trialDays = TRIAL_DAYS[selected];
+
+  const close = useCallback(() => router.back(), [router]);
+
+  // Fetch the Adapty paywall for the `main` placement on mount.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const ok = await activateAdapty();
+      if (!ok) {
+        if (mounted) setPhase('fallback');
+        return;
+      }
+      try {
+        const pw = await adapty.getPaywall(ADAPTY_PLACEMENT_MAIN);
+        if (!mounted) return;
+        paywallRef.current = pw;
+        setPhase(pw.hasViewConfiguration ? 'adapty' : 'fallback');
+      } catch {
+        if (mounted) setPhase('fallback');
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // ---- Adapty Paywall Builder event handlers ----
+  const onPurchaseCompleted = useCallback<EventHandlers['onPurchaseCompleted']>(
+    (purchaseResult) => {
+      if (purchaseResult.type === 'success') {
+        void refreshProfile();
+        router.back();
+      }
+      // 'user_cancelled' / 'pending': keep the paywall open
+    },
+    [refreshProfile, router],
+  );
+
+  const onRestoreCompleted = useCallback<EventHandlers['onRestoreCompleted']>(
+    (profile) => {
+      if (profile.accessLevels?.[PREMIUM_ACCESS_LEVEL]?.isActive) {
+        void refreshProfile();
+        router.back();
+      }
+    },
+    [refreshProfile, router],
+  );
+
+  const onUrlPress = useCallback<EventHandlers['onUrlPress']>((url) => {
+    Linking.openURL(url).catch(() => {});
+  }, []);
+
+  const onRenderingFailed = useCallback<EventHandlers['onRenderingFailed']>(() => {
+    setPhase('fallback');
+  }, []);
+
+  // ---- Fallback purchase paths ----
+  const manualPurchase = useCallback(async (planId: PriceOption['id']) => {
+    const pw = paywallRef.current ?? (await adapty.getPaywall(ADAPTY_PLACEMENT_MAIN));
+    const products = await adapty.getPaywallProducts(pw);
+    if (!products.length) return;
+    const needle = planId === 'yearly' ? 'year' : 'month';
+    const product =
+      products.find((p) => (p.vendorProductId ?? '').toLowerCase().includes(needle)) ?? products[0];
+    const res = await adapty.makePurchase(product);
+    if (res.type === 'success') void refreshProfile();
+  }, [refreshProfile]);
+
+  const onStart = useCallback(async () => {
     setBusy(true);
     try {
-      // TODO(adapty): present Adapty paywall / make the StoreKit purchase here.
-      // For now we start the backend trial so the rest of the app unlocks.
-      await api.startTrial(config.trialDays);
+      if (!isAdaptyConfigured()) {
+        // Dev / Expo Go: no native Adapty — start the backend trial so the rest
+        // of the app unlocks for testing.
+        await api.startTrial(trialDays);
+        await refreshProfile();
+      } else {
+        await manualPurchase(selected);
+      }
     } catch {
-      // ignore in scaffold
+      // silent — user can retry
     } finally {
       setBusy(false);
       router.back();
     }
-  };
+  }, [trialDays, manualPurchase, refreshProfile, router, selected]);
 
+  const onRestore = useCallback(async () => {
+    if (!isAdaptyConfigured()) {
+      router.back();
+      return;
+    }
+    setBusy(true);
+    try {
+      const profile = await adapty.restorePurchases();
+      if (profile.accessLevels?.[PREMIUM_ACCESS_LEVEL]?.isActive) await refreshProfile();
+    } catch {
+      // ignore
+    } finally {
+      setBusy(false);
+      router.back();
+    }
+  }, [refreshProfile, router]);
+
+  // ---- Render: Paywall Builder ----
+  if (phase === 'adapty' && paywallRef.current) {
+    return (
+      <View style={styles.fill}>
+        <AdaptyPaywallView
+          paywall={paywallRef.current}
+          style={styles.fill}
+          onCloseButtonPress={close}
+          onPurchaseCompleted={onPurchaseCompleted}
+          onRestoreCompleted={onRestoreCompleted}
+          onUrlPress={onUrlPress}
+          onRenderingFailed={onRenderingFailed}
+        />
+      </View>
+    );
+  }
+
+  // ---- Render: loading ----
+  if (phase === 'loading') {
+    return (
+      <Screen edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.topBar}>
+          <View style={{ width: 26 }} />
+          <Pressable onPress={close} hitSlop={10}>
+            <X size={26} color={colors.inkMuted} strokeWidth={1.5} />
+          </Pressable>
+        </View>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.terracotta} />
+        </View>
+      </Screen>
+    );
+  }
+
+  // ---- Render: static fallback ----
   return (
     <Screen scroll edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.topBar}>
         <View style={{ width: 26 }} />
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={close} hitSlop={10}>
           <X size={26} color={colors.inkMuted} strokeWidth={1.5} />
         </Pressable>
       </View>
@@ -126,17 +271,17 @@ export default function PaywallScreen() {
         ))}
       </View>
 
-      {showTimeline ? (
+      {config.showTrialTimeline ? (
         <View style={styles.timeline}>
           <TimelineStep icon={LockOpen} title="Today" subtitle="Full access unlocks instantly" />
           <TimelineStep
             icon={Bell}
-            title={`Day ${Math.max(1, config.trialDays - 1)}`}
+            title={`Day ${Math.max(1, trialDays - 1)}`}
             subtitle="We’ll remind you before the trial ends"
           />
           <TimelineStep
             icon={Star}
-            title={`Day ${config.trialDays}`}
+            title={`Day ${trialDays}`}
             subtitle="Trial ends — cancel anytime before"
             last
           />
@@ -178,25 +323,23 @@ export default function PaywallScreen() {
         })}
       </View>
 
-      {showSocial ? (
-        <View style={styles.social}>
-          <Users size={16} color={colors.inkMuted} strokeWidth={1.5} />
-          <AppText variant="caption" color={colors.inkMuted}>
-            {config.socialProof}
-          </AppText>
-        </View>
-      ) : null}
-
       <Button
-        label={busy ? 'Starting…' : `Start ${config.trialDays}‑day free trial`}
+        label={busy ? 'Starting…' : `Start ${trialDays}‑day free trial`}
         variant="brand"
         loading={busy}
         onPress={onStart}
         style={styles.cta}
       />
 
+      <AppText variant="caption" color={colors.inkMuted} style={styles.disclosure}>
+        {selected === 'yearly'
+          ? '7‑day free trial, then $89.99/year'
+          : '3‑day free trial, then $9.99/month'}. Subscription auto‑renews until
+        cancelled — manage or cancel anytime in your Apple Account settings.
+      </AppText>
+
       <View style={styles.footer}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={onRestore}>
           <AppText variant="caption" color={colors.inkFaint}>
             Restore
           </AppText>
@@ -214,29 +357,13 @@ export default function PaywallScreen() {
           </AppText>
         </Pressable>
       </View>
-
-      <View style={styles.devBox}>
-        <AppText variant="overline" color={colors.inkFaint}>
-          Preview controls (Adapty drives these live)
-        </AppText>
-        <View style={styles.devRow}>
-          <AppText variant="caption" color={colors.inkMuted}>
-            Trial timeline
-          </AppText>
-          <Switch value={showTimeline} onValueChange={setShowTimeline} />
-        </View>
-        <View style={styles.devRow}>
-          <AppText variant="caption" color={colors.inkMuted}>
-            Social proof
-          </AppText>
-          <Switch value={showSocial} onValueChange={setShowSocial} />
-        </View>
-      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1, backgroundColor: colors.bg },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space.sm, marginBottom: space.md },
   headline: { marginTop: space.xs },
   subhead: { marginTop: space.sm, marginBottom: space.lg },
@@ -274,17 +401,7 @@ const styles = StyleSheet.create({
   radioDot: { width: 11, height: 11, borderRadius: radius.pill, backgroundColor: colors.terracotta },
   priceRight: { alignItems: 'flex-end', gap: 4 },
   badge: { backgroundColor: colors.terracotta, paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: radius.sm },
-  social: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, marginBottom: space.base },
   cta: { marginTop: space.sm },
+  disclosure: { marginTop: space.md, textAlign: 'center', lineHeight: 18 },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: space.sm, marginTop: space.base },
-  devBox: {
-    marginTop: space.xl,
-    padding: space.base,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    borderStyle: 'dashed',
-    gap: space.sm,
-  },
-  devRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

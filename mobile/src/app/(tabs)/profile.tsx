@@ -14,12 +14,15 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 
+import { adapty } from 'react-native-adapty';
+
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
+import { activateAdapty, isAdaptyConfigured, PREMIUM_ACCESS_LEVEL } from '@/billing/adapty';
 import { formatInt } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
 import { fonts } from '@/theme/typography';
@@ -161,29 +164,49 @@ export default function ProfileScreen() {
     }
   }, [linkTelegram, tgCode]);
 
-  const onRestore = () =>
-    Alert.alert(
-      'Restore purchases',
-      'In production this asks Adapty / the App Store to restore your subscription.\n\n(Not wired in this build.)',
-    );
+  const onRestore = useCallback(async () => {
+    if (!isAdaptyConfigured()) {
+      Alert.alert('Restore purchases', 'Purchases can be restored from a TestFlight or App Store build.');
+      return;
+    }
+    try {
+      await activateAdapty();
+      const adaptyProfile = await adapty.restorePurchases();
+      const active = Boolean(adaptyProfile.accessLevels?.[PREMIUM_ACCESS_LEVEL]?.isActive);
+      if (active) await refreshProfile();
+      Alert.alert(
+        'Restore purchases',
+        active
+          ? 'Your subscription has been restored.'
+          : 'No active subscription was found for your Apple ID.',
+      );
+    } catch {
+      Alert.alert('Restore purchases', 'Couldn’t restore purchases. Please try again.');
+    }
+  }, [refreshProfile]);
 
-  const onDelete = () =>
+  const onDelete = useCallback(() => {
     Alert.alert(
       'Delete account',
-      'This permanently deletes your account and diary across the app and the Telegram bot. This cannot be undone.',
+      'This permanently deletes your account and diary across the app and the Telegram bot. This cannot be undone.\n\nAn active App Store subscription is managed by Apple — cancel it in Settings › Apple Account › Subscriptions.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            // TODO(account-deletion): call a backend DELETE /app/me endpoint to
-            // erase the account + identities + diary (Apple requirement), then:
-            signOut();
+          onPress: async () => {
+            try {
+              await api.deleteAccount();
+            } catch {
+              Alert.alert('Delete account', 'Couldn’t delete your account. Please try again.');
+              return;
+            }
+            await signOut();
           },
         },
       ],
     );
+  }, [signOut]);
 
   return (
     <Screen scroll>
@@ -217,11 +240,11 @@ export default function ProfileScreen() {
             <AppText variant="caption" color={colors.protein}>
               P {profile?.target_protein_g ? Math.round(profile.target_protein_g) : 0}g
             </AppText>
-            <AppText variant="caption" color={colors.carbs}>
-              C {profile?.target_carbs_g ? Math.round(profile.target_carbs_g) : 0}g
-            </AppText>
             <AppText variant="caption" color={colors.fat}>
               F {profile?.target_fat_g ? Math.round(profile.target_fat_g) : 0}g
+            </AppText>
+            <AppText variant="caption" color={colors.carbs}>
+              C {profile?.target_carbs_g ? Math.round(profile.target_carbs_g) : 0}g
             </AppText>
           </View>
         </View>

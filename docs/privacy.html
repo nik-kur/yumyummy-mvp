@@ -64,9 +64,9 @@
 
 <main>
   <h1>Privacy Policy</h1>
-  <p class="meta">Effective date: 28 February 2026 &nbsp;·&nbsp; Last updated: 27 March 2026</p>
+  <p class="meta">Effective date: 28 February 2026 &nbsp;·&nbsp; Last updated: 2 July 2026</p>
 
-  <p>YumYummy ("we", "us", "our") is committed to protecting your privacy. This Privacy Policy explains what personal data we collect, how we use it, with whom we share it, and what rights you have in relation to it. It applies to all users of the YumYummy Telegram bot (@yum_yummybot) (the "Service").</p>
+  <p>YumYummy ("we", "us", "our") is committed to protecting your privacy. This Privacy Policy explains what personal data we collect, how we use it, with whom we share it, and what rights you have in relation to it. It applies to the YumYummy mobile app for iOS ("the App") and the YumYummy Telegram bot (@yum_yummybot) — together, the "Service".</p>
 
   <h2>1. Data Controller</h2>
   <p>The data controller responsible for your personal data is:</p>
@@ -81,26 +81,31 @@
 
   <h3>2.1 Data You Provide Directly</h3>
   <ul>
-    <li><strong>Telegram user ID and username</strong> — used to identify and link your account.</li>
+    <li><strong>Sign-in identifiers</strong> — when you create an account in the App you sign in with Apple, Google, or email. We receive a stable, provider-specific user identifier and, where you permit it, your email address. If you sign in with Apple using "Hide My Email", we only receive Apple's private relay address.</li>
+    <li><strong>Telegram user ID and username</strong> — used to identify your account when you use the Telegram bot or link it to the App.</li>
     <li><strong>Profile information</strong> — age, height, weight, biological sex, activity level, and nutritional goals, which you provide during the onboarding process.</li>
-    <li><strong>Meal log entries</strong> — descriptions of food and drink you submit (text, voice transcriptions, or product barcodes).</li>
+    <li><strong>Meal log entries</strong> — descriptions of food and drink you submit (text, voice transcriptions, product barcodes, or meal photos).</li>
+    <li><strong>Meal photos</strong> — in the App you can photograph a plate, product, or nutrition label to log a meal. Meal photos are uploaded to our cloud storage and stored together with the corresponding meal entry so you can review them later; they are deleted when you delete the meal or your account. Barcode/label images sent to the Telegram bot are processed for recognition and not stored afterwards.</li>
     <li><strong>Saved meals</strong> — meals you choose to save for quick re-logging.</li>
     <li><strong>Timezone preference</strong> — to display daily summaries correctly.</li>
-    <li><strong>Photos</strong> — barcode images you send to the bot for product recognition. These are not permanently stored after processing.</li>
-    <li><strong>Voice messages</strong> — audio files you send for speech-to-text transcription. Audio is sent to our transcription provider and is not permanently stored after the transcript is generated.</li>
+    <li><strong>Voice messages</strong> — audio you record to log meals by voice. Audio is sent to our transcription provider and is not permanently stored after the transcript is generated.</li>
   </ul>
 
   <h3>2.2 Data Collected Automatically</h3>
   <ul>
     <li><strong>Technical logs</strong> — server-side logs including timestamps and error traces, used for debugging and service monitoring. These logs do not include message content.</li>
+    <li><strong>Product analytics</strong> — we record in-app events (for example screens viewed, features used, onboarding and subscription funnel steps) to understand how the Service is used and to improve it. These events are linked to a pseudonymous analytics identifier and to your account, and are processed by our analytics provider (PostHog). We do not use this data for third-party advertising inside the App.</li>
+    <li><strong>Device &amp; app information</strong> — app version, operating-system version, device model, and general (non-precise) region, used for diagnostics and compatibility.</li>
     <li><strong>AI usage metrics</strong> — aggregate counts of AI model tokens consumed and web search queries performed per request. These metrics are linked to your account and used to enforce fair-use limits (see our <a href="terms.html">Terms &amp; Conditions</a>, Section 7) and to monitor service costs. We do not store the content of AI responses in usage records — only numerical token counts and estimated processing costs.</li>
   </ul>
 
   <h3>2.3 Payment Data</h3>
-  <p>We do <strong>not</strong> collect, process, or store your payment card details. Payments are processed via one of two methods:</p>
+  <p>We do <strong>not</strong> collect, process, or store your payment card details. Depending on where you subscribe, payments are handled by one of the following:</p>
   <ul>
-    <li><strong>Telegram Stars (XTR)</strong> — processed within the Telegram app. We receive only a notification that a subscription has been activated, renewed, or cancelled, along with a Telegram payment charge identifier. See <a href="https://telegram.org/privacy" target="_blank" rel="noopener noreferrer">Telegram's Privacy Policy</a>.</li>
-    <li><strong>Paddle.com</strong> — our merchant of record for card, Apple Pay, and Google Pay payments. Paddle collects and processes your payment details on our behalf. We receive only a transaction identifier, subscription status, and billing amounts. We never see or store your card number. See <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer">Paddle's Privacy Policy</a>.</li>
+    <li><strong>Apple App Store (in-app purchases)</strong> — subscriptions bought in the iOS App are processed by Apple and billed to your Apple Account. Apple does not share your payment card details with us. We receive the product purchased, the subscription status, and transaction identifiers. See <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer">Apple's Privacy Policy</a>.</li>
+    <li><strong>Adapty</strong> — our subscription-management provider. Adapty validates App Store purchase receipts, tracks subscription status, and links it to a pseudonymous customer identifier so the App can unlock premium access. It receives transaction and subscription metadata (not your card number). See <a href="https://adapty.io/privacy/" target="_blank" rel="noopener noreferrer">Adapty's Privacy Policy</a>.</li>
+    <li><strong>Telegram Stars (XTR)</strong> — for purchases in the Telegram bot, processed within the Telegram app. We receive only a notification that a subscription has been activated, renewed, or cancelled, along with a Telegram payment charge identifier. See <a href="https://telegram.org/privacy" target="_blank" rel="noopener noreferrer">Telegram's Privacy Policy</a>.</li>
+    <li><strong>Paddle.com</strong> — our merchant of record for card, Apple Pay, and Google Pay payments made on the web. Paddle collects and processes your payment details on our behalf. We receive only a transaction identifier, subscription status, and billing amounts. We never see or store your card number. See <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer">Paddle's Privacy Policy</a>.</li>
   </ul>
 
   <h2>3. How We Use Your Data</h2>
@@ -121,7 +126,7 @@
         <td style="padding:8px 12px;">Performance of contract</td>
       </tr>
       <tr style="border-bottom:1px solid #e5e7eb;">
-        <td style="padding:8px 12px;">Sending transactional notifications (e.g., subscription status updates) via Telegram</td>
+        <td style="padding:8px 12px;">Sending transactional notifications (e.g., subscription status, reminders) via Telegram or app push notifications</td>
         <td style="padding:8px 12px;">Performance of contract</td>
       </tr>
       <tr style="border-bottom:1px solid #e5e7eb;">
@@ -137,7 +142,7 @@
         <td style="padding:8px 12px;">Legal obligation</td>
       </tr>
       <tr>
-        <td style="padding:8px 12px;">Improving the Service (aggregated, anonymised analytics only)</td>
+        <td style="padding:8px 12px;">Understanding and improving the Service through product analytics and diagnostics (screens viewed, features used, funnel steps)</td>
         <td style="padding:8px 12px;">Legitimate interests</td>
       </tr>
     </tbody>
@@ -147,18 +152,22 @@
   <h2>4. Sub-processors &amp; Third Parties</h2>
   <p>We share data with the following third parties only as necessary to provide the Service:</p>
   <ul>
-    <li><strong>Telegram</strong> (payment processing via Telegram Stars and bot platform) — processes subscription payments and bot interactions. <a href="https://telegram.org/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
-    <li><strong>Paddle.com Market Limited</strong> (merchant of record for card payments) — processes card, Apple Pay, and Google Pay transactions, handles invoicing, sales tax / VAT, and refunds for card payments. <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
+    <li><strong>Apple</strong> (App Store in-app purchases) — processes subscriptions bought in the iOS App and billing. <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
+    <li><strong>Adapty Tech Inc.</strong> (subscription management) — validates App Store receipts and stores subscription status linked to a pseudonymous customer identifier. <a href="https://adapty.io/privacy/" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
+    <li><strong>PostHog</strong> (product analytics) — receives in-app and website usage events tied to a pseudonymous identifier, used to measure and improve the Service. <a href="https://posthog.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
     <li><strong>OpenAI, L.L.C.</strong> (AI-powered meal parsing, restaurant nutrition lookup, voice transcription) — receives meal description text and transcribed audio content. Data is processed under OpenAI's API data processing agreement; your data is not used to train OpenAI's public models. <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
-    <li><strong>Cloud hosting provider</strong> (servers where the Service backend and database are hosted) — processes all data as a data processor on our behalf. We use providers that maintain appropriate security standards.</li>
-    <li><strong>Redis Labs / equivalent</strong> (in-memory session storage) — stores temporary bot session state (not permanent personal data); data expires within the session.</li>
+    <li><strong>Telegram</strong> (Telegram Stars payments and bot platform) — processes subscription payments and bot interactions. <a href="https://telegram.org/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
+    <li><strong>Paddle.com Market Limited</strong> (merchant of record for web card payments) — processes card, Apple Pay, and Google Pay transactions, handles invoicing, sales tax / VAT, and refunds for web payments. <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a></li>
+    <li><strong>Cloud hosting &amp; storage providers</strong> (servers, database, and object storage for meal photos) — process data as data processors on our behalf under appropriate security standards.</li>
+    <li><strong>Advertising &amp; attribution partners — marketing website only.</strong> Our public website (yumyummy.ai) uses the <strong>Meta (Facebook) Pixel</strong> and <strong>TikTok Pixel</strong> to measure ad campaigns. These run on the website only and are <em>not</em> present in the iOS App. See <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer">Meta's</a> and <a href="https://www.tiktok.com/legal/page/global/privacy-policy/en" target="_blank" rel="noopener noreferrer">TikTok's</a> privacy policies.</li>
   </ul>
 
   <h2>5. Data Retention</h2>
   <ul>
-    <li><strong>Account and meal log data</strong> — retained while your account is active, and for up to 90 days after account deletion to allow for dispute resolution, after which it is permanently deleted.</li>
+    <li><strong>Account and meal log data</strong> — retained while your account is active. When you delete your account (in the App via Profile &rarr; Delete account, in the bot, or by contacting us) your account, sign-in identities, and diary are erased promptly from our live systems; residual copies in encrypted backups are purged within 30 days.</li>
+    <li><strong>Meal photos</strong> — stored with the meal entry while it exists; deleted when you delete the meal or your account.</li>
     <li><strong>Voice audio files</strong> — deleted immediately after transcription; we do not store raw audio.</li>
-    <li><strong>Barcode images</strong> — deleted immediately after product recognition; we do not store product photos.</li>
+    <li><strong>Barcode/label images (Telegram bot)</strong> — deleted immediately after product recognition; we do not store them.</li>
     <li><strong>Technical logs</strong> — retained for up to 90 days, then deleted automatically.</li>
     <li><strong>AI usage records</strong> — aggregate token counts and cost estimates per request, retained for up to 12 months for billing and analytics purposes, then deleted automatically.</li>
     <li><strong>Subscription transaction records</strong> — retained for up to 7 years as required by applicable financial and tax regulations.</li>
@@ -179,7 +188,7 @@
   <ul>
     <li><strong>Access</strong> — request a copy of the personal data we hold about you;</li>
     <li><strong>Rectification</strong> — ask us to correct inaccurate data;</li>
-    <li><strong>Erasure ("right to be forgotten")</strong> — ask us to delete your data. You can initiate this by contacting us at the email below;</li>
+    <li><strong>Erasure ("right to be forgotten")</strong> — you can permanently delete your account and all associated data yourself at any time in the App (Profile &rarr; Delete account), or by contacting us at the email below;</li>
     <li><strong>Portability</strong> — request your meal log data in a machine-readable format (CSV export is available directly in the bot via the Export function);</li>
     <li><strong>Objection / Restriction</strong> — object to certain processing or request that we restrict processing in specific circumstances.</li>
   </ul>
@@ -191,8 +200,9 @@
   <h2>9. International Data Transfers</h2>
   <p>Your data may be processed in countries outside your country of residence, including the United States (OpenAI servers) and the European Union (some cloud infrastructure). We take steps to ensure that international transfers are protected by appropriate safeguards (such as standard contractual clauses or equivalent mechanisms).</p>
 
-  <h2>10. Cookies</h2>
-  <p>The bot itself does not use cookies. This legal website (the page you are reading now) does not set any cookies or use analytics tracking.</p>
+  <h2>10. Cookies &amp; Website Tracking</h2>
+  <p>The iOS App and the Telegram bot do <strong>not</strong> use cookies. Our public marketing website (yumyummy.ai), including these legal pages, uses cookies and similar technologies for analytics and advertising measurement via <strong>PostHog</strong>, the <strong>Meta (Facebook) Pixel</strong>, and the <strong>TikTok Pixel</strong>. These help us understand website traffic and measure the performance of our ad campaigns.</p>
+  <p>You can control cookies through your browser settings and opt out of interest-based advertising via your Meta and TikTok ad-preferences settings. Disabling these does not affect your ability to use the Service.</p>
 
   <h2>11. Changes to This Policy</h2>
   <p>We may update this Privacy Policy from time to time. We will notify you of material changes through the Service or by email before the changes take effect. The "Last updated" date at the top of this page will always reflect the most recent revision.</p>

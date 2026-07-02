@@ -14,10 +14,11 @@ These endpoints intentionally reuse the existing services
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, get_current_account
+from app.ai.stt_client import transcribe_audio
 from app.db.session import SessionLocal
 from app.core.config import settings
 from app.models.account import Account, Identity
@@ -26,6 +27,12 @@ from app.models.user_day import UserDay
 from app.models.meal_entry import MealEntry
 from app.models.saved_meal import SavedMeal
 from app.models.saved_meal_item import SavedMealItem
+from app.models.usage_record import UsageRecord
+from app.models.churn_survey import ChurnSurvey
+from app.models.payment_event import PaymentEvent
+from app.models.notification_event import NotificationEvent
+from app.models.acquisition_event import AcquisitionEvent
+from app.models.auth_code import AuthOneTimeCode
 from app.auth.service import get_primary_user, account_member_users
 from app.billing.account_access import account_billing_snapshot, account_has_access
 from app.billing.plans import resolve_trial_days
@@ -112,6 +119,78 @@ def update_me(
     db.commit()
     db.refresh(user)
     return _build_profile(db, account, user)
+
+
+@router.delete("/me")
+def delete_me(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Permanently delete the caller's account and all of its data.
+
+    Required by App Store Review Guideline 5.1.1(v): an app that supports
+    account creation must let the user *delete* their account (not merely sign
+    out) from within the app. This erases the account, every sign-in identity
+    (Apple / Google / email / Telegram), the diary (days, meals, saved meals),
+    billing/usage history, and lifecycle analytics keyed to the account.
+
+    It does NOT cancel an active App Store subscription — auto-renewable
+    subscriptions are managed by Apple and cancelled by the user in Settings;
+    we only remove our own copy of the account and its data.
+    """
+    members = account_member_users(db, account.id)
+    user_ids = [u.id for u in members]
+    telegram_ids = [u.telegram_id for u in members if u.telegram_id]
+
+    # email_login one-time codes are keyed by email with a NULL account_id, so
+    # the accounts FK cascade won't reach them — collect the account's emails.
+    emails: set[str] = set()
+    if account.primary_email:
+        emails.add(account.primary_email.strip().lower())
+    for ident in db.query(Identity).filter(Identity.account_id == account.id).all():
+        if ident.email:
+            emails.add(ident.email.strip().lower())
+        if ident.provider == "email" and ident.provider_id:
+            emails.add(str(ident.provider_id).strip().lower())
+
+    if user_ids:
+        # Diary children first (these FKs have no ON DELETE CASCADE).
+        saved_ids = [
+            row[0]
+            for row in db.query(SavedMeal.id).filter(SavedMeal.user_id.in_(user_ids)).all()
+        ]
+        if saved_ids:
+            db.query(SavedMealItem).filter(
+                SavedMealItem.saved_meal_id.in_(saved_ids)
+            ).delete(synchronize_session=False)
+        db.query(SavedMeal).filter(SavedMeal.user_id.in_(user_ids)).delete(synchronize_session=False)
+        db.query(MealEntry).filter(MealEntry.user_id.in_(user_ids)).delete(synchronize_session=False)
+        db.query(UserDay).filter(UserDay.user_id.in_(user_ids)).delete(synchronize_session=False)
+        db.query(UsageRecord).filter(UsageRecord.user_id.in_(user_ids)).delete(synchronize_session=False)
+        db.query(ChurnSurvey).filter(ChurnSurvey.user_id.in_(user_ids)).delete(synchronize_session=False)
+        db.query(PaymentEvent).filter(PaymentEvent.user_id.in_(user_ids)).delete(synchronize_session=False)
+
+    if telegram_ids:
+        db.query(NotificationEvent).filter(
+            NotificationEvent.telegram_id.in_(telegram_ids)
+        ).delete(synchronize_session=False)
+        db.query(AcquisitionEvent).filter(
+            AcquisitionEvent.telegram_id.in_(telegram_ids)
+        ).delete(synchronize_session=False)
+
+    if emails:
+        db.query(AuthOneTimeCode).filter(
+            AuthOneTimeCode.subject.in_(list(emails))
+        ).delete(synchronize_session=False)
+
+    # Diary containers, then the account. Identities and telegram_link one-time
+    # codes are removed by the accounts FK cascade (ON DELETE CASCADE).
+    db.query(User).filter(User.account_id == account.id).delete(synchronize_session=False)
+    db.query(Account).filter(Account.id == account.id).delete(synchronize_session=False)
+
+    db.commit()
+    logger.info("account_deleted account_id=%s users=%s", account.id, user_ids)
+    return {"status": "deleted"}
 
 
 @router.get("/today", response_model=DaySummary)
@@ -504,3 +583,36 @@ async def app_agent_run(
             message_text="Got it, but I couldn't format the result. Please try again.",
             confidence=None, totals=_empty_totals(), items=[], source_url=None,
         )
+
+
+@router.post("/voice/transcribe")
+async def app_voice_transcribe(
+    audio: UploadFile = File(...),
+    account: Account = Depends(get_current_account),
+):
+    """Speech-to-text only for the mobile composer.
+
+    Unlike ``/ai/voice_parse_meal`` this deliberately does NOT run the
+    web-search meal-analysis pipeline — the app just drops the transcript into
+    the capture box so the user can review/edit it, then submits it through
+    ``/app/agent/run`` (which does the source-checked logging). Keeping this
+    endpoint transcript-only makes voice logging fast and avoids duplicate,
+    wasted analysis work.
+    """
+    try:
+        file_bytes = await audio.read()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not read audio file")
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+
+    try:
+        transcript = await transcribe_audio(
+            file_bytes=file_bytes,
+            filename=audio.filename or "voice.m4a",
+        )
+    except Exception as exc:
+        logger.error("[/app/voice/transcribe] STT failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail="Could not recognize speech")
+
+    return {"transcript": transcript.strip()}

@@ -89,12 +89,8 @@ export default function SignInScreen() {
           onPress={() => run(async () => { await auth.signInWithProvider('apple'); goHome(); })}
           icon={<Apple size={18} color={colors.bg} strokeWidth={1.5} />}
         />
-        {/* Lucide has no Google brand mark; the official multicolor "G" is added when native Google auth is wired. */}
-        <Button
-          label="Continue with Google"
-          variant="secondary"
-          onPress={() => run(async () => { await auth.signInWithProvider('google'); goHome(); })}
-        />
+        {/* Google sign-in ships in a later build (native @react-native-google-signin
+            + OAuth client). Hidden until then so we don't present a dead control. */}
       </View>
 
       <View style={styles.dividerRow}>
@@ -198,11 +194,16 @@ export default function SignInScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.demo} onPress={onSkipDemo}>
-        <AppText variant="caption" color={colors.inkFaint} center>
-          Demo: skip sign‑in →
-        </AppText>
-      </Pressable>
+      {/* Dev-only shortcut: relies on the backend returning the login code,
+          which is disabled in production. Hidden from release/TestFlight builds
+          (reviewers sign in with Apple). */}
+      {__DEV__ ? (
+        <Pressable style={styles.demo} onPress={onSkipDemo}>
+          <AppText variant="caption" color={colors.inkFaint} center>
+            Demo: skip sign‑in →
+          </AppText>
+        </Pressable>
+      ) : null}
     </Screen>
   );
 }

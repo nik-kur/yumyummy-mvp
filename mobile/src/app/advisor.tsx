@@ -75,11 +75,11 @@ function Bubble({ message }: { message: Message }) {
               <AppText variant="caption" color={colors.protein}>
                 P {message.card.protein}g
               </AppText>
-              <AppText variant="caption" color={colors.carbs}>
-                C {message.card.carbs}g
-              </AppText>
               <AppText variant="caption" color={colors.fat}>
                 F {message.card.fat}g
+              </AppText>
+              <AppText variant="caption" color={colors.carbs}>
+                C {message.card.carbs}g
               </AppText>
             </View>
           </View>
@@ -184,6 +184,9 @@ export default function AdvisorScreen() {
             <ArrowUp size={22} color={colors.bg} strokeWidth={2} />
           </Pressable>
         </View>
+        <AppText variant="caption" color={colors.inkFaint} style={styles.disclaimer}>
+          AI advisor — informational only, not medical or dietary advice.
+        </AppText>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -253,4 +256,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendDisabled: { opacity: 0.4 },
+  disclaimer: { textAlign: 'center', paddingHorizontal: space.lg, paddingBottom: space.sm },
 });
