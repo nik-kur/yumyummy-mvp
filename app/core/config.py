@@ -144,6 +144,17 @@ class Settings(BaseSettings):
     adapty_product_yearly: Optional[str] = None
 
     # ------------------------------------------------------------------
+    # Agent engine experiment (v2 beta)
+    # ------------------------------------------------------------------
+    # Engine used by /app/agent/run. "v1" = current Agent Builder workflow.
+    # "v2" switches EVERYONE — keep "v1" and use the allowlist for betas.
+    agent_engine_default: str = "v1"
+    # Comma-separated Account ids routed to agent v2 (beta testers).
+    agent_v2_account_ids: Optional[str] = None
+    # Which v2 model variant to run (see app/agent_v2/config.py).
+    agent_v2_variant: str = "v2g"
+
+    # ------------------------------------------------------------------
     # Object storage (Cloudflare R2 / AWS S3) for meal photos
     # ------------------------------------------------------------------
     storage_enabled: bool = False
@@ -172,6 +183,18 @@ class Settings(BaseSettings):
     @property
     def google_client_id_set(self) -> set[str]:
         return {p.strip() for p in (self.google_client_id or "").split(",") if p.strip()}
+
+    @property
+    def agent_v2_account_id_set(self) -> set[int]:
+        """Parsed set of account ids beta-testing agent v2."""
+        if not self.agent_v2_account_ids:
+            return set()
+        out: set[int] = set()
+        for part in self.agent_v2_account_ids.split(","):
+            part = part.strip()
+            if part.isdigit():
+                out.add(int(part))
+        return out
 
     @property
     def dev_telegram_id_set(self) -> set[int]:

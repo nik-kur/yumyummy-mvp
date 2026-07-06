@@ -1,0 +1,195 @@
+{
+  "variant": "v2g",
+  "rows": [
+    {
+      "text": "4600699501398",
+      "expected": "barcode",
+      "got": "barcode",
+      "ok": true,
+      "ms": 760,
+      "kcal": 899,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "штрих-код 5449000000996",
+      "expected": "barcode",
+      "got": "barcode",
+      "ok": true,
+      "ms": 674,
+      "kcal": 139,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "barcode 8000500310427",
+      "expected": "barcode",
+      "got": "barcode",
+      "ok": true,
+      "ms": 552,
+      "kcal": 71,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "гречка 200 г и куриная грудка 150 г",
+      "expected": "log_meal",
+      "got": "log_meal",
+      "ok": true,
+      "ms": 4065,
+      "kcal": 385,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "овсянка на воде из 60 г хлопьев и банан",
+      "expected": "log_meal",
+      "got": "log_meal",
+      "ok": true,
+      "ms": 3656,
+      "kcal": 334,
+      "conf": "ESTIMATE",
+      "err": null
+    },
+    {
+      "text": "2 вареных яйца и тост с маслом",
+      "expected": "log_meal",
+      "got": "log_meal",
+      "ok": true,
+      "ms": 3576,
+      "kcal": 357,
+      "conf": "ESTIMATE",
+      "err": null
+    },
+    {
+      "text": "салат из огурцов и помидоров с оливковым маслом",
+      "expected": "log_meal",
+      "got": "log_meal",
+      "ok": true,
+      "ms": 3329,
+      "kcal": 133,
+      "conf": "ESTIMATE",
+      "err": null
+    },
+    {
+      "text": "borsch bowl and a slice of rye bread",
+      "expected": "log_meal",
+      "got": "log_meal",
+      "ok": true,
+      "ms": 2818,
+      "kcal": 283,
+      "conf": "ESTIMATE",
+      "err": null
+    },
+    {
+      "text": "капучино и тунакадо из Joe & The Juice",
+      "expected": "eatout",
+      "got": "eatout",
+      "ok": true,
+      "ms": 7032,
+      "kcal": 663,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "биг мак и средняя картошка из макдональдса",
+      "expected": "eatout",
+      "got": "eatout",
+      "ok": true,
+      "ms": 6983,
+      "kcal": 856,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "гранде латте из старбакса",
+      "expected": "eatout",
+      "got": "eatout",
+      "ok": true,
+      "ms": 6365,
+      "kcal": 190,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "шаурма из Wolt-а от Döner Pasha",
+      "expected": "eatout",
+      "got": "eatout",
+      "ok": true,
+      "ms": 13829,
+      "kcal": 612,
+      "conf": "ESTIMATE",
+      "err": null
+    },
+    {
+      "text": "сникерс 50 г",
+      "expected": "product",
+      "got": "product",
+      "ok": true,
+      "ms": 5444,
+      "kcal": 241,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "актимель клубничный, одна бутылочка",
+      "expected": "product",
+      "got": "product",
+      "ok": true,
+      "ms": 7220,
+      "kcal": 71,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "творог Простоквашино 5% 200 г",
+      "expected": "product",
+      "got": "product",
+      "ok": true,
+      "ms": 4868,
+      "kcal": 234,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "Barilla penne 80 g dry with Mutti tomato sauce",
+      "expected": "product",
+      "got": "product",
+      "ok": true,
+      "ms": 6922,
+      "kcal": 318,
+      "conf": "HIGH",
+      "err": null
+    },
+    {
+      "text": "что ты умеешь?",
+      "expected": "help",
+      "got": "help",
+      "ok": true,
+      "ms": 1316,
+      "kcal": 0,
+      "conf": null,
+      "err": null
+    },
+    {
+      "text": "привет! как дела?",
+      "expected": "unknown",
+      "got": "unknown",
+      "ok": true,
+      "ms": 1261,
+      "kcal": 0,
+      "conf": null,
+      "err": null
+    },
+    {
+      "text": "[photo] evals/agent_v2/datasets/photos/real/photo_03.jpg",
+      "expected": "photo_meal",
+      "got": "photo_meal",
+      "ok": true,
+      "ms": 12142,
+      "kcal": 252,
+      "conf": "ESTIMATE",
+      "err": null
+    }
+  ]
+}

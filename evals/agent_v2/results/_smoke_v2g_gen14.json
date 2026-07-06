@@ -1,0 +1,160 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/generic_15.csv",
+    "n": 2,
+    "concurrency": 2,
+    "photo_mode": "b",
+    "wall_clock_s": 5.1,
+    "ts": "2026-07-02 23:25:55"
+  },
+  "summary": {
+    "n": 2,
+    "ok": 2,
+    "errors": 0,
+    "latency_s": {
+      "mean": 3.9,
+      "median": 3.9,
+      "p90": 4.8,
+      "max": 4.8
+    },
+    "cost_usd": {
+      "mean": 0.00141,
+      "total": 0.0028
+    },
+    "domain_hit_rate": null,
+    "domain_scored_n": 0,
+    "kcal_ok_rate": 0.5,
+    "kcal_scored_n": 2,
+    "kcal_err_pct_median": 33.0,
+    "zero_kcal_bugs": 0,
+    "confidence_dist": {
+      "ESTIMATE": 2
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "gen_13",
+      "agent_type": "log_meal",
+      "input": "борщ 300 мл",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 4804.3,
+      "cost_usd": 0.00233,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 210.0,
+        "protein_g": 12.0,
+        "fat_g": 9.0,
+        "carbs_g": 21.0
+      },
+      "items": [
+        {
+          "name": "борщ",
+          "grams": 300.0,
+          "calories_kcal": 210.0,
+          "protein_g": 12.0,
+          "fat_g": 9.0,
+          "carbs_g": 21.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 210 kcal • P 12.0g • F 9.0g • C 21.0g\nConfidence: ESTIMATE\nSource: none",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 388,
+          "output_tokens": 712,
+          "search_queries": 0,
+          "duration_ms": 4784.2,
+          "cost_usd": 0.00233
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.1,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": false,
+        "kcal_err_pct": 55.6,
+        "zero_kcal_bug": false
+      }
+    },
+    {
+      "case_id": "gen_14",
+      "agent_type": "log_meal",
+      "input": "3 сырника",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3002.7,
+      "cost_usd": 0.000483,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 340.0,
+        "protein_g": 24.0,
+        "fat_g": 12.0,
+        "carbs_g": 34.0
+      },
+      "items": [
+        {
+          "name": "сырники",
+          "grams": 180.0,
+          "calories_kcal": 340.0,
+          "protein_g": 24.0,
+          "fat_g": 12.0,
+          "carbs_g": 34.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 340 kcal • P 24.0g • F 12.0g • C 34.0g\nConfidence: ESTIMATE\nSource: none\nNote: Estimated 3 syrniki at 60g each.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 385,
+          "output_tokens": 97,
+          "search_queries": 0,
+          "duration_ms": 2999.2,
+          "cost_usd": 0.000483
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.2,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 10.5,
+        "zero_kcal_bug": false
+      }
+    }
+  ]
+}

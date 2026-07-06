@@ -1,0 +1,700 @@
+{
+  "meta": {
+    "variant": "v1",
+    "dataset": "evals/agent_v2/datasets/generic_15.csv",
+    "n": 15,
+    "concurrency": 3,
+    "photo_mode": "b",
+    "wall_clock_s": 142.0,
+    "ts": "2026-07-02 23:48:44"
+  },
+  "summary": {
+    "n": 15,
+    "ok": 15,
+    "errors": 0,
+    "latency_s": {
+      "mean": 25.81,
+      "median": 25.47,
+      "p90": 32.37,
+      "max": 33.33
+    },
+    "cost_usd": {
+      "mean": null,
+      "total": null
+    },
+    "domain_hit_rate": 0.0,
+    "domain_scored_n": 12,
+    "kcal_ok_rate": 0.867,
+    "kcal_scored_n": 15,
+    "kcal_err_pct_median": 0.2,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {},
+    "confidence_dist": {
+      "HIGH": 13,
+      "ESTIMATE": 2
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "gen_01",
+      "agent_type": "log_meal",
+      "input": "2 яйца вкрутую",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 23361.2,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 140.0,
+        "protein_g": 12.0,
+        "fat_g": 10.0,
+        "carbs_g": 1.2
+      },
+      "items": [
+        {
+          "name": "hard-boiled eggs",
+          "grams": 100.0,
+          "calories_kcal": 140.0,
+          "protein_g": 12.0,
+          "fat_g": 10.0,
+          "carbs_g": 1.2,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 140 kcal • P 12g • F 10g • C 1.2g\nConfidence: HIGH\nNote: Assumes two large hard-boiled eggs (~50 g each); values are estimates.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 9.7,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_02",
+      "agent_type": "log_meal",
+      "input": "овсянка на воде из 60 г сухой овсянки",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 20190.5,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 233.4,
+        "protein_g": 10.14,
+        "fat_g": 4.14,
+        "carbs_g": 39.78
+      },
+      "items": [
+        {
+          "name": "Oatmeal (60 g dry oats, cooked in water)",
+          "grams": 60.0,
+          "calories_kcal": 233.4,
+          "protein_g": 10.14,
+          "fat_g": 4.14,
+          "carbs_g": 39.78,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 233.4 kcal • P 10.14g • F 4.14g • C 39.78g\nConfidence: HIGH\nNote: Assumes prepared with water, no added sugar or toppings.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.2,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_03",
+      "agent_type": "log_meal",
+      "input": "гречка отварная 200 г",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 29537.5,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 184.0,
+        "protein_g": 6.8,
+        "fat_g": 1.2,
+        "carbs_g": 39.8
+      },
+      "items": [
+        {
+          "name": "гречка отварная",
+          "grams": 200.0,
+          "calories_kcal": 184.0,
+          "protein_g": 6.8,
+          "fat_g": 1.2,
+          "carbs_g": 39.8,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 184 kcal • P 6.8g • F 1.2g • C 39.8g\nConfidence: HIGH\nNote: Assumes cooked buckwheat with water, no added fats or salt; portion 200 g.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_04",
+      "agent_type": "log_meal",
+      "input": "куриная грудка гриль 150 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 19402.0,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 247.5,
+        "protein_g": 46.5,
+        "fat_g": 5.4,
+        "carbs_g": 0.0
+      },
+      "items": [
+        {
+          "name": "Grilled chicken breast",
+          "grams": 150.0,
+          "calories_kcal": 247.5,
+          "protein_g": 46.5,
+          "fat_g": 5.4,
+          "carbs_g": 0.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 247.5 kcal • P 46.5g • F 5.4g • C 0g\nConfidence: HIGH\nNote: Assumptions: skinless grilled chicken breast, 150 g; macros estimated from standard nutrition data (no added ingredients).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.2,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_05",
+      "agent_type": "log_meal",
+      "input": "1 средний банан",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 26881.0,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 105.0,
+        "protein_g": 1.3,
+        "fat_g": 0.3,
+        "carbs_g": 27.0
+      },
+      "items": [
+        {
+          "name": "Banana (medium)",
+          "grams": 118.0,
+          "calories_kcal": 105.0,
+          "protein_g": 1.3,
+          "fat_g": 0.3,
+          "carbs_g": 27.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 105 kcal • P 1.3g • F 0.3g • C 27g\nConfidence: HIGH\nNote: 1 medium banana (~118 g) used; nutrition values are approximate.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_06",
+      "agent_type": "log_meal",
+      "input": "рис отварной 250 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 22986.0,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 325.0,
+        "protein_g": 6.0,
+        "fat_g": 0.75,
+        "carbs_g": 70.5
+      },
+      "items": [
+        {
+          "name": "Rice, boiled",
+          "grams": 250.0,
+          "calories_kcal": 325.0,
+          "protein_g": 6.0,
+          "fat_g": 0.75,
+          "carbs_g": 70.5,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 325 kcal • P 6.0g • F 0.75g • C 70.5g\nConfidence: HIGH\nNote: Assumptions: standard cooked white rice; nutrition approximated as 130 kcal/100 g; 2.4 g protein; 0.3 g fat; 28.2 g carbs per 100 g. For 250 g cooked rice: 325 kcal, 6.0 g protein, 0.75 g fat, 70.5 g carbs.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_07",
+      "agent_type": "log_meal",
+      "input": "греческий йогурт 170 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 25474.6,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 100.3,
+        "protein_g": 17.0,
+        "fat_g": 0.0,
+        "carbs_g": 6.1
+      },
+      "items": [
+        {
+          "name": "Greek yogurt",
+          "grams": 170.0,
+          "calories_kcal": 100.3,
+          "protein_g": 17.0,
+          "fat_g": 0.0,
+          "carbs_g": 6.1,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 100.3 kcal • P17g • F0g • C6.1g\nConfidence: HIGH\nNote: Assumes plain nonfat Greek yogurt (0% fat) per 170 g.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": false,
+        "kcal_err_pct": 39.2,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_08",
+      "agent_type": "log_meal",
+      "input": "1 среднее яблоко",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 17814.9,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 95.0,
+        "protein_g": 0.5,
+        "fat_g": 0.3,
+        "carbs_g": 25.0
+      },
+      "items": [
+        {
+          "name": "Medium apple",
+          "grams": 182.0,
+          "calories_kcal": 95.0,
+          "protein_g": 0.5,
+          "fat_g": 0.3,
+          "carbs_g": 25.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 95 kcal • P 0.5g • F 0.3g • C 25g\nConfidence: HIGH\nNote: Assumes a standard medium apple (~182 g).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_09",
+      "agent_type": "log_meal",
+      "input": "лосось запечённый 120 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 24636.3,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 247.0,
+        "protein_g": 27.0,
+        "fat_g": 15.6,
+        "carbs_g": 0.0
+      },
+      "items": [
+        {
+          "name": "Salmon, baked",
+          "grams": 120.0,
+          "calories_kcal": 247.0,
+          "protein_g": 27.0,
+          "fat_g": 15.6,
+          "carbs_g": 0.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 247 kcal • P 27g • F 15.6g • C 0g\nConfidence: HIGH\nNote: Assumptions: 120 g baked salmon with no added oil or sauce; macros are estimated using standard cooked salmon values.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_10",
+      "agent_type": "log_meal",
+      "input": "картофель отварной 300 г",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 17918.6,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 258.0,
+        "protein_g": 4.8,
+        "fat_g": 0.3,
+        "carbs_g": 60.0
+      },
+      "items": [
+        {
+          "name": "Boiled potatoes",
+          "grams": 300.0,
+          "calories_kcal": 258.0,
+          "protein_g": 4.8,
+          "fat_g": 0.3,
+          "carbs_g": 60.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 258 kcal • P 4.8g • F 0.3g • C 60g\nConfidence: HIGH\nNote: Assumes plain boiled potatoes with no added fats or toppings; standard nutrition data ~86 kcal per 100 g.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.1,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_11",
+      "agent_type": "log_meal",
+      "input": "салат из огурцов и помидоров с 1 ст.л. оливкового масла",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 33325.5,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 197.0,
+        "protein_g": 3.0,
+        "fat_g": 14.7,
+        "carbs_g": 17.0
+      },
+      "items": [
+        {
+          "name": "Cucumber",
+          "grams": 200.0,
+          "calories_kcal": 32.0,
+          "protein_g": 0.7,
+          "fat_g": 0.2,
+          "carbs_g": 7.2,
+          "source_url": null
+        },
+        {
+          "name": "Tomato",
+          "grams": 250.0,
+          "calories_kcal": 45.0,
+          "protein_g": 2.3,
+          "fat_g": 0.5,
+          "carbs_g": 9.8,
+          "source_url": null
+        },
+        {
+          "name": "Olive oil",
+          "grams": 14.0,
+          "calories_kcal": 120.0,
+          "protein_g": 0.0,
+          "fat_g": 14.0,
+          "carbs_g": 0.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 197 kcal • P 3.0g • F 14.7g • C 17.0g\nConfidence: ESTIMATE\nNote: Assumptions: 200 g cucumber, 250 g tomato, and 1 tablespoon olive oil used in salad.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 22.4,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_12",
+      "agent_type": "log_meal",
+      "input": "макароны отварные 200 г с 10 г сливочного масла",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 32243.1,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 334.0,
+        "protein_g": 9.8,
+        "fat_g": 9.8,
+        "carbs_g": 50.1
+      },
+      "items": [
+        {
+          "name": "Pasta, cooked",
+          "grams": 200.0,
+          "calories_kcal": 262.0,
+          "protein_g": 9.8,
+          "fat_g": 1.8,
+          "carbs_g": 50.0,
+          "source_url": null
+        },
+        {
+          "name": "Butter",
+          "grams": 10.0,
+          "calories_kcal": 72.0,
+          "protein_g": 0.0,
+          "fat_g": 8.0,
+          "carbs_g": 0.1,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 334 kcal • P 9.8g • F 9.8g • C 50.1g\nConfidence: HIGH\nNote: Assumptions: cooked pasta values used for 200 g; butter 10 g; macros are approximate and can vary by brand; no other ingredients.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 13.9,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_13",
+      "agent_type": "log_meal",
+      "input": "борщ 300 мл",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 29594.5,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 160.0,
+        "protein_g": 3.0,
+        "fat_g": 4.0,
+        "carbs_g": 28.0
+      },
+      "items": [
+        {
+          "name": "борщ",
+          "grams": 300.0,
+          "calories_kcal": 160.0,
+          "protein_g": 3.0,
+          "fat_g": 4.0,
+          "carbs_g": 28.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 160 kcal • P 3g • F 4g • C 28g\nConfidence: HIGH\nNote: Assumptions: 300 ml portion of plain borscht (no meat, no sour cream); nutrition estimates based on typical beet soup; 1 ml ≈ 1 g.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_14",
+      "agent_type": "log_meal",
+      "input": "3 сырника",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 31393.3,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 780.0,
+        "protein_g": 27.0,
+        "fat_g": 36.0,
+        "carbs_g": 78.0
+      },
+      "items": [
+        {
+          "name": "syrnik",
+          "grams": 150.0,
+          "calories_kcal": 260.0,
+          "protein_g": 9.0,
+          "fat_g": 12.0,
+          "carbs_g": 26.0,
+          "source_url": null
+        },
+        {
+          "name": "syrnik",
+          "grams": 150.0,
+          "calories_kcal": 260.0,
+          "protein_g": 9.0,
+          "fat_g": 12.0,
+          "carbs_g": 26.0,
+          "source_url": null
+        },
+        {
+          "name": "syrnik",
+          "grams": 150.0,
+          "calories_kcal": 260.0,
+          "protein_g": 9.0,
+          "fat_g": 12.0,
+          "carbs_g": 26.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 780 kcal • P 27g • F 36g • C 78g\nConfidence: ESTIMATE\nNote: Assuming three syrniki pastries, about 150 g each (total ~450 g).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": false,
+        "kcal_err_pct": 105.3,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_15",
+      "agent_type": "log_meal",
+      "input": "стакан кефира 250 мл 2.5%",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 32372.2,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 130.0,
+        "protein_g": 8.0,
+        "fat_g": 6.0,
+        "carbs_g": 13.0
+      },
+      "items": [
+        {
+          "name": "Kefir, 2.5% fat",
+          "grams": 250.0,
+          "calories_kcal": 130.0,
+          "protein_g": 8.0,
+          "fat_g": 6.0,
+          "carbs_g": 13.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 130 kcal • P 8g • F 6g • C 13g\nConfidence: HIGH\nNote: Assumptions: Kefir with 2.5% fat, 250 ml. Nutrient estimates are approximate based on typical kefir nutrition.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 4.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    }
+  ]
+}

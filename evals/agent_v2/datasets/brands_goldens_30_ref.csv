@@ -1,0 +1,31 @@
+case_id,agent_type,input_as_text,image_url,expected_source_mode,expected_source_domains,expected_confidence,expected_kcal,kcal_tolerance_pct,region,criticality,notes
+eatout_01,eatout,"Starbucks Caramel Macchiato grande — кбжу",,trusted_domain,starbucks.com|starbucks,high_or_estimate,250,30,US/EU,high,US grande 2% ~250; UK ~227.
+eatout_02,eatout,"McDonald's Big Mac — calories and macros",,trusted_domain,mcdonalds.com|mcdonalds,high_or_estimate,570,25,US/EU,high,US 590 / UK 508.
+eatout_03,eatout,"KFC Original Recipe chicken breast — кбжу",,trusted_domain,kfc.com|kfc,high_or_estimate,390,25,US,high,US official 390.
+eatout_04,eatout,"Subway Meatball Marinara footlong — кбжу",,trusted_domain,subway.com|subway,high_or_estimate,960,20,US/EU,high,US footlong ~960.
+eatout_05,eatout,"Burger King Whopper — кбжу на 1 бургер",,trusted_domain,burgerking.com|burgerking,high_or_estimate,670,20,US/EU,high,US official 670.
+eatout_06,eatout,"Domino's Pepperoni Pizza medium 1 slice — calories",,trusted_domain,dominos.com|dominos,high_or_estimate,215,30,US,high,Hand tossed medium slice ~215.
+eatout_07,eatout,"Chipotle chicken burrito bowl — macros",,trusted_domain,chipotle.com|chipotle,high_or_estimate,,,US,high,Configurable bowl; domain check only.
+eatout_08,eatout,"Кофемания: тирамису — кбжу на порцию",,trusted_domain,coffeemania.ru|coffeemania,high_or_estimate,,,CIS,high,Official site has nutrition per dish.
+eatout_09,eatout,"Тануки: ролл Калифорния 8 шт — кбжу",,trusted_domain,tanuki.ru|tanuki,high_or_estimate,,,CIS,high,Official site has nutrition data.
+eatout_10,eatout,"Joe & The Juice Power Shake — кбжу",,trusted_domain,joeandthejuice.is|joeandthejuice.com|joeandthejuice,high_or_estimate,,,EU,high,Official menu page.
+eatout_11,eatout,"Wendy's Baconator — calories and protein",,trusted_domain,wendys.com|wendys,high_or_estimate,960,15,US,high,US official 960.
+eatout_12,eatout,"Шашлык из свинины в локальном кафе 200г — кбжу",,estimate_allowed,,estimate_or_high,560,45,CIS,medium,No official source; ~250-300 kcal/100g pork shashlik.
+eatout_13,eatout,"Хачапури по-аджарски в грузинском ресторане — кбжу",,estimate_allowed,,estimate_or_high,900,45,CIS,medium,Large dish 700-1200 typical.
+eatout_14,eatout,"Pad Thai в тайском кафе — кбжу на порцию",,estimate_allowed,,estimate_or_high,750,45,ASIA,medium,Typical 600-1000.
+eatout_15,eatout,"Рамен с курицей в локальном японском кафе — кбжу",,estimate_allowed,,estimate_or_high,550,45,ASIA,medium,Typical 400-750.
+product_01,product,"Coca-Cola Classic 500 мл — кбжу на бутылку",,trusted_domain,coca-cola.com|coca-cola,high_or_estimate,210,10,GLOBAL,high,42 kcal/100ml.
+product_02,product,"Snickers батончик 50 г — кбжу",,trusted_domain,snickers.com|mars.com|openfoodfacts.org,high_or_estimate,245,10,GLOBAL,high,Official ~245 per 50g.
+product_03,product,"Red Bull 250 мл — кбжу",,trusted_domain,redbull.com|openfoodfacts.org,high_or_estimate,112,12,GLOBAL,high,45 kcal/100ml.
+product_04,product,"Nutella 30 г (2 ст.л.) — кбжу",,trusted_domain,nutella.com|ferrero.com|openfoodfacts.org,high_or_estimate,160,12,GLOBAL,high,539 kcal/100g -> ~162/30g.
+product_05,product,"Lay's Classic чипсы 100 г — кбжу",,trusted_domain,lays.com|pepsico.com|openfoodfacts.org,high_or_estimate,536,12,GLOBAL,high,~536/100g US classic.
+product_06,product,"Danone Activia натуральная 125 г — кбжу",,trusted_domain,danone.com|activia.com|danone.ru|openfoodfacts.org,high_or_estimate,94,25,EU/CIS,high,~75 kcal/100g natural.
+product_07,product,"Haribo Goldbears 100 г — кбжу",,trusted_domain,haribo.com|openfoodfacts.org,high_or_estimate,343,12,GLOBAL,high,Official 343/100g.
+product_08,product,"Orbit Spearmint жвачка 1 подушечка — кбжу",,trusted_domain,orbit.com|wrigley.com|mars.com|openfoodfacts.org,high_or_estimate,5,80,GLOBAL,high,~2-7 kcal per piece; abs tolerance dominates.
+product_09,product,"Barilla Spaghetti No.5 100 г сухих — кбжу",,trusted_domain,barilla.com|openfoodfacts.org,high_or_estimate,359,8,GLOBAL,high,Official 359/100g dry.
+product_10,product,"Heinz Ketchup 20 г (1 пакетик) — кбжу",,trusted_domain,heinz.com|kraftheinz.com|openfoodfacts.org,high_or_estimate,20,40,GLOBAL,high,~102/100g -> ~20 per 20g.
+product_11,product,"Chobani Greek Yogurt 0% 170 г — macros",,trusted_domain,chobani.com|openfoodfacts.org,high_or_estimate,90,20,US,high,Official 90 per 170g cup.
+product_12,product,"Домашний компот из яблок 250 мл — кбжу",,estimate_allowed,,estimate_or_high,113,50,CIS,medium,~30-60 kcal/100ml depending on sugar.
+product_13,product,"Творог 5% без бренда 200 г — кбжу",,estimate_allowed,,estimate_or_high,242,25,CIS,medium,RU tvorog 5%: ~121/100g.
+product_14,product,"Хлеб белый нарезной 1 кусок ~30 г — кбжу",,estimate_allowed,,estimate_or_high,79,30,CIS,medium,~265/100g white bread.
+product_15,product,"Домашние блинчики с мясом 2 шт — кбжу",,estimate_allowed,,estimate_or_high,400,45,CIS,medium,~150-250 each depending on size.

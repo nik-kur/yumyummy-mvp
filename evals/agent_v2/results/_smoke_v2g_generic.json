@@ -1,0 +1,222 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/generic_15.csv",
+    "n": 3,
+    "concurrency": 3,
+    "photo_mode": "b",
+    "wall_clock_s": 8.5,
+    "ts": "2026-07-02 23:24:56"
+  },
+  "summary": {
+    "n": 3,
+    "ok": 3,
+    "errors": 0,
+    "latency_s": {
+      "mean": 7.83,
+      "median": 8.08,
+      "p90": 8.23,
+      "max": 8.23
+    },
+    "cost_usd": {
+      "mean": 0.00096,
+      "total": 0.0029
+    },
+    "domain_hit_rate": 1.0,
+    "domain_scored_n": 2,
+    "kcal_ok_rate": 0.667,
+    "kcal_scored_n": 3,
+    "kcal_err_pct_median": 0.0,
+    "zero_kcal_bugs": 0,
+    "confidence_dist": {
+      "ESTIMATE": 2,
+      "HIGH": 1
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "gen_01",
+      "agent_type": "log_meal",
+      "input": "2 яйца вкрутую",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 7188.6,
+      "cost_usd": 0.000384,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 155.0,
+        "protein_g": 12.6,
+        "fat_g": 10.6,
+        "carbs_g": 1.1
+      },
+      "items": [
+        {
+          "name": "2 яйца вкрутую",
+          "grams": 100.0,
+          "calories_kcal": 155.0,
+          "protein_g": 12.6,
+          "fat_g": 10.6,
+          "carbs_g": 1.1,
+          "source_url": "https://fdc.nal.usda.gov/food-details/173424/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/173424/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 155 kcal • P 12.6g • F 10.6g • C 1.1g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 252,
+          "output_tokens": 86,
+          "search_queries": 0,
+          "duration_ms": 5239.6,
+          "cost_usd": 0.000384
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1930.3,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false
+      }
+    },
+    {
+      "case_id": "gen_03",
+      "agent_type": "log_meal",
+      "input": "гречка отварная 200 г",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8226.0,
+      "cost_usd": 0.000395,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 184.0,
+        "protein_g": 6.8,
+        "fat_g": 1.2,
+        "carbs_g": 39.8
+      },
+      "items": [
+        {
+          "name": "гречка отварная",
+          "grams": 200.0,
+          "calories_kcal": 184.0,
+          "protein_g": 6.8,
+          "fat_g": 1.2,
+          "carbs_g": 39.8,
+          "source_url": "https://fdc.nal.usda.gov/food-details/170686/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/170686/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 184 kcal • P 6.8g • F 1.2g • C 39.8g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 256,
+          "output_tokens": 89,
+          "search_queries": 0,
+          "duration_ms": 5569.2,
+          "cost_usd": 0.000395
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 2653.9,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false
+      }
+    },
+    {
+      "case_id": "gen_14",
+      "agent_type": "log_meal",
+      "input": "3 сырника",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8083.0,
+      "cost_usd": 0.002099,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 142.5,
+        "protein_g": 16.4,
+        "fat_g": 6.3,
+        "carbs_g": 4.5
+      },
+      "items": [
+        {
+          "name": "сырники",
+          "grams": 150.0,
+          "calories_kcal": 142.5,
+          "protein_g": 16.4,
+          "fat_g": 6.3,
+          "carbs_g": 4.5,
+          "source_url": "https://fdc.nal.usda.gov/food-details/169078/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/169078/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 142 kcal • P 16.4g • F 6.3g • C 4.5g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. Estimated 3 pieces of syrniki at 50g each.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 250,
+          "output_tokens": 658,
+          "search_queries": 0,
+          "duration_ms": 3791.8,
+          "cost_usd": 0.002099
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 4287.2,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": false,
+        "kcal_err_pct": 62.5,
+        "zero_kcal_bug": false
+      }
+    }
+  ]
+}

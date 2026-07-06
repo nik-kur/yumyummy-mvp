@@ -1,0 +1,15 @@
+case_id,agent_type,input_as_text,image_url,expected_source_mode,expected_source_domains,expected_confidence,expected_kcal,kcal_tolerance_pct,region,criticality,notes
+rb_01,eatout,"Вкусно и точка: Биг Хит — кбжу",,trusted_domain,vkusnoitochka.ru|vkusnoitochka,high_or_estimate,503,25,CIS,high,Official site lists nutrition.
+rb_02,eatout,"Додо Пицца: пицца Пепперони 25 см целиком — кбжу",,trusted_domain,dodopizza.ru|dodopizza,high_or_estimate,,,CIS,high,Official site lists per-100g; whole pizza needs math.
+rb_03,eatout,"Теремок: блин с ветчиной и сыром — кбжу",,trusted_domain,teremok.ru|teremok,high_or_estimate,,,CIS,medium,Official site has nutrition.
+rb_04,product,"ВкусВилл: сырники классические 180 г — кбжу",,trusted_domain,vkusvill.ru|vkusvill,high_or_estimate,400,35,CIS,high,Product page has КБЖУ per 100g.
+rb_05,product,"Простоквашино: творог 5% 200 г — кбжу",,trusted_domain,prostokvashino.ru|prostokvashino|danone.ru,high_or_estimate,242,20,CIS,high,121 kcal/100g.
+rb_06,product,"Агуша: йогурт питьевой клубника 200 г — кбжу",,trusted_domain,agulife.ru|agusha,high_or_estimate,,,CIS,medium,Brand site or retail page.
+me_01,eatout,"Al Baik: Chicken Fillet Sandwich — calories",,trusted_domain,albaik.com|albaik,high_or_estimate,,,ME,high,Saudi chain; official/aggregator.
+me_02,eatout,"Herfy: Big Herfy burger — calories",,trusted_domain,herfy.com|herfy,high_or_estimate,,,ME,medium,Saudi chain.
+me_03,eatout,"Хумус с питой в ливанском кафе, порция — кбжу",,estimate_allowed,,estimate_or_high,450,45,ME,medium,Generic dish; estimate expected.
+az_01,eatout,"Шах-плов в ресторане в Баку, порция — кбжу",,estimate_allowed,,estimate_or_high,600,50,AZ,medium,No official source; honest ESTIMATE expected.
+eu_01,eatout,"Pret a Manger: Chicken Caesar & Bacon Baguette — calories",,trusted_domain,pret.co.uk|pret.com|pret,high_or_estimate,554,20,EU,high,Official UK nutrition page.
+eu_02,eatout,"PAUL: круассан сливочный — кбжу",,trusted_domain,paul.fr|paul-uk.com|paul,high_or_estimate,280,35,EU,medium,Bakery chain croissant ~250-310.
+us_01,eatout,"Sweetgreen: Harvest Bowl — calories and macros",,trusted_domain,sweetgreen.com|sweetgreen,high_or_estimate,705,20,US,high,Official menu lists 705.
+cis_02,product,"Боржоми 500 мл — кбжу",,trusted_domain,borjomi.com|borjomi,high_or_estimate,0,0,CIS,medium,Mineral water: 0 kcal edge case.

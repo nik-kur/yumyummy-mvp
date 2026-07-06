@@ -1,0 +1,237 @@
+{
+  "meta": {
+    "variant": "v1",
+    "dataset": "evals/agent_v2/datasets/barcodes_5.csv",
+    "n": 5,
+    "concurrency": 2,
+    "photo_mode": "b",
+    "wall_clock_s": 26.6,
+    "ts": "2026-07-02 23:49:11"
+  },
+  "summary": {
+    "n": 5,
+    "ok": 5,
+    "errors": 0,
+    "latency_s": {
+      "mean": 9.63,
+      "median": 10.59,
+      "p90": 12.75,
+      "max": 12.75
+    },
+    "cost_usd": {
+      "mean": null,
+      "total": null
+    },
+    "domain_hit_rate": 0.0,
+    "domain_scored_n": 4,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 1,
+    "kcal_err_pct_median": 0.0,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 4
+    },
+    "confidence_dist": {
+      "HIGH": 4,
+      "none": 1
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "bc_01",
+      "agent_type": "barcode",
+      "input": "5449000000996",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 12753.8,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "barcode_lookup",
+      "totals": {
+        "calories_kcal": 139.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 35.0
+      },
+      "items": [
+        {
+          "name": "Coca‑Cola Classic, 330 мл (1 банка)",
+          "grams": 330.0,
+          "calories_kcal": 139.0,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 35.0,
+          "source_url": "https://www.htdrinks.co.uk/products/DetailsPortal.asp?product_code=021656"
+        }
+      ],
+      "source_url": "https://www.htdrinks.co.uk/products/DetailsPortal.asp?product_code=021656",
+      "cited_domains": [],
+      "message_text": "Нашёл продукт: Coca‑Cola Classic, 330 мл (банка), штрих‑код 5449000000996.\n\nПищевая ценность на 100 мл: приблизительно 42 ккал, 0 г белков, 0 г жиров, ~10,6 г углеводов (все из сахара); на 330 мл (одна банка): ~139 ккал, 0 г белков, 0 г жиров, ~35 г углеводов/сахара.\n\nЯ использовал данные с профессиональных сайтов и магазинов:\n— proE/proе: 42 ккал, 10,6 г углеводов на 100 г → 138,6 ккал и 34,98 г на 330 г порции, где вода и сахар доминируют (принимается 1 мл ≈ 1 г) ([proe.info](https://proe.info/ru/food/koka-kola-330-ml?utm_source=openai))\n— HT Drinks London: детальная таблица на 100 мл → 42 ккал, 10,6 г углеводов; на 330 мл: 139 ккал, 35 г углеводов, 0 г белков, 0 г жиров ([htdrinks.co.uk](https://www.htdrinks.co.uk/products/DetailsPortal.asp?product_code=021656&utm_source=openai))\n— FoodFactor: 42 ккал/100 г, 35 г углеводов, 139 ккал на 330 мл ([foodfactor.net](https://www.foodfactor.net/produits/5449000000996/coca-cola.php?utm_source=openai))\n\nТак как напиток жидкий, я считаю 1 мл примерно равным 1 г, что я указываю в сообщении. Порция — 330 мл (стандартная банка).\n\nИтоговые макронутриенты на одну банку (330 мл):\n- Калории: 139 ккал\n- Белки: 0 г\n- Жиры: 0 г\n- Углеводы: 35 г (все, вероятно, сахар)\n\nИсточник с точной таблицей: HT Drinks London (страница продукта с указанием значений на 100 мл и 330 мл) ([htdrinks.co.uk](https://www.htdrinks.co.uk/products/DetailsPortal.asp?product_code=021656))",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "bc_02",
+      "agent_type": "barcode",
+      "input": "3017620422003",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11554.8,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "NutritionFacts",
+      "totals": {
+        "calories_kcal": 81.0,
+        "protein_g": 1.0,
+        "fat_g": 4.6,
+        "carbs_g": 8.6
+      },
+      "items": [
+        {
+          "name": "Nutella (Ferrero) Nutrition per 100 g",
+          "grams": 15.0,
+          "calories_kcal": 81.0,
+          "protein_g": 1.0,
+          "fat_g": 4.6,
+          "carbs_g": 8.6,
+          "source_url": "https://lafamilleatable.com/en/products/p-pate-a-tartiner-noisettes-et-cacao-nutella-3017620422003"
+        }
+      ],
+      "source_url": "https://lafamilleatable.com/en/products/p-pate-a-tartiner-noisettes-et-cacao-nutella-3017620422003",
+      "cited_domains": [],
+      "message_text": "Я нашёл продукт по указанному штрихкоду 3017620422003 – это паста Nutella™ (Ferrero), упаковка 400 г.\n\nВот информация о питательных веществах на 100 г (согласно официальному описанию продукта):\n- Калории: 539 ккал\n- Жиры: 30,9 г (из них насыщенные: 10,6 г)\n- Углеводы: 57,5 г (в том числе сахар: 56,3 г)\n- Белки: 6,3 г\n- Соль: 0,107 г ([lafamilleatable.com](https://lafamilleatable.com/en/products/p-pate-a-tartiner-noisettes-et-cacao-nutella-3017620422003?utm_source=openai))\n\nВы не указали размер порции, поэтому я приму разумное предположение: стандартная порция – 15 г (примерно 1 столовая ложка). Я в расчетах считаю, что 1 г ≈ 1 мл, но для плотной пасты это соотношение достаточно точно.\n\nРасчёт на порцию 15 г:\n- Калории: 539 ккал × 15 г / 100 г = 80,85 ккал ≈ 81 ккал\n- Жиры: 30,9 г × 15 / 100 = 4,64 г\n- Насыщенные жиры: 10,6 г × 15 / 100 = 1,59 г\n- Углеводы: 57,5 г × 15 / 100 = 8,63 г\n- Сахар: 56,3 г × 15 / 100 = 8,45 г\n- Белки: 6,3 г × 15 / 100 = 0,95 г\n- Соль: 0,107 г × 15 / 100 = 0,016 г\n\nИтоговые значения за порцию ~15 г:\n- Калории: 81 ккал\n- Жиры: 4,6 г (насыщенные: 1,6 г)\n- Углеводы: 8,6 г (сахар: 8,5 г)\n- Белки: 1,0 г\n- Соль: 0,02 г\n\n Если порция другая (например, 20 г или 30 г), просто умножьте данные на нужный коэффициент (например, 20 г → ×1,33; 30 г → ×2).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "bc_03",
+      "agent_type": "barcode",
+      "input": "5000112637939",
+      "region": "EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8585.8,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "barcode_lookup",
+      "totals": {
+        "calories_kcal": 1.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [
+        {
+          "name": "Coca‑Cola Zero (330 ml) — на 100 ml",
+          "grams": 100.0,
+          "calories_kcal": 0.3,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 0.0,
+          "source_url": "https://lillalandet.se/produkt/coca-cola-zero-33cl-burk20st/"
+        }
+      ],
+      "source_url": "https://lillalandet.se/produkt/coca-cola-zero-33cl-burk20st/",
+      "cited_domains": [],
+      "message_text": "Вот, что удалось найти по штрихкоду 5000112637939 (это — Coca‑Cola Zero, 330 мл):\n\nNutritional values per 100 ml (источник: Lilla Landet):\n- Энергия: 1.4 kJ (≈ 0.3 kcal)\n- Жиры: 0 г\n- Углеводы: 0 г (в том числе сахара: 0 г)\n- Белки: 0 г\n- Соль: 0.02 г ([lillalandet.se](https://lillalandet.se/produkt/coca-cola-zero-33cl-burk20st/?utm_source=openai))\n\nТакже похожие значения указаны на сайте Allegro (польская версия): около 0.3 kcal, 0 г жиров, углеводов, белков, соль ≈ 0.01 г на 100 г (≈ см. 100 мл) ([allegro.pl](https://allegro.pl/oferta/napoj-gazowany-coca-cola-zero-sugar-zero-cukru-330-original-puszka-szwedzka-18405661681?utm_source=openai)).\n\nПользователь не указал порцию, поэтому я приму, что речь идёт о стандартной банке 330 мл (что соответствует «33 cl») — это разумное предположение.\n Так как напиток жидкий, 1 мл ≈ 1 г, поэтому можно напрямую умножать.\n\nРасчёт на 330 мл:\n- Энергия: 0.3 kcal × 3.3 = 1.0 kcal (≈1 kcal)\n- Жиры: 0 × 3.3 = 0 г\n- Углеводы: 0 г\n- Белки: 0 г\n\nИтоговая информация:\n",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "bc_04",
+      "agent_type": "barcode",
+      "input": "7622210449283",
+      "region": "EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 10586.6,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "provide_nutrition",
+      "totals": {
+        "calories_kcal": 1401.0,
+        "protein_g": 18.9,
+        "fat_g": 51.0,
+        "carbs_g": 207.0
+      },
+      "items": [
+        {
+          "name": "LU Prince Chocolate Biscuit (per 100 g)",
+          "grams": 100.0,
+          "calories_kcal": 467.0,
+          "protein_g": 6.3,
+          "fat_g": 17.0,
+          "carbs_g": 69.0,
+          "source_url": "https://www.miamland.com/produkt/8048/kup-biscuits-prince-chocolat-au-ble-complet-300g-prince"
+        }
+      ],
+      "source_url": "https://www.miamland.com/produkt/8048/kup-biscuits-prince-chocolat-au-ble-complet-300g-prince",
+      "cited_domains": [],
+      "message_text": "Я нашёл продукт с EAN‑кодом 7622210449283 — это LU Prince Chocolate 300 г, тёмные шоколадные печенья с цельнозерновой начинкой, производитель Mondelēz International. Подробную информацию о составе и калориях удалось найти на одном из сайтов‑продавцов. Вот данные на 100 г:\n\n- Энергетическая ценность: 467 ккал\n- Жиры: 17 г\n- Насыщенные жиры: 5,6 г\n- Углеводы: 69 г\n- Сахар: 32 г\n- Клетчатка: 4 г\n- Белки: 6,3 г\n- Соль: 0,49 г\n\nИсточник: сайт‑дистрибутор Miamland, где указаны именно эти значения на 100 г продукта. \n\nПоскольку вес упаковки 300 г, я пересчитаю данные на одну упаковку — 300 г. Умножаю каждый показатель на 3 (300 г / 100 г = 3):\n\n- Калории: 467 ккал × 3 = 1401 ккал\n- Жиры: 17 г × 3 = 51 г\n- Насыщенные жиры: 5,6 г × 3 = 16,8 г\n- Углеводы: 69 г × 3 = 207 г\n- Сахар: 32 г × 3 = 96 г\n- Клетчатка: 4 г × 3 = 12 г\n- Белки: 6,3 г × 3 = 18,9 г\n- Соль: 0,49 г × 3 = 1,47 г\n\nЕсли вы хотите информацию на другую порцию (например, 100 г или количество печенек), дайте знать — я пересчитаю.\n\n —\n",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "bc_05",
+      "agent_type": "barcode",
+      "input": "4999999999999",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 4686.9,
+      "cost_usd": null,
+      "confidence": null,
+      "intent": "FindProductNutrition",
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Could not find data for barcode 4999999999999. Send the product name or a photo of the nutrition label, and I'll calculate it.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    }
+  ]
+}

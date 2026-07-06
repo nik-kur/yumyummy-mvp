@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "variant": "v2g35",
+    "dataset": "evals/agent_v2/datasets/brands_goldens_30_ref.csv",
+    "n": 2,
+    "concurrency": 2,
+    "photo_mode": "b",
+    "wall_clock_s": 6.1,
+    "ts": "2026-07-02 23:52:31"
+  },
+  "summary": {
+    "n": 2,
+    "ok": 2,
+    "errors": 0,
+    "latency_s": {
+      "mean": 4.76,
+      "median": 4.76,
+      "p90": 5.35,
+      "max": 5.35
+    },
+    "cost_usd": {
+      "mean": 0.00434,
+      "total": 0.0087
+    },
+    "domain_hit_rate": 0.5,
+    "domain_scored_n": 2,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 2,
+    "kcal_err_pct_median": 6.7,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 1
+    },
+    "confidence_dist": {
+      "ESTIMATE": 2
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "eatout_02",
+      "agent_type": "eatout",
+      "input": "McDonald's Big Mac — calories and macros",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5350.8,
+      "cost_usd": 0.003528,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 509.0,
+        "protein_g": 26.0,
+        "fat_g": 25.0,
+        "carbs_g": 42.0
+      },
+      "items": [
+        {
+          "name": "McDonald's Big Mac (Биг Мак)",
+          "grams": 214.0,
+          "calories_kcal": 509.0,
+          "protein_g": 26.0,
+          "fat_g": 25.0,
+          "carbs_g": 42.0,
+          "source_url": "https://www.mcdonalds.com/gb/en-gb/product/big-mac.html"
+        }
+      ],
+      "source_url": "https://www.mcdonalds.com/gb/en-gb/product/big-mac.html",
+      "cited_domains": [],
+      "message_text": "Total: 509 kcal • P 26.0g • F 25.0g • C 42.0g\nConfidence: ESTIMATE\nSource: mcdonalds.com\nNote: Параметры рассчитаны на основе официальных данных McDonald's для порции классического бургера Биг Мак (весом около 214-220 г). Обратите внимание, что в РФ аналогичный бургер от сети «Вкусно — и точка» называется «Биг Хит» (весит 228 г и содержит около 524 ккал, 27 г белков, 28 г жиров, 40 г углеводов).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3.5-flash",
+          "input_tokens": 642,
+          "output_tokens": 285,
+          "search_queries": 0,
+          "duration_ms": 5337.6,
+          "cost_usd": 0.003528
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 10.7,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_03",
+      "agent_type": "product",
+      "input": "Red Bull 250 мл — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 4171.2,
+      "cost_usd": 0.005151,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 115.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 27.5
+      },
+      "items": [
+        {
+          "name": "Red Bull Энергетический напиток, 250 мл",
+          "grams": 250.0,
+          "calories_kcal": 115.0,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 27.5,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 115 kcal • P 0.0g • F 0.0g • C 27.5g\nConfidence: ESTIMATE\nSource: none\nNote: Показатели рассчитаны на стандартную банку Red Bull объемом 250 мл, исходя из энергетической ценности 46 ккал и 11 г углеводов на 100 мл.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3.5-flash",
+          "input_tokens": 644,
+          "output_tokens": 465,
+          "search_queries": 0,
+          "duration_ms": 4168.0,
+          "cost_usd": 0.005151
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 2.7,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    }
+  ]
+}

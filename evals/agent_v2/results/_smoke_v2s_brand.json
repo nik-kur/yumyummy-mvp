@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "variant": "v2s",
+    "dataset": "evals/agent_v2/datasets/brands_goldens_30_ref.csv",
+    "n": 2,
+    "concurrency": 2,
+    "photo_mode": "b",
+    "wall_clock_s": 7.5,
+    "ts": "2026-07-02 23:28:37"
+  },
+  "summary": {
+    "n": 2,
+    "ok": 2,
+    "errors": 0,
+    "latency_s": {
+      "mean": 4.61,
+      "median": 4.61,
+      "p90": 5.14,
+      "max": 5.14
+    },
+    "cost_usd": {
+      "mean": 0.00862,
+      "total": 0.0172
+    },
+    "domain_hit_rate": 0.5,
+    "domain_scored_n": 2,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 2,
+    "kcal_err_pct_median": 6.7,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 1,
+      "dead": 1
+    },
+    "confidence_dist": {
+      "HIGH": 2
+    },
+    "mean_search_queries": 1
+  },
+  "cases": [
+    {
+      "case_id": "eatout_02",
+      "agent_type": "eatout",
+      "input": "McDonald's Big Mac — calories and macros",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 4065.8,
+      "cost_usd": 0.00855,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 503.0,
+        "protein_g": 26.0,
+        "fat_g": 25.0,
+        "carbs_g": 42.0
+      },
+      "items": [
+        {
+          "name": "Big Mac",
+          "grams": 210.0,
+          "calories_kcal": 503.0,
+          "protein_g": 26.0,
+          "fat_g": 25.0,
+          "carbs_g": 42.0,
+          "source_url": "https://mcdonaldsmenu.ru/burgers/big-mak-47218"
+        }
+      ],
+      "source_url": "https://mcdonaldsmenu.ru/burgers/big-mak-47218",
+      "cited_domains": [
+        "arise-app.com",
+        "bjuk.ru",
+        "bonfit.ru",
+        "burgerpedia.fandom.com",
+        "calorizator.ru",
+        "foodstruct.com",
+        "health-diet.ru",
+        "mcdonalds.az",
+        "mcdonalds.com",
+        "mcdonaldsmenu.ru",
+        "mobile.fatsecret.ru",
+        "ru.wikipedia.org",
+        "youtube.com"
+      ],
+      "message_text": "Total: 503 kcal • P 26.0g • F 25.0g • C 42.0g\nConfidence: HIGH\nSource: mcdonaldsmenu.ru\nNote: Данные для одного Big Mac (вес 210 г) с официального меню McDonald's (Россия/международное меню). Ккал соответствует расчёту: 4*26 + 9*25 + 4*42 = 503 ккал.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "perplexity",
+          "model": "sonar",
+          "input_tokens": 369,
+          "output_tokens": 181,
+          "search_queries": 1,
+          "duration_ms": 4061.7,
+          "cost_usd": 0.00855
+        }
+      ],
+      "search_queries": 1,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 11.8,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "product_02",
+      "agent_type": "product",
+      "input": "Snickers батончик 50 г — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5144.4,
+      "cost_usd": 0.008685,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 241.0,
+        "protein_g": 4.8,
+        "fat_g": 13.5,
+        "carbs_g": 28.0
+      },
+      "items": [
+        {
+          "name": "Snickers батончик 50 г",
+          "grams": 50.0,
+          "calories_kcal": 241.0,
+          "protein_g": 4.8,
+          "fat_g": 13.5,
+          "carbs_g": 28.0,
+          "source_url": "https://spacecoffee.com.ua/p1488367535-batonchik-shokoladnyj-snikers.html"
+        }
+      ],
+      "source_url": "https://spacecoffee.com.ua/p1488367535-batonchik-shokoladnyj-snikers.html",
+      "cited_domains": [
+        "calorizator.ru",
+        "fatsecret.ru",
+        "fitaudit.ru",
+        "foodstruct.com",
+        "health-diet.ru",
+        "komus-opt.ru",
+        "lenta.com",
+        "prodzapas.pro",
+        "spacecoffee.com.ua",
+        "vkusvill.ru"
+      ],
+      "message_text": "Total: 241 kcal • P 4.8g • F 13.5g • C 28.0g\nConfidence: HIGH\nSource: spacecoffee.com.ua\nNote: Значения рассчитаны на 50 г батончика, исходя из данных на 100 г: белки 9.5 г, жиры 27.0 г, углеводы 56.0 г, энергия 482 ккал [1]. 50 г = 0.5 * 100 г, поэтому все значения умножены на 0.5. Ккал ≈ 4*4.75 + 9*13.5 + 4*28.0 = 19 + 121.5 + 112 = 252.5 ккал (в пределах 15% от 241 из-за округления масс, но прямая пропорция 482*0.5=241 использована).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "perplexity",
+          "model": "sonar",
+          "input_tokens": 374,
+          "output_tokens": 311,
+          "search_queries": 1,
+          "duration_ms": 5141.5,
+          "cost_usd": 0.008685
+        }
+      ],
+      "search_queries": 1,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.6,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}

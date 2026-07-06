@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "variant": "v1",
+    "dataset": "evals/agent_v2/datasets/brands_goldens_30_ref.csv",
+    "n": 1,
+    "concurrency": 1,
+    "photo_mode": "b",
+    "wall_clock_s": 59.2,
+    "ts": "2026-07-02 23:30:39"
+  },
+  "summary": {
+    "n": 1,
+    "ok": 1,
+    "errors": 0,
+    "latency_s": {
+      "mean": 57.86,
+      "median": 57.86,
+      "p90": 57.86,
+      "max": 57.86
+    },
+    "cost_usd": {
+      "mean": null,
+      "total": null
+    },
+    "domain_hit_rate": 1.0,
+    "domain_scored_n": 1,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 1,
+    "kcal_err_pct_median": 1.4,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 1
+    },
+    "confidence_dist": {
+      "HIGH": 1
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "eatout_02",
+      "agent_type": "eatout",
+      "input": "McDonald's Big Mac — calories and macros",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 57861.4,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 578.0,
+        "protein_g": 28.0,
+        "fat_g": 31.1,
+        "carbs_g": 43.7
+      },
+      "items": [
+        {
+          "name": "McDonald's Big Mac",
+          "grams": null,
+          "calories_kcal": 578.0,
+          "protein_g": 28.0,
+          "fat_g": 31.1,
+          "carbs_g": 43.7,
+          "source_url": "https://www.mcdonalds.com/content/dam/sites/nz/nfl/About%20us/NZ%20Core%20Food%20Menu_February%202026_0%20(1).pdf"
+        }
+      ],
+      "source_url": "https://www.mcdonalds.com/content/dam/sites/nz/nfl/About%20us/NZ%20Core%20Food%20Menu_February%202026_0%20(1).pdf",
+      "cited_domains": [],
+      "message_text": "Total: McDonald's Big Mac — 578 kcal; Protein 28.0 g; Fat 31.1 g; Carbs 43.7 g. \nConfidence: HIGH\nSource: mcdonalds.com (official NZ nutrition PDF).\nNote: These numbers are taken from McDonald’s official New Zealand nutrition facts (Issue: February 2026). McDonald’s USA product page lists the Big Mac at 580 kcal — values can vary by country, serving size and formulation, so check your local McDonald’s nutrition page or app for the version served in your area.  ([mcdonalds.com](https://www.mcdonalds.com/content/dam/sites/nz/nfl/About%20us/NZ%20Core%20Food%20Menu_February%202026_0%20%281%29.pdf))",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.4,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}

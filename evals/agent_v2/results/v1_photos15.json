@@ -1,0 +1,740 @@
+{
+  "meta": {
+    "variant": "v1",
+    "dataset": "evals/agent_v2/datasets/photos_real_15.csv",
+    "n": 15,
+    "concurrency": 3,
+    "photo_mode": "b",
+    "wall_clock_s": 341.2,
+    "ts": "2026-07-04 18:23:03"
+  },
+  "summary": {
+    "n": 15,
+    "ok": 15,
+    "errors": 0,
+    "latency_s": {
+      "mean": 58.81,
+      "median": 53.79,
+      "p90": 84.08,
+      "max": 124.8
+    },
+    "cost_usd": {
+      "mean": null,
+      "total": null
+    },
+    "domain_hit_rate": 0.0,
+    "domain_scored_n": 4,
+    "kcal_ok_rate": 0.933,
+    "kcal_scored_n": 15,
+    "kcal_err_pct_median": 11.5,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 4,
+      "dead": 3
+    },
+    "confidence_dist": {
+      "HIGH": 6,
+      "ESTIMATE": 8,
+      "MEDIUM": 1
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "photo_01",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 80133.4,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 273.0,
+        "protein_g": 23.5,
+        "fat_g": 14.0,
+        "carbs_g": 13.2
+      },
+      "items": [
+        {
+          "name": "Азбука Life — Сырники без сахара, запечённые",
+          "grams": 140.0,
+          "calories_kcal": 273.0,
+          "protein_g": 23.5,
+          "fat_g": 14.0,
+          "carbs_g": 13.2,
+          "source_url": "https://www.fatsecret.ru/%D0%BA%D0%B0%D0%BB%D0%BE%D1%80%D0%B8%D0%B8-%D0%BF%D0%B8%D1%82%D0%B0%D0%BD%D0%B8%D0%B5/%D0%90%D0%B7%D0%B1%D1%83%D0%BA%D0%B0-life/%D0%A1%D1%8B%D1%80%D0%BD%D0%B8%D0%BA%D0%B8-%D0%B1%D0%B5%D0%B7-%D0%A1%D0%B0%D1%85%D0%B0%D1%80%D0%B0-%D0%97%D0%B0%D0%BF%D0%B5%D1%87%D0%B5%D0%BD%D0%BD%D1%8B%D0%B5/1-%D0%BF%D0%BE%D1%80%D1%86%D0%B8%D1%8F"
+        }
+      ],
+      "source_url": "https://www.fatsecret.ru/%D0%BA%D0%B0%D0%BB%D0%BE%D1%80%D0%B8%D0%B8-%D0%BF%D0%B8%D1%82%D0%B0%D0%BD%D0%B8%D0%B5/%D0%90%D0%B7%D0%B1%D1%83%D0%BA%D0%B0-life/%D0%A1%D1%8B%D1%80%D0%BD%D0%B8%D0%BA%D0%B8-%D0%B1%D0%B5%D0%B7-%D0%A1%D0%B0%D1%85%D0%B0%D1%80%D0%B0-%D0%97%D0%B0%D0%BF%D0%B5%D1%87%D0%B5%D0%BD%D0%BD%D1%8B%D0%B5/1-%D0%BF%D0%BE%D1%80%D1%86%D0%B8%D1%8F",
+      "cited_domains": [],
+      "message_text": "Порция, которую вы указали: 140 г (это стандартная упаковочная порция). Пищевая ценность на 140 г (порция): 273 ккал; белки 23.5 г; жиры 14 г; углеводы 13.2 г. Эти значения совпадают с маркировкой на упаковке (видно на фото) и с онлайн‑записями продукта. Источник данных указан в поле source_url ниже. Уверенность: высокая.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "photo_02",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 28147.5,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 440.8,
+        "protein_g": 30.4,
+        "fat_g": 26.6,
+        "carbs_g": 26.6
+      },
+      "items": [
+        {
+          "name": "Салат Нисуаз (тунец, яйцо, томаты, эдамаме, зелень)",
+          "grams": 380.0,
+          "calories_kcal": 440.8,
+          "protein_g": 30.4,
+          "fat_g": 26.6,
+          "carbs_g": 26.6,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "I see in the photo: Салат Нисуаз (нисуаз) — салат с тунцом, яйцом, томатами, зеленью и бобами эдамаме.\n\nTotal: 441 kcal • P 30.4g • F 26.6g • C 26.6g\nConfidence: ESTIMATE\nNote: Used the explicit serving size shown (380 g). Macros were calculated from the nutrition shown in the photo per 100 g: 116 kcal, P 8 g, F 7 g, C 7 g.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_03",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 61880.6,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 252.0,
+        "protein_g": 54.0,
+        "fat_g": 0.45,
+        "carbs_g": 8.1
+      },
+      "items": [
+        {
+          "name": "President (Président) творог домашний рассыпчатый 0,1% — 450 г",
+          "grams": 450.0,
+          "calories_kcal": 252.0,
+          "protein_g": 54.0,
+          "fat_g": 0.45,
+          "carbs_g": 8.1,
+          "source_url": "https://foodmaster.kz/ru/catalog/tvorog-president-domashniy-rassypchatyi-01-155"
+        }
+      ],
+      "source_url": "https://foodmaster.kz/ru/catalog/tvorog-president-domashniy-rassypchatyi-01-155",
+      "cited_domains": [],
+      "message_text": "Определил продукт по фото и запросу: President (Président) — творог домашний рассыпчатый 0,1% (упаковка 450 г). Взял пищеевую ценность, указанную на странице товара, где приведены значения на 100 г, и пересчитал на вашу порцию 450 г (множитель 4,5). Источник с таблицей питания указан в поле source_url для товара и вверху ответа. Результаты для 450 г: калории и макроэлементы приведены ниже.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 18.7,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "photo_04",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 51405.5,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 202.8,
+        "protein_g": 12.9,
+        "fat_g": 12.0,
+        "carbs_g": 10.8
+      },
+      "items": [
+        {
+          "name": "Овощной салат с брынзой и травами — Уже Готово (300 г)",
+          "grams": 300.0,
+          "calories_kcal": 202.8,
+          "protein_g": 12.9,
+          "fat_g": 12.0,
+          "carbs_g": 10.8,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Использовал данные с этикетки на присланной фотографии. На этикетке указана пищевая ценность в 100 г: энергия 67.6 ккал, белки 4.3 г, жиры 4.0 г, углеводы 3.6 г. Вы указали порцию 300 г — пересчитал значения на эту порцию (300 г = 3 × 100 г). Не удалось найти страницу продукта в интернете по названию/штрихкоду, поэтому источник — фото упаковки (проверяемые данные с этикетки). Достоверность: ESTIMATE.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.1,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_05",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 44599.0,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 138.0,
+        "protein_g": 15.1,
+        "fat_g": 5.2,
+        "carbs_g": 7.8
+      },
+      "items": [
+        {
+          "name": "TEOS натуральный (йогурт питьевой) 2% — порция 260 г",
+          "grams": 260.0,
+          "calories_kcal": 138.0,
+          "protein_g": 15.1,
+          "fat_g": 5.2,
+          "carbs_g": 7.8,
+          "source_url": "https://magnit.ru/product/1000458438-teos_active_yogurt_naturalnyy_2_260g_pl_b"
+        }
+      ],
+      "source_url": "https://magnit.ru/product/1000458438-teos_active_yogurt_naturalnyy_2_260g_pl_b",
+      "cited_domains": [],
+      "message_text": "Порция: 260 г (указано на упаковке на фото). Источник данных: карточка товара «Йогурт питьевой Teos Active натуральный 2% 260 г» на сайте Магнит (страница товара). Пищевая ценность в 100 г по источнику: 53 ккал, белки 5.8 г, жиры 2 г, углеводы 3 г. Множитель для расчёта: 260 / 100 = 2.6. Пересчитал на вашу порцию и округлил (ккал — целые, макроэлементы — до 1 знака после запятой).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 16.9,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "photo_06",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 50823.9,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 192.5,
+        "protein_g": 17.5,
+        "fat_g": 5.0,
+        "carbs_g": 19.5
+      },
+      "items": [
+        {
+          "name": "TEOS греческий йогурт (черника) 250 г",
+          "grams": 250.0,
+          "calories_kcal": 192.5,
+          "protein_g": 17.5,
+          "fat_g": 5.0,
+          "carbs_g": 19.5,
+          "source_url": "https://lavka.yandex.kz/good/jogurt-grecheskij-teos-2percent-chernika-250-gram"
+        }
+      ],
+      "source_url": "https://lavka.yandex.kz/good/jogurt-grecheskij-teos-2percent-chernika-250-gram",
+      "cited_domains": [],
+      "message_text": "Определил продукт по фото: TEOS — греческий йогурт с черникой, порция 250 г (вы прислали фото и указали 250 г). Для расчёта использована публичная карточка товара в Яндекс.Лавке с таблицей пищевой ценности (в карточке указаны значения на 100 г: 77 ккал, белки 7 г, жиры 2 г, углеводы 7,8 г). Пересчитано на вашу порцию 250 г (×2,5): калории 192.5 ккал, белки 17.5 г, жиры 5.0 г, углеводы 19.5 г. На крышке крупной надписью указано «18 г белка» — это соответствует округлённому значению. Уверенность: высокая — данные взяты со страницы продавца.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 12.5,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "photo_07",
+      "agent_type": "photo",
+      "input": "",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 31584.3,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 506.0,
+        "protein_g": 44.6,
+        "fat_g": 7.6,
+        "carbs_g": 64.7
+      },
+      "items": [
+        {
+          "name": "Cooked brown rice",
+          "grams": 150.0,
+          "calories_kcal": 167.0,
+          "protein_g": 3.9,
+          "fat_g": 1.4,
+          "carbs_g": 34.5,
+          "source_url": null
+        },
+        {
+          "name": "Chickpeas (cooked/drained)",
+          "grams": 90.0,
+          "calories_kcal": 148.0,
+          "protein_g": 8.0,
+          "fat_g": 2.3,
+          "carbs_g": 24.7,
+          "source_url": null
+        },
+        {
+          "name": "Chicken breast (cooked)",
+          "grams": 100.0,
+          "calories_kcal": 165.0,
+          "protein_g": 31.0,
+          "fat_g": 3.6,
+          "carbs_g": 0.0,
+          "source_url": null
+        },
+        {
+          "name": "Broccoli (steamed)",
+          "grams": 60.0,
+          "calories_kcal": 21.0,
+          "protein_g": 1.4,
+          "fat_g": 0.2,
+          "carbs_g": 4.3,
+          "source_url": null
+        },
+        {
+          "name": "Cherry tomatoes",
+          "grams": 30.0,
+          "calories_kcal": 5.0,
+          "protein_g": 0.3,
+          "fat_g": 0.1,
+          "carbs_g": 1.2,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "I see in the photo: a bowl with cooked brown rice, chickpeas, diced chicken breast, broccoli florets, and a few cherry tomato halves.\n\nTotal: 506 kcal • P 44.6g • F 7.6g • C 64.7g\nConfidence: ESTIMATE\nNote: Assumed a medium bowl with ~150g cooked rice, ~90g chickpeas, ~100g cooked chicken breast, ~60g broccoli, and ~30g cherry tomatoes; no visible sauce/oil counted.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 5.4,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_08",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 80325.1,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 272.7,
+        "protein_g": 23.5,
+        "fat_g": 14.0,
+        "carbs_g": 13.2
+      },
+      "items": [
+        {
+          "name": "Азбука Life — Сырники без сахара (запечённые)",
+          "grams": 140.0,
+          "calories_kcal": 272.7,
+          "protein_g": 23.5,
+          "fat_g": 14.0,
+          "carbs_g": 13.2,
+          "source_url": "https://foods.fatsecret.com/Diary.aspx?invid=-1&pa=fjrd&rid=36532894"
+        }
+      ],
+      "source_url": "https://foods.fatsecret.com/Diary.aspx?invid=-1&pa=fjrd&rid=36532894",
+      "cited_domains": [],
+      "message_text": "По фото и по указанному названию: «Азбука Life — сырники без сахара, запечённые». Вы указали порцию 140 г — это совпадает с порцией на упаковке. Пищевая ценность на 140 г (указана на упаковке): калории 272.7 ккал (≈273 ккал), белки 23.5 г, жиры 14 г, углеводы 13.2 г. Источник: таблица на упаковке (данные подтверждены в онлайн-базе FatSecret; ссылка в поле source_url).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 26.7,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "photo_09",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 32956.7,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 265.0,
+        "protein_g": 23.0,
+        "fat_g": 8.8,
+        "carbs_g": 25.1
+      },
+      "items": [
+        {
+          "name": "Cottage cheese (curd), ~4% fat",
+          "grams": 200.0,
+          "calories_kcal": 196.0,
+          "protein_g": 22.2,
+          "fat_g": 8.6,
+          "carbs_g": 6.8,
+          "source_url": null
+        },
+        {
+          "name": "Raisins",
+          "grams": 15.0,
+          "calories_kcal": 45.0,
+          "protein_g": 0.5,
+          "fat_g": 0.1,
+          "carbs_g": 12.0,
+          "source_url": null
+        },
+        {
+          "name": "Dried apricots",
+          "grams": 10.0,
+          "calories_kcal": 24.0,
+          "protein_g": 0.3,
+          "fat_g": 0.1,
+          "carbs_g": 6.3,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "I see in the photo: a small plastic container of cottage cheese/curd mixed with raisins and a few pieces of dried apricot.\n\nTotal: 265 kcal • P 23.0g • F 8.8g • C 25.1g\nConfidence: ESTIMATE\nNote: Assumed ~200g cottage cheese (around 4% fat) plus ~15g raisins and ~10g dried apricot pieces.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 5.4,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_10",
+      "agent_type": "photo",
+      "input": "",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 124802.5,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 212.0,
+        "protein_g": 4.9,
+        "fat_g": 14.5,
+        "carbs_g": 20.4
+      },
+      "items": [
+        {
+          "name": "Salad (leafy greens, cucumber, cherry tomatoes, avocado; small crouton sprinkle)",
+          "grams": 260.0,
+          "calories_kcal": 212.0,
+          "protein_g": 4.9,
+          "fat_g": 14.5,
+          "carbs_g": 20.4,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "I see in the photo: a takeaway salad with leafy greens, cucumber, cherry tomatoes, and sliced avocado (with a small sprinkle of croutons/crumbs).\n\nTotal: 212 kcal • P 5g • F 14.5g • C 20.4g\nConfidence: ESTIMATE\nNote: Estimated ~260g total salad; assumed no/very light added dressing (no visible oil/creamy dressing).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 29.3,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_11",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 53791.0,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 490.0,
+        "protein_g": 29.0,
+        "fat_g": 38.0,
+        "carbs_g": 9.0
+      },
+      "items": [
+        {
+          "name": "Сливочный скрэмбл с салатом из креветок и авокадо (Q Coffee Shop)",
+          "grams": 300.0,
+          "calories_kcal": 490.0,
+          "protein_g": 29.0,
+          "fat_g": 38.0,
+          "carbs_g": 9.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Я визуально распознал продукт: «Сливочный скрэмбл с салатом из креветок и авокадо» (бренд: Q Coffee Shop, на этикетке указан Instagram: coffeeshop_kz, дата изготовления 30/06/2026). Я не нашёл официальной страницы с таблицей питания для этого конкретного готового блюда, поэтому ниже — приближённая (AI) оценка питания на порцию. Предположение о порции: 300 г (размер выбран как типичная порция кафе — скрэмбл + салат). Оценка составлена из типичных ингредиентов и примерных количеств: 2 яйца + сливки/масло для скрэмбла, ~60 г креветок, ~50 г авокадо, ~10 г оливкового масла, овощи; все расчёты — приблизительные. Если вы знаете точный вес порции — пришлите, пересчитаю точнее.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 22.5,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_12",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 28332.2,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 354.0,
+        "protein_g": 30.0,
+        "fat_g": 21.0,
+        "carbs_g": 13.6
+      },
+      "items": [
+        {
+          "name": "Cooked shrimp",
+          "grams": 60.0,
+          "calories_kcal": 59.0,
+          "protein_g": 14.4,
+          "fat_g": 0.2,
+          "carbs_g": 0.1,
+          "source_url": null
+        },
+        {
+          "name": "Avocado",
+          "grams": 75.0,
+          "calories_kcal": 120.0,
+          "protein_g": 1.5,
+          "fat_g": 11.0,
+          "carbs_g": 6.4,
+          "source_url": null
+        },
+        {
+          "name": "Scrambled eggs (plain)",
+          "grams": 100.0,
+          "calories_kcal": 145.0,
+          "protein_g": 12.6,
+          "fat_g": 9.5,
+          "carbs_g": 1.1,
+          "source_url": null
+        },
+        {
+          "name": "Mixed salad vegetables (greens, cucumber, cherry tomatoes)",
+          "grams": 150.0,
+          "calories_kcal": 30.0,
+          "protein_g": 1.5,
+          "fat_g": 0.3,
+          "carbs_g": 6.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "I see in the photo: a salad bowl with cooked shrimp, avocado chunks, scrambled eggs, and mixed greens with cucumber and cherry tomatoes.\n\nTotal: 354 kcal • P 30.0g • F 21.0g • C 13.6g\nConfidence: ESTIMATE\nNote: Assumed ~5 medium shrimp (~60g cooked), ~1/2 avocado (~75g), ~2 scrambled eggs (~100g) and ~150g mixed veggies/greens; no visible dressing counted.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 11.5,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_13",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 68968.4,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 183.0,
+        "protein_g": 3.9,
+        "fat_g": 12.0,
+        "carbs_g": 11.0
+      },
+      "items": [
+        {
+          "name": "SNAQER Pistachio & Kunafa (Snaq Fabriq)",
+          "grams": 45.0,
+          "calories_kcal": 183.0,
+          "protein_g": 3.9,
+          "fat_g": 12.0,
+          "carbs_g": 11.0,
+          "source_url": "https://oxynutrition.net/product/snaq-fabriq-snaqfer-dubai-collection-pistachio-kunafa-dubai/"
+        }
+      ],
+      "source_url": "https://oxynutrition.net/product/snaq-fabriq-snaqfer-dubai-collection-pistachio-kunafa-dubai/",
+      "cited_domains": [],
+      "message_text": "Nutrition for SNAQER Pistachio & Kunafa — serving = 45 g (the package shown). Values are taken from the product page for the Snaq Fabriq \"Dubai Collection Pistachio & Kunafa\" and are reported per 45 g serving on that page. I used the 45 g serving printed on the pack (your photo) so no additional scaling was necessary.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 3.7,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "photo_14",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 60349.0,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 192.0,
+        "protein_g": 11.1,
+        "fat_g": 8.1,
+        "carbs_g": 18.9
+      },
+      "items": [
+        {
+          "name": "Приятного аппетита! — набор для овощной окрошки (большая порция)",
+          "grams": 300.0,
+          "calories_kcal": 192.0,
+          "protein_g": 11.1,
+          "fat_g": 8.1,
+          "carbs_g": 18.9,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Определил продукт по фото: «Приятного аппетита! — набор для овощной окрошки (большая порция)». На этикетке указана пищевая ценность на 100 г: белки 3,7 г, жиры 2,7 г, углеводы 6,3 г, энергия 64 ккал. Вы съели 300 г (указано на упаковке как масса нетто 1 порц. = 300 г). Множитель для пересчёта: 300/100 = 3. Пересчитал значения на вашу порцию. Я попытался найти официальную страницу/страницу товара в интернете, но точной страницы с таблицей питания не нашёл, поэтому данные взяты из фотографии упаковки и помечены как ESTIMATE.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_15",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 84083.8,
+      "cost_usd": null,
+      "confidence": "MEDIUM",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 107.0,
+        "protein_g": 23.4,
+        "fat_g": 1.3,
+        "carbs_g": 0.5
+      },
+      "items": [
+        {
+          "name": "Азбука вкуса (Азбука Life) — Филе цыплёнка су-вид",
+          "grams": 120.0,
+          "calories_kcal": 107.0,
+          "protein_g": 23.4,
+          "fat_g": 1.3,
+          "carbs_g": 0.5,
+          "source_url": "https://www.tablicakalorijnosti.ru/produkty/file-tsyplenka-su-vid-slaidami-av-azbuka-life"
+        }
+      ],
+      "source_url": "https://www.tablicakalorijnosti.ru/produkty/file-tsyplenka-su-vid-slaidami-av-azbuka-life",
+      "cited_domains": [],
+      "message_text": "Продукт: «Азбука вкуса (Азбука Life) — Филе цыплёнка су-вид». Порция: предположил 120 г (на многих страницах товара и на похожих SKU указана масса 120 г; на фото виден небольшой контейнер). Источник пищевых данных: агрегатор TablicaKalorijnosti (страница продукта). На сайте указано (на 100 г): 89,5 ккал, белки 19,5 г, жиры 1,1 г, углеводы 0,4 г. Пересчитал на 120 г порцию (89,5×1,2): калории 107 ккал, белки 23,4 г, жиры 1,3 г, углеводы 0,5 г. Уверенность: средняя (данные из агрегатора; если хотите — найду официальную страницу/этикетку или посчитаю по другому источнику). На упаковке видно штамп с датой 27.06.2026.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": false,
+        "kcal_err_pct": 72.6,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}

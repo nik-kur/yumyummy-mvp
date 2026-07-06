@@ -1,0 +1,163 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/photos_real_15.csv",
+    "n": 2,
+    "concurrency": 2,
+    "photo_mode": "b",
+    "wall_clock_s": 3.0,
+    "ts": "2026-07-04 18:17:04"
+  },
+  "summary": {
+    "n": 2,
+    "ok": 2,
+    "errors": 0,
+    "latency_s": {
+      "mean": 2.62,
+      "median": 2.62,
+      "p90": 2.66,
+      "max": 2.66
+    },
+    "cost_usd": {
+      "mean": 0.00108,
+      "total": 0.0022
+    },
+    "domain_hit_rate": null,
+    "domain_scored_n": 0,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 2,
+    "kcal_err_pct_median": 0.1,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {},
+    "confidence_dist": {
+      "ESTIMATE": 2
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "photo_01",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 2573.1,
+      "cost_usd": 0.001033,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 272.7,
+        "protein_g": 23.5,
+        "fat_g": 14.0,
+        "carbs_g": 13.2
+      },
+      "items": [
+        {
+          "name": "Baked Syrniki (Cheese Pancakes)",
+          "grams": 140.0,
+          "calories_kcal": 272.7,
+          "protein_g": 23.5,
+          "fat_g": 14.0,
+          "carbs_g": 13.2,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 273 kcal • P 23.5g • F 14.0g • C 13.2g\nConfidence: ESTIMATE\nSource: none\nNote: mode=b Nutritional data extracted from the package label for a 140g portion.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1394,
+          "output_tokens": 112,
+          "search_queries": 0,
+          "duration_ms": 2547.7,
+          "cost_usd": 0.001033
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.0,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.1,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_14",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 2664.1,
+      "cost_usd": 0.001135,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 192.0,
+        "protein_g": 11.1,
+        "fat_g": 8.1,
+        "carbs_g": 18.9
+      },
+      "items": [
+        {
+          "name": "Okrashka vegetable base",
+          "grams": 300.0,
+          "calories_kcal": 192.0,
+          "protein_g": 11.1,
+          "fat_g": 8.1,
+          "carbs_g": 18.9,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 192 kcal • P 11.1g • F 8.1g • C 18.9g\nConfidence: ESTIMATE\nSource: none\nNote: mode=b Nutritional values based on the label: 64 kcal, 3.7g protein, 2.7g fat, and 6.3g carbs per 100g, scaled to the 300g net weight shown.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1394,
+          "output_tokens": 146,
+          "search_queries": 0,
+          "duration_ms": 2661.0,
+          "cost_usd": 0.001135
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.0,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    }
+  ]
+}

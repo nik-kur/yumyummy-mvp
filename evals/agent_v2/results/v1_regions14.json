@@ -1,0 +1,626 @@
+{
+  "meta": {
+    "variant": "v1",
+    "dataset": "evals/agent_v2/datasets/brands_regions_v1.csv",
+    "n": 14,
+    "concurrency": 3,
+    "photo_mode": "b",
+    "wall_clock_s": 252.0,
+    "ts": "2026-07-02 23:37:11"
+  },
+  "summary": {
+    "n": 14,
+    "ok": 14,
+    "errors": 0,
+    "latency_s": {
+      "mean": 49.61,
+      "median": 46.04,
+      "p90": 67.54,
+      "max": 106.44
+    },
+    "cost_usd": {
+      "mean": null,
+      "total": null
+    },
+    "domain_hit_rate": 0.667,
+    "domain_scored_n": 12,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 9,
+    "kcal_err_pct_median": 4.9,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 11,
+      "dead": 1
+    },
+    "confidence_dist": {
+      "HIGH": 12,
+      "ESTIMATE": 2
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "rb_01",
+      "agent_type": "eatout",
+      "input": "Вкусно и точка: Биг Хит — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 55972.8,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 524.0,
+        "protein_g": 27.0,
+        "fat_g": 28.0,
+        "carbs_g": 40.0
+      },
+      "items": [
+        {
+          "name": "Биг Хит (Вкусно — и точка)",
+          "grams": 228.0,
+          "calories_kcal": 524.0,
+          "protein_g": 27.0,
+          "fat_g": 28.0,
+          "carbs_g": 40.0,
+          "source_url": "https://foods.fatsecret.com/Diary.aspx?pa=fjrd&rid=67162047"
+        }
+      ],
+      "source_url": "https://foods.fatsecret.com/Diary.aspx?pa=fjrd&rid=67162047",
+      "cited_domains": [],
+      "message_text": "Total: 1 порция (Биг Хит) — 524 кКал; Белки 27 г; Жиры 28 г; Углеводы 40 г.\nConfidence: HIGH\nSource: foods.fatsecret.com\nNote: Найдены явные значения КБЖУ для «Биг Хит» в базе FatSecret — порция указана как 1 бургер (228 г): 524 кКал, белки 27 г, жиры 28 г, углеводы 40 г. Официальный сайт «Вкусно — и точка» описывает продукт в меню, но публичной страницы с таблицей КБЖУ не обнаружено, поэтому использована агрегированная база данных; дополнительные независимые справочники (health-diet и др.) дают сопоставимые значения. Если хотите — могу попытаться найти данные в приложении/киоске сети или в службах доставки.  ([foods.fatsecret.com](https://foods.fatsecret.com/Diary.aspx?pa=fjrd&rid=67162047))",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 4.2,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "rb_02",
+      "agent_type": "eatout",
+      "input": "Додо Пицца: пицца Пепперони 25 см целиком — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 67539.3,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 573.0,
+        "protein_g": 46.1,
+        "fat_g": 37.7,
+        "carbs_g": 120.0
+      },
+      "items": [
+        {
+          "name": "Пицца Пепперони (Додо Пицца) — 25 см (целиком)",
+          "grams": 366.0,
+          "calories_kcal": 573.0,
+          "protein_g": 46.1,
+          "fat_g": 37.7,
+          "carbs_g": 120.0,
+          "source_url": "https://glovo-allergy-info-prod.s3.eu-west-1.amazonaws.com/public/products_information_181984.pdf"
+        }
+      ],
+      "source_url": "https://glovo-allergy-info-prod.s3.eu-west-1.amazonaws.com/public/products_information_181984.pdf",
+      "cited_domains": [],
+      "message_text": "Total: 573 kcal; Protein 46.1 g; Fat 37.7 g; Carbs 120.0 g\nConfidence: HIGH\nSource: glovo-allergy-info-prod.s3.eu-west-1.amazonaws.com (Dodo Pizza menu PDF)\nNote: Used Dodo Pizza nutritional sheet published as a Glovo product/allergy PDF which lists per-100g values for \"Pepperoni\" (156.6 kcal; 12.6 g protein; 10.3 g fat; 32.8 g carbs) and the three size weights 366 / 535 / 670 ±50 g. I used the first weight (366 g) as the 25 cm size and multiplied the per-100g values by 366/100 to get totals below.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "rb_03",
+      "agent_type": "eatout",
+      "input": "Теремок: блин с ветчиной и сыром — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 57581.4,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 350.0,
+        "protein_g": 12.2,
+        "fat_g": 20.6,
+        "carbs_g": 29.0
+      },
+      "items": [
+        {
+          "name": "Блин с ветчиной и сыром (Теремок)",
+          "grams": null,
+          "calories_kcal": 350.0,
+          "protein_g": 12.2,
+          "fat_g": 20.6,
+          "carbs_g": 29.0,
+          "source_url": "https://health-diet.ru/base_of_food/sostav/300926.php"
+        }
+      ],
+      "source_url": "https://health-diet.ru/base_of_food/sostav/300926.php",
+      "cited_domains": [],
+      "message_text": "Total: 350 kcal, 12.2 g protein, 20.6 g fat, 29 g carbs\nConfidence: HIGH\nSource: https://health-diet.ru/base_of_food/sostav/300926.php\nNote: Нашёл явные КБЖУ для \"Блин с Ветчиной и Сыром\" (сети «Теремок») на странице-справочнике health-diet.ru — там указаны 350 кКал, 12.2 г белка, 20.6 г жира, 29 г углеводов.  ([health-diet.ru](https://health-diet.ru/base_of_food/sostav/300926.php)) Другие агрегаторы дают похожие, но немного отличающиеся значения (например, tablicakalorijnosti.ru — ~299 кКал; встречаются также записи для двойной порции с большей калорийностью), поэтому я опираюсь на страницу, где явно приведены числа.  ([tablicakalorijnosti.ru](https://www.tablicakalorijnosti.ru/produkty/blinchik-s-vetchinoi-i-syrom-teremok)) Прямой раздел с таблицей КБЖУ на официальном сайте Teremok в виде статичной страницы не был найден — в меню есть калькулятор калорий, но он требует интерактивного использования, поэтому я использовал доступные публичные таблицы.  ([teremok.ru](https://teremok.ru/menu/blin_zhyulen/?utm_source=openai))",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "rb_04",
+      "agent_type": "product",
+      "input": "ВкусВилл: сырники классические 180 г — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 29681.0,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 416.2,
+        "protein_g": 22.5,
+        "fat_g": 18.0,
+        "carbs_g": 41.0
+      },
+      "items": [
+        {
+          "name": "ВкусВилл — Сырники классические, 180 г",
+          "grams": 180.0,
+          "calories_kcal": 416.2,
+          "protein_g": 22.5,
+          "fat_g": 18.0,
+          "carbs_g": 41.0,
+          "source_url": "https://vkusvill.ru/goods/syrniki-klassicheskie-78284/"
+        }
+      ],
+      "source_url": "https://vkusvill.ru/goods/syrniki-klassicheskie-78284/",
+      "cited_domains": [],
+      "message_text": "Использована официальная страница товара ВкусВилл с указанием пищевой ценности на 100 г. На странице указано (на 100 г): 231.2 ккал, белки 12.5 г, жиры 10 г, углеводы 22.8 г. Для порции 180 г (указано вами) умножил значения на коэффициент 1.8. Результат приведён ниже. Источник: страница товара ВкусВилл (ссылка в поле source_url).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 4.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "rb_05",
+      "agent_type": "product",
+      "input": "Простоквашино: творог 5% 200 г — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 25523.4,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 234.0,
+        "protein_g": 30.0,
+        "fat_g": 10.0,
+        "carbs_g": 6.0
+      },
+      "items": [
+        {
+          "name": "Простоквашино: творог 5% 200 г",
+          "grams": 200.0,
+          "calories_kcal": 234.0,
+          "protein_g": 30.0,
+          "fat_g": 10.0,
+          "carbs_g": 6.0,
+          "source_url": "https://prostokvashino.ru/product/tvorog-5-200-g/"
+        }
+      ],
+      "source_url": "https://prostokvashino.ru/product/tvorog-5-200-g/",
+      "cited_domains": [],
+      "message_text": "Данные взяты с официального сайта Простоквашино. На 100 г: 117 ккал, белки 15 г, жиры 5 г, углеводы 3 г. Упаковка — 200 г; для порции 200 г значения пересчитаны (умножено на 2): 234 ккал, белки 30 г, жиры 10 г, углеводы 6 г. Пересчёт выполнен из указанных на странице показателей на 100 г (множитель 200/100 = 2).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 3.3,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "rb_06",
+      "agent_type": "product",
+      "input": "Агуша: йогурт питьевой клубника 200 г — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 59959.2,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 154.0,
+        "protein_g": 5.6,
+        "fat_g": 5.4,
+        "carbs_g": 20.6
+      },
+      "items": [
+        {
+          "name": "Агуша — йогурт питьевой (клубника/клубника-банан), 200 г",
+          "grams": 200.0,
+          "calories_kcal": 154.0,
+          "protein_g": 5.6,
+          "fat_g": 5.4,
+          "carbs_g": 20.6,
+          "source_url": "https://agulife.ru/products/iogurt-pitevoy-detskii-agusha-klubnika-banan/"
+        }
+      ],
+      "source_url": "https://agulife.ru/products/iogurt-pitevoy-detskii-agusha-klubnika-banan/",
+      "cited_domains": [],
+      "message_text": "Данные взяты с официального сайта «Агуша» (страница продукта «Йогурт питьевой Клубника-банан»). На сайте указана пищевая ценность на 100 г: 77 ккал, белки 2,8 г, жиры 2,7 г, углеводы 10,3 г (в т.ч. сахароза 5,8 г). Пересчитал(а) на вашу порцию 200 г.\n(Примечание: на сайте упаковки чаще указаны 180 г, но ПВ указана на 100 г — я использовал её для пересчёта.)",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "me_01",
+      "agent_type": "eatout",
+      "input": "Al Baik: Chicken Fillet Sandwich — calories",
+      "region": "ME",
+      "ok": true,
+      "error": null,
+      "latency_ms": 36566.7,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 373.0,
+        "protein_g": 23.0,
+        "fat_g": 16.0,
+        "carbs_g": 32.0
+      },
+      "items": [
+        {
+          "name": "Al Baik — Chicken Fillet Sandwich",
+          "grams": null,
+          "calories_kcal": 373.0,
+          "protein_g": 23.0,
+          "fat_g": 16.0,
+          "carbs_g": 32.0,
+          "source_url": "https://menualbaikprice.com/"
+        }
+      ],
+      "source_url": "https://menualbaikprice.com/",
+      "cited_domains": [],
+      "message_text": "Total: 373 kcal (Protein 23 g / Fat 16 g / Carbs 32 g)\nConfidence: HIGH\nSource: menualbaikprice.com\nNote: I could not find calorie/macro numbers on the official Al Baik site (albaik.com lists the menu but not nutrition). The values above were found on menualbaikprice.com where the Chicken Fillet Sandwich is listed with 373 kcal and macros (23 g protein, 32 g carbs, 16 g fat). Actual values may vary slightly by branch or preparation.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "me_02",
+      "agent_type": "eatout",
+      "input": "Herfy: Big Herfy burger — calories",
+      "region": "ME",
+      "ok": true,
+      "error": null,
+      "latency_ms": 106438.3,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 581.0,
+        "protein_g": 28.0,
+        "fat_g": 30.0,
+        "carbs_g": 50.0
+      },
+      "items": [
+        {
+          "name": "Big Herfy (Big Herfy burger)",
+          "grams": null,
+          "calories_kcal": 581.0,
+          "protein_g": 28.0,
+          "fat_g": 30.0,
+          "carbs_g": 50.0,
+          "source_url": "https://www.talabat.com/ksa/restaurant/12612/herfy-rbwh?aid=2075"
+        }
+      ],
+      "source_url": "https://www.talabat.com/ksa/restaurant/12612/herfy-rbwh?aid=2075",
+      "cited_domains": [],
+      "message_text": "Total: Big Herfy (Herfy) — 581 kcal (estimated macros: protein 28 g / fat 30 g / carbs 50 g)\nConfidence: HIGH\nSource: talabat.com (restaurant menu page)\nNote: The Talabat restaurant page for Herfy lists the Big Herfy burger at 581 calories. Herfy's official site/menu PDF does not publish full nutrition tables, so protein/fat/carbs above are AI estimates (reasonable macronutrient split for a beef burger of this calorie level) informed by similar Herfy items in food databases and delivery listings.  ([talabat.com](https://www.talabat.com/ksa/restaurant/12612/herfy-rbwh?aid=2075&utm_source=openai))",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "me_03",
+      "agent_type": "eatout",
+      "input": "Хумус с питой в ливанском кафе, порция — кбжу",
+      "region": "ME",
+      "ok": true,
+      "error": null,
+      "latency_ms": 61179.4,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 414.0,
+        "protein_g": 17.4,
+        "fat_g": 15.1,
+        "carbs_g": 54.5
+      },
+      "items": [
+        {
+          "name": "Хумус (ресторанная порция ≈150 г)",
+          "grams": 150.0,
+          "calories_kcal": 249.0,
+          "protein_g": 11.9,
+          "fat_g": 14.4,
+          "carbs_g": 21.5,
+          "source_url": null
+        },
+        {
+          "name": "Пита (1 средняя ≈60 г)",
+          "grams": 60.0,
+          "calories_kcal": 165.0,
+          "protein_g": 5.5,
+          "fat_g": 0.7,
+          "carbs_g": 33.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 414 kcal (Белки 17.4 г / Жиры 15.1 г / Углеводы 54.5 г)\nConfidence: ESTIMATE\nSource: none\nNote: Я не нашёл официальной страницы конкретного «ливанского кафе» с указанием нутриентов для именно этой порции. Для оценки я использовал общедоступные значения: хумус ≈166 kcal на 100 г (USDA-derived).  ([calzen.ai](https://calzen.ai/en/calories-in/hummus/?utm_source=openai)) Средняя пите (≈60 г) ≈165 kcal.  ([nutritionvalue.org](https://www.nutritionvalue.org/Bread%2C_enriched%2C_white%2C_pita_nutritional_value.html?utm_source=openai))  Я предположил порцию хумуса ≈150 г + 1 среднюю питу (≈60 г). Подробности расчёта ниже.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 8.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "az_01",
+      "agent_type": "eatout",
+      "input": "Шах-плов в ресторане в Баку, порция — кбжу",
+      "region": "AZ",
+      "ok": true,
+      "error": null,
+      "latency_ms": 50300.7,
+      "cost_usd": null,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 700.0,
+        "protein_g": 33.0,
+        "fat_g": 34.0,
+        "carbs_g": 80.0
+      },
+      "items": [
+        {
+          "name": "Шах-плов (ресторан в Баку) — порция (≈350 г)",
+          "grams": 350.0,
+          "calories_kcal": 700.0,
+          "protein_g": 33.0,
+          "fat_g": 34.0,
+          "carbs_g": 80.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 1 порция (≈350 г) — 700 kcal; Белки 33 г, Жиры 34 г, Углеводы 80 г.\nConfidence: ESTIMATE\nSource: none\nNote: Не удалось найти официальную таблицу пищевой ценности шах-плова именно от ресторанов Баку. Оценка получена как среднее по нескольким рецептным/пищевым страницам (значения на 100 г), затем умножено на типичную ресторанную порцию ≈350 г. Источники, использованные для оценки: food.ru (питательность на 100 г), tasty.decorexpro (питательность на 100 г), Patee (питательность и ккал на 100 г), а также рецепт/оценка порции (nur.kz). См. подробности:  ([food.ru](https://food.ru/recipes/1019-shah-plov))",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 16.7,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "eu_01",
+      "agent_type": "eatout",
+      "input": "Pret a Manger: Chicken Caesar & Bacon Baguette — calories",
+      "region": "EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 29722.9,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 604.0,
+        "protein_g": 30.5,
+        "fat_g": 28.4,
+        "carbs_g": 54.4
+      },
+      "items": [
+        {
+          "name": "Chicken Caesar Bacon Baguette (Pret A Manger)",
+          "grams": 218.05,
+          "calories_kcal": 604.0,
+          "protein_g": 30.5,
+          "fat_g": 28.4,
+          "carbs_g": 54.4,
+          "source_url": "https://www.pret.co.uk/en-GB/pret-delivers/products/UK006823/chicken-caesar-bacon-baguette"
+        }
+      ],
+      "source_url": "https://www.pret.co.uk/en-GB/pret-delivers/products/UK006823/chicken-caesar-bacon-baguette",
+      "cited_domains": [],
+      "message_text": "Total: 604 kcal (Protein 30.5 g; Fat 28.4 g; Carbs 54.4 g)\nConfidence: HIGH\nSource: pret.co.uk\nNote: Nutrition values are taken from Pret A Manger's product page for \"Chicken Caesar Bacon Baguette\" (per serving). The product page lists per-100g and per-serving values; serving weight is not shown on the page but can be calculated from those values (≈218 g).  ([pret.co.uk](https://www.pret.co.uk/en-GB/pret-delivers/products/UK006823/chicken-caesar-bacon-baguette))",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 9.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eu_02",
+      "agent_type": "eatout",
+      "input": "PAUL: круассан сливочный — кбжу",
+      "region": "EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 30957.2,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 264.39,
+        "protein_g": 4.92,
+        "fat_g": 14.18,
+        "carbs_g": 28.57
+      },
+      "items": [
+        {
+          "name": "PAUL — Croissant (круассан сливочный)",
+          "grams": 65.0,
+          "calories_kcal": 264.39,
+          "protein_g": 4.92,
+          "fat_g": 14.18,
+          "carbs_g": 28.57,
+          "source_url": "https://www.paul.fr/le-croissant-2.html"
+        }
+      ],
+      "source_url": "https://www.paul.fr/le-croissant-2.html",
+      "cited_domains": [],
+      "message_text": "Total: 1 x PAUL croissant (per portion) — 264.39 kcal, B 4.92 g / F 14.18 g / C 28.57 g\nConfidence: HIGH\nSource: paul.fr (official product page)\nNote: Found PAUL official product page \"Le croissant\" which lists nutrition per 100 g and per portion. I used the per-portion values shown on the page. The portion weight (~65 g) is inferred from the per-100 g and per-portion kcal (264.39 kcal per portion vs 406.75 kcal per 100 g).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 5.6,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "us_01",
+      "agent_type": "eatout",
+      "input": "Sweetgreen: Harvest Bowl — calories and macros",
+      "region": "US",
+      "ok": true,
+      "error": null,
+      "latency_ms": 41789.1,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 685.0,
+        "protein_g": 37.0,
+        "fat_g": 32.0,
+        "carbs_g": 62.0
+      },
+      "items": [
+        {
+          "name": "Harvest Bowl",
+          "grams": 362.0,
+          "calories_kcal": 685.0,
+          "protein_g": 37.0,
+          "fat_g": 32.0,
+          "carbs_g": 62.0,
+          "source_url": "https://assets.ctfassets.net/eum7w7yri3zr/tAoILeemX7N8HyCaIBsHg/04217a63d74925267cb439de25a711d2/S3_2023_Nutrition_Binder.pdf"
+        }
+      ],
+      "source_url": "https://assets.ctfassets.net/eum7w7yri3zr/tAoILeemX7N8HyCaIBsHg/04217a63d74925267cb439de25a711d2/S3_2023_Nutrition_Binder.pdf",
+      "cited_domains": [],
+      "message_text": "Total: 685 kcal (Protein 37 g, Fat 32 g, Carbs 62 g)\nConfidence: HIGH\nSource: assets.ctfassets.net\nNote: Values taken from Sweetgreen's official nutrition binder (S3_2023_Nutrition_Binder.pdf) — serving size listed as 362 g. I used the official Sweetgreen nutrition PDF hosted on assets.ctfassets.net; other aggregators may show slightly different numbers, but the PDF is the brand's published nutrition data.",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 2.8,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "cis_02",
+      "agent_type": "product",
+      "input": "Боржоми 500 мл — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 41277.7,
+      "cost_usd": null,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.0
+      },
+      "items": [
+        {
+          "name": "Боржоми, 500 мл",
+          "grams": 500.0,
+          "calories_kcal": 0.0,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 0.0,
+          "source_url": "https://babushkadeli.uk/en/borjomi-sparkling-mineral-water-500ml"
+        }
+      ],
+      "source_url": "https://babushkadeli.uk/en/borjomi-sparkling-mineral-water-500ml",
+      "cited_domains": [],
+      "message_text": "Порция: 500 мл (для жидкостей принято считать 1 мл ≈ 1 г). По данным карточки товара, пищевая ценность Borjomi на 100 мл: 0 ккал, белки 0 г, жиры 0 г, углеводы 0 г. Соответственно на 500 мл: 0 ккал, белки 0 г, жиры 0 г, углеводы 0 г. Источник указан в поле source_url. Вода содержит минералы (натрий, гидрокарбонаты) — при необходимости могу добавить их содержание (мг/л).",
+      "stages": [],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}

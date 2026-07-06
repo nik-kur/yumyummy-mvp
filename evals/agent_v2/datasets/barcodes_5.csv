@@ -1,0 +1,6 @@
+case_id,agent_type,input_as_text,image_url,expected_source_mode,expected_source_domains,expected_confidence,expected_kcal,kcal_tolerance_pct,region,criticality,notes
+bc_01,barcode,"5449000000996",,off,openfoodfacts.org,high_or_estimate,139,15,GLOBAL,high,"Coca-Cola 330ml can; 42/100ml x 3.3 (serving from OFF)."
+bc_02,barcode,"3017620422003",,off,openfoodfacts.org,high_or_estimate,,,GLOBAL,high,"Nutella 400g jar; serving-dependent."
+bc_03,barcode,"5000112637939",,off,openfoodfacts.org,high_or_estimate,,,EU,medium,"Coca-Cola Zero 330ml UK; ~0-1 kcal expected."
+bc_04,barcode,"7622210449283",,off,openfoodfacts.org,high_or_estimate,,,EU,medium,"Mondelez EAN; tests OFF coverage."
+bc_05,barcode,"4999999999999",,off_miss_fallback,,estimate_or_high,,,GLOBAL,low,"Nonexistent EAN; must fall back to grounded search without crashing."

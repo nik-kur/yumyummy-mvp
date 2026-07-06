@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/brands_regions_v1.csv",
+    "n": 1,
+    "concurrency": 1,
+    "photo_mode": "b",
+    "wall_clock_s": 4.9,
+    "ts": "2026-07-02 23:26:25"
+  },
+  "summary": {
+    "n": 1,
+    "ok": 1,
+    "errors": 0,
+    "latency_s": {
+      "mean": 4.76,
+      "median": 4.76,
+      "p90": 4.76,
+      "max": 4.76
+    },
+    "cost_usd": {
+      "mean": 0.0287,
+      "total": 0.0287
+    },
+    "domain_hit_rate": 0.0,
+    "domain_scored_n": 1,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 1,
+    "kcal_err_pct_median": 4.2,
+    "zero_kcal_bugs": 0,
+    "confidence_dist": {
+      "ESTIMATE": 1
+    },
+    "mean_search_queries": 2
+  },
+  "cases": [
+    {
+      "case_id": "rb_01",
+      "agent_type": "eatout",
+      "input": "Вкусно и точка: Биг Хит — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 4759.1,
+      "cost_usd": 0.028702,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 524.0,
+        "protein_g": 27.0,
+        "fat_g": 28.0,
+        "carbs_g": 40.0
+      },
+      "items": [
+        {
+          "name": "Вкусно и точка: Биг Хит",
+          "grams": 228.0,
+          "calories_kcal": 524.0,
+          "protein_g": 27.0,
+          "fat_g": 28.0,
+          "carbs_g": 40.0,
+          "source_url": "https://vkusnoitochka.ru/menu/burgers/big-hit"
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 524 kcal • P 27.0g • F 28.0g • C 40.0g\nConfidence: ESTIMATE\nSource: none\nNote: Данные для одного бургера весом 228 г. КБЖУ соответствуют актуальному меню сети «Вкусно — и точка».",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 397,
+          "output_tokens": 168,
+          "search_queries": 2,
+          "duration_ms": 4746.2,
+          "cost_usd": 0.028702
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 4.2,
+        "zero_kcal_bug": false
+      }
+    }
+  ]
+}

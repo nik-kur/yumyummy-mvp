@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "variant": "v2o",
+    "dataset": "evals/agent_v2/datasets/brands_goldens_30_ref.csv",
+    "n": 2,
+    "concurrency": 2,
+    "photo_mode": "b",
+    "wall_clock_s": 32.0,
+    "ts": "2026-07-02 23:28:57"
+  },
+  "summary": {
+    "n": 2,
+    "ok": 2,
+    "errors": 0,
+    "latency_s": {
+      "mean": 20.82,
+      "median": 20.82,
+      "p90": 30.33,
+      "max": 30.33
+    },
+    "cost_usd": {
+      "mean": 0.0269,
+      "total": 0.0538
+    },
+    "domain_hit_rate": 0.5,
+    "domain_scored_n": 2,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 2,
+    "kcal_err_pct_median": 5.2,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 2
+    },
+    "confidence_dist": {
+      "HIGH": 2
+    },
+    "mean_search_queries": 2
+  },
+  "cases": [
+    {
+      "case_id": "eatout_02",
+      "agent_type": "eatout",
+      "input": "McDonald's Big Mac — calories and macros",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 30329.0,
+      "cost_usd": 0.040077,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 520.0,
+        "protein_g": 24.0,
+        "fat_g": 28.0,
+        "carbs_g": 45.0
+      },
+      "items": [
+        {
+          "name": "McDonald’s Big Mac",
+          "grams": 209.0,
+          "calories_kcal": 520.0,
+          "protein_g": 24.0,
+          "fat_g": 28.0,
+          "carbs_g": 45.0,
+          "source_url": "https://qa.mcdonalds.com/content/dam/sites/ca/nfl/pdf/NutritionFacts_CA_EN.pdf"
+        }
+      ],
+      "source_url": "https://qa.mcdonalds.com/content/dam/sites/ca/nfl/pdf/NutritionFacts_CA_EN.pdf",
+      "cited_domains": [],
+      "message_text": "Total: 520 kcal • P 24.0g • F 28.0g • C 45.0g\nConfidence: HIGH\nSource: qa.mcdonalds.com\nNote: Values from McDonald’s Canada nutrition facts PDF (serving size 209 g). McDonald’s nutrition can vary by country and serving — McDonald’s US product page lists 580 kcal for a Big Mac; use the above Canadian PDF values if you consumed the 209 g serving listed.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "openai",
+          "model": "gpt-5-mini",
+          "input_tokens": 28003,
+          "output_tokens": 1538,
+          "search_queries": 3,
+          "duration_ms": 30311.6,
+          "cost_usd": 0.040077
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 8.8,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_02",
+      "agent_type": "product",
+      "input": "Snickers батончик 50 г — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11301.7,
+      "cost_usd": 0.013713,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 241.0,
+        "protein_g": 4.3,
+        "fat_g": 11.3,
+        "carbs_g": 30.3
+      },
+      "items": [
+        {
+          "name": "Snickers батончик",
+          "grams": 50.0,
+          "calories_kcal": 241.0,
+          "protein_g": 4.3,
+          "fat_g": 11.3,
+          "carbs_g": 30.3,
+          "source_url": "https://www.snickers.ua/portfolio/SnickersStandard"
+        }
+      ],
+      "source_url": "https://www.snickers.ua/portfolio/SnickersStandard",
+      "cited_domains": [],
+      "message_text": "Total: 241 kcal • P 4.3g • F 11.3g • C 30.3g\nConfidence: HIGH\nSource: snickers.ua\nNote: Значения взяты с официальной страницы SNICKERS (портфолио) — приведены для порции 50 г (строка «НА ПОРЦІЮ 50 Г»). КБЖУ соответствуют указанным на странице Mars/Snickers.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "openai",
+          "model": "gpt-5-mini",
+          "input_tokens": 10459,
+          "output_tokens": 549,
+          "search_queries": 1,
+          "duration_ms": 11301.1,
+          "cost_usd": 0.013713
+        }
+      ],
+      "search_queries": 1,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.6,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}

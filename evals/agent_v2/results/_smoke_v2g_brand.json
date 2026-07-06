@@ -1,0 +1,140 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/brands_goldens_30_ref.csv",
+    "n": 2,
+    "concurrency": 2,
+    "photo_mode": "b",
+    "wall_clock_s": 10.5,
+    "ts": "2026-07-02 23:26:20"
+  },
+  "summary": {
+    "n": 2,
+    "ok": 2,
+    "errors": 0,
+    "latency_s": {
+      "mean": 7.67,
+      "median": 7.67,
+      "p90": 10.21,
+      "max": 10.21
+    },
+    "cost_usd": {
+      "mean": 0.02891,
+      "total": 0.0578
+    },
+    "domain_hit_rate": 0.5,
+    "domain_scored_n": 2,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 2,
+    "kcal_err_pct_median": 6.1,
+    "zero_kcal_bugs": 0,
+    "confidence_dist": {
+      "HIGH": 2
+    },
+    "mean_search_queries": 2
+  },
+  "cases": [
+    {
+      "case_id": "eatout_02",
+      "agent_type": "eatout",
+      "input": "McDonald's Big Mac — calories and macros",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5132.6,
+      "cost_usd": 0.028913,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 509.0,
+        "protein_g": 26.0,
+        "fat_g": 26.0,
+        "carbs_g": 42.0
+      },
+      "items": [
+        {
+          "name": "McDonald's Big Mac (Биг Мак)",
+          "grams": 215.0,
+          "calories_kcal": 509.0,
+          "protein_g": 26.0,
+          "fat_g": 26.0,
+          "carbs_g": 42.0,
+          "source_url": "https://www.mcdonalds.com/gb/en-gb/product/big-mac.html"
+        }
+      ],
+      "source_url": "https://www.mcdonalds.com/gb/en-gb/product/big-mac.html",
+      "cited_domains": [],
+      "message_text": "Total: 509 kcal • P 26.0g • F 26.0g • C 42.0g\nConfidence: HIGH\nSource: mcdonalds.com\nNote: Данные основаны на стандартной порции классического Биг Мака. В зависимости от региона (США, Европа, СНГ) калорийность может незначительно варьироваться от 500 до 590 ккал из-за различий в рецептуре соуса и булочки.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 392,
+          "output_tokens": 239,
+          "search_queries": 2,
+          "duration_ms": 5113.1,
+          "cost_usd": 0.028913
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 10.7,
+        "zero_kcal_bug": false
+      }
+    },
+    {
+      "case_id": "product_02",
+      "agent_type": "product",
+      "input": "Snickers батончик 50 г — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 10209.7,
+      "cost_usd": 0.028912,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 241.0,
+        "protein_g": 4.3,
+        "fat_g": 11.5,
+        "carbs_g": 30.5
+      },
+      "items": [
+        {
+          "name": "Snickers батончик",
+          "grams": 50.0,
+          "calories_kcal": 241.0,
+          "protein_g": 4.3,
+          "fat_g": 11.5,
+          "carbs_g": 30.5,
+          "source_url": "https://www.coop.ch/en/food/sweets-snacks/chocolate-bars/snickers-bar-50g/p/4459620"
+        }
+      ],
+      "source_url": "https://www.coop.ch/en/food/sweets-snacks/chocolate-bars/snickers-bar-50g/p/4459620",
+      "cited_domains": [],
+      "message_text": "Total: 241 kcal • P 4.3g • F 11.5g • C 30.5g\nConfidence: HIGH\nSource: coop.ch\nNote: Данные рассчитаны для стандартного батончика весом 50 г на основе официальной информации Mars (481 ккал на 100 г).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 396,
+          "output_tokens": 238,
+          "search_queries": 2,
+          "duration_ms": 10206.2,
+          "cost_usd": 0.028912
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.6,
+        "zero_kcal_bug": false
+      }
+    }
+  ]
+}

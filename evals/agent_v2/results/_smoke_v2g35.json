@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "variant": "v2g35",
+    "dataset": "evals/agent_v2/datasets/brands_goldens_30_ref.csv",
+    "n": 1,
+    "concurrency": 1,
+    "photo_mode": "b",
+    "wall_clock_s": 12.4,
+    "ts": "2026-07-02 23:32:16"
+  },
+  "summary": {
+    "n": 1,
+    "ok": 1,
+    "errors": 0,
+    "latency_s": {
+      "mean": 11.92,
+      "median": 11.92,
+      "p90": 11.92,
+      "max": 11.92
+    },
+    "cost_usd": {
+      "mean": 0.0115,
+      "total": 0.0115
+    },
+    "domain_hit_rate": 1.0,
+    "domain_scored_n": 1,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 1,
+    "kcal_err_pct_median": 11.7,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "dead": 1
+    },
+    "confidence_dist": {
+      "HIGH": 1
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "eatout_05",
+      "agent_type": "eatout",
+      "input": "Burger King Whopper — кбжу на 1 бургер",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11919.8,
+      "cost_usd": 0.011499,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 591.8,
+        "protein_g": 26.1,
+        "fat_g": 31.4,
+        "carbs_g": 51.2
+      },
+      "items": [
+        {
+          "name": "Burger King Воппер",
+          "grams": 272.9,
+          "calories_kcal": 591.8,
+          "protein_g": 26.1,
+          "fat_g": 31.4,
+          "carbs_g": 51.2,
+          "source_url": "https://burgerking.ru"
+        }
+      ],
+      "source_url": "https://burgerking.ru",
+      "cited_domains": [],
+      "message_text": "Total: 592 kcal • P 26.1g • F 31.4g • C 51.2g\nConfidence: HIGH\nSource: burgerking.ru\nNote: Данные взяты из официальных информационных материалов Burger King в России для одного стандартного Воппера весом 272.9 г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3.5-flash",
+          "input_tokens": 676,
+          "output_tokens": 1165,
+          "search_queries": 0,
+          "duration_ms": 11899.4,
+          "cost_usd": 0.011499
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 11.7,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    }
+  ]
+}

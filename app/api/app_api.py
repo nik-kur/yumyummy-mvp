@@ -507,6 +507,51 @@ def _empty_totals() -> WorkflowTotals:
     return WorkflowTotals(calories_kcal=0, protein_g=0, fat_g=0, carbs_g=0)
 
 
+def _build_nutrition_context(db: Session, user: User) -> str:
+    """Targets + eaten today + remaining, as the Telegram bot builds for
+    food_advice. The mobile app doesn't send this, so we compute it here."""
+    import json
+
+    import pytz
+
+    try:
+        tz = pytz.timezone(user.timezone or "Europe/Moscow")
+    except pytz.exceptions.UnknownTimeZoneError:
+        tz = pytz.timezone("Europe/Moscow")
+    today = datetime.now(tz).date()
+
+    day = (
+        db.query(UserDay)
+        .filter(UserDay.user_id == user.id, UserDay.date == today)
+        .first()
+    )
+    target_cal = user.target_calories or 2000
+    target_prot = user.target_protein_g or 150
+    target_fat = user.target_fat_g or 65
+    target_carbs = user.target_carbs_g or 200
+    eaten_cal = (day.total_calories if day else 0) or 0
+    eaten_prot = (day.total_protein_g if day else 0) or 0
+    eaten_fat = (day.total_fat_g if day else 0) or 0
+    eaten_carbs = (day.total_carbs_g if day else 0) or 0
+    return json.dumps(
+        {
+            "target_calories": target_cal,
+            "target_protein_g": target_prot,
+            "target_fat_g": target_fat,
+            "target_carbs_g": target_carbs,
+            "eaten_calories": eaten_cal,
+            "eaten_protein_g": eaten_prot,
+            "eaten_fat_g": eaten_fat,
+            "eaten_carbs_g": eaten_carbs,
+            "remaining_calories": max(0, target_cal - eaten_cal),
+            "remaining_protein_g": max(0, target_prot - eaten_prot),
+            "remaining_fat_g": max(0, target_fat - eaten_fat),
+            "remaining_carbs_g": max(0, target_carbs - eaten_carbs),
+        },
+        ensure_ascii=False,
+    )
+
+
 @router.post("/agent/run", response_model=WorkflowRunResponse)
 async def app_agent_run(
     payload: AppAgentRunRequest,
@@ -530,14 +575,49 @@ async def app_agent_run(
     # The workflow only uses this id as an opaque context key.
     workflow_id = user.telegram_id or f"acct:{account.id}"
 
+    # --- Agent v2 beta: per-account engine switch (server-side, no app change).
+    # Any v2 failure falls through to the v1 workflow, so beta accounts can
+    # never end up worse off than production.
+    result = None
+    use_v2 = (
+        settings.agent_engine_default == "v2"
+        or account.id in settings.agent_v2_account_id_set
+    )
+    if use_v2:
+        try:
+            from app.agent_v2.adapter import run_v2_workflow
+
+            nutrition_context = payload.nutrition_context
+            if (payload.force_intent or "").lower() in ("advice", "food_advice") and not nutrition_context:
+                nutrition_context = _build_nutrition_context(db, user)
+
+            result = await run_v2_workflow(
+                user_text=payload.text,
+                telegram_id=workflow_id,
+                image_url=payload.image_url,
+                force_intent=payload.force_intent,
+                nutrition_context=nutrition_context,
+                variant=settings.agent_v2_variant,
+            )
+            logger.info(
+                "[/app/agent/run] served by agent v2 (%s) account=%s intent=%s",
+                settings.agent_v2_variant, account.id, result.get("intent"),
+            )
+        except Exception as exc:
+            logger.warning(
+                "[/app/agent/run] agent v2 failed, falling back to v1: %s", exc,
+            )
+            result = None
+
     try:
-        result = await run_yumyummy_workflow(
-            user_text=payload.text,
-            telegram_id=workflow_id,
-            image_url=payload.image_url,
-            force_intent=payload.force_intent,
-            nutrition_context=payload.nutrition_context,
-        )
+        if result is None:
+            result = await run_yumyummy_workflow(
+                user_text=payload.text,
+                telegram_id=workflow_id,
+                image_url=payload.image_url,
+                force_intent=payload.force_intent,
+                nutrition_context=payload.nutrition_context,
+            )
     except WorkflowNotInstalledError as exc:
         logger.warning("[/app/agent/run] workflow unavailable: %s", exc)
         return WorkflowRunResponse(
