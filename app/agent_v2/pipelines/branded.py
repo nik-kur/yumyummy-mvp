@@ -84,7 +84,9 @@ async def run(
         branded.source_url, provider_urls, official, include_official_homepage=True
     )[:4]
     item_ranked = {
-        i: rank_candidates(bi.source_url, provider_urls, official)[:2]
+        i: rank_candidates(
+            bi.source_url, provider_urls, official, include_official_homepage=True
+        )[:3]
         for i, bi in enumerate(branded.items)
     }
     to_probe = list(dict.fromkeys(main_ranked + [u for r in item_ranked.values() for u in r]))
