@@ -6,10 +6,11 @@ import {
   Pressable,
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Animated,
   Easing,
+  type KeyboardEvent,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
@@ -34,6 +35,50 @@ import { fonts } from '@/theme/typography';
 type Mode = 'input' | 'accepted';
 
 const EXAMPLES = ['2 eggs & toast', 'Chicken & rice bowl', 'Oat latte', 'Greek salad'];
+
+/**
+ * Keyboard overlap for this screen, measured in window coordinates.
+ *
+ * `KeyboardAvoidingView` mis-measures inside iOS sheet modals (this screen uses
+ * `presentation: 'modal'`), leaving the action bar covered by the keyboard. So
+ * we take the keyboard's top edge from the native event and measure the
+ * container's real bottom with `measureInWindow` — correct on every device
+ * size and presentation style. Android resizes the window natively, so 0 there.
+ */
+function useKeyboardOverlap(ref: React.RefObject<View | null>): number {
+  const [overlap, setOverlap] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const animate = (e: KeyboardEvent) =>
+      LayoutAnimation.configureNext({
+        duration: e.duration > 0 ? e.duration : 250,
+        update: { type: LayoutAnimation.Types.keyboard },
+      });
+    const onFrame = (e: KeyboardEvent) => {
+      const el = ref.current;
+      if (!el) return;
+      el.measureInWindow((_x, y, _w, h) => {
+        animate(e);
+        setOverlap(Math.max(0, y + h - e.endCoordinates.screenY));
+      });
+    };
+    const onHide = (e: KeyboardEvent) => {
+      animate(e);
+      setOverlap(0);
+    };
+    const subs = [
+      Keyboard.addListener('keyboardWillChangeFrame', onFrame),
+      // Re-measure once everything settled (modal + keyboard animations can
+      // overlap on first open, skewing the mid-flight measurement).
+      Keyboard.addListener('keyboardDidShow', onFrame),
+      Keyboard.addListener('keyboardWillHide', onHide),
+    ];
+    return () => subs.forEach((s) => s.remove());
+  }, [ref]);
+
+  return overlap;
+}
 
 /** A live-looking equalizer shown while recording (decorative, not real levels). */
 function Waveform({ color }: { color: string }) {
@@ -79,6 +124,9 @@ export default function CaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ prefill?: string; mode?: string }>();
   const { submit } = usePendingMeals();
+
+  const containerRef = useRef<View>(null);
+  const keyboardOverlap = useKeyboardOverlap(containerRef);
 
   const [mode, setMode] = useState<Mode>('input');
   const [text, setText] = useState(typeof params.prefill === 'string' ? params.prefill : '');
@@ -247,11 +295,13 @@ export default function CaptureScreen() {
 
   return (
     <Screen edges={['top', 'bottom', 'left', 'right']}>
-      {/* `padding` keeps the footer (actions / recording bar) glued to the top
-          of the keyboard — no dead zone between them. */}
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      {/* Manual keyboard tracking (see useKeyboardOverlap): bottom padding
+          equals the real keyboard overlap, so the action bar always sits
+          right on top of the keyboard on any device / presentation style. */}
+      <View
+        ref={containerRef}
+        collapsable={false}
+        style={[styles.flex, keyboardOverlap > 0 && { paddingBottom: keyboardOverlap }]}
       >
         <View style={styles.topBar}>
           <View>
@@ -359,7 +409,7 @@ export default function CaptureScreen() {
             </View>
           </>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }

@@ -30,10 +30,13 @@ struct YYProvider: TimelineProvider {
 
 /// "1,138" — comma grouping to match the app. SwiftUI's `Text("\(Int)")` would
 /// otherwise localize the number (e.g. "1 138" with a space in ru locale).
+/// The POSIX locale pins the separator regardless of device settings.
 func yyFormat(_ n: Int) -> String {
     let f = NumberFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
     f.numberStyle = .decimal
     f.groupingSeparator = ","
+    f.usesGroupingSeparator = true
     return f.string(from: NSNumber(value: n)) ?? "\(n)"
 }
 
