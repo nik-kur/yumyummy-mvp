@@ -6,8 +6,13 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from .. import prompts
+from ..config import VariantSpec
+from ..llm_schemas import PARSE_SCHEMA
 from ..providers import fdc
-from ..schemas import Item, ParsedItem, Totals
+from ..providers.base import extract_json
+from ..providers.dispatch import call_llm, stage_usage
+from ..schemas import Item, ParsedItem, ParseResult, StageUsage, Totals
 
 _REDIRECT_MARKERS = ("vertexaisearch", "grounding-api-redirect")
 # Browser-like UA: retail/brand sites (av.ru, vkusvill...) answer 4xx to bot
@@ -69,7 +74,8 @@ async def resolve_redirect_urls(urls: List[str], limit: int = 3) -> List[str]:
 
 
 # User-generated / aggregator domains: never a good primary source for a
-# branded item. Ranked to the bottom; forums are effectively banned.
+# branded item. Aggregators rank last among real candidates; forums are
+# excluded entirely (rank >= 85 is filtered out in rank_candidates).
 _FORUM_DOMAINS = (
     "reddit.com", "quora.com", "otzovik.com", "irecommend.ru", "pikabu.ru",
     "vk.com", "facebook.com", "instagram.com", "tiktok.com", "x.com",
@@ -146,7 +152,7 @@ def _source_rank(url: str, official_domain: str = "") -> int:
         if len(compressed) >= 6 and compressed != core and compressed in host_flat:
             return 1
     if any(f in d for f in _FORUM_DOMAINS):
-        return 80
+        return 87
     if any(a in d for a in _AGGREGATOR_DOMAINS):
         return 40
     return 20
@@ -400,3 +406,51 @@ def single_source_url(items: List[Item]) -> Optional[str]:
     if len(urls) == 1:
         return next(iter(urls))
     return None
+
+
+async def fdc_decompose_fallback(
+    unlinked: List[Item],
+    spec: VariantSpec,
+    language: str = "ru",
+) -> Tuple[Optional[List[Item]], Optional[StageUsage], int]:
+    """
+    Last-resort source recovery: dishes that ended up with NO source link are
+    mapped to USDA generic foods — the whole dish when FDC has it, otherwise
+    its main components with assumed weights — so every line carries a
+    verifiable link.
+
+    Returns (new_items | None, llm_stage | None, fdc_hits). None items means
+    "keep the original estimate": FDC matched nothing, or the decomposed total
+    drifted >50% from the original estimate (implausible mapping).
+    """
+    if not unlinked:
+        return None, None, 0
+    dishes = "\n".join(
+        f"- {i.name} ~{(i.grams or 100):.0f} g ~{i.calories_kcal:.0f} kcal"
+        for i in unlinked
+    )
+    try:
+        resp = await call_llm(
+            spec.parse_provider,
+            spec.parse_model,
+            prompts.decompose_user_msg(dishes, language),
+            system=prompts.DECOMPOSE_SYSTEM,
+            json_schema=PARSE_SCHEMA,
+            schema_name="parse_result",
+        )
+        stage = stage_usage("fdc_decompose", spec.parse_provider, spec.parse_model, resp)
+        parsed = ParseResult.model_validate(extract_json(resp.text))
+    except Exception:
+        return None, None, 0
+    if not parsed.items:
+        return None, stage, 0
+    items, fdc_hits = await fdc_resolve_all(parsed.items)
+    if fdc_hits == 0:
+        return None, stage, 0
+    est_kcal = sum(i.calories_kcal for i in unlinked)
+    dec_kcal = sum(i.calories_kcal for i in items)
+    if est_kcal > 0 and dec_kcal > 0:
+        ratio = max(est_kcal, dec_kcal) / min(est_kcal, dec_kcal)
+        if ratio > 1.5:
+            return None, stage, 0
+    return items, stage, fdc_hits

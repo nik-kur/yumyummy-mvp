@@ -15,12 +15,14 @@ from ..providers.dispatch import call_llm, stage_usage
 from ..schemas import BrandedResult, Item, V2Result
 from .common import (
     domain_of,
+    fdc_decompose_fallback,
     format_message,
     is_redirect_url,
     macros_sane,
     probe_urls,
     rank_candidates,
     resolve_redirect_urls,
+    single_source_url,
     sum_totals,
 )
 
@@ -118,6 +120,28 @@ async def run(
         item_urls = {i.source_url for i in items if i.source_url}
         if len(item_urls) == 1:
             source_url = next(iter(item_urls))
+
+    note = branded.note or ""
+    decomposed = False
+    if items and not source_url and not any(i.source_url for i in items):
+        # Nothing verifiable online at all (no-name dish, obscure product):
+        # map to USDA generic foods so every line still carries a source.
+        dec_items, dec_stage, dec_hits = await fdc_decompose_fallback(
+            items, spec, language
+        )
+        if dec_stage is not None:
+            result.add_stage(dec_stage)
+        if dec_items:
+            items = dec_items
+            result.items = items
+            result.totals = sum_totals(items)
+            source_url = single_source_url(items)
+            confidence = "ESTIMATE"  # grams are assumed, not from a source
+            decomposed = True
+            note = (note + " " if note else "") + (
+                f"{dec_hits}/{len(items)} items matched to USDA FoodData Central."
+            )
+
     # A claimed HIGH without any provider-confirmed page is suspect: the model
     # answered from memory. Keep the URL but downgrade confidence.
     if confidence == "HIGH" and not provider_urls and resp.search_queries == 0:
@@ -137,12 +161,14 @@ async def run(
     cited_domains = sorted(
         {d for d in ([domain_of(u) for u in provider_urls] + resp.source_domains) if d}
     )
-    note = branded.note or ""
+    src_label = domain_of(source_url or "")
+    if not src_label and any(i.source_url for i in items):
+        src_label = "fdc.nal.usda.gov" if decomposed else "per-item links"
     result.message_text = format_message(
         result.totals,
         confidence,
         note=note,
-        source=domain_of(source_url or "") or "none",
+        source=src_label or "none",
     )
     result.total_duration_ms = round((time.perf_counter() - t0) * 1000, 1)
     result.cited_domains = cited_domains

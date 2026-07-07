@@ -19,10 +19,11 @@ from ..schemas import ParseResult, StageUsage, V2Result
 from . import branded as branded_pipeline
 from .common import (
     _estimate_item,
+    fdc_decompose_fallback,
+    fdc_resolve_all,
     format_message,
     single_source_url,
     sum_totals,
-    fdc_resolve_all,
 )
 
 
@@ -74,7 +75,6 @@ async def run(
         if generic_parsed:
             fdc_t0 = time.perf_counter()
             fdc_items, fdc_hits = await fdc_resolve_all(generic_parsed)
-            items.extend(fdc_items)
             result.add_stage(
                 StageUsage(
                     stage="fdc_lookup",
@@ -82,6 +82,28 @@ async def run(
                     duration_ms=round((time.perf_counter() - fdc_t0) * 1000, 1),
                 )
             )
+            # Visually-estimated composite dishes (dressed salads, stews...)
+            # get no direct USDA match: decompose into components so they
+            # still carry links. Items with printed label data stay as read.
+            pairs = list(zip(fdc_items, generic_parsed))
+            to_dec = [
+                it for it, p in pairs
+                if not it.source_url and p.nutrition_source == "estimate"
+            ]
+            kept = [
+                it for it, p in pairs
+                if it.source_url or p.nutrition_source != "estimate"
+            ]
+            if to_dec:
+                dec_items, dec_stage, dec_hits = await fdc_decompose_fallback(
+                    to_dec, spec, parsed.language
+                )
+                if dec_stage is not None:
+                    result.add_stage(dec_stage)
+                if dec_items:
+                    fdc_items = kept + dec_items
+                    fdc_hits += dec_hits
+            items.extend(fdc_items)
 
         if branded_parsed:
             if mode == "c":

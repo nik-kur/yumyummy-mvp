@@ -10,7 +10,13 @@ from ..llm_schemas import PARSE_SCHEMA
 from ..providers.base import extract_json
 from ..providers.dispatch import call_llm, stage_usage
 from ..schemas import ParseResult, StageUsage, V2Result
-from .common import format_message, single_source_url, sum_totals, fdc_resolve_all
+from .common import (
+    fdc_decompose_fallback,
+    fdc_resolve_all,
+    format_message,
+    single_source_url,
+    sum_totals,
+)
 
 
 async def run(
@@ -52,10 +58,30 @@ async def run(
         )
     )
 
+    # Composite dishes (сырники, хачапури...) have no single USDA equivalent
+    # and end up linkless — decompose them into components so each line still
+    # carries a verifiable USDA link.
+    decomposed = False
+    unlinked = [i for i in items if not i.source_url]
+    if unlinked:
+        dec_items, dec_stage, dec_hits = await fdc_decompose_fallback(
+            unlinked, spec, parsed.language
+        )
+        if dec_stage is not None:
+            result.add_stage(dec_stage)
+        if dec_items:
+            items = [i for i in items if i.source_url] + dec_items
+            fdc_hits += dec_hits
+            decomposed = True
+
     result.items = items
     result.totals = sum_totals(items)
     all_explicit = bool(parsed.items) and all(p.explicit_grams for p in parsed.items)
-    result.confidence = "HIGH" if (all_explicit and fdc_hits == len(items)) else "ESTIMATE"
+    result.confidence = (
+        "HIGH"
+        if (all_explicit and fdc_hits == len(items) and not decomposed)
+        else "ESTIMATE"
+    )
     result.source_url = single_source_url(items)
 
     note_bits = []

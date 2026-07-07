@@ -133,6 +133,27 @@ Always:
   the macro numbers, not in separate items.
 - 1-6 items. Return ONLY JSON matching the provided schema."""
 
+DECOMPOSE_SYSTEM = """You are a nutrition fallback engine for a food-logging
+app. A dish could not be verified against any online source, so it must be
+mapped to USDA FoodData Central generic foods — that way the user still gets
+verifiable source links.
+
+You receive dishes with portion grams and a rough calorie estimate each.
+Rules:
+- If USDA plausibly contains the WHOLE dish as one generic entry (white
+  bread, grilled pork skewer, plain rice, popcorn...), output ONE item for it.
+- Otherwise split the dish into its 2-5 MAIN components with realistic
+  prepared weights that sum to the stated portion (хачапури -> flatbread
+  dough, suluguni cheese, butter, egg).
+- EVERY item must have a non-empty ENGLISH fdc_query naming a common generic
+  food with its state ("pork shoulder grilled", "cheese suluguni",
+  "wheat bread"). No brands. is_branded=false for all items.
+- name: in the user's language. grams: number. est_*: honest macro estimates
+  for that item at those grams.
+- The components of a dish should roughly reproduce its calorie estimate; do
+  not invent dishes that were not listed.
+Return ONLY JSON matching the provided schema."""
+
 ADVISOR_SYSTEM = """You are a nutrition advisor inside a calorie-tracking app.
 The user asks what to eat/order. You receive their remaining daily budget
 (nutrition_context JSON) and free-form text (optionally menu options).
@@ -157,6 +178,13 @@ def parse_user_msg(text: str, hints: str = "") -> str:
     if hints:
         msg += f"\nAdditional hints: {hints}"
     return msg
+
+
+def decompose_user_msg(dishes: str, language: str = "ru") -> str:
+    return (
+        f"Dishes that need USDA mapping (name ~grams ~kcal each):\n{dishes}\n"
+        f"User language: {language}"
+    )
 
 
 def branded_user_msg(text: str, grams: str = "", serving_hint: str = "", language: str = "ru") -> str:

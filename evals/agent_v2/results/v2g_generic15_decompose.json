@@ -1,0 +1,1066 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/generic_15.csv",
+    "n": 15,
+    "concurrency": 4,
+    "photo_mode": "b",
+    "wall_clock_s": 36.8,
+    "ts": "2026-07-07 17:17:22"
+  },
+  "summary": {
+    "n": 15,
+    "ok": 15,
+    "errors": 0,
+    "latency_s": {
+      "mean": 7.07,
+      "median": 3.54,
+      "p90": 16.4,
+      "max": 22.78
+    },
+    "cost_usd": {
+      "mean": 0.00192,
+      "total": 0.0287
+    },
+    "domain_hit_rate": 0.917,
+    "domain_scored_n": 12,
+    "kcal_ok_rate": 0.933,
+    "kcal_scored_n": 15,
+    "kcal_err_pct_median": 8.7,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 11
+    },
+    "confidence_dist": {
+      "ESTIMATE": 7,
+      "HIGH": 8
+    },
+    "mean_search_queries": 0
+  },
+  "cases": [
+    {
+      "case_id": "gen_01",
+      "agent_type": "log_meal",
+      "input": "2 яйца вкрутую",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3533.5,
+      "cost_usd": 0.000658,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 155.0,
+        "protein_g": 12.6,
+        "fat_g": 10.6,
+        "carbs_g": 1.1
+      },
+      "items": [
+        {
+          "name": "яйца вкрутую",
+          "grams": 100.0,
+          "calories_kcal": 155.0,
+          "protein_g": 12.6,
+          "fat_g": 10.6,
+          "carbs_g": 1.1,
+          "source_url": "https://fdc.nal.usda.gov/food-details/173424/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/173424/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 155 kcal • P 12.6g • F 10.6g • C 1.1g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. 2 standard hard-boiled eggs (~50g each)",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 638,
+          "output_tokens": 113,
+          "search_queries": 0,
+          "duration_ms": 2057.2,
+          "cost_usd": 0.000658
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1437.6,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_02",
+      "agent_type": "log_meal",
+      "input": "овсянка на воде из 60 г сухой овсянки",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5279.2,
+      "cost_usd": 0.000659,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 147.6,
+        "protein_g": 10.4,
+        "fat_g": 4.2,
+        "carbs_g": 39.7
+      },
+      "items": [
+        {
+          "name": "овсянка",
+          "grams": 60.0,
+          "calories_kcal": 147.6,
+          "protein_g": 10.4,
+          "fat_g": 4.2,
+          "carbs_g": 39.7,
+          "source_url": "https://fdc.nal.usda.gov/food-details/168872/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/168872/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 148 kcal • P 10.4g • F 4.2g • C 39.7g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. User specified 60g of dry oats.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 647,
+          "output_tokens": 112,
+          "search_queries": 0,
+          "duration_ms": 3923.3,
+          "cost_usd": 0.000659
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1350.6,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": false,
+        "kcal_err_pct": 36.7,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_03",
+      "agent_type": "log_meal",
+      "input": "гречка отварная 200 г",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3470.3,
+      "cost_usd": 0.000651,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 184.0,
+        "protein_g": 6.8,
+        "fat_g": 1.2,
+        "carbs_g": 39.8
+      },
+      "items": [
+        {
+          "name": "гречка отварная",
+          "grams": 200.0,
+          "calories_kcal": 184.0,
+          "protein_g": 6.8,
+          "fat_g": 1.2,
+          "carbs_g": 39.8,
+          "source_url": "https://fdc.nal.usda.gov/food-details/170686/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/170686/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 184 kcal • P 6.8g • F 1.2g • C 39.8g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. 200 grams of cooked buckwheat.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 642,
+          "output_tokens": 110,
+          "search_queries": 0,
+          "duration_ms": 1965.4,
+          "cost_usd": 0.000651
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1499.2,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_04",
+      "agent_type": "log_meal",
+      "input": "куриная грудка гриль 150 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6971.1,
+      "cost_usd": 0.00064,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 226.5,
+        "protein_g": 45.8,
+        "fat_g": 4.8,
+        "carbs_g": 0.0
+      },
+      "items": [
+        {
+          "name": "куриная грудка гриль",
+          "grams": 150.0,
+          "calories_kcal": 226.5,
+          "protein_g": 45.8,
+          "fat_g": 4.8,
+          "carbs_g": 0.0,
+          "source_url": "https://fdc.nal.usda.gov/food-details/171534/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/171534/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 226 kcal • P 45.8g • F 4.8g • C 0.0g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 644,
+          "output_tokens": 106,
+          "search_queries": 0,
+          "duration_ms": 5341.7,
+          "cost_usd": 0.00064
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1623.3,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 8.7,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_05",
+      "agent_type": "log_meal",
+      "input": "1 средний банан",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3326.7,
+      "cost_usd": 0.000657,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 105.0,
+        "protein_g": 1.3,
+        "fat_g": 0.4,
+        "carbs_g": 26.9
+      },
+      "items": [
+        {
+          "name": "1 средний банан",
+          "grams": 118.0,
+          "calories_kcal": 105.0,
+          "protein_g": 1.3,
+          "fat_g": 0.4,
+          "carbs_g": 26.9,
+          "source_url": "https://fdc.nal.usda.gov/food-details/173944/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/173944/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 105 kcal • P 1.3g • F 0.4g • C 26.9g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. One medium banana is approximately 118g.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 637,
+          "output_tokens": 113,
+          "search_queries": 0,
+          "duration_ms": 1866.6,
+          "cost_usd": 0.000657
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1454.4,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_06",
+      "agent_type": "log_meal",
+      "input": "рис отварной 250 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3327.1,
+      "cost_usd": 0.000654,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 270.0,
+        "protein_g": 4.5,
+        "fat_g": 0.5,
+        "carbs_g": 60.0
+      },
+      "items": [
+        {
+          "name": "рис отварной",
+          "grams": 250.0,
+          "calories_kcal": 270.0,
+          "protein_g": 4.5,
+          "fat_g": 0.5,
+          "carbs_g": 60.0,
+          "source_url": "https://fdc.nal.usda.gov/food-details/168914/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/168914/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 270 kcal • P 4.5g • F 0.5g • C 60.0g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. User provided explicit weight for cooked rice.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 641,
+          "output_tokens": 111,
+          "search_queries": 0,
+          "duration_ms": 1847.2,
+          "cost_usd": 0.000654
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1474.1,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 16.9,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_07",
+      "agent_type": "log_meal",
+      "input": "греческий йогурт 170 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3354.8,
+      "cost_usd": 0.000651,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 124.1,
+        "protein_g": 16.9,
+        "fat_g": 3.3,
+        "carbs_g": 6.7
+      },
+      "items": [
+        {
+          "name": "греческий йогурт",
+          "grams": 170.0,
+          "calories_kcal": 124.1,
+          "protein_g": 16.9,
+          "fat_g": 3.3,
+          "carbs_g": 6.7,
+          "source_url": "https://fdc.nal.usda.gov/food-details/170903/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/170903/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 124 kcal • P 16.9g • F 3.3g • C 6.7g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. 170 grams of greek yogurt",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 642,
+          "output_tokens": 110,
+          "search_queries": 0,
+          "duration_ms": 1778.5,
+          "cost_usd": 0.000651
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1570.7,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 24.8,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_08",
+      "agent_type": "log_meal",
+      "input": "1 среднее яблоко",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3074.2,
+      "cost_usd": 0.000646,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 87.4,
+        "protein_g": 0.5,
+        "fat_g": 0.2,
+        "carbs_g": 23.3
+      },
+      "items": [
+        {
+          "name": "яблоко",
+          "grams": 182.0,
+          "calories_kcal": 87.4,
+          "protein_g": 0.5,
+          "fat_g": 0.2,
+          "carbs_g": 23.3,
+          "source_url": "https://fdc.nal.usda.gov/food-details/171689/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/171689/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 87 kcal • P 0.5g • F 0.2g • C 23.3g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. 1 medium apple is roughly 182 grams.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 638,
+          "output_tokens": 109,
+          "search_queries": 0,
+          "duration_ms": 1646.7,
+          "cost_usd": 0.000646
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1421.1,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 8.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_09",
+      "agent_type": "log_meal",
+      "input": "лосось запечённый 120 г",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 9302.1,
+      "cost_usd": 0.00278,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 250.0,
+        "protein_g": 26.0,
+        "fat_g": 15.0,
+        "carbs_g": 0.0
+      },
+      "items": [
+        {
+          "name": "лосось запечённый",
+          "grams": 120.0,
+          "calories_kcal": 250.0,
+          "protein_g": 26.0,
+          "fat_g": 15.0,
+          "carbs_g": 0.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 250 kcal • P 26.0g • F 15.0g • C 0.0g\nConfidence: ESTIMATE\nSource: none\nNote: Parsed 120g of baked salmon.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 643,
+          "output_tokens": 110,
+          "search_queries": 0,
+          "duration_ms": 1743.2,
+          "cost_usd": 0.000651
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1410.3,
+          "cost_usd": 0
+        },
+        {
+          "stage": "fdc_decompose",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 310,
+          "output_tokens": 658,
+          "search_queries": 0,
+          "duration_ms": 4392.3,
+          "cost_usd": 0.002129
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.2,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_10",
+      "agent_type": "log_meal",
+      "input": "картофель отварной 300 г",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 16403.4,
+      "cost_usd": 0.000657,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 228.0,
+        "protein_g": 4.1,
+        "fat_g": 0.4,
+        "carbs_g": 53.1
+      },
+      "items": [
+        {
+          "name": "картофель отварной",
+          "grams": 300.0,
+          "calories_kcal": 228.0,
+          "protein_g": 4.1,
+          "fat_g": 0.4,
+          "carbs_g": 53.1,
+          "source_url": "https://fdc.nal.usda.gov/food-details/168484/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/168484/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 228 kcal • P 4.1g • F 0.4g • C 53.1g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. 300 grams of boiled potato",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 643,
+          "output_tokens": 112,
+          "search_queries": 0,
+          "duration_ms": 14906.6,
+          "cost_usd": 0.000657
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1491.1,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 12.6,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_11",
+      "agent_type": "log_meal",
+      "input": "салат из огурцов и помидоров с 1 ст.л. оливкового масла",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 12102.5,
+      "cost_usd": 0.004702,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 168.8,
+        "protein_g": 1.8,
+        "fat_g": 14.5,
+        "carbs_g": 8.5
+      },
+      "items": [
+        {
+          "name": "салат из огурцов и помидоров",
+          "grams": 250.0,
+          "calories_kcal": 45.0,
+          "protein_g": 1.8,
+          "fat_g": 0.5,
+          "carbs_g": 8.5,
+          "source_url": null
+        },
+        {
+          "name": "оливковое масло",
+          "grams": 14.0,
+          "calories_kcal": 123.8,
+          "protein_g": 0.0,
+          "fat_g": 14.0,
+          "carbs_g": 0.0,
+          "source_url": "https://fdc.nal.usda.gov/food-details/167737/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/167737/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 169 kcal • P 1.8g • F 14.5g • C 8.5g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 1/2 items matched to USDA FoodData Central. Estimated salad weight at 250g; 1 tbsp olive oil is 14g.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 652,
+          "output_tokens": 208,
+          "search_queries": 0,
+          "duration_ms": 2078.1,
+          "cost_usd": 0.00095
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1475.7,
+          "cost_usd": 0
+        },
+        {
+          "stage": "fdc_decompose",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 311,
+          "output_tokens": 1199,
+          "search_queries": 0,
+          "duration_ms": 7011.4,
+          "cost_usd": 0.003752
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 4.8,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "gen_12",
+      "agent_type": "log_meal",
+      "input": "макароны отварные 200 г с 10 г сливочного масла",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3464.4,
+      "cost_usd": 0.000888,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 404.0,
+        "protein_g": 11.6,
+        "fat_g": 11.9,
+        "carbs_g": 61.2
+      },
+      "items": [
+        {
+          "name": "макароны отварные",
+          "grams": 200.0,
+          "calories_kcal": 314.0,
+          "protein_g": 11.6,
+          "fat_g": 1.9,
+          "carbs_g": 61.2,
+          "source_url": "https://fdc.nal.usda.gov/food-details/169751/nutrients"
+        },
+        {
+          "name": "сливочное масло",
+          "grams": 10.0,
+          "calories_kcal": 90.0,
+          "protein_g": 0.0,
+          "fat_g": 10.0,
+          "carbs_g": 0.0,
+          "source_url": "https://fdc.nal.usda.gov/food-details/171314/nutrients"
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 404 kcal • P 11.6g • F 11.9g • C 61.2g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 2/2 items matched to USDA FoodData Central.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 653,
+          "output_tokens": 187,
+          "search_queries": 0,
+          "duration_ms": 1906.5,
+          "cost_usd": 0.000888
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1551.7,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 4.1,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_13",
+      "agent_type": "log_meal",
+      "input": "борщ 300 мл",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 22781.4,
+      "cost_usd": 0.012236,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 210.0,
+        "protein_g": 15.3,
+        "fat_g": 8.1,
+        "carbs_g": 18.9
+      },
+      "items": [
+        {
+          "name": "Борщ (овощная основа)",
+          "grams": 260.0,
+          "calories_kcal": 158.6,
+          "protein_g": 7.6,
+          "fat_g": 6.0,
+          "carbs_g": 18.2,
+          "source_url": "https://fdc.nal.usda.gov/food-details/171149/nutrients"
+        },
+        {
+          "name": "Говядина отварная",
+          "grams": 30.0,
+          "calories_kcal": 37.8,
+          "protein_g": 7.3,
+          "fat_g": 1.0,
+          "carbs_g": 0.0,
+          "source_url": "https://fdc.nal.usda.gov/food-details/174730/nutrients"
+        },
+        {
+          "name": "Сметана",
+          "grams": 10.0,
+          "calories_kcal": 13.6,
+          "protein_g": 0.4,
+          "fat_g": 1.1,
+          "carbs_g": 0.7,
+          "source_url": "https://fdc.nal.usda.gov/food-details/173443/nutrients"
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 210 kcal • P 15.3g • F 8.1g • C 18.9g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 3/3 items matched to USDA FoodData Central. 300 ml estimated as 300g for density",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 639,
+          "output_tokens": 106,
+          "search_queries": 0,
+          "duration_ms": 1952.9,
+          "cost_usd": 0.000638
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.3,
+          "cost_usd": 0
+        },
+        {
+          "stage": "fdc_decompose",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 305,
+          "output_tokens": 3815,
+          "search_queries": 0,
+          "duration_ms": 19163.5,
+          "cost_usd": 0.011598
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 31.2,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_14",
+      "agent_type": "log_meal",
+      "input": "3 сырника",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6180.1,
+      "cost_usd": 0.001563,
+      "confidence": "ESTIMATE",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 477.0,
+        "protein_g": 13.9,
+        "fat_g": 34.0,
+        "carbs_g": 31.7
+      },
+      "items": [
+        {
+          "name": "сырники (творог)",
+          "grams": 140.0,
+          "calories_kcal": 291.2,
+          "protein_g": 11.0,
+          "fat_g": 23.4,
+          "carbs_g": 9.4,
+          "source_url": "https://fdc.nal.usda.gov/food-details/169079/nutrients"
+        },
+        {
+          "name": "сырники (мука и сахар)",
+          "grams": 30.0,
+          "calories_kcal": 99.6,
+          "protein_g": 2.9,
+          "fat_g": 0.6,
+          "carbs_g": 22.3,
+          "source_url": "https://fdc.nal.usda.gov/food-details/168944/nutrients"
+        },
+        {
+          "name": "сырники (масло для жарки)",
+          "grams": 10.0,
+          "calories_kcal": 86.2,
+          "protein_g": 0.0,
+          "fat_g": 10.0,
+          "carbs_g": 0.0,
+          "source_url": "https://fdc.nal.usda.gov/food-details/171422/nutrients"
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 477 kcal • P 13.9g • F 34.0g • C 31.7g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: 3/3 items matched to USDA FoodData Central. Estimated 3 syrniki at 60g each.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 636,
+          "output_tokens": 108,
+          "search_queries": 0,
+          "duration_ms": 1907.5,
+          "cost_usd": 0.000642
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.1,
+          "cost_usd": 0
+        },
+        {
+          "stage": "fdc_decompose",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 306,
+          "output_tokens": 256,
+          "search_queries": 0,
+          "duration_ms": 2676.4,
+          "cost_usd": 0.000921
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 25.5,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "gen_15",
+      "agent_type": "log_meal",
+      "input": "стакан кефира 250 мл 2.5%",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3540.5,
+      "cost_usd": 0.000701,
+      "confidence": "HIGH",
+      "intent": "log_meal",
+      "totals": {
+        "calories_kcal": 107.5,
+        "protein_g": 9.5,
+        "fat_g": 2.5,
+        "carbs_g": 11.9
+      },
+      "items": [
+        {
+          "name": "кефир 2.5%",
+          "grams": 250.0,
+          "calories_kcal": 107.5,
+          "protein_g": 9.5,
+          "fat_g": 2.5,
+          "carbs_g": 11.9,
+          "source_url": "https://fdc.nal.usda.gov/food-details/170904/nutrients"
+        }
+      ],
+      "source_url": "https://fdc.nal.usda.gov/food-details/170904/nutrients",
+      "cited_domains": [],
+      "message_text": "Total: 108 kcal • P 9.5g • F 2.5g • C 11.9g\nConfidence: HIGH\nSource: fdc.nal.usda.gov\nNote: 1/1 items matched to USDA FoodData Central. Стакан кефира 250 мл жирностью 2.5%.",
+      "stages": [
+        {
+          "stage": "parse",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 647,
+          "output_tokens": 126,
+          "search_queries": 0,
+          "duration_ms": 2009.2,
+          "cost_usd": 0.000701
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1525.5,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 14.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}
