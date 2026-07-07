@@ -33,6 +33,16 @@ MEAL_INTENTS = ["log_meal", "product", "eatout", "barcode", "photo_meal", "nutri
 _ITEM_KEYS = ("name", "grams", "calories_kcal", "protein_g", "fat_g", "carbs_g", "source_url")
 
 
+def _serialize_assessment(assessment: Any) -> Optional[str]:
+    """JSON-encode the agent's provenance blob (None when absent/malformed)."""
+    if not isinstance(assessment, dict) or not assessment.get("method"):
+        return None
+    try:
+        return json.dumps(assessment, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return None
+
+
 def _serialize_items(items: List[Dict[str, Any]]) -> Optional[str]:
     """JSON-encode the per-ingredient breakdown for storage (None if empty)."""
     clean: List[Dict[str, Any]] = []
@@ -177,6 +187,7 @@ def persist_agent_result_for_user(db: Session, user: User, agent_result: Dict[st
             accuracy_level=accuracy_level,
             items_json=_serialize_items(items),
             source_url=agent_result.get("source_url"),
+            assessment_json=_serialize_assessment(agent_result.get("assessment")),
         )
 
         # Update day aggregates

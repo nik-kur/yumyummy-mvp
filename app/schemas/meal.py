@@ -35,6 +35,15 @@ class MealItemRead(BaseModel):
     source_url: Optional[str] = None
 
 
+class MealAssessmentRead(BaseModel):
+    """HOW the agent obtained the numbers (additive, 25(1)+)."""
+    method: str = "estimate"
+    domain: Optional[str] = None
+    portion_estimated: bool = False
+    verified_items: int = 0
+    total_items: int = 0
+
+
 class MealRead(BaseModel):
     id: int
     eaten_at: datetime
@@ -46,6 +55,7 @@ class MealRead(BaseModel):
     accuracy_level: Optional[str] = None
     source_url: Optional[str] = None
     items: List[MealItemRead] = []
+    assessment: Optional[MealAssessmentRead] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -12,11 +12,12 @@ from ..config import VariantSpec
 from ..llm_schemas import BRANDED_SCHEMA
 from ..providers.base import LLMResponse, extract_json
 from ..providers.dispatch import call_llm, stage_usage
-from ..schemas import BrandedResult, Item, V2Result
+from ..schemas import Assessment, BrandedResult, Item, V2Result
 from .common import (
     domain_of,
     fdc_decompose_fallback,
     format_message,
+    is_official_source,
     is_redirect_url,
     macros_sane,
     probe_urls,
@@ -156,6 +157,25 @@ async def run(
 
     result.confidence = confidence
     result.source_url = source_url
+
+    verified = sum(1 for i in items if i.source_url)
+    if decomposed:
+        method, dom = "usda_components", "fdc.nal.usda.gov"
+    elif source_url and is_official_source(source_url, official):
+        method, dom = "official", domain_of(source_url)
+    elif source_url or verified:
+        method, dom = "web", domain_of(source_url or "") or None
+    else:
+        method, dom = "estimate", None
+    result.assessment = Assessment(
+        method=method,
+        domain=dom,
+        # Grams from a text request come from the model unless the user stated
+        # them; decomposition always assumes component weights.
+        portion_estimated=decomposed,
+        verified_items=verified,
+        total_items=len(items),
+    )
 
     # Expose provider-verified domains for eval scoring (grounding metadata).
     cited_domains = sorted(

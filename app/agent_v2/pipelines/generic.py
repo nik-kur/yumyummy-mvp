@@ -9,7 +9,7 @@ from ..config import VariantSpec
 from ..llm_schemas import PARSE_SCHEMA
 from ..providers.base import extract_json
 from ..providers.dispatch import call_llm, stage_usage
-from ..schemas import ParseResult, StageUsage, V2Result
+from ..schemas import Assessment, ParseResult, StageUsage, V2Result
 from .common import (
     fdc_decompose_fallback,
     fdc_resolve_all,
@@ -83,6 +83,15 @@ async def run(
         else "ESTIMATE"
     )
     result.source_url = single_source_url(items)
+
+    verified = sum(1 for i in items if i.source_url)
+    result.assessment = Assessment(
+        method=("usda_components" if decomposed else "usda") if fdc_hits else "estimate",
+        domain="fdc.nal.usda.gov" if fdc_hits else None,
+        portion_estimated=not all_explicit,
+        verified_items=verified,
+        total_items=len(items),
+    )
 
     note_bits = []
     if fdc_hits:

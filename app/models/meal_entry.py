@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     Column,
@@ -43,8 +43,11 @@ class MealEntry(Base):
     #   items_json: JSON list of {name, grams, calories_kcal, protein_g, fat_g,
     #               carbs_g, source_url}
     #   source_url: primary source the macros were checked against
+    #   assessment_json: {method, domain, portion_estimated, verified_items,
+    #               total_items} — HOW the numbers were obtained (25(1)+)
     items_json = Column(Text, nullable=True)
     source_url = Column(String, nullable=True)
+    assessment_json = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="meals")
     user_day = relationship("UserDay", back_populates="meals")
@@ -60,3 +63,15 @@ class MealEntry(Base):
         except (ValueError, TypeError):
             logger.warning("[MealEntry] bad items_json on meal id=%s", self.id)
             return []
+
+    @property
+    def assessment(self) -> Optional[Dict[str, Any]]:
+        """Parsed assessment provenance (None when absent/legacy/corrupt)."""
+        if not self.assessment_json:
+            return None
+        try:
+            data = json.loads(self.assessment_json)
+            return data if isinstance(data, dict) else None
+        except (ValueError, TypeError):
+            logger.warning("[MealEntry] bad assessment_json on meal id=%s", self.id)
+            return None

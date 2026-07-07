@@ -11,7 +11,7 @@ from typing import Optional
 from app.external.openfoodfacts_client import fetch_product_by_barcode
 
 from ..config import VariantSpec
-from ..schemas import Item, StageUsage, V2Result
+from ..schemas import Assessment, Item, StageUsage, V2Result
 from . import branded as branded_pipeline
 from .common import format_message, sum_totals
 
@@ -80,6 +80,7 @@ async def run(
             serving = float(sq) if sq else 0.0
         except (TypeError, ValueError):
             serving = 0.0
+    serving_assumed = serving <= 0
     if serving <= 0:
         serving = 100.0
 
@@ -102,6 +103,13 @@ async def run(
     result.totals = sum_totals(result.items)
     result.confidence = "HIGH"
     result.source_url = url
+    result.assessment = Assessment(
+        method="off",
+        domain="openfoodfacts.org",
+        portion_estimated=serving_assumed,
+        verified_items=1,
+        total_items=1,
+    )
     result.message_text = format_message(
         result.totals,
         "HIGH",

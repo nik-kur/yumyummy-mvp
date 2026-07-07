@@ -54,6 +54,26 @@ class StageUsage(BaseModel):
     cost_usd: float = 0
 
 
+class Assessment(BaseModel):
+    """HOW the numbers were obtained — machine-readable, additive on the wire
+    (25(1)+). The mobile app renders a localized human sentence from `method`.
+
+    Methods: label (read off a label/menu in the photo), off (barcode DB),
+    official (brand's official site), web (other live verified page),
+    usda (matched to USDA FDC), usda_components (dish decomposed into USDA
+    components), photo (visual ID, per-item sources vary), estimate (pure AI
+    guess, nothing verifiable).
+    """
+    method: str = "estimate"
+    # Domain the main source lives on (vkusvill.ru, fdc.nal.usda.gov, ...).
+    domain: Optional[str] = None
+    # True when the portion size was assumed/eyeballed rather than stated.
+    portion_estimated: bool = False
+    # How many breakdown lines carry a verifiable source, out of how many.
+    verified_items: int = 0
+    total_items: int = 0
+
+
 class V2Result(BaseModel):
     intent: str
     message_text: str = ""
@@ -61,6 +81,8 @@ class V2Result(BaseModel):
     totals: Totals = Field(default_factory=Totals)
     items: List[Item] = Field(default_factory=list)
     source_url: Optional[str] = None
+    # Additive (25(1)+): how the numbers were obtained. Survives to the wire.
+    assessment: Optional[Assessment] = None
 
     # v2 extras (not part of the v1 wire format)
     variant: str = ""
@@ -76,7 +98,7 @@ class V2Result(BaseModel):
         self.total_cost_usd = round(self.total_cost_usd + stage.cost_usd, 6)
 
     def to_v1_dict(self) -> dict:
-        """The exact WorkflowRunResponse-compatible payload."""
+        """The exact WorkflowRunResponse-compatible payload (+ additive fields)."""
         return {
             "intent": self.intent,
             "message_text": self.message_text,
@@ -84,6 +106,7 @@ class V2Result(BaseModel):
             "totals": self.totals.model_dump(),
             "items": [i.model_dump() for i in self.items],
             "source_url": self.source_url,
+            "assessment": self.assessment.model_dump() if self.assessment else None,
         }
 
 

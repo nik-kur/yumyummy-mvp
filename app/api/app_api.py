@@ -448,6 +448,7 @@ def repeat_meal(
         accuracy_level=src.accuracy_level,
         items_json=src.items_json,
         source_url=src.source_url,
+        assessment_json=src.assessment_json,
     )
     user_day.total_calories = (user_day.total_calories or 0) + (src.calories or 0)
     user_day.total_protein_g = (user_day.total_protein_g or 0) + (src.protein_g or 0)
@@ -812,6 +813,7 @@ async def app_agent_run(
                 user_text=payload.text,
                 telegram_id=workflow_id,
                 image_url=payload.image_url,
+                image_urls=payload.image_urls,
                 force_intent=payload.force_intent,
                 nutrition_context=nutrition_context,
                 variant=settings.agent_v2_variant,
@@ -828,10 +830,14 @@ async def app_agent_run(
 
     try:
         if result is None:
+            # v1 workflow is single-photo only: fall back to the first image.
+            first_image = payload.image_url or (
+                payload.image_urls[0] if payload.image_urls else None
+            )
             result = await run_yumyummy_workflow(
                 user_text=payload.text,
                 telegram_id=workflow_id,
-                image_url=payload.image_url,
+                image_url=first_image,
                 force_intent=payload.force_intent,
                 nutrition_context=payload.nutrition_context,
             )

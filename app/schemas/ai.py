@@ -63,6 +63,8 @@ class WorkflowRunRequest(BaseModel):
     telegram_id: str
     text: str
     image_url: Optional[str] = None
+    # Additive (25(1)+): multi-photo meals. image_url stays for old callers.
+    image_urls: Optional[List[str]] = None
     force_intent: Optional[str] = None
     nutrition_context: Optional[str] = None
 
@@ -86,6 +88,16 @@ class WorkflowItem(BaseModel):
     source_url: Optional[str] = None
 
 
+class WorkflowAssessment(BaseModel):
+    """HOW the numbers were obtained (additive, 25(1)+). The app renders a
+    localized human sentence from `method`; old clients ignore the field."""
+    method: str = "estimate"   # label|off|official|web|usda|usda_components|photo|estimate
+    domain: Optional[str] = None
+    portion_estimated: bool = False
+    verified_items: int = 0
+    total_items: int = 0
+
+
 class WorkflowRunResponse(BaseModel):
     """Ответ workflow."""
     intent: str
@@ -94,6 +106,8 @@ class WorkflowRunResponse(BaseModel):
     totals: WorkflowTotals
     items: List[WorkflowItem]
     source_url: Optional[str] = None
+    # Additive (25(1)+): present only when the v2 engine served the request.
+    assessment: Optional[WorkflowAssessment] = None
 
 
 # Context API schemas for agent tools

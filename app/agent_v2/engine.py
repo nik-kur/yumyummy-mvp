@@ -9,12 +9,13 @@ Two entry modes:
   the router for free text (its `intent` field decides generic vs branded;
   the parsed items are reused so generic costs no extra call).
 """
+import asyncio
 import base64
 import re
 import time
 import traceback
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import httpx
 
@@ -73,12 +74,49 @@ async def _load_image(image_path: Optional[str], image_url: Optional[str]) -> Op
     return None
 
 
+# Multi-photo cap: bounds vision cost/latency per request (25(1) sends <= 4).
+MAX_IMAGES = 5
+
+
+async def _load_all_images(
+    image_path: Optional[str],
+    image_url: Optional[str],
+    image_urls: Optional[List[str]],
+) -> List[bytes]:
+    """All request images, de-duplicated, capped at MAX_IMAGES.
+
+    `image_url` (the legacy single field) counts first so old clients keep the
+    exact same behaviour; `image_urls` is the additive 25(1)+ field.
+    """
+    urls: List[str] = []
+    for u in [image_url] + list(image_urls or []):
+        if u and u not in urls:
+            urls.append(u)
+    urls = urls[:MAX_IMAGES]
+
+    loaded: List[bytes] = []
+    if image_path:
+        loaded.append(Path(image_path).read_bytes())
+    if urls:
+        results = await asyncio.gather(
+            *(_load_image(None, u) for u in urls), return_exceptions=True
+        )
+        for r in results:
+            if isinstance(r, bytes):
+                loaded.append(r)
+        # Every URL failing to download is a real error, not "no photo".
+        if not loaded:
+            raise RuntimeError("failed to download any of the request images")
+    return loaded[:MAX_IMAGES]
+
+
 async def _run_auto(
     text: str,
     spec: VariantSpec,
     *,
     image_path: Optional[str],
     image_url: Optional[str],
+    image_urls: Optional[List[str]],
     grams: str,
     serving_hint: str,
     language: str,
@@ -91,12 +129,13 @@ async def _run_auto(
         res.total_duration_ms = round((time.perf_counter() - t0) * 1000, 1)
         return res
 
-    # 2) Photo: vision call; mode "c" escalates clearly-branded packaged items
-    #    to a grounded web lookup (v1 router's photo/product split, in-pipeline).
-    image_bytes = await _load_image(image_path, image_url)
-    if image_bytes is not None:
-        res = await photo.run(
-            image_bytes, spec, caption=text, grams=grams, serving_hint=serving_hint, mode="c"
+    # 2) Photo(s): vision call per image; mode "c" escalates clearly-branded
+    #    packaged items to a grounded web lookup (v1 router's photo/product
+    #    split, in-pipeline).
+    images = await _load_all_images(image_path, image_url, image_urls)
+    if images:
+        res = await photo.run_multi(
+            images, spec, caption=text, grams=grams, serving_hint=serving_hint, mode="c"
         )
         res.total_duration_ms = round((time.perf_counter() - t0) * 1000, 1)
         return res
@@ -146,6 +185,7 @@ async def run(
     variant: str = "v2g",
     image_path: Optional[str] = None,
     image_url: Optional[str] = None,
+    image_urls: Optional[List[str]] = None,
     grams: str = "",
     serving_hint: str = "",
     language: str = "ru",
@@ -160,6 +200,7 @@ async def run(
                 spec,
                 image_path=image_path,
                 image_url=image_url,
+                image_urls=image_urls,
                 grams=grams,
                 serving_hint=serving_hint,
                 language=language,
@@ -181,11 +222,11 @@ async def run(
             )
 
         if intent == "photo_meal":
-            image_bytes = await _load_image(image_path, image_url)
-            if image_bytes is None:
-                raise ValueError("photo_meal requires image_path or image_url")
-            return await photo.run(
-                image_bytes,
+            images = await _load_all_images(image_path, image_url, image_urls)
+            if not images:
+                raise ValueError("photo_meal requires image_path or image_url(s)")
+            return await photo.run_multi(
+                images,
                 spec,
                 caption=text,
                 grams=grams,

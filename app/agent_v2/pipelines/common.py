@@ -305,6 +305,11 @@ def rank_candidates(
     return out
 
 
+def is_official_source(url: str, official_domain: str) -> bool:
+    """True when `url` lives on the brand's own domain (incl. regional TLDs)."""
+    return bool(url) and _source_rank(url, official_domain) <= 1
+
+
 def sum_totals(items: List[Item]) -> Totals:
     return Totals(
         calories_kcal=round(sum(i.calories_kcal for i in items), 1),

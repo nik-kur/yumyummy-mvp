@@ -9,7 +9,7 @@ feature flag without the client noticing any shape difference.
 - returns the WorkflowRunResponse dict + "_usage" in the v1 billing shape.
 """
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from . import engine
 from .schemas import V2Result
@@ -72,6 +72,7 @@ async def run_v2_workflow(
     user_text: str,
     telegram_id: Optional[str] = None,
     image_url: Optional[str] = None,
+    image_urls: Optional[List[str]] = None,
     force_intent: Optional[str] = None,
     nutrition_context: Optional[str] = None,
     variant: Optional[str] = None,
@@ -86,6 +87,7 @@ async def run_v2_workflow(
         user_text or "",
         variant=variant,
         image_url=image_url,
+        image_urls=image_urls,
         nutrition_context=nutrition_context or "",
     )
     if res.error:

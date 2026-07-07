@@ -464,6 +464,108 @@ def test_agent_run_accuracy_from_confidence_and_source(monkeypatch):
     assert m2[0]["accuracy_level"] == "ESTIMATE"
 
 
+def test_agent_run_stores_assessment_and_detail_returns_it(monkeypatch):
+    """The additive `assessment` blob (HOW the numbers were obtained) survives
+    the whole path: agent response -> persisted meal -> detail endpoint."""
+    _, token = _make_account_token(provider_id="asm@example.com", email="asm@example.com")
+
+    async def fake_workflow(**kwargs):
+        return {
+            "intent": "photo_meal",
+            "message_text": "ok",
+            "confidence": "HIGH",
+            "totals": {"calories_kcal": 320, "protein_g": 20, "fat_g": 10, "carbs_g": 35},
+            "items": [{"name": "Творог с ягодами", "grams": 200, "calories_kcal": 320,
+                       "protein_g": 20, "fat_g": 10, "carbs_g": 35, "source_url": None}],
+            "source_url": None,
+            "assessment": {"method": "label", "domain": None,
+                           "portion_estimated": False, "verified_items": 1, "total_items": 1},
+        }
+
+    monkeypatch.setattr(app_api_module, "run_yumyummy_workflow", fake_workflow)
+
+    r = client.post("/app/agent/run", headers=_auth(token), json={"text": "(photo)"})
+    assert r.status_code == 200, r.text
+    # Additive field comes back on the agent response itself...
+    assert r.json()["assessment"]["method"] == "label"
+
+    # ...and on the persisted meal via list/detail.
+    meals = client.get("/app/meals/recent", headers=_auth(token)).json()
+    assert meals[0]["assessment"]["method"] == "label"
+    assert meals[0]["assessment"]["verified_items"] == 1
+    detail = client.get(f"/app/meals/{meals[0]['id']}", headers=_auth(token)).json()
+    assert detail["assessment"]["method"] == "label"
+
+    # Repeat copies provenance verbatim.
+    rep = client.post(f"/app/meals/{meals[0]['id']}/repeat", headers=_auth(token)).json()
+    assert rep["assessment"]["method"] == "label"
+
+    # Old-shape results (no assessment key) still validate and store None.
+    async def old_workflow(**kwargs):
+        return {
+            "intent": "log_meal", "message_text": "ok", "confidence": "ESTIMATE",
+            "totals": {"calories_kcal": 100, "protein_g": 1, "fat_g": 1, "carbs_g": 20},
+            "items": [], "source_url": None,
+        }
+    monkeypatch.setattr(app_api_module, "run_yumyummy_workflow", old_workflow)
+    r = client.post("/app/agent/run", headers=_auth(token), json={"text": "яблоко"})
+    assert r.status_code == 200, r.text
+    assert r.json()["assessment"] is None
+
+
+def test_photo_run_multi_merges_items_confidence_and_assessment(monkeypatch):
+    """Multi-photo: per-photo results merge into one meal — items concat,
+    totals sum, confidence is HIGH only when every photo is HIGH, assessment
+    aggregates verified/total counters."""
+    import asyncio
+
+    from app.agent_v2.config import VARIANTS
+    from app.agent_v2.pipelines import photo as photo_pipeline
+    from app.agent_v2.schemas import Assessment, Item, Totals, V2Result
+
+    def _sub(name, kcal, confidence, method, verified):
+        r = V2Result(intent="photo_meal", variant="v2g")
+        r.items = [Item(name=name, grams=100, calories_kcal=kcal)]
+        r.totals = Totals(calories_kcal=kcal)
+        r.confidence = confidence
+        r.assessment = Assessment(
+            method=method, portion_estimated=(method != "label"),
+            verified_items=verified, total_items=1,
+        )
+        return r
+
+    subs = [
+        _sub("Овсянка", 300, "HIGH", "label", 1),
+        _sub("Кофе с молоком", 60, "ESTIMATE", "estimate", 0),
+    ]
+
+    async def fake_run(image_bytes, spec, **kwargs):
+        return subs.pop(0)
+
+    monkeypatch.setattr(photo_pipeline, "run", fake_run)
+    merged = asyncio.run(
+        photo_pipeline.run_multi([b"img1", b"img2"], VARIANTS["v2g"])
+    )
+    assert len(merged.items) == 2
+    assert merged.totals.calories_kcal == 360
+    assert merged.confidence == "ESTIMATE"  # one photo was an estimate
+    assert merged.assessment.method == "photo"
+    assert merged.assessment.verified_items == 1
+    assert merged.assessment.total_items == 2
+    assert merged.assessment.portion_estimated is True
+
+    # All photos labels -> the merged meal keeps the "label" method and HIGH.
+    subs.extend([
+        _sub("Йогурт", 120, "HIGH", "label", 1),
+        _sub("Батончик", 200, "HIGH", "label", 1),
+    ])
+    merged = asyncio.run(
+        photo_pipeline.run_multi([b"img1", b"img2"], VARIANTS["v2g"])
+    )
+    assert merged.confidence == "HIGH"
+    assert merged.assessment.method == "label"
+
+
 # ===== Telegram linking =====
 
 def test_telegram_link_redeem_merges(monkeypatch):
