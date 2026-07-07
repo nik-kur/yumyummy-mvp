@@ -11,6 +11,7 @@ These endpoints intentionally reuse the existing services
 ``record_usage_for_user``, billing access) rather than duplicating logic.
 """
 
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -52,6 +53,9 @@ from app.schemas.app_api import (
     AccountProfileUpdate,
     BillingSnapshot,
     AppMealCreate,
+    AppMealItemInput,
+    AppMealUpdate,
+    AppSavedMealUpdate,
     AppAgentRunRequest,
     AppTrialStartRequest,
     AppTrialStartResponse,
@@ -70,6 +74,21 @@ _PROFILE_FIELDS = (
 
 def _member_ids(db: Session, account: Account) -> list[int]:
     return [u.id for u in account_member_users(db, account.id)]
+
+
+def _items_json(items: list[AppMealItemInput]) -> str:
+    """Serialize breakdown items to the ``MealEntry.items_json`` format."""
+    return json.dumps([i.model_dump() for i in items], ensure_ascii=False)
+
+
+def _items_totals(items: list[AppMealItemInput]) -> tuple[float, float, float, float]:
+    """(calories, protein, fat, carbs) summed over a breakdown."""
+    return (
+        sum((i.calories_kcal or 0) for i in items),
+        sum((i.protein_g or 0) for i in items),
+        sum((i.fat_g or 0) for i in items),
+        sum((i.carbs_g or 0) for i in items),
+    )
 
 
 def _build_profile(db: Session, account: Account, user: User) -> AccountProfile:
@@ -294,6 +313,8 @@ def create_meal(
         carbs_g=payload.carbs_g,
         uc_type="APP",
         accuracy_level=payload.accuracy_level or "ESTIMATE",
+        items_json=_items_json(payload.items) if payload.items else None,
+        source_url=payload.source_url,
     )
     user_day.total_calories = (user_day.total_calories or 0) + payload.calories
     user_day.total_protein_g = (user_day.total_protein_g or 0) + payload.protein_g
@@ -316,6 +337,58 @@ def get_meal(
     meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
     if meal is None or meal.user_id not in ids:
         raise HTTPException(status_code=404, detail="Meal not found")
+    return MealRead.model_validate(meal)
+
+
+@router.patch("/meals/{meal_id}", response_model=MealRead)
+def update_meal(
+    meal_id: int,
+    payload: AppMealUpdate,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Edit a logged meal: rename, replace the component breakdown, or set
+    totals directly. Additive endpoint (25(1)+) — nothing existing changes.
+
+    When ``items`` is provided it replaces the stored breakdown and the meal
+    totals are recomputed from it; explicit total fields override. The owning
+    day's aggregates are adjusted by the delta so Today stays consistent.
+    """
+    ids = _member_ids(db, account)
+    meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
+    if meal is None or meal.user_id not in ids:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    old_cal = meal.calories or 0
+    old_prot = meal.protein_g or 0
+    old_fat = meal.fat_g or 0
+    old_carbs = meal.carbs_g or 0
+
+    if payload.description_user is not None and payload.description_user.strip():
+        meal.description_user = payload.description_user.strip()
+
+    if payload.items is not None:
+        meal.items_json = _items_json(payload.items)
+        meal.calories, meal.protein_g, meal.fat_g, meal.carbs_g = _items_totals(payload.items)
+
+    if payload.calories is not None:
+        meal.calories = payload.calories
+    if payload.protein_g is not None:
+        meal.protein_g = payload.protein_g
+    if payload.fat_g is not None:
+        meal.fat_g = payload.fat_g
+    if payload.carbs_g is not None:
+        meal.carbs_g = payload.carbs_g
+
+    user_day = db.query(UserDay).filter(UserDay.id == meal.user_day_id).first()
+    if user_day is not None:
+        user_day.total_calories = max((user_day.total_calories or 0) + (meal.calories or 0) - old_cal, 0)
+        user_day.total_protein_g = max((user_day.total_protein_g or 0) + (meal.protein_g or 0) - old_prot, 0)
+        user_day.total_fat_g = max((user_day.total_fat_g or 0) + (meal.fat_g or 0) - old_fat, 0)
+        user_day.total_carbs_g = max((user_day.total_carbs_g or 0) + (meal.carbs_g or 0) - old_carbs, 0)
+
+    db.commit()
+    db.refresh(meal)
     return MealRead.model_validate(meal)
 
 
@@ -460,6 +533,150 @@ def create_saved_meal(
     db.commit()
     db.refresh(saved)
     return SavedMealRead.model_validate(saved)
+
+
+@router.patch("/saved-meals/{saved_meal_id}", response_model=SavedMealRead)
+def update_saved_meal(
+    saved_meal_id: int,
+    payload: AppSavedMealUpdate,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Edit a saved meal: rename, replace its component breakdown, or set
+    totals directly. Additive endpoint (25(1)+)."""
+    ids = _member_ids(db, account)
+    saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
+    if saved is None or saved.user_id not in ids:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+
+    if payload.name is not None and payload.name.strip():
+        saved.name = payload.name.strip()
+
+    if payload.items is not None:
+        db.query(SavedMealItem).filter(
+            SavedMealItem.saved_meal_id == saved.id
+        ).delete(synchronize_session=False)
+        for item in payload.items:
+            db.add(SavedMealItem(
+                saved_meal_id=saved.id,
+                name=item.name,
+                grams=item.grams,
+                calories_kcal=item.calories_kcal or 0,
+                protein_g=item.protein_g or 0,
+                fat_g=item.fat_g or 0,
+                carbs_g=item.carbs_g or 0,
+                source_url=item.source_url,
+            ))
+        (saved.total_calories, saved.total_protein_g,
+         saved.total_fat_g, saved.total_carbs_g) = _items_totals(payload.items)
+
+    if payload.total_calories is not None:
+        saved.total_calories = payload.total_calories
+    if payload.total_protein_g is not None:
+        saved.total_protein_g = payload.total_protein_g
+    if payload.total_fat_g is not None:
+        saved.total_fat_g = payload.total_fat_g
+    if payload.total_carbs_g is not None:
+        saved.total_carbs_g = payload.total_carbs_g
+
+    db.commit()
+    db.refresh(saved)
+    return SavedMealRead.model_validate(saved)
+
+
+@router.delete("/saved-meals/{saved_meal_id}")
+def delete_saved_meal(
+    saved_meal_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Remove a saved meal (and its items) from My Menu. Additive (25(1)+)."""
+    ids = _member_ids(db, account)
+    saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
+    if saved is None or saved.user_id not in ids:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+    db.delete(saved)  # ORM cascade removes the items
+    db.commit()
+    return {"status": "deleted", "saved_meal_id": saved_meal_id}
+
+
+@router.post("/saved-meals/{saved_meal_id}/log", response_model=MealRead)
+def log_saved_meal(
+    saved_meal_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Log a saved meal onto today, breakdown included, and bump its use count.
+
+    Additive endpoint (25(1)+). Replaces the client-side "Log again" flow that
+    posted bare totals (losing the component breakdown and never incrementing
+    ``use_count``).
+    """
+    import pytz
+
+    ids = _member_ids(db, account)
+    saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
+    if saved is None or saved.user_id not in ids:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+
+    user = get_primary_user(db, account)
+    db.flush()
+
+    tz_name = user.timezone or "Europe/Moscow"
+    try:
+        tz = pytz.timezone(tz_name)
+    except pytz.exceptions.UnknownTimeZoneError:
+        tz = pytz.timezone("Europe/Moscow")
+    now_local = datetime.now(tz)
+    today = now_local.date()
+
+    user_day = (
+        db.query(UserDay)
+        .filter(UserDay.user_id == user.id, UserDay.date == today)
+        .first()
+    )
+    if not user_day:
+        user_day = UserDay(
+            user_id=user.id, date=today,
+            total_calories=0, total_protein_g=0, total_fat_g=0, total_carbs_g=0,
+        )
+        db.add(user_day)
+        db.flush()
+
+    items = [
+        {
+            "name": it.name,
+            "grams": it.grams,
+            "calories_kcal": it.calories_kcal,
+            "protein_g": it.protein_g,
+            "fat_g": it.fat_g,
+            "carbs_g": it.carbs_g,
+            "source_url": it.source_url,
+        }
+        for it in saved.items
+    ]
+    meal = MealEntry(
+        user_id=user.id,
+        user_day_id=user_day.id,
+        eaten_at=now_local,
+        description_user=saved.name,
+        calories=saved.total_calories or 0,
+        protein_g=saved.total_protein_g or 0,
+        fat_g=saved.total_fat_g or 0,
+        carbs_g=saved.total_carbs_g or 0,
+        uc_type="APP_SAVED",
+        accuracy_level="ESTIMATE",
+        items_json=json.dumps(items, ensure_ascii=False) if items else None,
+    )
+    user_day.total_calories = (user_day.total_calories or 0) + (saved.total_calories or 0)
+    user_day.total_protein_g = (user_day.total_protein_g or 0) + (saved.total_protein_g or 0)
+    user_day.total_fat_g = (user_day.total_fat_g or 0) + (saved.total_fat_g or 0)
+    user_day.total_carbs_g = (user_day.total_carbs_g or 0) + (saved.total_carbs_g or 0)
+    saved.use_count = (saved.use_count or 0) + 1
+    db.add(meal)
+    db.commit()
+    db.refresh(meal)
+    return MealRead.model_validate(meal)
 
 
 @router.get("/billing/status", response_model=BillingSnapshot)

@@ -57,6 +57,19 @@ class AccountProfileUpdate(BaseModel):
     timezone: Optional[str] = None
 
 
+class AppMealItemInput(BaseModel):
+    """One component of a meal's breakdown, as sent by the app when creating
+    or editing a meal. Mirrors the shape stored in ``MealEntry.items_json``."""
+
+    name: str
+    grams: Optional[float] = Field(default=None, ge=0)
+    calories_kcal: Optional[float] = Field(default=None, ge=0)
+    protein_g: Optional[float] = Field(default=None, ge=0)
+    fat_g: Optional[float] = Field(default=None, ge=0)
+    carbs_g: Optional[float] = Field(default=None, ge=0)
+    source_url: Optional[str] = None
+
+
 class AppMealCreate(BaseModel):
     date: date
     description_user: str
@@ -65,6 +78,37 @@ class AppMealCreate(BaseModel):
     fat_g: float = 0
     carbs_g: float = 0
     accuracy_level: Optional[str] = None
+    # Optional component breakdown (additive, 25(1)+). Stored verbatim so the
+    # created entry can be component-edited later like AI-logged meals.
+    items: List[AppMealItemInput] = []
+    source_url: Optional[str] = None
+
+
+class AppMealUpdate(BaseModel):
+    """Additive edit payload for a logged meal (25(1)+).
+
+    ``items`` replaces the whole breakdown and the meal totals are recomputed
+    from it; explicit total fields override the recomputed values.
+    """
+
+    description_user: Optional[str] = None
+    calories: Optional[float] = Field(default=None, ge=0)
+    protein_g: Optional[float] = Field(default=None, ge=0)
+    fat_g: Optional[float] = Field(default=None, ge=0)
+    carbs_g: Optional[float] = Field(default=None, ge=0)
+    items: Optional[List[AppMealItemInput]] = None
+
+
+class AppSavedMealUpdate(BaseModel):
+    """Additive edit payload for a saved meal (25(1)+). Same semantics as
+    :class:`AppMealUpdate`: items replace the breakdown and drive the totals."""
+
+    name: Optional[str] = None
+    total_calories: Optional[float] = Field(default=None, ge=0)
+    total_protein_g: Optional[float] = Field(default=None, ge=0)
+    total_fat_g: Optional[float] = Field(default=None, ge=0)
+    total_carbs_g: Optional[float] = Field(default=None, ge=0)
+    items: Optional[List[AppMealItemInput]] = None
 
 
 class AppAgentRunRequest(BaseModel):

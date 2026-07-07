@@ -217,6 +217,109 @@ def test_saved_meals():
     assert r.json()["total"] == 1
 
 
+def test_update_meal_items_recompute_totals_and_day():
+    _, token = _make_account_token(provider_id="edit@example.com", email="edit@example.com")
+    today = _utcnow().date().isoformat()
+
+    r = client.post("/app/meals", headers=_auth(token), json={
+        "date": today, "description_user": "Greek salad", "calories": 400,
+        "protein_g": 10, "fat_g": 30, "carbs_g": 20,
+        "items": [
+            {"name": "feta", "grams": 50, "calories_kcal": 130, "protein_g": 7, "fat_g": 11, "carbs_g": 2},
+            {"name": "tomatoes", "grams": 120, "calories_kcal": 22, "protein_g": 1, "fat_g": 0, "carbs_g": 5},
+            {"name": "olive oil", "grams": 20, "calories_kcal": 180, "protein_g": 0, "fat_g": 20, "carbs_g": 0},
+        ],
+    })
+    assert r.status_code == 200, r.text
+    meal_id = r.json()["id"]
+    assert len(r.json()["items"]) == 3
+
+    # Drop the tomatoes: totals must be recomputed from the remaining items.
+    r = client.patch(f"/app/meals/{meal_id}", headers=_auth(token), json={
+        "items": [
+            {"name": "feta", "grams": 50, "calories_kcal": 130, "protein_g": 7, "fat_g": 11, "carbs_g": 2},
+            {"name": "olive oil", "grams": 20, "calories_kcal": 180, "protein_g": 0, "fat_g": 20, "carbs_g": 0},
+        ],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["calories"] == 310
+    assert body["protein_g"] == 7
+    assert body["fat_g"] == 31
+    assert body["carbs_g"] == 2
+    assert len(body["items"]) == 2
+
+    # The day's aggregates follow the edit (400 -> 310).
+    r = client.get("/app/today", headers=_auth(token))
+    assert r.json()["total_calories"] == 310
+
+    # Direct totals edit (no items): explicit fields win.
+    r = client.patch(f"/app/meals/{meal_id}", headers=_auth(token), json={
+        "calories": 500, "description_user": "Greek salad (large)",
+    })
+    assert r.status_code == 200
+    assert r.json()["calories"] == 500
+    assert r.json()["description_user"] == "Greek salad (large)"
+    assert len(r.json()["items"]) == 2  # breakdown untouched
+    r = client.get("/app/today", headers=_auth(token))
+    assert r.json()["total_calories"] == 500
+
+    # Foreign accounts can't edit someone else's meal.
+    _, other = _make_account_token(provider_id="edit2@example.com", email="edit2@example.com")
+    assert client.patch(f"/app/meals/{meal_id}", headers=_auth(other), json={"calories": 1}).status_code == 404
+
+
+def test_saved_meal_edit_delete_and_log():
+    _, token = _make_account_token(provider_id="sm2@example.com", email="sm2@example.com")
+    r = client.post("/app/saved-meals", headers=_auth(token), json={
+        "user_id": 0, "name": "Bowl", "total_calories": 450,
+        "total_protein_g": 30, "total_fat_g": 10, "total_carbs_g": 60,
+        "items": [
+            {"name": "rice", "grams": 150, "calories_kcal": 200, "protein_g": 4, "fat_g": 1, "carbs_g": 45},
+            {"name": "chicken", "grams": 120, "calories_kcal": 250, "protein_g": 26, "fat_g": 9, "carbs_g": 15},
+        ],
+    })
+    assert r.status_code == 200, r.text
+    saved_id = r.json()["id"]
+
+    # The list response now carries the breakdown (additive field).
+    r = client.get("/app/saved-meals", headers=_auth(token))
+    assert len(r.json()["items"][0]["items"]) == 2
+
+    # Rename + drop a component: totals recomputed from the remaining items.
+    r = client.patch(f"/app/saved-meals/{saved_id}", headers=_auth(token), json={
+        "name": "Chicken bowl",
+        "items": [
+            {"name": "chicken", "grams": 120, "calories_kcal": 250, "protein_g": 26, "fat_g": 9, "carbs_g": 15},
+        ],
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Chicken bowl"
+    assert r.json()["total_calories"] == 250
+    assert len(r.json()["items"]) == 1
+
+    # Log it onto today: meal carries the breakdown, use_count increments.
+    r = client.post(f"/app/saved-meals/{saved_id}/log", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert r.json()["calories"] == 250
+    assert len(r.json()["items"]) == 1
+    r = client.get("/app/today", headers=_auth(token))
+    assert r.json()["total_calories"] == 250
+    r = client.get("/app/saved-meals", headers=_auth(token))
+    assert r.json()["items"][0]["use_count"] == 1
+
+    # Foreign account: 404 on all mutations; then owner deletes it.
+    _, other = _make_account_token(provider_id="sm3@example.com", email="sm3@example.com")
+    assert client.patch(f"/app/saved-meals/{saved_id}", headers=_auth(other), json={"name": "x"}).status_code == 404
+    assert client.delete(f"/app/saved-meals/{saved_id}", headers=_auth(other)).status_code == 404
+    assert client.post(f"/app/saved-meals/{saved_id}/log", headers=_auth(other)).status_code == 404
+
+    r = client.delete(f"/app/saved-meals/{saved_id}", headers=_auth(token))
+    assert r.status_code == 200
+    r = client.get("/app/saved-meals", headers=_auth(token))
+    assert r.json()["total"] == 0
+
+
 # ===== Agent run (logging via AI) =====
 
 def test_agent_run_persists_meal(monkeypatch):

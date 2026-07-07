@@ -59,6 +59,9 @@ class SavedMealListRead(BaseModel):
     total_fat_g: float
     total_carbs_g: float
     use_count: int
+    # Additive (25(1)+): the app list view needs the breakdown for in-place
+    # editing and for logging with components. Older clients ignore it.
+    items: List[SavedMealItemRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 
