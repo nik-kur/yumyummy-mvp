@@ -12,6 +12,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { getToken, setToken, USE_MOCKS } from '@/api/client';
 import * as api from '@/api/endpoints';
 import type { AccountProfile } from '@/api/types';
+import { identifyAdapty, logoutAdapty } from '@/billing/adapty';
 
 type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
@@ -41,6 +42,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const me = await api.getMe();
     setProfile(me);
     setStatus('signedIn');
+    // Bind this account to its Adapty profile so App Store purchases (and the
+    // Adapty webhook) resolve to the right account. No-op until a public SDK
+    // key is configured.
+    void identifyAdapty(me.account_id);
   }, []);
 
   // Boot: if a token is stored, resolve the account.
@@ -195,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setToken(null);
     setProfile(null);
     setStatus('signedOut');
+    void logoutAdapty();
   }, []);
 
   const value = useMemo<AuthContextValue>(

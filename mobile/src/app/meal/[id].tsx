@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, Alert, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ShieldCheck, Trash2, RotateCcw, ExternalLink } from 'lucide-react-native';
+import { ChevronLeft, ShieldCheck, Trash2, Pencil, ExternalLink } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { AccuracyBadge } from '@/components/Badges';
+import {
+  MealEditSheet,
+  ItemEditSheet,
+  scaleItem,
+  sumItems,
+  type MacroTotals,
+} from '@/components/mealEdit';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
 import type { AccuracyLevel, MealItem, MealRead } from '@/api/types';
@@ -50,20 +57,22 @@ function MacroTile({ label, value, color }: { label: string; value: number; colo
   );
 }
 
-function ItemRow({ item }: { item: MealItem }) {
+// Row tap now opens the component editor; the source link moved onto the
+// little external-link icon so both actions stay reachable.
+function ItemRow({ item, onEdit }: { item: MealItem; onEdit?: () => void }) {
   const grams = item.grams ? `${Math.round(item.grams)} g` : null;
   const macros = [
     item.protein_g != null ? `P ${Math.round(item.protein_g)}` : null,
-    item.carbs_g != null ? `C ${Math.round(item.carbs_g)}` : null,
     item.fat_g != null ? `F ${Math.round(item.fat_g)}` : null,
+    item.carbs_g != null ? `C ${Math.round(item.carbs_g)}` : null,
   ]
     .filter(Boolean)
     .join(' · ');
   return (
     <Pressable
-      disabled={!item.source_url}
-      onPress={() => item.source_url && openUrl(item.source_url)}
-      style={({ pressed }) => [styles.itemRow, pressed && item.source_url ? styles.pressed : null]}
+      disabled={!onEdit}
+      onPress={onEdit}
+      style={({ pressed }) => [styles.itemRow, pressed && onEdit ? styles.pressed : null]}
     >
       <View style={styles.itemInfo}>
         <View style={styles.itemNameRow}>
@@ -71,7 +80,9 @@ function ItemRow({ item }: { item: MealItem }) {
             {item.name}
           </AppText>
           {item.source_url ? (
-            <ExternalLink size={15} color={colors.infoBlue} strokeWidth={1.5} />
+            <Pressable hitSlop={10} onPress={() => item.source_url && openUrl(item.source_url)}>
+              <ExternalLink size={15} color={colors.infoBlue} strokeWidth={1.5} />
+            </Pressable>
           ) : null}
         </View>
         <AppText variant="caption" color={colors.inkMuted}>
@@ -102,6 +113,8 @@ export default function MealDetailScreen() {
   const [meal, setMeal] = useState<MealRead | null>(null);
   const [busy, setBusy] = useState(false);
   const [repeating, setRepeating] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editItemIndex, setEditItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -138,6 +151,120 @@ export default function MealDetailScreen() {
     return Array.from(urls);
   }, [meal?.source_url, items]);
 
+  // Base record for optimistic edits (params fallback until hydration lands).
+  const current: MealRead = meal ?? {
+    id,
+    eaten_at: time,
+    description_user: description,
+    calories,
+    protein_g: protein,
+    fat_g: fat,
+    carbs_g: carbs,
+    accuracy_level: accuracy,
+    items: [],
+  };
+
+  /** Optimistically apply `optimistic`, then reconcile with the server. */
+  const applyUpdate = async (update: Parameters<typeof api.updateMeal>[1], optimistic: MealRead) => {
+    if (!id) return;
+    const before = meal;
+    setMeal(optimistic);
+    try {
+      const serverMeal = await api.updateMeal(id, update);
+      setMeal(serverMeal);
+    } catch {
+      setMeal(before);
+      Alert.alert('Could not save changes', 'Please check your connection and try again.');
+    }
+  };
+
+  const onEditSave = (portion: number, totals: MacroTotals) => {
+    setEditOpen(false);
+    const scaled = {
+      calories: Math.round(calories * portion),
+      protein: Math.round(protein * portion),
+      fat: Math.round(fat * portion),
+      carbs: Math.round(carbs * portion),
+    };
+    const stepperOnly =
+      totals.calories === scaled.calories &&
+      totals.protein === scaled.protein &&
+      totals.fat === scaled.fat &&
+      totals.carbs === scaled.carbs;
+
+    if (stepperOnly && portion === 1) return; // nothing changed
+
+    if (stepperOnly && items.length > 0) {
+      // Pure portion change: rescale the components so the breakdown stays true.
+      const nextItems = items.map((it) => scaleItem(it, portion));
+      const t = sumItems(nextItems);
+      void applyUpdate(
+        { items: nextItems },
+        { ...current, items: nextItems, calories: t.calories, protein_g: t.protein, fat_g: t.fat, carbs_g: t.carbs },
+      );
+      return;
+    }
+    void applyUpdate(
+      {
+        calories: totals.calories,
+        protein_g: totals.protein,
+        fat_g: totals.fat,
+        carbs_g: totals.carbs,
+      },
+      {
+        ...current,
+        calories: totals.calories,
+        protein_g: totals.protein,
+        fat_g: totals.fat,
+        carbs_g: totals.carbs,
+      },
+    );
+  };
+
+  const onItemSave = (next: MealItem) => {
+    if (editItemIndex == null) return;
+    const nextItems = items.map((it, i) => (i === editItemIndex ? next : it));
+    setEditItemIndex(null);
+    const t = sumItems(nextItems);
+    void applyUpdate(
+      { items: nextItems },
+      { ...current, items: nextItems, calories: t.calories, protein_g: t.protein, fat_g: t.fat, carbs_g: t.carbs },
+    );
+  };
+
+  const onItemRemove = () => {
+    if (editItemIndex == null) return;
+    const idx = editItemIndex;
+    if (items.length <= 1) {
+      setEditItemIndex(null);
+      Alert.alert(
+        'Last component',
+        'This is the only component left. Delete the whole meal instead?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete meal', style: 'destructive', onPress: () => onDelete() },
+        ],
+      );
+      return;
+    }
+    Alert.alert('Remove component', `Remove “${items[idx]?.name}” from this meal?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          setEditItemIndex(null);
+          const nextItems = items.filter((_, i) => i !== idx);
+          const t = sumItems(nextItems);
+          void applyUpdate(
+            { items: nextItems },
+            { ...current, items: nextItems, calories: t.calories, protein_g: t.protein, fat_g: t.fat, carbs_g: t.carbs },
+          );
+        },
+      },
+    ]);
+  };
+
   const onRepeat = async () => {
     if (!id) return;
     setRepeating(true);
@@ -162,6 +289,8 @@ export default function MealDetailScreen() {
         total_protein_g: protein,
         total_fat_g: fat,
         total_carbs_g: carbs,
+        // Keep the breakdown so the saved meal stays editable per component.
+        items,
       });
       Alert.alert('Saved to My Menu', 'Log it again anytime in one tap.');
     } catch {
@@ -196,7 +325,9 @@ export default function MealDetailScreen() {
         <AppText variant="overline" color={colors.inkMuted}>
           {time ? formatTime(time) : 'Meal'}
         </AppText>
-        <View style={{ width: 26 }} />
+        <Pressable onPress={() => setEditOpen(true)} hitSlop={10}>
+          <Pencil size={20} color={colors.inkMuted} strokeWidth={1.5} />
+        </Pressable>
       </View>
 
       <AppText variant="h1" style={styles.title}>
@@ -219,20 +350,20 @@ export default function MealDetailScreen() {
 
       <View style={styles.tiles}>
         <MacroTile label="Protein" value={protein} color={colors.protein} />
-        <MacroTile label="Carbs" value={carbs} color={colors.carbs} />
         <MacroTile label="Fat" value={fat} color={colors.fat} />
+        <MacroTile label="Carbs" value={carbs} color={colors.carbs} />
       </View>
 
       {items.length > 0 ? (
         <View style={styles.section}>
           <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
-            Breakdown
+            Breakdown — tap to edit
           </AppText>
           <Card padded={false} style={styles.breakdownCard}>
             {items.map((it, i) => (
               <View key={`${it.name}-${i}`}>
                 {i > 0 ? <View style={styles.sep} /> : null}
-                <ItemRow item={it} />
+                <ItemRow item={it} onEdit={() => setEditItemIndex(i)} />
               </View>
             ))}
           </Card>
@@ -290,6 +421,22 @@ export default function MealDetailScreen() {
           </AppText>
         </Pressable>
       </View>
+
+      <MealEditSheet
+        visible={editOpen}
+        title={description || 'Edit meal'}
+        initial={{ calories, protein, fat, carbs }}
+        hasItems={items.length > 0}
+        onClose={() => setEditOpen(false)}
+        onSave={onEditSave}
+      />
+      <ItemEditSheet
+        visible={editItemIndex != null}
+        item={editItemIndex != null ? items[editItemIndex] ?? null : null}
+        onClose={() => setEditItemIndex(null)}
+        onSave={onItemSave}
+        onRemove={onItemRemove}
+      />
     </Screen>
   );
 }

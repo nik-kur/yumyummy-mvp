@@ -8,8 +8,11 @@ import type {
   AccountProfileUpdate,
   BillingSnapshot,
   DaySummary,
+  MealItem,
   MealRead,
+  MealUpdateInput,
   SavedMealListItem,
+  SavedMealUpdateInput,
   SavedMealsListResponse,
   TrialStartResponse,
   WorkflowItem,
@@ -166,6 +169,37 @@ export function removeMockMeal(id: number): void {
   state.meals = state.meals.filter((m) => m.id !== id);
 }
 
+function itemTotals(items: MealItem[]) {
+  return {
+    calories: items.reduce((a, i) => a + (i.calories_kcal ?? 0), 0),
+    protein_g: items.reduce((a, i) => a + (i.protein_g ?? 0), 0),
+    fat_g: items.reduce((a, i) => a + (i.fat_g ?? 0), 0),
+    carbs_g: items.reduce((a, i) => a + (i.carbs_g ?? 0), 0),
+  };
+}
+
+/** Mirrors PATCH /app/meals/{id}: items drive totals, explicit fields win. */
+export function patchMockMeal(id: number, update: MealUpdateInput): MealRead {
+  const idx = state.meals.findIndex((m) => m.id === id);
+  const base = state.meals[idx] ?? state.meals[0];
+  const next: MealRead = { ...base };
+  if (update.description_user?.trim()) next.description_user = update.description_user.trim();
+  if (update.items) {
+    next.items = update.items;
+    const t = itemTotals(update.items);
+    next.calories = t.calories;
+    next.protein_g = t.protein_g;
+    next.fat_g = t.fat_g;
+    next.carbs_g = t.carbs_g;
+  }
+  if (update.calories != null) next.calories = update.calories;
+  if (update.protein_g != null) next.protein_g = update.protein_g;
+  if (update.fat_g != null) next.fat_g = update.fat_g;
+  if (update.carbs_g != null) next.carbs_g = update.carbs_g;
+  if (idx >= 0) state.meals = state.meals.map((m) => (m.id === id ? next : m));
+  return next;
+}
+
 export function getMockSaved(): SavedMealsListResponse {
   return { ...state.savedMeals, items: [...state.savedMeals.items] };
 }
@@ -178,6 +212,7 @@ export function addMockSaved(input: {
   total_protein_g: number;
   total_fat_g: number;
   total_carbs_g: number;
+  items?: MealItem[];
 }): SavedMealListItem {
   const saved: SavedMealListItem = { id: ++nextSavedId, use_count: 1, ...input };
   state.savedMeals = {
@@ -187,6 +222,59 @@ export function addMockSaved(input: {
     per_page: state.savedMeals.per_page + 1,
   };
   return saved;
+}
+
+/** Mirrors PATCH /app/saved-meals/{id}. */
+export function patchMockSaved(id: number, update: SavedMealUpdateInput): void {
+  state.savedMeals = {
+    ...state.savedMeals,
+    items: state.savedMeals.items.map((s) => {
+      if (s.id !== id) return s;
+      const next: SavedMealListItem = { ...s };
+      if (update.name?.trim()) next.name = update.name.trim();
+      if (update.items) {
+        next.items = update.items;
+        const t = itemTotals(update.items);
+        next.total_calories = t.calories;
+        next.total_protein_g = t.protein_g;
+        next.total_fat_g = t.fat_g;
+        next.total_carbs_g = t.carbs_g;
+      }
+      if (update.total_calories != null) next.total_calories = update.total_calories;
+      if (update.total_protein_g != null) next.total_protein_g = update.total_protein_g;
+      if (update.total_fat_g != null) next.total_fat_g = update.total_fat_g;
+      if (update.total_carbs_g != null) next.total_carbs_g = update.total_carbs_g;
+      return next;
+    }),
+  };
+}
+
+export function removeMockSaved(id: number): void {
+  const items = state.savedMeals.items.filter((s) => s.id !== id);
+  state.savedMeals = { ...state.savedMeals, items, total: items.length, per_page: items.length };
+}
+
+/** Mirrors POST /app/saved-meals/{id}/log. */
+export function logMockSaved(id: number): MealRead {
+  const saved = state.savedMeals.items.find((s) => s.id === id);
+  if (saved) {
+    state.savedMeals = {
+      ...state.savedMeals,
+      items: state.savedMeals.items.map((s) =>
+        s.id === id ? { ...s, use_count: s.use_count + 1 } : s,
+      ),
+    };
+  }
+  const meal = addMockMeal({
+    description_user: saved?.name ?? 'Saved meal',
+    calories: saved?.total_calories ?? 0,
+    protein_g: saved?.total_protein_g ?? 0,
+    fat_g: saved?.total_fat_g ?? 0,
+    carbs_g: saved?.total_carbs_g ?? 0,
+    accuracy_level: 'ESTIMATE',
+  });
+  if (saved?.items?.length) meal.items = saved.items;
+  return meal;
 }
 
 export function startMockTrial(trialDays?: number): TrialStartResponse {

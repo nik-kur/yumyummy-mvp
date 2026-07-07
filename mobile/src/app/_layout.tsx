@@ -9,13 +9,19 @@ import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/state/auth';
 import { PendingMealsProvider } from '@/state/pendingMeals';
 import { NotificationsBridge } from '@/notifications/NotificationsBridge';
+import { WidgetActionBridge } from '@/widgets/WidgetActionBridge';
 import { useAppFonts } from '@/theme/useAppFonts';
+import { activateAdapty } from '@/billing/adapty';
 import { colors } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const fontsLoaded = useAppFonts();
+
+  useEffect(() => {
+    void activateAdapty();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
@@ -29,6 +35,7 @@ export default function RootLayout() {
         <AuthProvider>
           <PendingMealsProvider>
             <NotificationsBridge />
+            <WidgetActionBridge />
             <Stack
               screenOptions={{
                 headerShown: false,

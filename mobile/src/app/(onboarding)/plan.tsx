@@ -114,8 +114,8 @@ export default function PlanScreen() {
           </AppText>
           <View style={styles.macros}>
             <MacroBar label="Protein" macro="protein" value={plan.protein} target={plan.protein} />
-            <MacroBar label="Carbs" macro="carbs" value={plan.carbs} target={plan.carbs} />
             <MacroBar label="Fat" macro="fat" value={plan.fat} target={plan.fat} />
+            <MacroBar label="Carbs" macro="carbs" value={plan.carbs} target={plan.carbs} />
           </View>
         </Card>
 

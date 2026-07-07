@@ -128,8 +128,8 @@ export default function EditTargetsScreen() {
         ) : null}
         <View style={styles.sep} />
         <Field label="Protein" unit="g" value={protein} onChangeText={setProtein} tint={colors.protein} />
-        <Field label="Carbs" unit="g" value={carbs} onChangeText={setCarbs} tint={colors.carbs} />
         <Field label="Fat" unit="g" value={fat} onChangeText={setFat} tint={colors.fat} />
+        <Field label="Carbs" unit="g" value={carbs} onChangeText={setCarbs} tint={colors.carbs} />
       </Card>
 
       <View style={styles.actions}>

@@ -15,8 +15,11 @@ import type {
   BillingSnapshot,
   DaySummary,
   EmailCodeRequestResponse,
+  MealItem,
   MealRead,
+  MealUpdateInput,
   PresignResponse,
+  SavedMealUpdateInput,
   SavedMealsListResponse,
   TelegramLinkRedeemResponse,
   TrialStartResponse,
@@ -161,6 +164,13 @@ export async function getMeal(id: number): Promise<MealRead> {
   return apiFetch<MealRead>(`/app/meals/${id}`);
 }
 
+/** Edit a logged meal (25(1)+): rename, replace breakdown, or set totals.
+ *  The server recomputes meal + day totals and returns the updated meal. */
+export async function updateMeal(id: number, update: MealUpdateInput): Promise<MealRead> {
+  if (USE_MOCKS) return mock.patchMockMeal(id, update);
+  return apiFetch<MealRead>(`/app/meals/${id}`, { method: 'PATCH', body: update });
+}
+
 /** Re-log a meal verbatim (server copies macros + breakdown; no AI search). */
 export async function repeatMeal(id: number): Promise<MealRead> {
   if (USE_MOCKS) {
@@ -252,6 +262,8 @@ export interface SavedMealCreateInput {
   total_protein_g: number;
   total_fat_g: number;
   total_carbs_g: number;
+  /** Component breakdown (25(1)+) so the saved meal stays editable per item. */
+  items?: MealItem[];
 }
 
 export async function createSavedMeal(payload: SavedMealCreateInput): Promise<void> {
@@ -262,10 +274,39 @@ export async function createSavedMeal(payload: SavedMealCreateInput): Promise<vo
       total_protein_g: payload.total_protein_g,
       total_fat_g: payload.total_fat_g,
       total_carbs_g: payload.total_carbs_g,
+      items: payload.items,
     });
     return;
   }
-  // NOTE: backend SavedMealCreate currently requires `user_id`; the app resolves
-  // it from `GET /app/me`. `items` is sent empty for a quick single-meal save.
-  await apiFetch<unknown>('/app/saved-meals', { method: 'POST', body: { ...payload, items: [] } });
+  // NOTE: backend SavedMealCreate requires `user_id`; the app resolves it from
+  // `GET /app/me`.
+  await apiFetch<unknown>('/app/saved-meals', {
+    method: 'POST',
+    body: { items: [], ...payload },
+  });
+}
+
+/** Edit a saved meal (25(1)+): rename, replace breakdown, or set totals. */
+export async function updateSavedMeal(id: number, update: SavedMealUpdateInput): Promise<void> {
+  if (USE_MOCKS) {
+    mock.patchMockSaved(id, update);
+    return;
+  }
+  await apiFetch<unknown>(`/app/saved-meals/${id}`, { method: 'PATCH', body: update });
+}
+
+/** Remove a saved meal from My Menu (25(1)+). */
+export async function deleteSavedMeal(id: number): Promise<void> {
+  if (USE_MOCKS) {
+    mock.removeMockSaved(id);
+    return;
+  }
+  await apiFetch<{ status: string }>(`/app/saved-meals/${id}`, { method: 'DELETE' });
+}
+
+/** Log a saved meal onto today server-side (25(1)+): keeps the breakdown and
+ *  bumps use_count, unlike the old client-side createMeal copy. */
+export async function logSavedMeal(id: number): Promise<MealRead> {
+  if (USE_MOCKS) return mock.logMockSaved(id);
+  return apiFetch<MealRead>(`/app/saved-meals/${id}/log`, { method: 'POST' });
 }

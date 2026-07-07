@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 import * as api from '@/api/endpoints';
-import { uploadMealPhoto } from '@/api/upload';
+import { uploadMealPhoto, transcribeAudio } from '@/api/upload';
 import type { WorkflowItem } from '@/api/types';
 
 /**
@@ -27,8 +27,8 @@ export type PendingStatus = 'processing' | 'error';
 
 export interface PendingMeal {
   id: string;
-  label: string; // what the user typed, or "Photo meal"
-  kind: 'text' | 'photo';
+  label: string; // what the user typed, "Photo meal", or "Voice note…"
+  kind: 'text' | 'photo' | 'voice';
   status: PendingStatus;
   error?: string;
   createdAt: number;
@@ -37,6 +37,8 @@ export interface PendingMeal {
 export interface SubmitInput {
   text?: string;
   localImageUri?: string;
+  /** Local file:// URI of a recorded voice note. Transcribed in the background. */
+  audioUri?: string;
 }
 
 interface PendingMealsContextValue {
@@ -107,6 +109,12 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
     setLastSettledAt(Date.now());
   }, []);
 
+  // Non-terminal patch (does NOT bump lastSettledAt): used to swap a voice note's
+  // placeholder label for the real transcript once STT returns.
+  const update = useCallback((id: string, patch: Partial<PendingMeal>) => {
+    setPending((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
+
   const run = useCallback(
     async (id: string, input: SubmitInput) => {
       // Snapshot Today's meal count BEFORE we submit. If the request later times
@@ -127,11 +135,37 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
       };
 
       try {
+        // Voice notes are fire-and-forget: transcribe here (in the background)
+        // so the user never waits on the composer. The transcript replaces the
+        // "Voice note…" placeholder and then feeds the normal logging path.
+        let voiceText = '';
+        if (input.audioUri) {
+          try {
+            voiceText = (await transcribeAudio(input.audioUri)).trim();
+          } catch {
+            removeOrPatch(id, {
+              status: 'error',
+              error: 'Couldn’t transcribe that voice note. Tap to retry.',
+            });
+            return;
+          }
+          if (!voiceText) {
+            removeOrPatch(id, {
+              status: 'error',
+              error: 'Didn’t catch that. Tap to retry, or log by text.',
+            });
+            return;
+          }
+          if (voiceText) update(id, { label: voiceText });
+        }
+
         let imageUrl: string | null = null;
         if (input.localImageUri) {
           imageUrl = await uploadMealPhoto(input.localImageUri);
         }
-        const text = input.text?.trim() || (imageUrl ? '(photo)' : '');
+        const typed = input.text?.trim() ?? '';
+        const combined = [typed, voiceText].filter(Boolean).join(' ');
+        const text = combined || (imageUrl ? '(photo)' : '');
         const res = await api.agentRun({ text, image_url: imageUrl });
 
         // IMPORTANT: `/app/agent/run` already persisted the meal server-side
@@ -181,14 +215,20 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [removeOrPatch],
+    [removeOrPatch, update],
   );
 
   const submit = useCallback(
     (input: SubmitInput) => {
       const id = nextId();
-      const label = input.text?.trim() || 'Photo meal';
-      const kind: PendingMeal['kind'] = input.localImageUri ? 'photo' : 'text';
+      const kind: PendingMeal['kind'] = input.audioUri
+        ? 'voice'
+        : input.localImageUri
+          ? 'photo'
+          : 'text';
+      const label =
+        input.text?.trim() ||
+        (kind === 'voice' ? 'Voice note…' : kind === 'photo' ? 'Photo meal' : 'Meal');
       inputsRef.current[id] = input;
       setPending((prev) => [
         { id, label, kind, status: 'processing', createdAt: Date.now() },

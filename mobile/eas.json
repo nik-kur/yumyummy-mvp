@@ -11,7 +11,8 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://yumyummy-mvp-eu.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://yumyummy-mvp-eu.onrender.com",
+        "EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY": "public_live_yn88NC6V.qkUHucx8YFaYUh6XnSID"
       }
     },
     "preview": {
@@ -20,13 +21,15 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://yumyummy-mvp-eu.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://yumyummy-mvp-eu.onrender.com",
+        "EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY": "public_live_yn88NC6V.qkUHucx8YFaYUh6XnSID"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://yumyummy-mvp-eu.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://yumyummy-mvp-eu.onrender.com",
+        "EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY": "public_live_yn88NC6V.qkUHucx8YFaYUh6XnSID"
       }
     }
   },

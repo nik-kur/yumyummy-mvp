@@ -37,10 +37,10 @@ export const colors = {
   error: '#9A2A1F',
   errorSoft: '#FBEAE7',
 
-  // macros — muted, data-only (never UI chrome)
+  // macros — muted, data-only (never UI chrome). Displayed in P → F → C order.
   protein: '#5A6A3A', // olive
-  carbs: '#2C6CA8', // muted blue
   fat: '#8A5A14', // ochre
+  carbs: '#2C6CA8', // muted blue
 
   // accuracy-badge palette — aligned to the semantic system
   exact: '#2E6B4E', // = success
@@ -95,4 +95,4 @@ export const shadow = {
   },
 } as const;
 
-export type MacroKey = 'protein' | 'carbs' | 'fat';
+export type MacroKey = 'protein' | 'fat' | 'carbs';

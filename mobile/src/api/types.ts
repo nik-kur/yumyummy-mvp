@@ -107,6 +107,30 @@ export interface AppMealCreate {
   fat_g?: number;
   carbs_g?: number;
   accuracy_level?: AccuracyLevel;
+  /** Optional component breakdown (25(1)+), preserved for later editing. */
+  items?: MealItem[];
+  source_url?: string | null;
+}
+
+/** PATCH /app/meals/{id} (25(1)+). `items` replaces the breakdown and drives
+ *  the totals; explicit total fields override the recomputed values. */
+export interface MealUpdateInput {
+  description_user?: string;
+  calories?: number;
+  protein_g?: number;
+  fat_g?: number;
+  carbs_g?: number;
+  items?: MealItem[];
+}
+
+/** PATCH /app/saved-meals/{id} (25(1)+). Same semantics as MealUpdateInput. */
+export interface SavedMealUpdateInput {
+  name?: string;
+  total_calories?: number;
+  total_protein_g?: number;
+  total_fat_g?: number;
+  total_carbs_g?: number;
+  items?: MealItem[];
 }
 
 export interface SavedMealListItem {
@@ -117,6 +141,8 @@ export interface SavedMealListItem {
   total_fat_g: number;
   total_carbs_g: number;
   use_count: number;
+  /** Component breakdown (25(1)+); empty for older saves. */
+  items?: MealItem[];
 }
 
 export interface SavedMealsListResponse {

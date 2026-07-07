@@ -17,7 +17,9 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.security.application-groups": ["group.ai.yumyummy.app"]
+        "com.apple.security.application-groups": [
+          "group.ai.yumyummy.app"
+        ]
       }
     },
     "android": {
@@ -39,7 +41,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
+      ["expo-secure-store", { "configureAndroidBackup": false }],
       "expo-apple-authentication",
       [
         "expo-image-picker",
@@ -57,7 +59,15 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "YumYummy uses the microphone so you can log meals by voice."
+        }
+      ],
+      ["react-native-adapty", { "replaceAndroidBackupConfig": true }],
+      ["expo-build-properties", { "ios": { "deploymentTarget": "15.1" } }]
     ],
     "experiments": {
       "typedRoutes": false,

@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+} from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Sparkles, ChevronRight, CircleAlert } from 'lucide-react-native';
 
@@ -46,29 +54,118 @@ function MealRow({ meal, onPress }: { meal: MealRead; onPress: () => void }) {
   );
 }
 
-function PendingRow({ item, onPress }: { item: PendingMeal; onPress: () => void }) {
-  const isError = item.status === 'error';
+// The agent usually answers in ~3–15 s. Instead of a bare spinner we show a
+// progress bar tuned to ~10 s plus rotating stage captions (they mirror what
+// the agent actually does, in order). Past 10 s the copy softens to
+// "almost there" and the bar parks near the end — it never claims "done".
+const PENDING_STAGES: Record<PendingMeal['kind'], string[]> = {
+  text: ['Reading your meal…', 'Searching the web…', 'Checking sources…', 'Counting calories…'],
+  photo: [
+    'Looking at your photo…',
+    'Spotting the foods…',
+    'Searching the web…',
+    'Checking sources…',
+    'Counting calories…',
+  ],
+  voice: ['Transcribing your note…', 'Reading your meal…', 'Searching the web…', 'Counting calories…'],
+};
+const STAGE_MS = 2500;
+const LONG_WAIT_MS = 10_000;
+const LONG_WAIT_LABEL = 'Almost there — double-checking sources…';
+
+function usePendingCaption(item: PendingMeal): string {
+  const [now, setNow] = useState(Date.now());
+  const processing = item.status === 'processing';
+  useEffect(() => {
+    if (!processing) return;
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, [processing]);
+
+  const elapsed = now - item.createdAt;
+  if (elapsed >= LONG_WAIT_MS) return LONG_WAIT_LABEL;
+  const stages = PENDING_STAGES[item.kind];
+  return stages[Math.min(Math.floor(elapsed / STAGE_MS), stages.length - 1)] ?? '';
+}
+
+function PendingProgress({ createdAt }: { createdAt: number }) {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Resume mid-flight if the row re-mounts (tab switch, refetch).
+    const elapsed = Date.now() - createdAt;
+    progress.setValue(Math.min(elapsed / LONG_WAIT_MS, 1) * 0.9);
+    const anims: Animated.CompositeAnimation[] = [];
+    if (elapsed < LONG_WAIT_MS) {
+      anims.push(
+        Animated.timing(progress, {
+          toValue: 0.9,
+          duration: LONG_WAIT_MS - elapsed,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }),
+      );
+    }
+    // Slow crawl for long waits so the bar keeps breathing but never finishes.
+    anims.push(
+      Animated.timing(progress, {
+        toValue: 0.97,
+        duration: 60_000,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }),
+    );
+    const seq = Animated.sequence(anims);
+    seq.start();
+    return () => seq.stop();
+  }, [createdAt, progress]);
+
+  const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.mealRow, pressed && styles.pressed]}>
+    <View style={styles.progressTrack}>
+      <Animated.View style={[styles.progressFill, { width }]} />
+    </View>
+  );
+}
+
+function PendingRow({ item, onPress }: { item: PendingMeal; onPress: () => void }) {
+  const caption = usePendingCaption(item);
+  const isError = item.status === 'error';
+  // While processing, dim the whole row (bank-style "pending" treatment) so it
+  // reads as in-flight, not a finished entry.
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.mealRow, !isError && styles.pendingRow, pressed && styles.pressed]}
+    >
       <View style={styles.mealInfo}>
         <AppText
           variant="bodyStrong"
           numberOfLines={1}
-          color={isError ? colors.terracottaText : colors.ink}
+          color={isError ? colors.terracottaText : colors.inkMuted}
         >
           {item.label}
         </AppText>
-        <View style={styles.badgeRow}>
-          <AppText variant="caption" color={colors.inkMuted}>
-            {isError ? 'Tap to retry' : 'Analyzing on the web…'}
-          </AppText>
-        </View>
+        {isError ? (
+          <View style={styles.badgeRow}>
+            <AppText variant="caption" color={colors.terracottaText}>
+              Tap to retry
+            </AppText>
+          </View>
+        ) : (
+          <>
+            <AppText variant="caption" color={colors.inkFaint}>
+              {caption}
+            </AppText>
+            <PendingProgress createdAt={item.createdAt} />
+          </>
+        )}
       </View>
       <View style={styles.mealKcal}>
         {isError ? (
           <CircleAlert size={22} color={colors.terracottaText} strokeWidth={1.5} />
         ) : (
-          <ActivityIndicator color={colors.terracotta} />
+          <ActivityIndicator size="small" color={colors.inkFaint} />
         )}
       </View>
     </Pressable>
@@ -118,7 +215,7 @@ export default function TodayScreen() {
       } else {
         Alert.alert(
           'Finding exact numbers',
-          'We’re checking the web for accurate calories and macros. This usually takes 1–2 minutes — your meal updates here automatically when it’s ready.',
+          'We’re checking the web for accurate calories and macros. This usually takes ~10 seconds — your meal appears here automatically when it’s ready.',
           [{ text: 'Got it' }],
         );
       }
@@ -138,7 +235,13 @@ export default function TodayScreen() {
   const over = remaining < 0;
   const progress = hasTarget ? consumed / target : 0;
 
-  const meals = day?.meals ?? [];
+  // Newest first (like a message feed) — the backend returns the day ascending.
+  const meals = [...(day?.meals ?? [])].sort((a, b) => {
+    const ta = Date.parse(a.eaten_at ?? '');
+    const tb = Date.parse(b.eaten_at ?? '');
+    if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return tb - ta;
+    return (b.id ?? 0) - (a.id ?? 0);
+  });
 
   return (
     <Screen scroll>
@@ -189,8 +292,8 @@ export default function TodayScreen() {
 
             <View style={styles.macros}>
               <MacroBar label="Protein" macro="protein" value={day?.total_protein_g ?? 0} target={profile?.target_protein_g} />
-              <MacroBar label="Carbs" macro="carbs" value={day?.total_carbs_g ?? 0} target={profile?.target_carbs_g} />
               <MacroBar label="Fat" macro="fat" value={day?.total_fat_g ?? 0} target={profile?.target_fat_g} />
+              <MacroBar label="Carbs" macro="carbs" value={day?.total_carbs_g ?? 0} target={profile?.target_carbs_g} />
             </View>
           </Card>
 
@@ -312,9 +415,18 @@ const styles = StyleSheet.create({
   mealsCard: { overflow: 'hidden' },
   mealsCardStacked: { marginTop: space.sm },
   mealRow: { flexDirection: 'row', alignItems: 'center', gap: space.base, padding: space.base },
+  pendingRow: { opacity: 0.85 },
   pressed: { backgroundColor: colors.surfaceAlt },
   mealInfo: { flex: 1, gap: 4 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   mealKcal: { alignItems: 'flex-end' },
+  progressTrack: {
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.hairline,
+    overflow: 'hidden',
+    marginTop: space.xs,
+  },
+  progressFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.terracotta },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairline, marginLeft: space.base },
 });
