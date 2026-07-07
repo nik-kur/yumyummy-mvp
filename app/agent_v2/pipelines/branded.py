@@ -14,14 +14,14 @@ from ..providers.base import LLMResponse, extract_json
 from ..providers.dispatch import call_llm, stage_usage
 from ..schemas import BrandedResult, Item, V2Result
 from .common import (
-    choose_source_url,
     domain_of,
     format_message,
     is_redirect_url,
     macros_sane,
+    probe_urls,
+    rank_candidates,
     resolve_redirect_urls,
     sum_totals,
-    url_alive_quick,
 )
 
 
@@ -76,8 +76,28 @@ async def run(
     provider_urls = await _provider_urls(resp)
     official = branded.official_domain
 
+    # Probe every candidate we might show (main + per-item) in one parallel
+    # sweep: catches hard 404s AND soft 404s (200 + "page not found" body).
+    # The brand's homepage joins as a fallback candidate: an official root
+    # page beats an aggregator when search returned no official deep page.
+    main_ranked = rank_candidates(
+        branded.source_url, provider_urls, official, include_official_homepage=True
+    )[:4]
+    item_ranked = {
+        i: rank_candidates(bi.source_url, provider_urls, official)[:2]
+        for i, bi in enumerate(branded.items)
+    }
+    to_probe = list(dict.fromkeys(main_ranked + [u for r in item_ranked.values() for u in r]))
+    alive = await probe_urls(to_probe)
+
+    def first_alive(ranked: List[str]) -> Optional[str]:
+        for u in ranked:
+            if alive.get(u):
+                return u
+        return None
+
     items: List[Item] = []
-    for bi in branded.items:
+    for i, bi in enumerate(branded.items):
         items.append(
             Item(
                 name=bi.name,
@@ -86,19 +106,14 @@ async def run(
                 protein_g=round(bi.protein_g, 1),
                 fat_g=round(bi.fat_g, 1),
                 carbs_g=round(bi.carbs_g, 1),
-                source_url=choose_source_url(bi.source_url, provider_urls, official),
+                source_url=first_alive(item_ranked[i]),
             )
         )
     result.items = items
     result.totals = sum_totals(items)
 
     confidence = branded.confidence if branded.confidence in ("HIGH", "ESTIMATE") else "ESTIMATE"
-    source_url = choose_source_url(branded.source_url, provider_urls, official)
-    # A model-typed URL the search layer didn't confirm may be hallucinated:
-    # one cheap HEAD probe, fall back to the best confirmed page if dead.
-    if source_url and source_url not in provider_urls:
-        if not await url_alive_quick(source_url):
-            source_url = choose_source_url("", provider_urls, official)
+    source_url = first_alive(main_ranked)
     if not source_url:
         # Model sometimes cites per-item only; promote a unanimous item URL.
         item_urls = {i.source_url for i in items if i.source_url}

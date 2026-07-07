@@ -1,0 +1,1686 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/brands_goldens_30_ref.csv",
+    "n": 30,
+    "concurrency": 4,
+    "photo_mode": "b",
+    "wall_clock_s": 104.2,
+    "ts": "2026-07-07 14:18:23"
+  },
+  "summary": {
+    "n": 30,
+    "ok": 30,
+    "errors": 0,
+    "latency_s": {
+      "mean": 8.84,
+      "median": 8.1,
+      "p90": 11.15,
+      "max": 33.38
+    },
+    "cost_usd": {
+      "mean": 0.04553,
+      "total": 1.366
+    },
+    "domain_hit_rate": 0.773,
+    "domain_scored_n": 22,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 26,
+    "kcal_err_pct_median": 2.1,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 22,
+      "blocked": 2,
+      "dead": 3
+    },
+    "confidence_dist": {
+      "HIGH": 21,
+      "ESTIMATE": 9
+    },
+    "mean_search_queries": 3.17
+  },
+  "cases": [
+    {
+      "case_id": "eatout_01",
+      "agent_type": "eatout",
+      "input": "Starbucks Caramel Macchiato grande — кбжу",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 10608.1,
+      "cost_usd": 0.029226,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 250.0,
+        "protein_g": 10.0,
+        "fat_g": 7.0,
+        "carbs_g": 35.0
+      },
+      "items": [
+        {
+          "name": "Starbucks Caramel Macchiato grande (473 ml)",
+          "grams": 473.0,
+          "calories_kcal": 250.0,
+          "protein_g": 10.0,
+          "fat_g": 7.0,
+          "carbs_g": 35.0,
+          "source_url": "https://www.starbucks.com/menu/product/413/hot?parent=%2Fdrinks%2Fhot-coffees%2Fmacchiatos"
+        }
+      ],
+      "source_url": "https://starbucks.com/",
+      "cited_domains": [],
+      "message_text": "Total: 250 kcal • P 10.0g • F 7.0g • C 35.0g\nConfidence: HIGH\nSource: starbucks.com\nNote: Данные приведены для порции Grande (16 fl oz / 473 мл) по стандартному рецепту (с 2% молоком). Калорийность подтверждена официальным сайтом Starbucks (250 ккал). Макронутриенты: белки ~10г, жиры ~7г, углеводы ~35г (из них сахара ~33г). За порцию принят стандартный объем 473 мл.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 856,
+          "output_tokens": 266,
+          "search_queries": 2,
+          "duration_ms": 6924.0,
+          "cost_usd": 0.029226
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "eatout_02",
+      "agent_type": "eatout",
+      "input": "McDonald's Big Mac — calories and macros",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11150.5,
+      "cost_usd": 0.085261,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 503.0,
+        "protein_g": 25.0,
+        "fat_g": 25.0,
+        "carbs_g": 45.0
+      },
+      "items": [
+        {
+          "name": "McDonald's Big Mac (Биг Мак)",
+          "grams": 216.0,
+          "calories_kcal": 503.0,
+          "protein_g": 25.0,
+          "fat_g": 25.0,
+          "carbs_g": 45.0,
+          "source_url": "https://bg.ru/bg/food/food-news/10437-big-hit"
+        }
+      ],
+      "source_url": "https://mcdonalds.com/",
+      "cited_domains": [
+        "bg.ru",
+        "irecommend.ru",
+        "vkusnotochka-menu.ru"
+      ],
+      "message_text": "Total: 503 kcal • P 25.0g • F 25.0g • C 45.0g\nConfidence: HIGH\nSource: mcdonalds.com\nNote: В связи с ребрендингом McDonald's в России, данные приведены для бургера «Биг Хит» (полный аналог Биг Мака) согласно официальному сайту сети «Вкусно — и точка». Состав и КБЖУ идентичны оригинальному рецепту: две котлеты из говядины, сыр, соус, салат и булочка с кунжутом. Для классического McDonald's (США/Европа) значения могут незначительно отличаться (около 509–540 ккал) в зависимости от региона.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 854,
+          "output_tokens": 278,
+          "search_queries": 6,
+          "duration_ms": 7454.0,
+          "cost_usd": 0.085261
+        }
+      ],
+      "search_queries": 6,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 11.8,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_03",
+      "agent_type": "eatout",
+      "input": "KFC Original Recipe chicken breast — кбжу",
+      "region": "US",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11839.6,
+      "cost_usd": 0.08531,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 390.0,
+        "protein_g": 39.0,
+        "fat_g": 21.0,
+        "carbs_g": 11.0
+      },
+      "items": [
+        {
+          "name": "KFC Куриная грудка (оригинальная)",
+          "grams": 172.0,
+          "calories_kcal": 390.0,
+          "protein_g": 39.0,
+          "fat_g": 21.0,
+          "carbs_g": 11.0,
+          "source_url": null
+        }
+      ],
+      "source_url": "https://kfc.ru/",
+      "cited_domains": [],
+      "message_text": "Total: 390 kcal • P 39.0g • F 21.0g • C 11.0g\nConfidence: HIGH\nSource: kfc.ru\nNote: Данные приведены для одной стандартной порции куриной грудки KFC Original Recipe (с костью, в панировке). Вес одной грудки в среднем составляет 172 г. На 100 г продукта: ~227 ккал, Б: 22.7г, Ж: 12.2г, У: 6.4г. В России KFC переименован в Rostic's, но рецептура 'Оригинальной' курицы остается идентичной.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 855,
+          "output_tokens": 294,
+          "search_queries": 6,
+          "duration_ms": 10735.9,
+          "cost_usd": 0.08531
+        }
+      ],
+      "search_queries": 6,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "blocked"
+      }
+    },
+    {
+      "case_id": "eatout_04",
+      "agent_type": "eatout",
+      "input": "Subway Meatball Marinara footlong — кбжу",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8623.0,
+      "cost_usd": 0.043251,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 1020.0,
+        "protein_g": 54.0,
+        "fat_g": 40.0,
+        "carbs_g": 110.0
+      },
+      "items": [
+        {
+          "name": "Subway Meatball Marinara Footlong",
+          "grams": 510.0,
+          "calories_kcal": 1020.0,
+          "protein_g": 54.0,
+          "fat_g": 40.0,
+          "carbs_g": 110.0,
+          "source_url": "https://www.subway.com/en-us/menunutrition/menu/product?ProductId=4267&MenuTypeId=1"
+        }
+      ],
+      "source_url": "https://www.subway.com/en-us/menunutrition/menu/product?ProductId=4267&MenuTypeId=1",
+      "cited_domains": [],
+      "message_text": "Total: 1020 kcal • P 54.0g • F 40.0g • C 110.0g\nConfidence: HIGH\nSource: subway.com\nNote: Данные взяты с официального сайта Subway для стандартной порции сэндвича Footlong (30 см). Вес порции составляет примерно 510 г (на основе данных 255 г для порции 6-inch). КБЖУ может незначительно меняться в зависимости от выбранного типа хлеба и овощей.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 857,
+          "output_tokens": 274,
+          "search_queries": 3,
+          "duration_ms": 5308.0,
+          "cost_usd": 0.043251
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 6.2,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "eatout_05",
+      "agent_type": "eatout",
+      "input": "Burger King Whopper — кбжу на 1 бургер",
+      "region": "US/EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 9629.6,
+      "cost_usd": 0.043141,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 591.8,
+        "protein_g": 26.1,
+        "fat_g": 31.4,
+        "carbs_g": 51.2
+      },
+      "items": [
+        {
+          "name": "Burger King Воппер (Whopper)",
+          "grams": 273.0,
+          "calories_kcal": 591.8,
+          "protein_g": 26.1,
+          "fat_g": 31.4,
+          "carbs_g": 51.2,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 592 kcal • P 26.1g • F 31.4g • C 51.2g\nConfidence: ESTIMATE\nSource: none\nNote: Данные приведены для стандартного бургера «Воппер» весом 273 г согласно официальным данным Burger King Россия. Пищевая ценность на 100 г составляет: 216.8 ккал, белки 9.6 г, жиры 11.5 г, углеводы 18.8 г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 859,
+          "output_tokens": 237,
+          "search_queries": 3,
+          "duration_ms": 9506.4,
+          "cost_usd": 0.043141
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 11.7,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "eatout_06",
+      "agent_type": "eatout",
+      "input": "Domino's Pepperoni Pizza medium 1 slice — calories",
+      "region": "US",
+      "ok": true,
+      "error": null,
+      "latency_ms": 10169.2,
+      "cost_usd": 0.07108,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 200.0,
+        "protein_g": 8.0,
+        "fat_g": 9.0,
+        "carbs_g": 22.0
+      },
+      "items": [
+        {
+          "name": "Domino's Pepperoni Pizza (Medium 12\", Hand Tossed Crust), 1 slice",
+          "grams": 74.0,
+          "calories_kcal": 200.0,
+          "protein_g": 8.0,
+          "fat_g": 9.0,
+          "carbs_g": 22.0,
+          "source_url": "https://www.dominos.com/en/pages/international/"
+        }
+      ],
+      "source_url": "https://www.dominos.com/en/pages/international/",
+      "cited_domains": [
+        "calorieking.com",
+        "dominos.com"
+      ],
+      "message_text": "Total: 200 kcal • P 8.0g • F 9.0g • C 22.0g\nConfidence: HIGH\nSource: dominos.com\nNote: Nutrition data is for 1 slice (1/8 of a medium 12-inch pizza) with standard hand-tossed crust and regular cheese. Each slice weighs approximately 74g (2.6 oz). Values are based on the official Domino's US nutrition guide.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 858,
+          "output_tokens": 217,
+          "search_queries": 5,
+          "duration_ms": 6232.6,
+          "cost_usd": 0.07108
+        }
+      ],
+      "search_queries": 5,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 7.0,
+        "zero_kcal_bug": false,
+        "url_status": "dead"
+      }
+    },
+    {
+      "case_id": "eatout_07",
+      "agent_type": "eatout",
+      "input": "Chipotle chicken burrito bowl — macros",
+      "region": "US",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8333.4,
+      "cost_usd": 0.057243,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 655.0,
+        "protein_g": 51.0,
+        "fat_g": 21.0,
+        "carbs_g": 67.0
+      },
+      "items": [
+        {
+          "name": "Chipotle Chicken Burrito Bowl (Chicken, White Rice, Black Beans, Fresh Tomato Salsa, Cheese, Lettuce)",
+          "grams": 510.0,
+          "calories_kcal": 655.0,
+          "protein_g": 51.0,
+          "fat_g": 21.0,
+          "carbs_g": 67.0,
+          "source_url": "https://www.chipotle.com/nutrition-calculator"
+        }
+      ],
+      "source_url": "https://chipotle.com/",
+      "cited_domains": [
+        "carbmanager.com"
+      ],
+      "message_text": "Total: 655 kcal • P 51.0g • F 21.0g • C 67.0g\nConfidence: HIGH\nSource: chipotle.com\nNote: Расчет произведен для стандартной порции куриного боула (Chicken Burrito Bowl) со стандартным набором ингредиентов: курица (180 ккал), белый рис (210 ккал), черная фасоль (130 ккал), томатная сальса (25 ккал), сыр (110 ккал) и салат (0 ккал). Общий вес порции составляет примерно 510 г. Данные взяты из официального калькулятора пищевой ценности Chipotle.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 853,
+          "output_tokens": 272,
+          "search_queries": 4,
+          "duration_ms": 6109.5,
+          "cost_usd": 0.057243
+        }
+      ],
+      "search_queries": 4,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_08",
+      "agent_type": "eatout",
+      "input": "Кофемания: тирамису — кбжу на порцию",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8829.2,
+      "cost_usd": 0.043102,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 341.0,
+        "protein_g": 6.0,
+        "fat_g": 25.0,
+        "carbs_g": 23.0
+      },
+      "items": [
+        {
+          "name": "Кофемания: Тирамису",
+          "grams": 115.0,
+          "calories_kcal": 341.0,
+          "protein_g": 6.0,
+          "fat_g": 25.0,
+          "carbs_g": 23.0,
+          "source_url": "https://coffeemania.ru/menu/stakan-tiramisu-new"
+        }
+      ],
+      "source_url": "https://coffeemania.ru/menu/stakan-tiramisu-new",
+      "cited_domains": [
+        "coffeemania.ru"
+      ],
+      "message_text": "Total: 341 kcal • P 6.0g • F 25.0g • C 23.0g\nConfidence: HIGH\nSource: coffeemania.ru\nNote: Данные взяты с официального сайта доставки «Кофемании». Порция составляет 115 г. КБЖУ: 341 ккал, Белки — 6 г, Жиры — 25 г, Углеводы — 23 г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 860,
+          "output_tokens": 224,
+          "search_queries": 3,
+          "duration_ms": 6401.6,
+          "cost_usd": 0.043102
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_09",
+      "agent_type": "eatout",
+      "input": "Тануки: ролл Калифорния 8 шт — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8797.0,
+      "cost_usd": 0.043181,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 334.4,
+        "protein_g": 12.3,
+        "fat_g": 27.7,
+        "carbs_g": 24.7
+      },
+      "items": [
+        {
+          "name": "Тануки: ролл Калифорния (8 шт.)",
+          "grams": 190.0,
+          "calories_kcal": 334.4,
+          "protein_g": 12.3,
+          "fat_g": 27.7,
+          "carbs_g": 24.7,
+          "source_url": "https://with-sport.com/product/category/tanuki"
+        }
+      ],
+      "source_url": "https://www.tanuki.ru/menu/rolly/roll-kaliforniya/",
+      "cited_domains": [
+        "healthline.com",
+        "roliksushi.ru",
+        "tanukifamily.kz",
+        "with-sport.com"
+      ],
+      "message_text": "Total: 334 kcal • P 12.3g • F 27.7g • C 24.7g\nConfidence: HIGH\nSource: tanuki.ru\nNote: Данные взяты из официального меню «Тануки». Стандартная порция ролла Калифорния составляет 190 г (8 шт.). Пищевая ценность на 100 г: 176 ккал, белки 6.5 г, жиры 14.6 г, углеводы 13 г. Итоговые значения рассчитаны на порцию 190 г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 861,
+          "output_tokens": 250,
+          "search_queries": 3,
+          "duration_ms": 5504.4,
+          "cost_usd": 0.043181
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_10",
+      "agent_type": "eatout",
+      "input": "Joe & The Juice Power Shake — кбжу",
+      "region": "EU",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8048.0,
+      "cost_usd": 0.057162,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 400.0,
+        "protein_g": 24.0,
+        "fat_g": 13.0,
+        "carbs_g": 47.0
+      },
+      "items": [
+        {
+          "name": "Joe & The Juice Power Shake (Regular, 16 oz / 470 ml)",
+          "grams": 470.0,
+          "calories_kcal": 400.0,
+          "protein_g": 24.0,
+          "fat_g": 13.0,
+          "carbs_g": 47.0,
+          "source_url": "https://content.joejuice.com/campaigns/power-shake-pop"
+        }
+      ],
+      "source_url": "https://content.joejuice.com/campaigns/power-shake-pop",
+      "cited_domains": [
+        "content.joejuice.com",
+        "flypittsburgh.com",
+        "joejuice.com",
+        "scribd.com"
+      ],
+      "message_text": "Total: 400 kcal • P 24.0g • F 13.0g • C 47.0g\nConfidence: HIGH\nSource: content.joejuice.com\nNote: Данные взяты из официального меню Joe & The Juice. Power Shake состоит из клубники, банана и ванильного молока. Калорийность порции Regular (16 oz / ~473 мл) составляет 400 ккал, порции Small (12 oz / ~355 мл) — 290 ккал. Расчет макронутриентов основан на официальном составе для стандартной версии напитка.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 855,
+          "output_tokens": 245,
+          "search_queries": 4,
+          "duration_ms": 5413.6,
+          "cost_usd": 0.057162
+        }
+      ],
+      "search_queries": 4,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": null,
+        "kcal_err_pct": null,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_11",
+      "agent_type": "eatout",
+      "input": "Wendy's Baconator — calories and protein",
+      "region": "US",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8147.2,
+      "cost_usd": 0.029207,
+      "confidence": "HIGH",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 960.0,
+        "protein_g": 57.0,
+        "fat_g": 66.0,
+        "carbs_g": 36.0
+      },
+      "items": [
+        {
+          "name": "Wendy's Baconator",
+          "grams": 304.0,
+          "calories_kcal": 960.0,
+          "protein_g": 57.0,
+          "fat_g": 66.0,
+          "carbs_g": 36.0,
+          "source_url": "http://pellgrantcalculator.com/baconator.html"
+        }
+      ],
+      "source_url": "https://wendys.com/",
+      "cited_domains": [
+        "calorieking.com",
+        "carbmanager.com",
+        "eatthismuch.com",
+        "en.wikipedia.org",
+        "mynetdiary.com",
+        "pellgrantcalculator.com",
+        "wendymenuusa.com",
+        "wendys.ky",
+        "wikipedia.org"
+      ],
+      "message_text": "Total: 960 kcal • P 57.0g • F 66.0g • C 36.0g\nConfidence: HIGH\nSource: wendys.com\nNote: Данные приведены для стандартной порции (1 сэндвич), которая весит примерно 304 г. Калорийность и БЖУ соответствуют актуальным данным для североамериканского рынка (960 ккал, 57 г белка). В разных регионах (например, в Великобритании) показатели могут незначительно отличаться из-за состава ингредиентов.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 854,
+          "output_tokens": 260,
+          "search_queries": 2,
+          "duration_ms": 5238.8,
+          "cost_usd": 0.029207
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_12",
+      "agent_type": "eatout",
+      "input": "Шашлык из свинины в локальном кафе 200г — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6432.3,
+      "cost_usd": 0.04321,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 516.0,
+        "protein_g": 31.4,
+        "fat_g": 42.8,
+        "carbs_g": 1.2
+      },
+      "items": [
+        {
+          "name": "Шашлык из свинины (локальное кафе)",
+          "grams": 200.0,
+          "calories_kcal": 516.0,
+          "protein_g": 31.4,
+          "fat_g": 42.8,
+          "carbs_g": 1.2,
+          "source_url": "https://tools.myfooddata.com/nutrition-facts/783303/wt1"
+        }
+      ],
+      "source_url": "https://tools.myfooddata.com/nutrition-facts/783303/wt1",
+      "cited_domains": [
+        "myfooddata.com",
+        "tools.myfooddata.com"
+      ],
+      "message_text": "Total: 516 kcal • P 31.4g • F 42.8g • C 1.2g\nConfidence: ESTIMATE\nSource: tools.myfooddata.com\nNote: Расчет произведен на основе средних значений для готового шашлыка из свинины (258 ккал, 15.7г белка, 21.4г жира на 100г). В локальных кафе чаще всего используется свиная шея или лопатка, что обуславливает умеренно высокое содержание жира. Для порции 200г значения удвоены. Углеводы минимальны (из маринада).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 865,
+          "output_tokens": 259,
+          "search_queries": 3,
+          "duration_ms": 4834.8,
+          "cost_usd": 0.04321
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 7.9,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_13",
+      "agent_type": "eatout",
+      "input": "Хачапури по-аджарски в грузинском ресторане — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6140.4,
+      "cost_usd": 0.029251,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 880.0,
+        "protein_g": 38.0,
+        "fat_g": 38.0,
+        "carbs_g": 96.0
+      },
+      "items": [
+        {
+          "name": "Хачапури по-аджарски (средняя порция в ресторане)",
+          "grams": 350.0,
+          "calories_kcal": 880.0,
+          "protein_g": 38.0,
+          "fat_g": 38.0,
+          "carbs_g": 96.0,
+          "source_url": "https://www.tablicakalorijnosti.ru/produkty/khachapuri-po-adzharski"
+        }
+      ],
+      "source_url": "https://www.tablicakalorijnosti.ru/produkty/khachapuri-po-adzharski",
+      "cited_domains": [
+        "tablicakalorijnosti.ru"
+      ],
+      "message_text": "Total: 880 kcal • P 38.0g • F 38.0g • C 96.0g\nConfidence: ESTIMATE\nSource: tablicakalorijnosti.ru\nNote: Расчет произведен для стандартной ресторанной порции весом 350 г на основе усредненных данных популярных сетей (Хачо и Пури, Пхали Хинкали). В среднем на 100 г приходится ~250-260 ккал (Б: 11, Ж: 11, У: 27-30). Вес порции в ресторанах обычно варьируется от 300 до 450 г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 865,
+          "output_tokens": 273,
+          "search_queries": 2,
+          "duration_ms": 3967.5,
+          "cost_usd": 0.029251
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 2.2,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_14",
+      "agent_type": "eatout",
+      "input": "Pad Thai в тайском кафе — кбжу на порцию",
+      "region": "ASIA",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6600.0,
+      "cost_usd": 0.043125,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 530.0,
+        "protein_g": 18.0,
+        "fat_g": 16.0,
+        "carbs_g": 78.0
+      },
+      "items": [
+        {
+          "name": "Пад Тай (средняя порция в кафе)",
+          "grams": 350.0,
+          "calories_kcal": 530.0,
+          "protein_g": 18.0,
+          "fat_g": 16.0,
+          "carbs_g": 78.0,
+          "source_url": "https://blog.cookpad.com/us/pad-thai/"
+        }
+      ],
+      "source_url": "https://blog.cookpad.com/us/pad-thai/",
+      "cited_domains": [
+        "av.ru",
+        "blog.cookpad.com",
+        "cookpad.com",
+        "goodfoodbowl.ru",
+        "livejournal.com",
+        "umamispb.ru"
+      ],
+      "message_text": "Total: 530 kcal • P 18.0g • F 16.0g • C 78.0g\nConfidence: ESTIMATE\nSource: blog.cookpad.com\nNote: Расчет произведен для стандартной ресторанной порции (~350 г). В среднем Pad Thai содержит 140–160 ккал на 100 г. Данные могут варьироваться в зависимости от основного ингредиента (курица, креветки или тофу) и количества масла/сахара в соусе. Использованы усредненные значения из нескольких источников для ресторанных блюд.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 858,
+          "output_tokens": 232,
+          "search_queries": 3,
+          "duration_ms": 3814.5,
+          "cost_usd": 0.043125
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 29.3,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "eatout_15",
+      "agent_type": "eatout",
+      "input": "Рамен с курицей в локальном японском кафе — кбжу",
+      "region": "ASIA",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5207.6,
+      "cost_usd": 0.02924,
+      "confidence": "ESTIMATE",
+      "intent": "eatout",
+      "totals": {
+        "calories_kcal": 530.0,
+        "protein_g": 35.0,
+        "fat_g": 14.5,
+        "carbs_g": 65.0
+      },
+      "items": [
+        {
+          "name": "Рамен с курицей (порция в кафе)",
+          "grams": 550.0,
+          "calories_kcal": 530.0,
+          "protein_g": 35.0,
+          "fat_g": 14.5,
+          "carbs_g": 65.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 530 kcal • P 35.0g • F 14.5g • C 65.0g\nConfidence: ESTIMATE\nSource: none\nNote: Поскольку бренд не указан, расчет произведен для стандартной ресторанной порции рамена с курицей весом около 550 г (бульон, пшеничная лапша, куриное филе, половинка яйца и овощи). Плотность калорий составляет около 0.96 ккал/г, что типично для супов с большим количеством лапши и белка. Данные усреднены по базам нутрициологических приложений Arise и Nutracheck для готового блюда.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 860,
+          "output_tokens": 270,
+          "search_queries": 2,
+          "duration_ms": 4716.5,
+          "cost_usd": 0.02924
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 3.6,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "product_01",
+      "agent_type": "product",
+      "input": "Coca-Cola Classic 500 мл — кбжу на бутылку",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6066.3,
+      "cost_usd": 0.043088,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 210.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 53.0
+      },
+      "items": [
+        {
+          "name": "Coca-Cola Classic (бутылка 500 мл)",
+          "grams": 500.0,
+          "calories_kcal": 210.0,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 53.0,
+          "source_url": "https://oe.kz/p/napitok-gazirovanniy-coca-cola-classic-0-45-l-zhestyanaya-banka/"
+        }
+      ],
+      "source_url": "https://oe.kz/p/napitok-gazirovanniy-coca-cola-classic-0-45-l-zhestyanaya-banka/",
+      "cited_domains": [
+        "barista-ltd.ru",
+        "bay-sweets.ru",
+        "centralcoop.co.uk",
+        "coca-cola.com",
+        "health-diet.ru",
+        "oe.kz",
+        "paracels.kz"
+      ],
+      "message_text": "Total: 210 kcal • P 0.0g • F 0.0g • C 53.0g\nConfidence: HIGH\nSource: oe.kz\nNote: Расчет произведен для стандартной бутылки 500 мл на основе официальных данных: 42 ккал и 10.6 г углеводов на 100 мл. Содержание жиров и белков равно нулю.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 861,
+          "output_tokens": 219,
+          "search_queries": 3,
+          "duration_ms": 4011.2,
+          "cost_usd": 0.043088
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_02",
+      "agent_type": "product",
+      "input": "Snickers батончик 50 г — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5308.8,
+      "cost_usd": 0.043389,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 248.0,
+        "protein_g": 3.8,
+        "fat_g": 12.9,
+        "carbs_g": 29.2
+      },
+      "items": [
+        {
+          "name": "Батончик Snickers (Сникерс)",
+          "grams": 50.0,
+          "calories_kcal": 248.0,
+          "protein_g": 3.8,
+          "fat_g": 12.9,
+          "carbs_g": 29.2,
+          "source_url": null
+        }
+      ],
+      "source_url": "https://snickers.ru/",
+      "cited_domains": [],
+      "message_text": "Total: 248 kcal • P 3.8g • F 12.9g • C 29.2g\nConfidence: HIGH\nSource: snickers.ru\nNote: Расчет произведен для стандартного батончика весом 50 г на основе данных производителя (Mars) для российского рынка: 496 ккал, 7.6 г белков, 25.8 г жиров и 58.3 г углеводов на 100 г. Обратите внимание, что фактический вес стандартного одиночного батончика в РФ составляет 50.5 г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 858,
+          "output_tokens": 320,
+          "search_queries": 3,
+          "duration_ms": 4918.3,
+          "cost_usd": 0.043389
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.2,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_03",
+      "agent_type": "product",
+      "input": "Red Bull 250 мл — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 7438.6,
+      "cost_usd": 0.029157,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 115.0,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 27.5
+      },
+      "items": [
+        {
+          "name": "Red Bull Energy Drink",
+          "grams": 250.0,
+          "calories_kcal": 115.0,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 27.5,
+          "source_url": "https://www.redbull.com/ru-ru/energydrink/kalorii-red-bull"
+        }
+      ],
+      "source_url": "https://www.redbull.com/ru-ru/energydrink/kalorii-red-bull",
+      "cited_domains": [
+        "barista-ltd.ru",
+        "colostate.edu",
+        "eatingsmartbeingactive.colostate.edu",
+        "redbull.com"
+      ],
+      "message_text": "Total: 115 kcal • P 0.0g • F 0.0g • C 27.5g\nConfidence: HIGH\nSource: redbull.com\nNote: Данные рассчитаны на банку объемом 250 мл на основе официальных показателей Red Bull: 46 ккал и 11 г углеводов на 100 мл. В одной банке (250 мл) содержится 27 г сахаров.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 856,
+          "output_tokens": 243,
+          "search_queries": 2,
+          "duration_ms": 3795.6,
+          "cost_usd": 0.029157
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 2.7,
+        "zero_kcal_bug": false,
+        "url_status": "blocked"
+      }
+    },
+    {
+      "case_id": "product_04",
+      "agent_type": "product",
+      "input": "Nutella 30 г (2 ст.л.) — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 9767.2,
+      "cost_usd": 0.029115,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 161.7,
+        "protein_g": 1.9,
+        "fat_g": 9.3,
+        "carbs_g": 17.2
+      },
+      "items": [
+        {
+          "name": "Nutella (ореховая паста с какао)",
+          "grams": 30.0,
+          "calories_kcal": 161.7,
+          "protein_g": 1.9,
+          "fat_g": 9.3,
+          "carbs_g": 17.2,
+          "source_url": "https://www.nutella.com/uk/en/products/nutella"
+        }
+      ],
+      "source_url": "https://www.nutella.com/uk/en/products/nutella",
+      "cited_domains": [
+        "health-diet.ru",
+        "nutella.com"
+      ],
+      "message_text": "Total: 162 kcal • P 1.9g • F 9.3g • C 17.2g\nConfidence: HIGH\nSource: nutella.com\nNote: Расчет выполнен на основе официальных данных Ferrero для порции 30 г (100 г продукта содержат: 539 ккал, 6.3 г белков, 30.9 г жиров, 57.5 г углеводов). Указанный объем 2 ст.л. принят равным 30 г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 861,
+          "output_tokens": 228,
+          "search_queries": 2,
+          "duration_ms": 4167.9,
+          "cost_usd": 0.029115
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.1,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_05",
+      "agent_type": "product",
+      "input": "Lay's Classic чипсы 100 г — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 9263.8,
+      "cost_usd": 0.071046,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 520.0,
+        "protein_g": 6.0,
+        "fat_g": 32.0,
+        "carbs_g": 52.0
+      },
+      "items": [
+        {
+          "name": "Lay's Classic (чипсы из натурального картофеля с солью)",
+          "grams": 100.0,
+          "calories_kcal": 520.0,
+          "protein_g": 6.0,
+          "fat_g": 32.0,
+          "carbs_g": 52.0,
+          "source_url": "https://tools.myfooddata.com/nutrition-facts/2632274/wt1"
+        }
+      ],
+      "source_url": "https://lays.ru/",
+      "cited_domains": [
+        "calorizator.ru",
+        "health-diet.ru",
+        "myfooddata.com",
+        "openfoodfacts.org",
+        "tools.myfooddata.com"
+      ],
+      "message_text": "Total: 520 kcal • P 6.0g • F 32.0g • C 52.0g\nConfidence: HIGH\nSource: lays.ru\nNote: Данные приведены для 100 г классических чипсов Lay's (золотистый картофель с солью). Состав: картофель, растительное масло, соль. Энергетическая ценность подтверждена данными для российского рынка (510–520 ккал на 100 г). Расчет калорийности: 6*4 + 32*9 + 52*4 = 520 ккал.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 861,
+          "output_tokens": 205,
+          "search_queries": 5,
+          "duration_ms": 6210.4,
+          "cost_usd": 0.071046
+        }
+      ],
+      "search_queries": 5,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 3.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_06",
+      "agent_type": "product",
+      "input": "Danone Activia натуральная 125 г — кбжу",
+      "region": "EU/CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5086.8,
+      "cost_usd": 0.04318,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 93.8,
+        "protein_g": 5.6,
+        "fat_g": 4.4,
+        "carbs_g": 7.9
+      },
+      "items": [
+        {
+          "name": "Danone Активиа натуральная (биойогурт)",
+          "grams": 125.0,
+          "calories_kcal": 93.8,
+          "protein_g": 5.6,
+          "fat_g": 4.4,
+          "carbs_g": 7.9,
+          "source_url": null
+        }
+      ],
+      "source_url": "https://danone.ru/",
+      "cited_domains": [],
+      "message_text": "Total: 94 kcal • P 5.6g • F 4.4g • C 7.9g\nConfidence: HIGH\nSource: danone.ru\nNote: Данные рассчитаны для упаковки 125 г на основе стандартных значений для Активиа натуральная 3.5% (на 100 г: 75 ккал, белки 4.5 г, жиры 3.5 г, углеводы 6.3 г). Бренд Danone в России переименован в «АктиБио», но состав продукта остался идентичным.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 860,
+          "output_tokens": 250,
+          "search_queries": 3,
+          "duration_ms": 4125.9,
+          "cost_usd": 0.04318
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.2,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_07",
+      "agent_type": "product",
+      "input": "Haribo Goldbears 100 г — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5982.0,
+      "cost_usd": 0.043146,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 343.0,
+        "protein_g": 6.9,
+        "fat_g": 0.5,
+        "carbs_g": 77.0
+      },
+      "items": [
+        {
+          "name": "Haribo Goldbears (Золотые мишки)",
+          "grams": 100.0,
+          "calories_kcal": 343.0,
+          "protein_g": 6.9,
+          "fat_g": 0.5,
+          "carbs_g": 77.0,
+          "source_url": null
+        }
+      ],
+      "source_url": "https://haribo.com/",
+      "cited_domains": [],
+      "message_text": "Total: 343 kcal • P 6.9g • F 0.5g • C 77.0g\nConfidence: HIGH\nSource: haribo.com\nNote: Данные указаны на 100 г продукта согласно официальной маркировке для европейского рынка (производство Венгрия). Калорийность подтверждена крупными ритейлерами и базами данных (Rimi, Calorizator).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 858,
+          "output_tokens": 239,
+          "search_queries": 3,
+          "duration_ms": 4549.6,
+          "cost_usd": 0.043146
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_08",
+      "agent_type": "product",
+      "input": "Orbit Spearmint жвачка 1 подушечка — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11560.8,
+      "cost_usd": 0.057214,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 2.1,
+        "protein_g": 0.0,
+        "fat_g": 0.0,
+        "carbs_g": 0.8
+      },
+      "items": [
+        {
+          "name": "Orbit Spearmint жвачка (1 подушечка)",
+          "grams": 1.36,
+          "calories_kcal": 2.1,
+          "protein_g": 0.0,
+          "fat_g": 0.0,
+          "carbs_g": 0.8,
+          "source_url": "https://www.orbitgum.com/"
+        }
+      ],
+      "source_url": "https://orbitgum.com/",
+      "cited_domains": [
+        "barista-ltd.ru",
+        "eatthismuch.com"
+      ],
+      "message_text": "Total: 2 kcal • P 0.0g • F 0.0g • C 0.8g\nConfidence: ESTIMATE\nSource: orbitgum.com\nNote: Расчет произведен на одну подушечку весом 1.36 г (стандартная пачка 13.6 г содержит 10 штук). Энергетическая ценность Orbit Spearmint составляет около 152 ккал на 100 г, что дает ~2 ккал на подушечку. Углеводы представлены в основном многоатомными спиртами (полиолами).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 861,
+          "output_tokens": 261,
+          "search_queries": 4,
+          "duration_ms": 4761.6,
+          "cost_usd": 0.057214
+        }
+      ],
+      "search_queries": 4,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 58.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_09",
+      "agent_type": "product",
+      "input": "Barilla Spaghetti No.5 100 г сухих — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 7103.5,
+      "cost_usd": 0.0431,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 359.0,
+        "protein_g": 14.0,
+        "fat_g": 2.0,
+        "carbs_g": 71.2
+      },
+      "items": [
+        {
+          "name": "Barilla Spaghetti No.5 (сухой продукт)",
+          "grams": 100.0,
+          "calories_kcal": 359.0,
+          "protein_g": 14.0,
+          "fat_g": 2.0,
+          "carbs_g": 71.2,
+          "source_url": "https://www.barilla.com/ru-ru/produkty/pasta/klassicheskaya-kollektsiya/spaghetti-n5"
+        }
+      ],
+      "source_url": "https://barilla.com/",
+      "cited_domains": [
+        "barilla.com",
+        "barilla.ru",
+        "dietadiary.com",
+        "eancatalog.ru",
+        "health-diet.ru",
+        "knuspr.de",
+        "myfooddata.com",
+        "piccantino.com"
+      ],
+      "message_text": "Total: 359 kcal • P 14.0g • F 2.0g • C 71.2g\nConfidence: HIGH\nSource: barilla.com\nNote: Данные указаны для 100 г сухих макарон Barilla Spaghetti No.5 согласно официальному российскому сайту производителя. Обратите внимание, что содержание белка в классической линейке Barilla составляет 14 г на 100 г продукта.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 862,
+          "output_tokens": 223,
+          "search_queries": 3,
+          "duration_ms": 3862.4,
+          "cost_usd": 0.0431
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_10",
+      "agent_type": "product",
+      "input": "Heinz Ketchup 20 г (1 пакетик) — кбжу",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6192.6,
+      "cost_usd": 0.085166,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 20.4,
+        "protein_g": 0.2,
+        "fat_g": 0.0,
+        "carbs_g": 4.6
+      },
+      "items": [
+        {
+          "name": "Heinz Tomato Ketchup (20 г пакетик)",
+          "grams": 20.0,
+          "calories_kcal": 20.4,
+          "protein_g": 0.2,
+          "fat_g": 0.0,
+          "carbs_g": 4.6,
+          "source_url": "https://www.onestop.co.uk/product/heinz-tomato-ketchup-460g/"
+        }
+      ],
+      "source_url": "https://www.onestop.co.uk/product/heinz-tomato-ketchup-460g/",
+      "cited_domains": [],
+      "message_text": "Total: 20 kcal • P 0.2g • F 0.0g • C 4.6g\nConfidence: HIGH\nSource: onestop.co.uk\nNote: Расчет произведен на основе стандартной порции классического томатного кетчупа Heinz (102 ккал на 100 г). Для пакетика весом 20 г значения умножены на 0.2.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 861,
+          "output_tokens": 245,
+          "search_queries": 6,
+          "duration_ms": 5257.9,
+          "cost_usd": 0.085166
+        }
+      ],
+      "search_queries": 6,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 2.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_11",
+      "agent_type": "product",
+      "input": "Chobani Greek Yogurt 0% 170 г — macros",
+      "region": "US",
+      "ok": true,
+      "error": null,
+      "latency_ms": 10921.1,
+      "cost_usd": 0.029141,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 90.0,
+        "protein_g": 16.0,
+        "fat_g": 0.0,
+        "carbs_g": 6.0
+      },
+      "items": [
+        {
+          "name": "Chobani Greek Yogurt 0% Plain",
+          "grams": 170.0,
+          "calories_kcal": 90.0,
+          "protein_g": 16.0,
+          "fat_g": 0.0,
+          "carbs_g": 6.0,
+          "source_url": "https://www.chobani.com/products/yogurt/greek/nonfat-plain-large-size-tub"
+        }
+      ],
+      "source_url": "https://www.chobani.com/products/yogurt/greek/nonfat-plain-large-size-tub",
+      "cited_domains": [
+        "chobani.com"
+      ],
+      "message_text": "Total: 90 kcal • P 16.0g • F 0.0g • C 6.0g\nConfidence: HIGH\nSource: chobani.com\nNote: Данные взяты с официального сайта Chobani для порции обезжиренного греческого йогурта (Nonfat Plain) объемом 170 г (3/4 чашки). В разных регионах (например, в Австралии) содержание белка может незначительно отличаться (до 16.5 г), но для стандартного продукта Chobani показатели составляют 90 ккал и 16 г белка.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 860,
+          "output_tokens": 237,
+          "search_queries": 2,
+          "duration_ms": 3316.2,
+          "cost_usd": 0.029141
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_12",
+      "agent_type": "product",
+      "input": "Домашний компот из яблок 250 мл — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6104.0,
+      "cost_usd": 0.029775,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 137.5,
+        "protein_g": 0.2,
+        "fat_g": 0.2,
+        "carbs_g": 34.0
+      },
+      "items": [
+        {
+          "name": "Домашний компот из яблок",
+          "grams": 250.0,
+          "calories_kcal": 137.5,
+          "protein_g": 0.2,
+          "fat_g": 0.2,
+          "carbs_g": 34.0,
+          "source_url": "https://beregifiguru.ru/%D0%9F%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82%D1%8B/%D0%9A%D0%B0%D0%BB%D0%BE%D1%80%D0%B8%D0%B9%D0%BD%D0%BE%D1%81%D1%82%D1%8C/%D0%9A%D0%BE%D0%BC%D0%BF%D0%BE%D1%82-%D1%8F%D0%B1%D0%BB%D0%BE%D1%87%D0%BD%D1%8B%D0%B9"
+        }
+      ],
+      "source_url": "https://beregifiguru.ru/%D0%9F%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82%D1%8B/%D0%9A%D0%B0%D0%BB%D0%BE%D1%80%D0%B8%D0%B9%D0%BD%D0%BE%D1%81%D1%82%D1%8C/%D0%9A%D0%BE%D0%BC%D0%BF%D0%BE%D1%82-%D1%8F%D0%B1%D0%BB%D0%BE%D1%87%D0%BD%D1%8B%D0%B9",
+      "cited_domains": [],
+      "message_text": "Total: 138 kcal • P 0.2g • F 0.2g • C 34.0g\nConfidence: ESTIMATE\nSource: beregifiguru.ru\nNote: Расчет произведен для стандартного домашнего яблочного компота с сахаром (на основе данных Скурихина/Береги Фигуру: 55 ккал, 0.1г белка, 0.1г жира, 13.6г углеводов на 100 мл). Объем 250 мл соответствует среднему стакану. Значения могут варьироваться в зависимости от количества добавленного сахара (от 25 до 90 ккал на 100 мл).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 863,
+          "output_tokens": 448,
+          "search_queries": 2,
+          "duration_ms": 5082.2,
+          "cost_usd": 0.029775
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 21.7,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_13",
+      "agent_type": "product",
+      "input": "Творог 5% без бренда 200 г — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6235.0,
+      "cost_usd": 0.029073,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 242.0,
+        "protein_g": 34.4,
+        "fat_g": 10.0,
+        "carbs_g": 6.0
+      },
+      "items": [
+        {
+          "name": "Творог 5% (без бренда)",
+          "grams": 200.0,
+          "calories_kcal": 242.0,
+          "protein_g": 34.4,
+          "fat_g": 10.0,
+          "carbs_g": 6.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 242 kcal • P 34.4g • F 10.0g • C 6.0g\nConfidence: ESTIMATE\nSource: none\nNote: Расчет произведен на основе средних данных ГОСТ для творога 5% жирности: 121 ккал, 17.2 г белка, 5 г жира и 3 г углеводов на 100 г. Значения умножены на 2 (для порции 200 г).",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 862,
+          "output_tokens": 214,
+          "search_queries": 2,
+          "duration_ms": 5344.7,
+          "cost_usd": 0.029073
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "product_14",
+      "agent_type": "product",
+      "input": "Хлеб белый нарезной 1 кусок ~30 г — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6246.4,
+      "cost_usd": 0.029215,
+      "confidence": "HIGH",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 78.0,
+        "protein_g": 2.2,
+        "fat_g": 0.9,
+        "carbs_g": 15.3
+      },
+      "items": [
+        {
+          "name": "Хлеб белый нарезной (1 кусок)",
+          "grams": 30.0,
+          "calories_kcal": 78.0,
+          "protein_g": 2.2,
+          "fat_g": 0.9,
+          "carbs_g": 15.3,
+          "source_url": "https://khleb.ru/catalog/svezhiy-khleb/belyy-khleb/detail/baton-nareznoy-400-g/"
+        }
+      ],
+      "source_url": "https://kolomenskoe.ru/",
+      "cited_domains": [
+        "dietadiary.com",
+        "khleb.ru"
+      ],
+      "message_text": "Total: 78 kcal • P 2.2g • F 0.9g • C 15.3g\nConfidence: HIGH\nSource: kolomenskoe.ru\nNote: Расчёт произведён для одного стандартного куска белого нарезного батона весом 30 г на основе данных ГОСТ 27844-88 (энергетическая ценность 260 ккал на 100 г). Использованы показатели БЖУ: белки 7.5г, жиры 3.0г, углеводы 51.0г на 100г.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 864,
+          "output_tokens": 261,
+          "search_queries": 2,
+          "duration_ms": 3552.7,
+          "cost_usd": 0.029215
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 1.3,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "product_15",
+      "agent_type": "product",
+      "input": "Домашние блинчики с мясом 2 шт — кбжу",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 33375.9,
+      "cost_usd": 0.02924,
+      "confidence": "ESTIMATE",
+      "intent": "product",
+      "totals": {
+        "calories_kcal": 315.0,
+        "protein_g": 13.5,
+        "fat_g": 15.0,
+        "carbs_g": 31.5
+      },
+      "items": [
+        {
+          "name": "Домашние блинчики с мясом (2 шт)",
+          "grams": 150.0,
+          "calories_kcal": 315.0,
+          "protein_g": 13.5,
+          "fat_g": 15.0,
+          "carbs_g": 31.5,
+          "source_url": "https://www.gastronom.ru/text/blinchiki-s-myasom-kalorijnost-opisanie-blyuda-kak-vybirat-nachinku-kak-gotovit-bzhu-1018596"
+        }
+      ],
+      "source_url": "https://www.gastronom.ru/text/blinchiki-s-myasom-kalorijnost-opisanie-blyuda-kak-vybirat-nachinku-kak-gotovit-bzhu-1018596",
+      "cited_domains": [],
+      "message_text": "Total: 315 kcal • P 13.5g • F 15.0g • C 31.5g\nConfidence: ESTIMATE\nSource: gastronom.ru\nNote: Расчет произведен для порции из 2 домашних блинчиков средним весом 75 г каждый (итого 150 г). Средняя калорийность домашних блинов с мясом составляет около 210 ккал на 100 г. Пищевая ценность может варьироваться в зависимости от жирности фарша и количества масла при обжарке.",
+      "stages": [
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 861,
+          "output_tokens": 270,
+          "search_queries": 2,
+          "duration_ms": 32789.0,
+          "cost_usd": 0.02924
+        }
+      ],
+      "search_queries": 2,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 21.2,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}

@@ -6,6 +6,7 @@ Modes (eval subvariants):
   b — model identifies items, USDA FDC supplies macros for generic items (default)
   c — like b, plus a grounded branded lookup when a brand is clearly visible
 """
+import asyncio
 import time
 from typing import Optional
 
@@ -84,16 +85,32 @@ async def run(
 
         if branded_parsed:
             if mode == "c":
-                # One extra grounded call covering all branded items together.
-                query = "; ".join(
-                    f"{p.brand} {p.name} ~{p.grams:.0f} g".strip() for p in branded_parsed
+                # One grounded lookup PER brand, in parallel. A combined query
+                # for several brands has no single official page, so search
+                # drifts to aggregators; per-brand queries each rank their own
+                # official domain first. Capped to bound cost/latency.
+                lookups = branded_parsed[:3]
+                extra = branded_parsed[3:]
+                subs = await asyncio.gather(
+                    *(
+                        branded_pipeline.run(
+                            f"Nutrition for: {p.brand} {p.name} ~{p.grams:.0f} g".strip(),
+                            spec,
+                            intent="photo_meal",
+                        )
+                        for p in lookups
+                    )
                 )
-                sub = await branded_pipeline.run(
-                    f"Nutrition for: {query}", spec, intent="photo_meal"
+                for p, sub in zip(lookups, subs):
+                    result.stages.extend(sub.stages)
+                    result.total_cost_usd = round(result.total_cost_usd + sub.total_cost_usd, 6)
+                    if sub.items and not sub.error:
+                        items.extend(sub.items)
+                    else:  # lookup failed — keep the vision estimate
+                        items.append(_estimate_item(p, p.grams if p.grams > 0 else 100.0))
+                items.extend(
+                    _estimate_item(p, p.grams if p.grams > 0 else 100.0) for p in extra
                 )
-                result.stages.extend(sub.stages)
-                result.total_cost_usd = round(result.total_cost_usd + sub.total_cost_usd, 6)
-                items.extend(sub.items)
             else:
                 items.extend(
                     _estimate_item(p, p.grams if p.grams > 0 else 100.0) for p in branded_parsed

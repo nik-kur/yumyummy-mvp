@@ -1,0 +1,1022 @@
+{
+  "meta": {
+    "variant": "v2g",
+    "dataset": "evals/agent_v2/datasets/photos_real_15.csv",
+    "n": 15,
+    "concurrency": 3,
+    "photo_mode": "c",
+    "wall_clock_s": 41.8,
+    "ts": "2026-07-07 14:21:26"
+  },
+  "summary": {
+    "n": 15,
+    "ok": 15,
+    "errors": 0,
+    "latency_s": {
+      "mean": 6.86,
+      "median": 6.1,
+      "p90": 11.76,
+      "max": 13.76
+    },
+    "cost_usd": {
+      "mean": 0.02441,
+      "total": 0.3662
+    },
+    "domain_hit_rate": 0.5,
+    "domain_scored_n": 4,
+    "kcal_ok_rate": 1.0,
+    "kcal_scored_n": 15,
+    "kcal_err_pct_median": 5.0,
+    "zero_kcal_bugs": 0,
+    "url_status_dist": {
+      "alive": 5
+    },
+    "confidence_dist": {
+      "HIGH": 5,
+      "ESTIMATE": 10
+    },
+    "mean_search_queries": 1.6
+  },
+  "cases": [
+    {
+      "case_id": "photo_01",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3011.2,
+      "cost_usd": 0.001345,
+      "confidence": "HIGH",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 272.7,
+        "protein_g": 23.5,
+        "fat_g": 14.0,
+        "carbs_g": 13.2
+      },
+      "items": [
+        {
+          "name": "baked syrniki sugar-free",
+          "grams": 140.0,
+          "calories_kcal": 272.7,
+          "protein_g": 23.5,
+          "fat_g": 14.0,
+          "carbs_g": 13.2,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 273 kcal • P 23.5g • F 14.0g • C 13.2g\nConfidence: HIGH\nSource: photo label\nNote: mode=c 1 item(s) read from the label/menu in the photo. Nutrition data taken directly from the packaging label for a 140g portion.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 188,
+          "search_queries": 0,
+          "duration_ms": 2975.1,
+          "cost_usd": 0.001345
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.1,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_02",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3110.7,
+      "cost_usd": 0.00141,
+      "confidence": "HIGH",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 440.8,
+        "protein_g": 30.4,
+        "fat_g": 26.6,
+        "carbs_g": 26.6
+      },
+      "items": [
+        {
+          "name": "Nicoise Salad",
+          "grams": 380.0,
+          "calories_kcal": 440.8,
+          "protein_g": 30.4,
+          "fat_g": 26.6,
+          "carbs_g": 26.6,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 441 kcal • P 30.4g • F 26.6g • C 26.6g\nConfidence: HIGH\nSource: photo label\nNote: mode=c 1 item(s) read from the label/menu in the photo. Nutrition values calculated from the printed per-100g data (116 kcal, 8g protein, 7g fat, 7g carbs) scaled to the portion weight of 380g.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1577,
+          "output_tokens": 207,
+          "search_queries": 0,
+          "duration_ms": 3104.8,
+          "cost_usd": 0.00141
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_03",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11634.9,
+      "cost_usd": 0.04463,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 252.0,
+        "protein_g": 54.0,
+        "fat_g": 0.5,
+        "carbs_g": 8.1
+      },
+      "items": [
+        {
+          "name": "President 0.1% fat cottage cheese (Творог Президент Рассыпчатый 0.1%)",
+          "grams": 450.0,
+          "calories_kcal": 252.0,
+          "protein_g": 54.0,
+          "fat_g": 0.5,
+          "carbs_g": 8.1,
+          "source_url": "https://balticsupermart.com/products/cottage-cheese-president-homemade-crumbly-0-1-450g"
+        }
+      ],
+      "source_url": "https://balticsupermart.com/products/cottage-cheese-president-homemade-crumbly-0-1-450g",
+      "cited_domains": [],
+      "message_text": "Total: 252 kcal • P 54.0g • F 0.5g • C 8.1g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c President brand cottage cheese (Suzbe), 0.1% fat, 450g container. Macros estimated based on standard non-fat cottage cheese profiles for this brand (approx 80 kcal, 16g protein per 100g).",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 183,
+          "search_queries": 0,
+          "duration_ms": 3023.4,
+          "cost_usd": 0.001331
+        },
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 863,
+          "output_tokens": 289,
+          "search_queries": 3,
+          "duration_ms": 6115.8,
+          "cost_usd": 0.043299
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 18.7,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "photo_04",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 2875.2,
+      "cost_usd": 0.001267,
+      "confidence": "HIGH",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 202.8,
+        "protein_g": 12.9,
+        "fat_g": 12.0,
+        "carbs_g": 10.8
+      },
+      "items": [
+        {
+          "name": "Vegetable salad with bryndza cheese and herbs",
+          "grams": 300.0,
+          "calories_kcal": 202.8,
+          "protein_g": 12.9,
+          "fat_g": 12.0,
+          "carbs_g": 10.8,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 203 kcal • P 12.9g • F 12.0g • C 10.8g\nConfidence: HIGH\nSource: photo label\nNote: mode=c 1 item(s) read from the label/menu in the photo. Values calculated based on the label for 300g portion: 67.6 kcal, 4.3g protein, 4g fat, 3.6g carbs per 100g.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 162,
+          "search_queries": 0,
+          "duration_ms": 2867.2,
+          "cost_usd": 0.001267
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.1,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_05",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 13760.6,
+      "cost_usd": 0.044446,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 161.2,
+        "protein_g": 17.2,
+        "fat_g": 5.2,
+        "carbs_g": 11.7
+      },
+      "items": [
+        {
+          "name": "Йогурт греческий Савушкин TEOS питьевой натуральный",
+          "grams": 260.0,
+          "calories_kcal": 161.2,
+          "protein_g": 17.2,
+          "fat_g": 5.2,
+          "carbs_g": 11.7,
+          "source_url": "https://teos.by/vkusy/"
+        }
+      ],
+      "source_url": "https://teos.by/vkusy/",
+      "cited_domains": [],
+      "message_text": "Total: 161 kcal • P 17.2g • F 5.2g • C 11.7g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c Based on the label for Teos Natural Drinking Yogurt (260g). Protein is listed as 13g per bottle. Typical macros for this specific 1.8% fat product are ~50 kcal, 5g protein, 1.8g fat, and 3.5g carbs per 100g.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 174,
+          "search_queries": 0,
+          "duration_ms": 3047.9,
+          "cost_usd": 0.001303
+        },
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 864,
+          "output_tokens": 237,
+          "search_queries": 3,
+          "duration_ms": 8070.1,
+          "cost_usd": 0.043143
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 2.9,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "photo_06",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 8206.3,
+      "cost_usd": 0.044326,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 228.0,
+        "protein_g": 17.5,
+        "fat_g": 5.0,
+        "carbs_g": 28.2
+      },
+      "items": [
+        {
+          "name": "Savushkin TEOS Greek Yogurt Blueberry",
+          "grams": 250.0,
+          "calories_kcal": 228.0,
+          "protein_g": 17.5,
+          "fat_g": 5.0,
+          "carbs_g": 28.2,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 228 kcal • P 17.5g • F 5.0g • C 28.2g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c TEOS Greek Yogurt with Blueberry, 250g container. Protein content (18g) is visible on the lid. Calories and other macros estimated based on standard product formulation.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 206,
+          "search_queries": 0,
+          "duration_ms": 3030.8,
+          "cost_usd": 0.001399
+        },
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 864,
+          "output_tokens": 165,
+          "search_queries": 3,
+          "duration_ms": 3894.5,
+          "cost_usd": 0.042927
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 3.6,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_07",
+      "agent_type": "photo",
+      "input": "",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6101.6,
+      "cost_usd": 0.002056,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 339.8,
+        "protein_g": 34.8,
+        "fat_g": 4.6,
+        "carbs_g": 43.0
+      },
+      "items": [
+        {
+          "name": "cooked bulgur",
+          "grams": 120.0,
+          "calories_kcal": 99.6,
+          "protein_g": 3.7,
+          "fat_g": 0.3,
+          "carbs_g": 22.3,
+          "source_url": "https://fdc.nal.usda.gov/food-details/170287/nutrients"
+        },
+        {
+          "name": "grilled chicken breast",
+          "grams": 80.0,
+          "calories_kcal": 120.8,
+          "protein_g": 24.4,
+          "fat_g": 2.5,
+          "carbs_g": 0.0,
+          "source_url": "https://fdc.nal.usda.gov/food-details/171534/nutrients"
+        },
+        {
+          "name": "cooked chickpeas",
+          "grams": 60.0,
+          "calories_kcal": 98.4,
+          "protein_g": 5.3,
+          "fat_g": 1.6,
+          "carbs_g": 16.4,
+          "source_url": "https://fdc.nal.usda.gov/food-details/173799/nutrients"
+        },
+        {
+          "name": "steamed broccoli",
+          "grams": 50.0,
+          "calories_kcal": 17.0,
+          "protein_g": 1.2,
+          "fat_g": 0.2,
+          "carbs_g": 3.5,
+          "source_url": null
+        },
+        {
+          "name": "cherry tomatoes",
+          "grams": 20.0,
+          "calories_kcal": 4.0,
+          "protein_g": 0.2,
+          "fat_g": 0.0,
+          "carbs_g": 0.8,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 340 kcal • P 34.8g • F 4.6g • C 43.0g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: mode=c 3 item(s) matched to USDA FoodData Central. A healthy bowl containing bulgur, seasoned grilled chicken, chickpeas, steamed broccoli, and cherry tomatoes.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 425,
+          "search_queries": 0,
+          "duration_ms": 4224.6,
+          "cost_usd": 0.002056
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1868.8,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 29.2,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_08",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 3824.4,
+      "cost_usd": 0.001733,
+      "confidence": "HIGH",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 371.7,
+        "protein_g": 43.5,
+        "fat_g": 14.0,
+        "carbs_g": 18.0
+      },
+      "items": [
+        {
+          "name": "Syrniki (baked cottage cheese pancakes) sugar-free",
+          "grams": 140.0,
+          "calories_kcal": 272.7,
+          "protein_g": 23.5,
+          "fat_g": 14.0,
+          "carbs_g": 13.2,
+          "source_url": null
+        },
+        {
+          "name": "Exponenta High-Pro Mango-Passionfruit",
+          "grams": 160.0,
+          "calories_kcal": 99.0,
+          "protein_g": 20.0,
+          "fat_g": 0.0,
+          "carbs_g": 4.8,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 372 kcal • P 43.5g • F 14.0g • C 18.0g\nConfidence: HIGH\nSource: photo label\nNote: mode=c 2 item(s) read from the label/menu in the photo. Based on nutrition labels visible in the photo.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 317,
+          "search_queries": 0,
+          "duration_ms": 3815.8,
+          "cost_usd": 0.001733
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.1,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_09",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 6492.1,
+      "cost_usd": 0.001321,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 215.0,
+        "protein_g": 16.5,
+        "fat_g": 6.0,
+        "carbs_g": 24.0
+      },
+      "items": [
+        {
+          "name": "cottage cheese with raisins and dried apricots",
+          "grams": 150.0,
+          "calories_kcal": 215.0,
+          "protein_g": 16.5,
+          "fat_g": 6.0,
+          "carbs_g": 24.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 215 kcal • P 16.5g • F 6.0g • C 24.0g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c A portion of farmer-style cottage cheese mixed with raisins and small pieces of dried apricot.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 180,
+          "search_queries": 0,
+          "duration_ms": 6484.5,
+          "cost_usd": 0.001321
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.2,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 23.2,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_10",
+      "agent_type": "photo",
+      "input": "",
+      "region": "GLOBAL",
+      "ok": true,
+      "error": null,
+      "latency_ms": 2982.7,
+      "cost_usd": 0.001378,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 285.0,
+        "protein_g": 5.0,
+        "fat_g": 24.0,
+        "carbs_g": 18.0
+      },
+      "items": [
+        {
+          "name": "Avocado salad with tomato and cucumber",
+          "grams": 250.0,
+          "calories_kcal": 285.0,
+          "protein_g": 5.0,
+          "fat_g": 24.0,
+          "carbs_g": 18.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 285 kcal • P 5.0g • F 24.0g • C 18.0g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c A fresh salad containing roughly half a large avocado, cherry tomatoes, cucumber, spinach leaves, and some seeds/pumpkin seeds. Estimated calories account for typical light vinaigrette or oil coating often present in pre-packed salads.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 199,
+          "search_queries": 0,
+          "duration_ms": 2973.1,
+          "cost_usd": 0.001378
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 0.4,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": false,
+        "kcal_ok": true,
+        "kcal_err_pct": 5.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_11",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 9840.1,
+      "cost_usd": 0.058671,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 558.0,
+        "protein_g": 19.6,
+        "fat_g": 50.1,
+        "carbs_g": 7.2
+      },
+      "items": [
+        {
+          "name": "Q Coffee Shop Creamy scramble with shrimp and avocado salad",
+          "grams": 280.0,
+          "calories_kcal": 558.0,
+          "protein_g": 19.6,
+          "fat_g": 50.1,
+          "carbs_g": 7.2,
+          "source_url": "https://iceboxkitchen.ru/menu/belkovaya-dieta/skrembl-s-krevetkami-i-avokado"
+        }
+      ],
+      "source_url": "https://iceboxkitchen.ru/menu/belkovaya-dieta/skrembl-s-krevetkami-i-avokado",
+      "cited_domains": [],
+      "message_text": "Total: 558 kcal • P 19.6g • F 50.1g • C 7.2g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c Сливочный скрэмбл с салатом из креветок и авокадо. Ingredients listed: chicken eggs, cream, butter, avocado, cucumbers, arugula, spinach, lollo rossa, cherry tomatoes, shrimp, garlic, ginger, olive oil, salt, lemon juice, nuts.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 187,
+          "search_queries": 0,
+          "duration_ms": 3042.2,
+          "cost_usd": 0.001342
+        },
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 864,
+          "output_tokens": 299,
+          "search_queries": 4,
+          "duration_ms": 5120.8,
+          "cost_usd": 0.057329
+        }
+      ],
+      "search_queries": 4,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 39.5,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "photo_12",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 5177.9,
+      "cost_usd": 0.00203,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 332.9,
+        "protein_g": 25.3,
+        "fat_g": 21.3,
+        "carbs_g": 11.7
+      },
+      "items": [
+        {
+          "name": "scrambled eggs",
+          "grams": 120.0,
+          "calories_kcal": 178.8,
+          "protein_g": 12.0,
+          "fat_g": 13.2,
+          "carbs_g": 1.9,
+          "source_url": "https://fdc.nal.usda.gov/food-details/172187/nutrients"
+        },
+        {
+          "name": "cooked shrimp",
+          "grams": 45.0,
+          "calories_kcal": 44.6,
+          "protein_g": 10.8,
+          "fat_g": 0.1,
+          "carbs_g": 0.1,
+          "source_url": "https://fdc.nal.usda.gov/food-details/175180/nutrients"
+        },
+        {
+          "name": "avocado",
+          "grams": 50.0,
+          "calories_kcal": 83.5,
+          "protein_g": 1.0,
+          "fat_g": 7.7,
+          "carbs_g": 4.3,
+          "source_url": "https://fdc.nal.usda.gov/food-details/171706/nutrients"
+        },
+        {
+          "name": "cherry tomatoes",
+          "grams": 60.0,
+          "calories_kcal": 11.0,
+          "protein_g": 0.5,
+          "fat_g": 0.1,
+          "carbs_g": 2.4,
+          "source_url": null
+        },
+        {
+          "name": "mixed salad greens and cucumber",
+          "grams": 100.0,
+          "calories_kcal": 15.0,
+          "protein_g": 1.0,
+          "fat_g": 0.2,
+          "carbs_g": 3.0,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 333 kcal • P 25.3g • F 21.3g • C 11.7g\nConfidence: ESTIMATE\nSource: fdc.nal.usda.gov\nNote: mode=c 3 item(s) matched to USDA FoodData Central. A breakfast bowl with scrambled eggs, shrimp, avocado, cherry tomatoes, cucumber, and mixed greens.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 416,
+          "search_queries": 0,
+          "duration_ms": 3609.7,
+          "cost_usd": 0.00203
+        },
+        {
+          "stage": "fdc_lookup",
+          "provider": "fdc",
+          "model": null,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "search_queries": 0,
+          "duration_ms": 1558.9,
+          "cost_usd": 0
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": true,
+        "kcal_ok": true,
+        "kcal_err_pct": 16.8,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_13",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11198.0,
+      "cost_usd": 0.044441,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 153.0,
+        "protein_g": 7.4,
+        "fat_g": 8.7,
+        "carbs_g": 6.3
+      },
+      "items": [
+        {
+          "name": "SNAQ FABRIQ Snaqer Dubai Trend Pistachio & Kunafa",
+          "grams": 45.0,
+          "calories_kcal": 153.0,
+          "protein_g": 7.4,
+          "fat_g": 8.7,
+          "carbs_g": 6.3,
+          "source_url": "https://www.bombbar.ru/product/podarochniy_nabor_dubai_trend_209_gr.html"
+        }
+      ],
+      "source_url": "https://www.bombbar.ru/product/podarochniy_nabor_dubai_trend_209_gr.html",
+      "cited_domains": [],
+      "message_text": "Total: 153 kcal • P 7.4g • F 8.7g • C 6.3g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c Calculated based on 16% protein (7.2g) per 45g bar. Macros estimated based on typical high-protein chocolate nut bars.",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 145,
+          "search_queries": 0,
+          "duration_ms": 2981.4,
+          "cost_usd": 0.001216
+        },
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 872,
+          "output_tokens": 263,
+          "search_queries": 3,
+          "duration_ms": 3900.5,
+          "cost_usd": 0.043225
+        }
+      ],
+      "search_queries": 3,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 19.5,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    },
+    {
+      "case_id": "photo_14",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 2939.4,
+      "cost_usd": 0.001267,
+      "confidence": "HIGH",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 192.0,
+        "protein_g": 11.1,
+        "fat_g": 8.1,
+        "carbs_g": 18.9
+      },
+      "items": [
+        {
+          "name": "Vegetable Okroshka Set",
+          "grams": 300.0,
+          "calories_kcal": 192.0,
+          "protein_g": 11.1,
+          "fat_g": 8.1,
+          "carbs_g": 18.9,
+          "source_url": null
+        }
+      ],
+      "source_url": null,
+      "cited_domains": [],
+      "message_text": "Total: 192 kcal • P 11.1g • F 8.1g • C 18.9g\nConfidence: HIGH\nSource: photo label\nNote: mode=c 1 item(s) read from the label/menu in the photo. Nutritional values calculated for the full 300g portion based on the 100g data visible on the label (64 kcal, 3.7g protein, 2.7g fat, 6.3g carbs per 100g).",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 162,
+          "search_queries": 0,
+          "duration_ms": 2931.6,
+          "cost_usd": 0.001267
+        }
+      ],
+      "search_queries": 0,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 0.0,
+        "zero_kcal_bug": false,
+        "url_status": null
+      }
+    },
+    {
+      "case_id": "photo_15",
+      "agent_type": "photo",
+      "input": "",
+      "region": "CIS",
+      "ok": true,
+      "error": null,
+      "latency_ms": 11756.5,
+      "cost_usd": 0.115876,
+      "confidence": "ESTIMATE",
+      "intent": "photo_meal",
+      "totals": {
+        "calories_kcal": 453.2,
+        "protein_g": 40.2,
+        "fat_g": 28.6,
+        "carbs_g": 8.6
+      },
+      "items": [
+        {
+          "name": "Azbuka Vkusa (Uje Gotovo) Greek-style vegetable salad with bryndza cheese",
+          "grams": 250.0,
+          "calories_kcal": 319.0,
+          "protein_g": 11.0,
+          "fat_g": 27.0,
+          "carbs_g": 8.0,
+          "source_url": "https://xn--80aaebczg6apa4bd.xn--p1ai/catalog/product/salat-grecheskiy/"
+        },
+        {
+          "name": "Azbuka Vkusa Sous-vide chicken breast slices (Azbuka Life)",
+          "grams": 150.0,
+          "calories_kcal": 134.2,
+          "protein_g": 29.2,
+          "fat_g": 1.6,
+          "carbs_g": 0.6,
+          "source_url": null
+        }
+      ],
+      "source_url": "https://xn--80aaebczg6apa4bd.xn--p1ai/catalog/product/salat-grecheskiy/",
+      "cited_domains": [],
+      "message_text": "Total: 453 kcal • P 40.2g • F 28.6g • C 8.6g\nConfidence: ESTIMATE\nSource: none\nNote: mode=c Two store-bought items from Azbuka Vkusa: a salad with vegetables, bryndza, and paprika dressing (~250g) and a pack of sous-vide chicken fillet (~150g).",
+      "stages": [
+        {
+          "stage": "photo_vision",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 1563,
+          "output_tokens": 284,
+          "search_queries": 0,
+          "duration_ms": 3380.4,
+          "cost_usd": 0.001633
+        },
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 874,
+          "output_tokens": 258,
+          "search_queries": 3,
+          "duration_ms": 5039.9,
+          "cost_usd": 0.043211
+        },
+        {
+          "stage": "branded_search",
+          "provider": "gemini",
+          "model": "gemini-3-flash-preview",
+          "input_tokens": 863,
+          "output_tokens": 200,
+          "search_queries": 5,
+          "duration_ms": 5742.2,
+          "cost_usd": 0.071032
+        }
+      ],
+      "search_queries": 8,
+      "score": {
+        "domain_hit": null,
+        "kcal_ok": true,
+        "kcal_err_pct": 16.2,
+        "zero_kcal_bug": false,
+        "url_status": "alive"
+      }
+    }
+  ]
+}
