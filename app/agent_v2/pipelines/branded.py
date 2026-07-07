@@ -78,15 +78,12 @@ async def run(
 
     # Probe every candidate we might show (main + per-item) in one parallel
     # sweep: catches hard 404s AND soft 404s (200 + "page not found" body).
-    # The brand's homepage joins as a fallback candidate: an official root
-    # page beats an aggregator when search returned no official deep page.
-    main_ranked = rank_candidates(
-        branded.source_url, provider_urls, official, include_official_homepage=True
-    )[:4]
+    # Ranking: official product page > store/retailer > aggregator > bare
+    # homepage. The best LIVE page wins — a store page with the real data
+    # beats a brand homepage that has none.
+    main_ranked = rank_candidates(branded.source_url, provider_urls, official)[:4]
     item_ranked = {
-        i: rank_candidates(
-            bi.source_url, provider_urls, official, include_official_homepage=True
-        )[:3]
+        i: rank_candidates(bi.source_url, provider_urls, official)[:3]
         for i, bi in enumerate(branded.items)
     }
     to_probe = list(dict.fromkeys(main_ranked + [u for r in item_ranked.values() for u in r]))

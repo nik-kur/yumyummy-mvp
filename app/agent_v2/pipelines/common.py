@@ -10,7 +10,19 @@ from ..providers import fdc
 from ..schemas import Item, ParsedItem, Totals
 
 _REDIRECT_MARKERS = ("vertexaisearch", "grounding-api-redirect")
-_UA = {"User-Agent": "Mozilla/5.0 (compatible; YumYummy/2.0)"}
+# Browser-like UA: retail/brand sites (av.ru, vkusvill...) answer 4xx to bot
+# UAs while serving the page fine to real users — we probe as a browser.
+_UA = {
+    "User-Agent": (
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ru,en;q=0.9",
+}
+# Statuses used as bot walls / geo walls: the page usually renders fine in the
+# user's real browser, so they don't prove the link is dead.
+_BOT_WALL_STATUSES = (401, 403, 405, 406, 409, 418, 429, 450, 451)
 
 
 def is_redirect_url(url: str) -> bool:
@@ -69,11 +81,57 @@ _AGGREGATOR_DOMAINS = (
 )
 
 
+def _is_bare_homepage(url: str) -> bool:
+    """Root page with no path/query — carries no product info."""
+    try:
+        p = urlparse(url)
+        return not p.query and (p.path or "/").rstrip("/") == ""
+    except Exception:
+        return False
+
+
+# Auth/checkout pages sometimes surface via redirect resolution (e.g. a store
+# link that bounces to its login). Never show these as a source.
+_JUNK_URL_MARKERS = (
+    "login", "signin", "sign-in", "signup", "sign-up", "/auth", "register",
+    "captcha", "/cart", "checkout", "basket", "account", "password",
+)
+# Store sub-pages with user content (Q&A, reviews) — cut back to the product
+# card itself, which is the actual data page.
+_UGC_SEGMENTS = {
+    "question", "questions", "review", "reviews", "otzyv", "otzyvy",
+    "feedback", "comments",
+}
+
+
+def clean_candidate_url(url: str) -> str:
+    """Drop fragments; truncate store Q&A/review sub-pages to the product page."""
+    try:
+        p = urlparse(url)
+        segments = p.path.split("/")
+        for idx, seg in enumerate(segments):
+            if seg.lower() in _UGC_SEGMENTS:
+                new_path = "/".join(segments[:idx]).rstrip("/") + "/"
+                return f"{p.scheme}://{p.netloc}{new_path}"
+        return url.split("#", 1)[0]
+    except Exception:
+        return url
+
+
 def _source_rank(url: str, official_domain: str = "") -> int:
     """Lower is better. Official brand domain wins; forums lose."""
     d = domain_of(url)
     if not d:
         return 90
+    low = url.lower()
+    if any(m in low for m in _JUNK_URL_MARKERS):
+        return 85
+    # A bare homepage (even the brand's own) has no nutrition info on it —
+    # linking it instead of the page the data came from misleads the user.
+    # Excluded outright (>= 85 is filtered): better an honest "no source"
+    # than a link that answers nothing.
+    if _is_bare_homepage(url):
+        return 86
     official = (official_domain or "").lower().replace("www.", "").strip()
     if official:
         if d == official or d.endswith("." + official):
@@ -98,34 +156,6 @@ def _source_rank(url: str, official_domain: str = "") -> int:
 # confirm. Keeps official model links above neutral provider pages (5+penalty
 # < 20) while neutral model links stay below confirmed neutral pages.
 _UNCONFIRMED_PENALTY = 5
-
-
-def choose_source_url(
-    model_url: str, provider_urls: List[str], official_domain: str = ""
-) -> Optional[str]:
-    """
-    Pick a source link we can actually stand behind.
-
-    Candidates: pages the provider's search layer really returned, plus the
-    model-typed URL with a small "unconfirmed" penalty. Official brand domain
-    > neutral pages > aggregators > forums; ties keep provider order.
-    """
-    model_url = (model_url or "").strip()
-    candidates: List[tuple] = [
-        (_source_rank(u, official_domain), i, u) for i, u in enumerate(provider_urls)
-    ]
-    if model_url and not is_redirect_url(model_url) and model_url not in provider_urls:
-        candidates.append(
-            (
-                _source_rank(model_url, official_domain) + _UNCONFIRMED_PENALTY,
-                len(candidates),
-                model_url,
-            )
-        )
-    if not candidates:
-        return None
-    candidates.sort(key=lambda t: (t[0], t[1]))
-    return candidates[0][2]
 
 
 # Markers of "soft 404" pages: the server answers 200 but renders an error
@@ -155,6 +185,9 @@ _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 _SCRIPT_STYLE_RE = re.compile(
     r"<(script|style)[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL
 )
+# A <script> that opens inside our 40KB sample but closes beyond it survives
+# the pair-stripping above; drop everything from that opening tag onwards.
+_SCRIPT_TAIL_RE = re.compile(r"<(?:script|style)\b.*$", re.IGNORECASE | re.DOTALL)
 
 
 def _looks_like_soft_404(final_url: str, original_url: str, body_head: str) -> bool:
@@ -166,7 +199,7 @@ def _looks_like_soft_404(final_url: str, original_url: str, body_head: str) -> b
         return True
     if any(m in title for m in _SOFT_404_MARKERS):
         return True
-    visible = _SCRIPT_STYLE_RE.sub(" ", body_head).lower()
+    visible = _SCRIPT_TAIL_RE.sub(" ", _SCRIPT_STYLE_RE.sub(" ", body_head)).lower()
     if any(m in visible for m in _SOFT_404_MARKERS):
         return True
     # Deep link that got silently collapsed to the site root is a dead page.
@@ -196,8 +229,9 @@ async def url_alive_quick(url: str, timeout: float = 3.0) -> bool:
             timeout=timeout, follow_redirects=True, headers=_UA
         ) as client:
             async with client.stream("GET", url) as resp:
-                # Bot walls (401/403/429) usually render fine in real browsers.
-                if resp.status_code in (401, 403, 429):
+                # Bot/geo walls (incl. non-standard ones like av.ru's 450)
+                # usually render fine in the user's real browser.
+                if resp.status_code in _BOT_WALL_STATUSES:
                     return True
                 if resp.status_code >= 400:
                     return False
@@ -234,14 +268,20 @@ def rank_candidates(
     model_url: str,
     provider_urls: List[str],
     official_domain: str = "",
-    include_official_homepage: bool = False,
 ) -> List[str]:
-    """All source candidates, best first (same ordering as choose_source_url)."""
+    """
+    All source candidates, best first: official product page > store/retailer
+    page > aggregator > forums. Pages that carry no product data are excluded
+    entirely: bare homepages, login/checkout/captcha pages. Store Q&A/review
+    sub-pages are truncated to the product card.
+    """
     model_url = (model_url or "").strip()
+    cleaned = [clean_candidate_url(u) for u in provider_urls]
     candidates: List[tuple] = [
-        (_source_rank(u, official_domain), i, u) for i, u in enumerate(provider_urls)
+        (_source_rank(u, official_domain), i, u) for i, u in enumerate(cleaned)
     ]
-    if model_url and not is_redirect_url(model_url) and model_url not in provider_urls:
+    if model_url and not is_redirect_url(model_url) and model_url not in cleaned:
+        model_url = clean_candidate_url(model_url)
         candidates.append(
             (
                 _source_rank(model_url, official_domain) + _UNCONFIRMED_PENALTY,
@@ -249,38 +289,14 @@ def rank_candidates(
                 model_url,
             )
         )
-    if include_official_homepage and official_domain:
-        # Brand homepage: worse than an official deep page (rank 0/1) but
-        # better than aggregators/neutral pages when those are all we have.
-        d = official_domain.lower().strip().replace("www.", "")
-        d = d.split("//")[-1].split("/")[0]
-        if d and "." in d and not any(domain_of(c[2]) == d and _source_rank(c[2], official_domain) <= 2 for c in candidates):
-            candidates.append((2, len(candidates), f"https://{d}/"))
     candidates.sort(key=lambda t: (t[0], t[1]))
-    return [c[2] for c in candidates]
-
-
-async def choose_live_source_url(
-    model_url: str,
-    provider_urls: List[str],
-    official_domain: str = "",
-    max_probes: int = 4,
-) -> Optional[str]:
-    """
-    Rank candidates, probe the top few in parallel and return the best LIVE
-    page. If every probed candidate is dead, return None — showing no link is
-    better than showing a guaranteed 404 (confidence then drops to ESTIMATE
-    via the existing "HIGH requires a link" rule).
-    """
-    ranked = rank_candidates(model_url, provider_urls, official_domain)
-    if not ranked:
-        return None
-    head = ranked[:max_probes]
-    alive = await probe_urls(head)
-    for u in head:
-        if alive.get(u):
-            return u
-    return None
+    out: List[str] = []
+    for rank, _, u in candidates:
+        # rank >= 85: login/checkout/captcha pages and unparseable URLs —
+        # they carry no nutrition data, never show them.
+        if rank < 85 and u not in out:
+            out.append(u)
+    return out
 
 
 def sum_totals(items: List[Item]) -> Totals:
