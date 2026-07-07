@@ -72,6 +72,25 @@ export interface MealItem {
   source_url?: string | null;
 }
 
+/** HOW the agent obtained the numbers (additive, 25(1)+). */
+export type AssessmentMethod =
+  | 'label'
+  | 'off'
+  | 'official'
+  | 'web'
+  | 'usda'
+  | 'usda_components'
+  | 'photo'
+  | 'estimate';
+
+export interface MealAssessment {
+  method: AssessmentMethod | string;
+  domain?: string | null;
+  portion_estimated?: boolean;
+  verified_items?: number;
+  total_items?: number;
+}
+
 export interface MealRead {
   id: number;
   eaten_at: string;
@@ -85,6 +104,8 @@ export interface MealRead {
   source_url?: string | null;
   /** Per-ingredient breakdown for AI-logged meals. */
   items?: MealItem[];
+  /** HOW the numbers were obtained (25(1)+ AI-logged meals). */
+  assessment?: MealAssessment | null;
   /** Display-only source label (mocks); real entries use source_url. */
   source?: string;
 }
@@ -176,11 +197,16 @@ export interface WorkflowRunResponse {
   totals: WorkflowTotals;
   items: WorkflowItem[];
   source_url?: string | null;
+  /** HOW the numbers were obtained (25(1)+ servers; null from older ones). */
+  assessment?: MealAssessment | null;
 }
 
 export interface AppAgentRunRequest {
   text: string;
   image_url?: string | null;
+  /** Multi-photo meals (25(1)+). `image_url` stays set to the first photo so
+   *  the request also works against an older server. */
+  image_urls?: string[] | null;
   force_intent?: string | null;
   nutrition_context?: string | null;
 }

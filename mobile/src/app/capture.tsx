@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
-import { X, Mic, Camera, Check, Trash2, ArrowUp } from 'lucide-react-native';
+import { X, Mic, Camera, Check, Trash2, ArrowUp, Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -35,6 +35,9 @@ import { fonts } from '@/theme/typography';
 type Mode = 'input' | 'accepted';
 
 const EXAMPLES = ['2 eggs & toast', 'Chicken & rice bowl', 'Oat latte', 'Greek salad'];
+
+/** Photos per meal cap — mirrors the server's multi-photo limit. */
+const MAX_PHOTOS = 4;
 
 /**
  * Keyboard overlap for this screen, measured in window coordinates.
@@ -130,7 +133,8 @@ export default function CaptureScreen() {
 
   const [mode, setMode] = useState<Mode>('input');
   const [text, setText] = useState(typeof params.prefill === 'string' ? params.prefill : '');
-  const [photo, setPhoto] = useState<string | null>(null);
+  // Up to MAX_PHOTOS photos of the same meal (e.g. plate + nutrition label).
+  const [photos, setPhotos] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -158,17 +162,28 @@ export default function CaptureScreen() {
     setMode('accepted');
   };
 
-  const canSubmit = (text.trim().length > 0 || !!photo) && !recording;
+  const canSubmit = (text.trim().length > 0 || photos.length > 0) && !recording;
 
-  // Send path for text / photo / photo+comment. Nothing is submitted until the
-  // user taps Analyze, so a photo can be reviewed and annotated first.
+  // Send path for text / photo(s) / photo+comment. Nothing is submitted until
+  // the user taps Analyze, so photos can be reviewed and annotated first.
   const onSubmit = () => {
     if (!canSubmit) return;
-    submit({ localImageUri: photo ?? undefined, text: text.trim() || undefined });
+    submit({
+      localImageUri: photos[0],
+      localImageUris: photos.slice(1),
+      text: text.trim() || undefined,
+    });
     accept();
   };
 
-  // ---- Photo: attach as a preview (do NOT auto-submit) --------------------
+  // ---- Photos: attach as previews (do NOT auto-submit). Up to MAX_PHOTOS of
+  // the same meal — e.g. the plate plus the package's nutrition label. -------
+
+  const addPhotos = (uris: string[]) => {
+    if (uris.length === 0) return;
+    setPhotos((prev) => Array.from(new Set([...prev, ...uris])).slice(0, MAX_PHOTOS));
+    setNote(null);
+  };
 
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -179,26 +194,25 @@ export default function CaptureScreen() {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
     if (result.canceled) return;
     const uri = result.assets?.[0]?.uri;
-    if (uri) {
-      setPhoto(uri);
-      setNote(null);
-    }
+    if (uri) addPhotos([uri]);
   };
 
   const pickFromLibrary = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_PHOTOS - photos.length,
     });
     if (result.canceled) return;
-    const uri = result.assets?.[0]?.uri;
-    if (uri) {
-      setPhoto(uri);
-      setNote(null);
-    }
+    addPhotos((result.assets ?? []).map((a) => a.uri).filter(Boolean));
   };
 
   const onPhoto = () => {
+    if (photos.length >= MAX_PHOTOS) {
+      setNote(`Up to ${MAX_PHOTOS} photos per meal — remove one to add another.`);
+      return;
+    }
     Alert.alert('Add a meal photo', undefined, [
       { text: 'Take Photo', onPress: () => void takePhoto() },
       { text: 'Choose from Library', onPress: () => void pickFromLibrary() },
@@ -353,31 +367,45 @@ export default function CaptureScreen() {
             <TextInput
               style={styles.input}
               placeholder={
-                photo
+                photos.length > 0
                   ? 'Add a note (optional) — e.g. “only ate half”'
                   : 'Just tell me what you ate…'
               }
               placeholderTextColor={colors.inkFaint}
               selectionColor={colors.terracotta}
               multiline
-              autoFocus={!photo}
+              autoFocus={photos.length === 0}
               value={text}
               onChangeText={setText}
             />
 
             <View style={styles.footer}>
-              {photo ? (
+              {photos.length > 0 ? (
                 <View style={styles.photoPreview}>
-                  <Image source={{ uri: photo }} style={styles.photoThumb} contentFit="cover" />
-                  <View style={styles.flex}>
-                    <AppText variant="bodyStrong">Photo attached</AppText>
-                    <AppText variant="caption" color={colors.inkMuted}>
-                      Add a note above if it helps, then tap Analyze.
-                    </AppText>
+                  <View style={styles.photoRow}>
+                    {photos.map((uri) => (
+                      <View key={uri}>
+                        <Image source={{ uri }} style={styles.photoThumb} contentFit="cover" />
+                        <Pressable
+                          onPress={() => setPhotos((prev) => prev.filter((p) => p !== uri))}
+                          hitSlop={8}
+                          style={styles.photoRemove}
+                        >
+                          <X size={12} color={colors.white} strokeWidth={2.5} />
+                        </Pressable>
+                      </View>
+                    ))}
+                    {photos.length < MAX_PHOTOS ? (
+                      <Pressable onPress={onPhoto} style={styles.photoAdd}>
+                        <Plus size={20} color={colors.inkMuted} strokeWidth={1.5} />
+                      </Pressable>
+                    ) : null}
                   </View>
-                  <Pressable onPress={() => setPhoto(null)} hitSlop={8} style={styles.photoRemove}>
-                    <X size={18} color={colors.inkMuted} strokeWidth={1.5} />
-                  </Pressable>
+                  <AppText variant="caption" color={colors.inkMuted}>
+                    {photos.length > 1
+                      ? `${photos.length} photos of one meal — I’ll combine them.`
+                      : 'Add the label or another angle with +, then tap Analyze.'}
+                  </AppText>
                 </View>
               ) : null}
 
@@ -387,7 +415,7 @@ export default function CaptureScreen() {
                 </AppText>
               ) : null}
 
-              {!text.trim() && !photo ? (
+              {!text.trim() && photos.length === 0 ? (
                 <View style={styles.examples}>
                   {EXAMPLES.map((ex) => (
                     <Chip key={ex} label={ex} onPress={() => setText(ex)} />
@@ -455,20 +483,33 @@ const styles = StyleSheet.create({
   analyzeWrap: { flex: 1 },
 
   photoPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
+    gap: space.sm,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.hairline,
     borderRadius: radius.md,
     padding: space.md,
   },
+  photoRow: { flexDirection: 'row', gap: space.sm },
   photoThumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt },
   photoRemove: {
-    width: 32,
-    height: 32,
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
     borderRadius: radius.pill,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoAdd: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.hairline,
     backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',

@@ -19,6 +19,7 @@ import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
 import type { AccuracyLevel, MealItem, MealRead } from '@/api/types';
 import { formatInt, formatTime } from '@/utils/format';
+import { assessmentText } from '@/utils/assessment';
 import { colors, radius, space } from '@/theme/tokens';
 
 function str(v: string | string[] | undefined): string {
@@ -378,11 +379,13 @@ export default function MealDetailScreen() {
           </AppText>
         </View>
         <AppText variant="caption" color={colors.inkMuted}>
-          {accuracy ? `Confidence: ${accuracy.toLowerCase()}. ` : ''}
-          Numbers come from the AI workflow’s source‑checked lookup.
-          {sources.length === 0 && items.length === 0
-            ? ' Ingredient‑level breakdown is available for AI‑logged meals.'
-            : ''}
+          {meal?.assessment
+            ? assessmentText(meal.assessment)
+            : `${accuracy ? `Confidence: ${accuracy.toLowerCase()}. ` : ''}Numbers come from the AI workflow’s source‑checked lookup.${
+                sources.length === 0 && items.length === 0
+                  ? ' Ingredient‑level breakdown is available for AI‑logged meals.'
+                  : ''
+              }`}
         </AppText>
         {sources.length > 0 ? (
           <View style={styles.sourceList}>

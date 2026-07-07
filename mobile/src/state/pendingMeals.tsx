@@ -37,8 +37,18 @@ export interface PendingMeal {
 export interface SubmitInput {
   text?: string;
   localImageUri?: string;
+  /** Additional photos of the same meal (25(1)+, max 4 total with the first). */
+  localImageUris?: string[];
   /** Local file:// URI of a recorded voice note. Transcribed in the background. */
   audioUri?: string;
+}
+
+/** All photo URIs of a submission, deduplicated, in user order. */
+function allImageUris(input: SubmitInput): string[] {
+  const uris = [input.localImageUri, ...(input.localImageUris ?? [])].filter(
+    (u): u is string => Boolean(u),
+  );
+  return Array.from(new Set(uris));
 }
 
 interface PendingMealsContextValue {
@@ -159,14 +169,22 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
           if (voiceText) update(id, { label: voiceText });
         }
 
-        let imageUrl: string | null = null;
-        if (input.localImageUri) {
-          imageUrl = await uploadMealPhoto(input.localImageUri);
+        // Upload every photo in parallel; the first URL doubles as the legacy
+        // single `image_url` so the request still works on an older server.
+        const uris = allImageUris(input);
+        let imageUrls: string[] = [];
+        if (uris.length > 0) {
+          imageUrls = await Promise.all(uris.map((u) => uploadMealPhoto(u)));
         }
+        const imageUrl = imageUrls[0] ?? null;
         const typed = input.text?.trim() ?? '';
         const combined = [typed, voiceText].filter(Boolean).join(' ');
         const text = combined || (imageUrl ? '(photo)' : '');
-        const res = await api.agentRun({ text, image_url: imageUrl });
+        const res = await api.agentRun({
+          text,
+          image_url: imageUrl,
+          image_urls: imageUrls.length > 1 ? imageUrls : undefined,
+        });
 
         // IMPORTANT: `/app/agent/run` already persisted the meal server-side
         // (the same source-checked path the Telegram bot uses). We must NOT
@@ -221,14 +239,21 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
   const submit = useCallback(
     (input: SubmitInput) => {
       const id = nextId();
+      const photoCount = allImageUris(input).length;
       const kind: PendingMeal['kind'] = input.audioUri
         ? 'voice'
-        : input.localImageUri
+        : photoCount > 0
           ? 'photo'
           : 'text';
       const label =
         input.text?.trim() ||
-        (kind === 'voice' ? 'Voice note…' : kind === 'photo' ? 'Photo meal' : 'Meal');
+        (kind === 'voice'
+          ? 'Voice note…'
+          : kind === 'photo'
+            ? photoCount > 1
+              ? `Photo meal (${photoCount} photos)`
+              : 'Photo meal'
+            : 'Meal');
       inputsRef.current[id] = input;
       setPending((prev) => [
         { id, label, kind, status: 'processing', createdAt: Date.now() },
