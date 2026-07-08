@@ -83,6 +83,18 @@ class MealTimeSplit(BaseModel):
     night: float = 0
 
 
+class RecapHighlight(BaseModel):
+    """One "fun fact" card on the Recap screen. The server owns the copy so new
+    categories can ship without an app update; ``icon`` is a hint the client
+    maps to a local icon (unknown values fall back gracefully)."""
+
+    id: str  # stable category id, e.g. "top_dish"
+    icon: str  # client icon hint: "utensils" | "flame" | "sunrise" | ...
+    title: str  # overline, e.g. "Most logged dish"
+    value: str  # the big line, e.g. "Butter croissant"
+    caption: Optional[str] = None  # e.g. "Logged 3 times this week"
+
+
 class WeeklyRecapResponse(BaseModel):
     """"Week in Recap" (Задача 6) — a friendly, shareable weekly summary.
 
@@ -123,6 +135,10 @@ class WeeklyRecapResponse(BaseModel):
 
     meal_time_split: MealTimeSplit = Field(default_factory=MealTimeSplit)
     streak: int = 0
+
+    # 3–4 rotating "fun fact" cards drawn from a larger candidate pool, so each
+    # week's recap feels fresh. Empty when there's no data.
+    highlights: list[RecapHighlight] = Field(default_factory=list)
 
     summary: str = ""
 

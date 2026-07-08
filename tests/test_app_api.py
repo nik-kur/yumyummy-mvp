@@ -296,6 +296,7 @@ def test_recap_empty_week_has_data_false_and_no_llm(monkeypatch):
     assert body["days_logged"] == 0
     assert body["week_start"] == "2026-03-02"
     assert body["week_end"] == "2026-03-08"
+    assert body["highlights"] == []  # no data → no fun-fact cards
     assert body["summary"]  # non-empty fallback text
 
 
@@ -334,10 +335,22 @@ def test_recap_with_data_computes_stats_and_caches_summary(monkeypatch):
     assert body["summary"] == "Great week — you stayed on track!"
     assert calls["n"] == 1
 
+    # Rotating fun-fact cards: 1–4 of them, well-formed, and stable for the
+    # same (user, week) across reads.
+    highlights = body["highlights"]
+    assert 1 <= len(highlights) <= 4
+    for h in highlights:
+        assert h["id"] and h["icon"] and h["title"] and h["value"]
+    ids = {h["id"] for h in highlights}
+    # "Meal" ×3 is the only dish and repeats → top_dish must be in the pool;
+    # with only ~4 candidates for this dataset it should be picked.
+    assert "top_dish" in ids or len(ids) == 4
+
     # Second read reuses the cached summary (no extra LLM call).
     r2 = client.get("/app/recap", headers=_auth(token), params={"week": "2026-03-02"})
     assert r2.status_code == 200
     assert r2.json()["summary"] == "Great week — you stayed on track!"
+    assert r2.json()["highlights"] == highlights
     assert calls["n"] == 1
 
 
