@@ -13,9 +13,10 @@ These endpoints intentionally reuse the existing services
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, get_current_account
@@ -59,6 +60,7 @@ from app.schemas.app_api import (
     AppAgentRunRequest,
     AppTrialStartRequest,
     AppTrialStartResponse,
+    DayTotals,
 )
 
 logger = logging.getLogger(__name__)
@@ -262,6 +264,134 @@ def get_today(
         total_carbs_g=user_day.total_carbs_g or 0,
         meals=[MealRead.model_validate(m) for m in meals],
     )
+
+
+def _parse_date(value: str) -> date:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+
+@router.get("/week", response_model=list[DaySummary])
+def get_week(
+    start: str = Query(..., description="First day of the 7-day window, YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Return 7 consecutive :class:`DaySummary` objects starting at ``start``.
+
+    Additive convenience (25(1)+) over calling ``GET /app/today`` seven times:
+    the Week tab needs a whole week (bars, weekly averages, and the selected
+    day's meal list) in a single round-trip. Days with no diary row come back as
+    zeroed summaries with an empty ``meals`` list, so the client always receives
+    exactly 7 ordered entries.
+    """
+    user = get_primary_user(db, account)
+    db.commit()
+
+    start_date = _parse_date(start)
+    dates = [start_date + timedelta(days=i) for i in range(7)]
+    end_date = dates[-1]
+
+    day_rows = (
+        db.query(UserDay)
+        .filter(
+            UserDay.user_id == user.id,
+            UserDay.date >= start_date,
+            UserDay.date <= end_date,
+        )
+        .all()
+    )
+    day_by_date = {d.date: d for d in day_rows}
+
+    meals_by_day: dict[int, list[MealEntry]] = {}
+    day_ids = [d.id for d in day_rows]
+    if day_ids:
+        for meal in (
+            db.query(MealEntry)
+            .filter(MealEntry.user_day_id.in_(day_ids))
+            .order_by(MealEntry.eaten_at.asc())
+            .all()
+        ):
+            meals_by_day.setdefault(meal.user_day_id, []).append(meal)
+
+    summaries: list[DaySummary] = []
+    for d in dates:
+        ud = day_by_date.get(d)
+        if ud is None:
+            summaries.append(DaySummary(
+                user_id=user.id, date=d,
+                total_calories=0, total_protein_g=0, total_fat_g=0, total_carbs_g=0,
+                meals=[],
+            ))
+            continue
+        summaries.append(DaySummary(
+            user_id=user.id,
+            date=d,
+            total_calories=ud.total_calories or 0,
+            total_protein_g=ud.total_protein_g or 0,
+            total_fat_g=ud.total_fat_g or 0,
+            total_carbs_g=ud.total_carbs_g or 0,
+            meals=[MealRead.model_validate(m) for m in meals_by_day.get(ud.id, [])],
+        ))
+    return summaries
+
+
+@router.get("/history", response_model=list[DayTotals])
+def get_history(
+    start: str = Query(..., description="Range start, YYYY-MM-DD (inclusive)"),
+    end: str = Query(..., description="Range end, YYYY-MM-DD (inclusive)"),
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Lightweight per-day totals over a date range (no meal breakdown).
+
+    Additive (25(1)+). Powers the Week tab's logging streak and the month
+    heatmap without pulling every day's full meal list. Only days that have a
+    diary row are returned (ordered by date); the client fills the gaps with
+    zeros.
+    """
+    user = get_primary_user(db, account)
+    db.commit()
+
+    start_date = _parse_date(start)
+    end_date = _parse_date(end)
+    if end_date < start_date:
+        raise HTTPException(status_code=400, detail="end must be on or after start")
+    if (end_date - start_date).days > 400:
+        raise HTTPException(status_code=400, detail="Range too large (max 400 days)")
+
+    day_rows = (
+        db.query(UserDay)
+        .filter(
+            UserDay.user_id == user.id,
+            UserDay.date >= start_date,
+            UserDay.date <= end_date,
+        )
+        .order_by(UserDay.date.asc())
+        .all()
+    )
+    counts: dict[int, int] = {}
+    if day_rows:
+        counts = dict(
+            db.query(MealEntry.user_day_id, func.count(MealEntry.id))
+            .filter(MealEntry.user_day_id.in_([d.id for d in day_rows]))
+            .group_by(MealEntry.user_day_id)
+            .all()
+        )
+
+    return [
+        DayTotals(
+            date=d.date,
+            total_calories=d.total_calories or 0,
+            total_protein_g=d.total_protein_g or 0,
+            total_fat_g=d.total_fat_g or 0,
+            total_carbs_g=d.total_carbs_g or 0,
+            meal_count=int(counts.get(d.id, 0)),
+        )
+        for d in day_rows
+    ]
 
 
 @router.get("/meals/recent", response_model=list[MealRead])

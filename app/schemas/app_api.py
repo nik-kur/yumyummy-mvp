@@ -57,6 +57,21 @@ class AccountProfileUpdate(BaseModel):
     timezone: Optional[str] = None
 
 
+class DayTotals(BaseModel):
+    """Lightweight per-day aggregate (no meal breakdown) for history/analytics.
+
+    Additive (25(1)+): powers the Week tab's streak counter and month heatmap
+    over a wide date range without pulling every day's full meal list.
+    """
+
+    date: date
+    total_calories: float = 0
+    total_protein_g: float = 0
+    total_fat_g: float = 0
+    total_carbs_g: float = 0
+    meal_count: int = 0
+
+
 class AppMealItemInput(BaseModel):
     """One component of a meal's breakdown, as sent by the app when creating
     or editing a meal. Mirrors the shape stored in ``MealEntry.items_json``."""

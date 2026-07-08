@@ -205,6 +205,76 @@ def test_meal_crud_and_today():
     assert r.json()["total_calories"] == 0
 
 
+def test_week_returns_seven_ordered_days_with_meals():
+    _, token = _make_account_token(provider_id="week@example.com", email="week@example.com")
+
+    # Two meals on the first day, one on the third day of the window.
+    client.post("/app/meals", headers=_auth(token), json={
+        "date": "2026-03-02", "description_user": "Oats", "calories": 300,
+        "protein_g": 12, "fat_g": 6, "carbs_g": 50,
+    })
+    client.post("/app/meals", headers=_auth(token), json={
+        "date": "2026-03-02", "description_user": "Coffee", "calories": 20,
+        "protein_g": 1, "fat_g": 0, "carbs_g": 3,
+    })
+    client.post("/app/meals", headers=_auth(token), json={
+        "date": "2026-03-04", "description_user": "Salad", "calories": 400,
+        "protein_g": 10, "fat_g": 30, "carbs_g": 20,
+    })
+
+    r = client.get("/app/week", headers=_auth(token), params={"start": "2026-03-02"})
+    assert r.status_code == 200, r.text
+    days = r.json()
+    assert len(days) == 7
+    assert [d["date"] for d in days] == [
+        "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05",
+        "2026-03-06", "2026-03-07", "2026-03-08",
+    ]
+    assert days[0]["total_calories"] == 320
+    assert len(days[0]["meals"]) == 2
+    assert days[1]["total_calories"] == 0
+    assert days[1]["meals"] == []
+    assert days[2]["total_calories"] == 400
+    assert len(days[2]["meals"]) == 1
+
+
+def test_week_requires_auth_and_valid_date():
+    _, token = _make_account_token(provider_id="week2@example.com", email="week2@example.com")
+    assert client.get("/app/week", params={"start": "2026-03-02"}).status_code == 401
+    assert client.get("/app/week", headers=_auth(token), params={"start": "not-a-date"}).status_code == 400
+
+
+def test_history_returns_totals_and_meal_counts():
+    _, token = _make_account_token(provider_id="hist@example.com", email="hist@example.com")
+
+    client.post("/app/meals", headers=_auth(token), json={
+        "date": "2026-03-02", "description_user": "A", "calories": 100,
+    })
+    client.post("/app/meals", headers=_auth(token), json={
+        "date": "2026-03-02", "description_user": "B", "calories": 200,
+    })
+    client.post("/app/meals", headers=_auth(token), json={
+        "date": "2026-03-05", "description_user": "C", "calories": 500,
+    })
+
+    r = client.get("/app/history", headers=_auth(token),
+                   params={"start": "2026-03-01", "end": "2026-03-07"})
+    assert r.status_code == 200, r.text
+    rows = r.json()
+    # Only days with a diary row come back, ordered by date.
+    assert [row["date"] for row in rows] == ["2026-03-02", "2026-03-05"]
+    assert rows[0]["total_calories"] == 300
+    assert rows[0]["meal_count"] == 2
+    assert rows[1]["total_calories"] == 500
+    assert rows[1]["meal_count"] == 1
+
+    # Validation: end before start, and an over-long range are rejected.
+    assert client.get("/app/history", headers=_auth(token),
+                      params={"start": "2026-03-07", "end": "2026-03-01"}).status_code == 400
+    assert client.get("/app/history", headers=_auth(token),
+                      params={"start": "2020-01-01", "end": "2026-03-01"}).status_code == 400
+
+
 def test_saved_meals():
     _, token = _make_account_token(provider_id="sm@example.com", email="sm@example.com")
     r = client.post("/app/saved-meals", headers=_auth(token), json={
