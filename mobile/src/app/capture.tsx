@@ -6,11 +6,9 @@ import {
   Pressable,
   Alert,
   Keyboard,
-  LayoutAnimation,
-  Platform,
+  ScrollView,
   Animated,
   Easing,
-  type KeyboardEvent,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
@@ -29,6 +27,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { usePendingMeals } from '@/state/pendingMeals';
+import { useKeyboardHeight } from '@/utils/keyboard';
 import { colors, radius, space } from '@/theme/tokens';
 import { fonts } from '@/theme/typography';
 
@@ -38,50 +37,6 @@ const EXAMPLES = ['2 eggs & toast', 'Chicken & rice bowl', 'Oat latte', 'Greek s
 
 /** Photos per meal cap — mirrors the server's multi-photo limit. */
 const MAX_PHOTOS = 4;
-
-/**
- * Keyboard overlap for this screen, measured in window coordinates.
- *
- * `KeyboardAvoidingView` mis-measures inside iOS sheet modals (this screen uses
- * `presentation: 'modal'`), leaving the action bar covered by the keyboard. So
- * we take the keyboard's top edge from the native event and measure the
- * container's real bottom with `measureInWindow` — correct on every device
- * size and presentation style. Android resizes the window natively, so 0 there.
- */
-function useKeyboardOverlap(ref: React.RefObject<View | null>): number {
-  const [overlap, setOverlap] = useState(0);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    const animate = (e: KeyboardEvent) =>
-      LayoutAnimation.configureNext({
-        duration: e.duration > 0 ? e.duration : 250,
-        update: { type: LayoutAnimation.Types.keyboard },
-      });
-    const onFrame = (e: KeyboardEvent) => {
-      const el = ref.current;
-      if (!el) return;
-      el.measureInWindow((_x, y, _w, h) => {
-        animate(e);
-        setOverlap(Math.max(0, y + h - e.endCoordinates.screenY));
-      });
-    };
-    const onHide = (e: KeyboardEvent) => {
-      animate(e);
-      setOverlap(0);
-    };
-    const subs = [
-      Keyboard.addListener('keyboardWillChangeFrame', onFrame),
-      // Re-measure once everything settled (modal + keyboard animations can
-      // overlap on first open, skewing the mid-flight measurement).
-      Keyboard.addListener('keyboardDidShow', onFrame),
-      Keyboard.addListener('keyboardWillHide', onHide),
-    ];
-    return () => subs.forEach((s) => s.remove());
-  }, [ref]);
-
-  return overlap;
-}
 
 /** A live-looking equalizer shown while recording (decorative, not real levels). */
 function Waveform({ color }: { color: string }) {
@@ -127,13 +82,10 @@ export default function CaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ prefill?: string; mode?: string }>();
   const { submit } = usePendingMeals();
-
-  const containerRef = useRef<View>(null);
-  const keyboardOverlap = useKeyboardOverlap(containerRef);
+  const keyboardHeight = useKeyboardHeight();
 
   const [mode, setMode] = useState<Mode>('input');
   const [text, setText] = useState(typeof params.prefill === 'string' ? params.prefill : '');
-  // Up to MAX_PHOTOS photos of the same meal (e.g. plate + nutrition label).
   const [photos, setPhotos] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -141,7 +93,6 @@ export default function CaptureScreen() {
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
-  // Recording timer.
   useEffect(() => {
     if (!recording) return;
     setElapsed(0);
@@ -150,7 +101,6 @@ export default function CaptureScreen() {
     return () => clearInterval(t);
   }, [recording]);
 
-  // After accepting, briefly show a confirmation, then collapse the sheet.
   useEffect(() => {
     if (mode !== 'accepted') return;
     const t = setTimeout(() => router.back(), 850);
@@ -164,8 +114,6 @@ export default function CaptureScreen() {
 
   const canSubmit = (text.trim().length > 0 || photos.length > 0) && !recording;
 
-  // Send path for text / photo(s) / photo+comment. Nothing is submitted until
-  // the user taps Analyze, so photos can be reviewed and annotated first.
   const onSubmit = () => {
     if (!canSubmit) return;
     submit({
@@ -175,9 +123,6 @@ export default function CaptureScreen() {
     });
     accept();
   };
-
-  // ---- Photos: attach as previews (do NOT auto-submit). Up to MAX_PHOTOS of
-  // the same meal — e.g. the plate plus the package's nutrition label. -------
 
   const addPhotos = (uris: string[]) => {
     if (uris.length === 0) return;
@@ -220,8 +165,6 @@ export default function CaptureScreen() {
     ]);
   };
 
-  // ---- Voice: fire-and-forget. Record → tap send → we transcribe + log ----
-
   const startRecording = async () => {
     try {
       const perm = await AudioModule.requestRecordingPermissionsAsync();
@@ -248,12 +191,10 @@ export default function CaptureScreen() {
     try {
       await recorder.stop();
     } catch {
-      // ignore — nothing to keep
+      // ignore
     }
   };
 
-  // Send the voice note immediately without waiting for transcription. The
-  // pending-meals queue transcribes it in the background, then logs it.
   const sendVoice = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setRecording(false);
@@ -272,7 +213,6 @@ export default function CaptureScreen() {
     accept();
   };
 
-  // Widget/Siri deep links land here with ?mode=… — fire the matching action once.
   const handledDeepLink = useRef(false);
   useEffect(() => {
     if (handledDeepLink.current) return;
@@ -283,7 +223,6 @@ export default function CaptureScreen() {
       handledDeepLink.current = true;
       void startRecording();
     }
-    // `text` (and any unknown value) just opens the composer — no action needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.mode]);
 
@@ -307,16 +246,12 @@ export default function CaptureScreen() {
 
   const mmss = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
+  // Layout: header | scrollable input | docked footer. The footer is NOT inside
+  // the flex input column — it sits in its own row and moves up with
+  // marginBottom = keyboard height so Mic / Camera / Analyze stay visible.
   return (
     <Screen edges={['top', 'bottom', 'left', 'right']}>
-      {/* Manual keyboard tracking (see useKeyboardOverlap): bottom padding
-          equals the real keyboard overlap, so the action bar always sits
-          right on top of the keyboard on any device / presentation style. */}
-      <View
-        ref={containerRef}
-        collapsable={false}
-        style={[styles.flex, keyboardOverlap > 0 && { paddingBottom: keyboardOverlap }]}
-      >
+      <View style={styles.flex}>
         <View style={styles.topBar}>
           <View>
             <AppText variant="h2">Log a meal</AppText>
@@ -330,10 +265,9 @@ export default function CaptureScreen() {
         </View>
 
         {recording ? (
-          // ---- Recording: panel pinned to the bottom, like the composer ----
           <>
             <View style={styles.flex} />
-            <View style={styles.recPanel}>
+            <View style={[styles.recPanel, keyboardHeight > 0 && { marginBottom: keyboardHeight }]}>
               <View style={styles.recStatusRow}>
                 <View style={styles.recDot} />
                 <AppText variant="bodyStrong">Listening…</AppText>
@@ -362,24 +296,31 @@ export default function CaptureScreen() {
             </View>
           </>
         ) : (
-          // ---- Composer: the input fills the screen; actions sit on the keyboard ----
           <>
-            <TextInput
-              style={styles.input}
-              placeholder={
-                photos.length > 0
-                  ? 'Add a note (optional) — e.g. “only ate half”'
-                  : 'Just tell me what you ate…'
-              }
-              placeholderTextColor={colors.inkFaint}
-              selectionColor={colors.terracotta}
-              multiline
-              autoFocus={photos.length === 0}
-              value={text}
-              onChangeText={setText}
-            />
+            <ScrollView
+              style={styles.flex}
+              contentContainerStyle={styles.inputScroll}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              showsVerticalScrollIndicator={false}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder={
+                  photos.length > 0
+                    ? 'Add a note (optional) — e.g. “only ate half”'
+                    : 'Just tell me what you ate…'
+                }
+                placeholderTextColor={colors.inkFaint}
+                selectionColor={colors.terracotta}
+                multiline
+                autoFocus={photos.length === 0}
+                value={text}
+                onChangeText={setText}
+              />
+            </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footerDock, keyboardHeight > 0 && { marginBottom: keyboardHeight }]}>
               {photos.length > 0 ? (
                 <View style={styles.photoPreview}>
                   <View style={styles.photoRow}>
@@ -454,11 +395,9 @@ const styles = StyleSheet.create({
   subtitle: { marginTop: space.xs },
   close: { paddingTop: space.xs },
 
-  // The input owns all free space between the header and the footer. No
-  // lineHeight on purpose: RN's iOS TextInput mis-centers text inside inflated
-  // line boxes (the "floating" placeholder/text this task fixes).
+  inputScroll: { flexGrow: 1 },
   input: {
-    flex: 1,
+    minHeight: 120,
     fontFamily: fonts.serifRegular,
     fontSize: 22,
     color: colors.ink,
@@ -467,8 +406,7 @@ const styles = StyleSheet.create({
     paddingTop: space.md,
   },
 
-  // Footer: attachment / hint / example chips / actions — pinned above the keyboard.
-  footer: { gap: space.md, paddingTop: space.md, paddingBottom: space.sm },
+  footerDock: { gap: space.md, paddingTop: space.md },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   iconButton: {
     width: 54,
@@ -515,7 +453,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Recording panel (bottom-pinned card).
   recPanel: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -523,7 +460,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: space.base,
     gap: space.base,
-    marginBottom: space.sm,
   },
   recStatusRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   recDot: { width: 10, height: 10, borderRadius: radius.pill, backgroundColor: colors.terracotta },

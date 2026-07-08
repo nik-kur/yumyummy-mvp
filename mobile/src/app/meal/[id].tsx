@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, Alert, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ShieldCheck, Trash2, Pencil, ExternalLink } from 'lucide-react-native';
+import { ChevronLeft, ShieldCheck, Trash2, ExternalLink } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
@@ -114,7 +114,8 @@ export default function MealDetailScreen() {
   const [meal, setMeal] = useState<MealRead | null>(null);
   const [busy, setBusy] = useState(false);
   const [repeating, setRepeating] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  // `?edit=1` deep-links straight into the edit sheet.
+  const [editOpen, setEditOpen] = useState(str(params.edit) === '1');
   const [editItemIndex, setEditItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -326,9 +327,9 @@ export default function MealDetailScreen() {
         <AppText variant="overline" color={colors.inkMuted}>
           {time ? formatTime(time) : 'Meal'}
         </AppText>
-        <Pressable onPress={() => setEditOpen(true)} hitSlop={10}>
-          <Pencil size={20} color={colors.inkMuted} strokeWidth={1.5} />
-        </Pressable>
+        {/* Spacer mirrors the back chevron so the time stays centered.
+            Editing lives in the bottom action bar now. */}
+        <View style={styles.topBarSpacer} />
       </View>
 
       <AppText variant="h1" style={styles.title}>
@@ -411,10 +412,10 @@ export default function MealDetailScreen() {
       <View style={styles.actions}>
         <Button label="Repeat this meal" loading={repeating} onPress={onRepeat} />
         <Button
-          label="Log similar"
+          label="Edit meal"
           variant="secondary"
           haptic={false}
-          onPress={() => router.push({ pathname: '/capture', params: { prefill: description } })}
+          onPress={() => setEditOpen(true)}
         />
         <Button label="Save to My Menu" variant="ghost" loading={busy} onPress={onSave} />
         <Pressable onPress={onDelete} style={styles.delete}>
@@ -447,6 +448,7 @@ export default function MealDetailScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.sm },
+  topBarSpacer: { width: 26 },
   title: { marginTop: space.base, marginBottom: space.lg },
   hero: { alignItems: 'center', paddingVertical: space.xl, gap: space.xs },
   badges: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },

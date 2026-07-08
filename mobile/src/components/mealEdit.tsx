@@ -13,16 +13,17 @@
  * Sheets are pure UI: they return the edited values via `onSave` and the
  * caller does the optimistic update + API call.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  KeyboardAvoidingView,
+  Animated,
+  Easing,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Minus, Plus, Trash2, X } from 'lucide-react-native';
@@ -30,6 +31,7 @@ import { Minus, Plus, Trash2, X } from 'lucide-react-native';
 import { AppText } from './AppText';
 import { Button } from './Button';
 import type { MealItem } from '@/api/types';
+import { useKeyboardHeight } from '@/utils/keyboard';
 import { colors, radius, shadow, space } from '@/theme/tokens';
 import { fonts } from '@/theme/typography';
 
@@ -75,42 +77,87 @@ export interface MacroTotals {
 }
 
 // ---- generic sheet shell ----------------------------------------------------
+//
+// Structure (fixes the build-28 issues: sheet floating above the bottom and
+// "Save" hidden behind a scroll):
+//  - The card is glued to the screen bottom. The keyboard lifts the CONTENT
+//    via paddingBottom (deterministic `useKeyboardOverlap`, no measuring, no
+//    KeyboardAvoidingView — that's what misbehaved inside Modal).
+//  - Header and footer (Save/Delete) are pinned OUTSIDE the scroll area, so
+//    the primary action is always on screen. The middle only scrolls in the
+//    rare case content genuinely doesn't fit (small phone + keyboard).
 
-function Sheet({
-  visible,
+function SheetShell({
   onClose,
   title,
+  footer,
+  scrollable = false,
   children,
 }: {
-  visible: boolean;
   onClose: () => void;
   title: string;
+  footer: ReactNode;
+  /** Only the saved-meal list (many components) scrolls; edit sheets fit on screen. */
+  scrollable?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const winH = useWindowDimensions().height;
+  const kb = useKeyboardHeight();
+
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  const body = scrollable ? (
+    <ScrollView
+      style={styles.sheetScroll}
+      contentContainerStyle={styles.sheetScrollContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      {children}
+    </ScrollView>
+  ) : (
+    <View style={styles.sheetBody}>{children}</View>
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + space.base }]}>
-            <View style={styles.sheetHeader}>
-              <AppText variant="h2" numberOfLines={1} style={styles.sheetTitle}>
-                {title}
-              </AppText>
-              <Pressable onPress={onClose} hitSlop={10}>
-                <X size={24} color={colors.inkMuted} strokeWidth={1.5} />
-              </Pressable>
-            </View>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              style={styles.sheetScroll}
-            >
-              {children}
-            </ScrollView>
+        <Animated.View
+          style={[
+            styles.sheet,
+            scrollable && { maxHeight: winH - insets.top - space.lg - kb },
+            {
+              paddingBottom: kb > 0 ? kb : insets.bottom,
+              opacity: anim,
+              transform: [
+                { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.grabber} />
+          <View style={styles.sheetHeader}>
+            <AppText variant="h2" numberOfLines={1} style={styles.sheetTitle}>
+              {title}
+            </AppText>
+            <Pressable onPress={onClose} hitSlop={10} style={styles.sheetClose}>
+              <X size={22} color={colors.inkMuted} strokeWidth={1.5} />
+            </Pressable>
           </View>
-        </KeyboardAvoidingView>
+          {body}
+          <View style={styles.sheetFooter}>{footer}</View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -156,7 +203,8 @@ function Stepper({
   );
 }
 
-function NumRow({
+/** One labeled numeric box (label on top, value + unit inside). */
+function MacroCell({
   label,
   unit,
   value,
@@ -167,16 +215,16 @@ function NumRow({
   unit: string;
   value: string;
   onChangeText: (t: string) => void;
-  tint?: string;
+  tint: string;
 }) {
   return (
-    <View style={styles.numRow}>
-      <AppText variant="body" color={tint ?? colors.ink} style={styles.numLabel}>
+    <View style={styles.cell}>
+      <AppText variant="overline" color={tint} numberOfLines={1}>
         {label}
       </AppText>
-      <View style={styles.numInputWrap}>
+      <View style={styles.cellInputRow}>
         <TextInput
-          style={styles.numInput}
+          style={styles.cellInput}
           value={value}
           onChangeText={onChangeText}
           keyboardType="number-pad"
@@ -193,6 +241,8 @@ function NumRow({
   );
 }
 
+/** Compact grid: calories on its own line, P/F/C side by side. Two rows total,
+ * so the whole sheet fits on screen without scrolling. */
 function MacroFields({
   cal,
   prot,
@@ -214,10 +264,12 @@ function MacroFields({
 }) {
   return (
     <View style={styles.fields}>
-      <NumRow label="Calories" unit="kcal" value={cal} onChangeText={onCal} tint={colors.terracottaText} />
-      <NumRow label="Protein" unit="g" value={prot} onChangeText={onProt} tint={colors.protein} />
-      <NumRow label="Fat" unit="g" value={fat} onChangeText={onFat} tint={colors.fat} />
-      <NumRow label="Carbs" unit="g" value={carbs} onChangeText={onCarbs} tint={colors.carbs} />
+      <MacroCell label="Calories" unit="kcal" value={cal} onChangeText={onCal} tint={colors.terracottaText} />
+      <View style={styles.fieldsRow}>
+        <MacroCell label="Protein" unit="g" value={prot} onChangeText={onProt} tint={colors.protein} />
+        <MacroCell label="Fat" unit="g" value={fat} onChangeText={onFat} tint={colors.fat} />
+        <MacroCell label="Carbs" unit="g" value={carbs} onChangeText={onCarbs} tint={colors.carbs} />
+      </View>
     </View>
   );
 }
@@ -228,13 +280,17 @@ const PORTION_STEP = 0.25;
 const PORTION_MIN = 0.25;
 const PORTION_MAX = 4;
 
-function MealEditBody({
+function MealEditInner({
+  title,
   initial,
   hasItems,
+  onClose,
   onSave,
 }: {
+  title: string;
   initial: MacroTotals;
   hasItems: boolean;
+  onClose: () => void;
   onSave: (portion: number, totals: MacroTotals) => void;
 }) {
   const [portion, setPortion] = useState(1);
@@ -252,49 +308,52 @@ function MealEditBody({
   };
 
   return (
-    <View style={styles.body}>
-      <View style={styles.sectionRow}>
-        <View style={styles.sectionText}>
-          <AppText variant="bodyStrong">Portion</AppText>
-          <AppText variant="caption" color={colors.inkMuted}>
-            Ate half? Set ×0.5 — everything rescales{hasItems ? ', components too' : ''}.
-          </AppText>
+    <SheetShell
+      onClose={onClose}
+      title={title}
+      footer={
+        <Button
+          label="Save changes"
+          onPress={() =>
+            onSave(portion, {
+              calories: toNum(cal),
+              protein: toNum(prot),
+              fat: toNum(fat),
+              carbs: toNum(carbs),
+            })
+          }
+        />
+      }
+    >
+      <View style={styles.body}>
+        <View style={styles.sectionRow}>
+          <View style={styles.sectionText}>
+            <AppText variant="bodyStrong">Portion</AppText>
+            <AppText variant="caption" color={colors.inkMuted}>
+              Ate half? Set ×0.5{hasItems ? ' — components rescale too' : ''}.
+            </AppText>
+          </View>
+          <Stepper
+            display={`×${portion}`}
+            onMinus={() => applyPortion(Math.max(PORTION_MIN, +(portion - PORTION_STEP).toFixed(2)))}
+            onPlus={() => applyPortion(Math.min(PORTION_MAX, +(portion + PORTION_STEP).toFixed(2)))}
+            minusDisabled={portion <= PORTION_MIN}
+            plusDisabled={portion >= PORTION_MAX}
+          />
         </View>
-        <Stepper
-          display={`×${portion}`}
-          onMinus={() => applyPortion(Math.max(PORTION_MIN, +(portion - PORTION_STEP).toFixed(2)))}
-          onPlus={() => applyPortion(Math.min(PORTION_MAX, +(portion + PORTION_STEP).toFixed(2)))}
-          minusDisabled={portion <= PORTION_MIN}
-          plusDisabled={portion >= PORTION_MAX}
+
+        <MacroFields
+          cal={cal}
+          prot={prot}
+          fat={fat}
+          carbs={carbs}
+          onCal={setCal}
+          onProt={setProt}
+          onFat={setFat}
+          onCarbs={setCarbs}
         />
       </View>
-
-      <AppText variant="overline" color={colors.inkMuted} style={styles.fieldsLabel}>
-        Or set the numbers directly
-      </AppText>
-      <MacroFields
-        cal={cal}
-        prot={prot}
-        fat={fat}
-        carbs={carbs}
-        onCal={setCal}
-        onProt={setProt}
-        onFat={setFat}
-        onCarbs={setCarbs}
-      />
-
-      <Button
-        label="Save changes"
-        onPress={() =>
-          onSave(portion, {
-            calories: toNum(cal),
-            protein: toNum(prot),
-            fat: toNum(fat),
-            carbs: toNum(carbs),
-          })
-        }
-      />
-    </View>
+    </SheetShell>
   );
 }
 
@@ -313,11 +372,16 @@ export function MealEditSheet({
   onClose: () => void;
   onSave: (portion: number, totals: MacroTotals) => void;
 }) {
+  // Mount per open so state re-seeds from `initial`.
+  if (!visible) return null;
   return (
-    <Sheet visible={visible} onClose={onClose} title={title}>
-      {/* Remount per open so state re-seeds from `initial`. */}
-      {visible ? <MealEditBody initial={initial} hasItems={hasItems} onSave={onSave} /> : null}
-    </Sheet>
+    <MealEditInner
+      title={title}
+      initial={initial}
+      hasItems={hasItems}
+      onClose={onClose}
+      onSave={onSave}
+    />
   );
 }
 
@@ -325,12 +389,14 @@ export function MealEditSheet({
 
 const GRAMS_STEP = 10;
 
-function ItemEditBody({
+function ItemEditInner({
   item,
+  onClose,
   onSave,
   onRemove,
 }: {
   item: MealItem;
+  onClose: () => void;
   onSave: (next: MealItem) => void;
   onRemove: () => void;
 }) {
@@ -354,81 +420,89 @@ function ItemEditBody({
   };
 
   return (
-    <View style={styles.body}>
-      <View style={styles.sectionRow}>
-        <View style={styles.sectionText}>
-          <AppText variant="bodyStrong">Weight</AppText>
-          <AppText variant="caption" color={colors.inkMuted}>
-            {baseGrams
-              ? 'Macros rescale with the grams.'
-              : 'No weight on record — edit the numbers below.'}
-          </AppText>
-        </View>
-        <View style={styles.gramsWrap}>
-          <Pressable
-            onPress={() => applyGrams(Math.max(0, toNum(grams) - GRAMS_STEP))}
-            disabled={toNum(grams) <= 0}
-            hitSlop={6}
-            style={[styles.stepBtn, toNum(grams) <= 0 && styles.stepBtnDisabled]}
-          >
-            <Minus size={20} color={toNum(grams) <= 0 ? colors.inkFaint : colors.ink} strokeWidth={2} />
+    <SheetShell
+      onClose={onClose}
+      title={item.name ?? 'Component'}
+      footer={
+        <View style={styles.footerCol}>
+          <Button
+            label="Save changes"
+            onPress={() =>
+              onSave({
+                ...item,
+                grams: toNum(grams) || item.grams,
+                calories_kcal: toNum(cal),
+                protein_g: toNum(prot),
+                fat_g: toNum(fat),
+                carbs_g: toNum(carbs),
+              })
+            }
+          />
+          <Pressable onPress={onRemove} style={styles.removeBtn}>
+            <Trash2 size={18} color={colors.error} strokeWidth={1.5} />
+            <AppText variant="bodyStrong" color={colors.error}>
+              Remove this component
+            </AppText>
           </Pressable>
-          <View style={styles.gramsInputWrap}>
-            <TextInput
-              style={styles.gramsInput}
-              value={grams}
-              onChangeText={(t) => applyGrams(toNum(t))}
-              keyboardType="number-pad"
-              placeholder="0"
-              placeholderTextColor={colors.inkFaint}
-              maxLength={5}
-              selectTextOnFocus
-            />
-            <AppText variant="caption" color={colors.inkFaint}>
-              g
+        </View>
+      }
+    >
+      <View style={styles.body}>
+        <View style={styles.sectionRow}>
+          <View style={styles.sectionText}>
+            <AppText variant="bodyStrong">Weight</AppText>
+            <AppText variant="caption" color={colors.inkMuted}>
+              {baseGrams
+                ? 'Macros rescale with the grams.'
+                : 'No weight on record — edit the numbers below.'}
             </AppText>
           </View>
-          <Pressable
-            onPress={() => applyGrams(toNum(grams) + GRAMS_STEP)}
-            hitSlop={6}
-            style={styles.stepBtn}
-          >
-            <Plus size={20} color={colors.ink} strokeWidth={2} />
-          </Pressable>
+          <View style={styles.gramsWrap}>
+            <Pressable
+              onPress={() => applyGrams(Math.max(0, toNum(grams) - GRAMS_STEP))}
+              disabled={toNum(grams) <= 0}
+              hitSlop={6}
+              style={[styles.stepBtn, toNum(grams) <= 0 && styles.stepBtnDisabled]}
+            >
+              <Minus size={20} color={toNum(grams) <= 0 ? colors.inkFaint : colors.ink} strokeWidth={2} />
+            </Pressable>
+            <View style={styles.gramsInputWrap}>
+              <TextInput
+                style={styles.gramsInput}
+                value={grams}
+                onChangeText={(t) => applyGrams(toNum(t))}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor={colors.inkFaint}
+                maxLength={5}
+                selectTextOnFocus
+              />
+              <AppText variant="caption" color={colors.inkFaint}>
+                g
+              </AppText>
+            </View>
+            <Pressable
+              onPress={() => applyGrams(toNum(grams) + GRAMS_STEP)}
+              hitSlop={6}
+              style={styles.stepBtn}
+            >
+              <Plus size={20} color={colors.ink} strokeWidth={2} />
+            </Pressable>
+          </View>
         </View>
+
+        <MacroFields
+          cal={cal}
+          prot={prot}
+          fat={fat}
+          carbs={carbs}
+          onCal={setCal}
+          onProt={setProt}
+          onFat={setFat}
+          onCarbs={setCarbs}
+        />
       </View>
-
-      <MacroFields
-        cal={cal}
-        prot={prot}
-        fat={fat}
-        carbs={carbs}
-        onCal={setCal}
-        onProt={setProt}
-        onFat={setFat}
-        onCarbs={setCarbs}
-      />
-
-      <Button
-        label="Save changes"
-        onPress={() =>
-          onSave({
-            ...item,
-            grams: toNum(grams) || item.grams,
-            calories_kcal: toNum(cal),
-            protein_g: toNum(prot),
-            fat_g: toNum(fat),
-            carbs_g: toNum(carbs),
-          })
-        }
-      />
-      <Pressable onPress={onRemove} style={styles.removeBtn}>
-        <Trash2 size={18} color={colors.error} strokeWidth={1.5} />
-        <AppText variant="bodyStrong" color={colors.error}>
-          Remove this component
-        </AppText>
-      </Pressable>
-    </View>
+    </SheetShell>
   );
 }
 
@@ -445,19 +519,17 @@ export function ItemEditSheet({
   onSave: (next: MealItem) => void;
   onRemove: () => void;
 }) {
-  return (
-    <Sheet visible={visible} onClose={onClose} title={item?.name ?? 'Component'}>
-      {visible && item ? <ItemEditBody item={item} onSave={onSave} onRemove={onRemove} /> : null}
-    </Sheet>
-  );
+  if (!visible || !item) return null;
+  return <ItemEditInner item={item} onClose={onClose} onSave={onSave} onRemove={onRemove} />;
 }
 
 // ---- saved meal edit sheet ----------------------------------------------------
 
-function SavedMealEditBody({
+function SavedMealEditInner({
   name,
   totals,
   items,
+  onClose,
   onSave,
   onDelete,
   onEditItem,
@@ -466,6 +538,7 @@ function SavedMealEditBody({
   name: string;
   totals: MacroTotals;
   items: MealItem[];
+  onClose: () => void;
   onSave: (name: string, totals: MacroTotals | null) => void;
   onDelete: () => void;
   onEditItem: (index: number) => void;
@@ -479,55 +552,77 @@ function SavedMealEditBody({
   const [carbs, setCarbs] = useState(fromNum(totals.carbs));
 
   return (
-    <View style={styles.body}>
-      <View style={styles.nameField}>
-        <AppText variant="overline" color={colors.inkMuted}>
-          Name
-        </AppText>
-        <TextInput
-          style={styles.nameInput}
-          value={draftName}
-          onChangeText={setDraftName}
-          placeholder="Meal name"
-          placeholderTextColor={colors.inkFaint}
-          maxLength={80}
-        />
-      </View>
-
-      {hasItems ? (
-        <View style={styles.itemList}>
-          <AppText variant="overline" color={colors.inkMuted}>
-            Components — tap to edit
-          </AppText>
-          {items.map((it, i) => (
-            <View key={`${it.name}-${i}`} style={styles.itemRow}>
-              <Pressable style={styles.itemRowMain} onPress={() => onEditItem(i)}>
-                <AppText variant="bodyStrong" numberOfLines={1} style={styles.itemRowName}>
-                  {it.name}
-                </AppText>
-                <AppText variant="caption" color={colors.inkMuted}>
-                  {[
-                    it.grams ? `${Math.round(it.grams)} g` : null,
-                    it.calories_kcal != null ? `${Math.round(it.calories_kcal)} kcal` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </AppText>
-              </Pressable>
-              <Pressable onPress={() => onRemoveItem(i)} hitSlop={8} style={styles.itemRemove}>
-                <Minus size={16} color={colors.error} strokeWidth={2.5} />
-              </Pressable>
-            </View>
-          ))}
-          <AppText variant="caption" color={colors.inkFaint}>
-            Totals update automatically from the components.
-          </AppText>
+    <SheetShell
+      onClose={onClose}
+      title="Edit saved meal"
+      scrollable
+      footer={
+        <View style={styles.footerCol}>
+          <Button
+            label="Save changes"
+            onPress={() =>
+              onSave(
+                draftName.trim() || name,
+                hasItems
+                  ? null
+                  : { calories: toNum(cal), protein: toNum(prot), fat: toNum(fat), carbs: toNum(carbs) },
+              )
+            }
+          />
+          <Pressable onPress={onDelete} style={styles.removeBtn}>
+            <Trash2 size={18} color={colors.error} strokeWidth={1.5} />
+            <AppText variant="bodyStrong" color={colors.error}>
+              Remove from My Menu
+            </AppText>
+          </Pressable>
         </View>
-      ) : (
-        <>
-          <AppText variant="overline" color={colors.inkMuted} style={styles.fieldsLabel}>
-            Nutrition
+      }
+    >
+      <View style={styles.body}>
+        <View style={styles.nameField}>
+          <AppText variant="overline" color={colors.inkMuted}>
+            Name
           </AppText>
+          <TextInput
+            style={styles.nameInput}
+            value={draftName}
+            onChangeText={setDraftName}
+            placeholder="Meal name"
+            placeholderTextColor={colors.inkFaint}
+            maxLength={80}
+          />
+        </View>
+
+        {hasItems ? (
+          <View style={styles.itemList}>
+            <AppText variant="overline" color={colors.inkMuted}>
+              Components — tap to edit
+            </AppText>
+            {items.map((it, i) => (
+              <View key={`${it.name}-${i}`} style={styles.itemRow}>
+                <Pressable style={styles.itemRowMain} onPress={() => onEditItem(i)}>
+                  <AppText variant="bodyStrong" numberOfLines={1} style={styles.itemRowName}>
+                    {it.name}
+                  </AppText>
+                  <AppText variant="caption" color={colors.inkMuted}>
+                    {[
+                      it.grams ? `${Math.round(it.grams)} g` : null,
+                      it.calories_kcal != null ? `${Math.round(it.calories_kcal)} kcal` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </AppText>
+                </Pressable>
+                <Pressable onPress={() => onRemoveItem(i)} hitSlop={8} style={styles.itemRemove}>
+                  <Minus size={16} color={colors.error} strokeWidth={2.5} />
+                </Pressable>
+              </View>
+            ))}
+            <AppText variant="caption" color={colors.inkFaint}>
+              Totals update automatically from the components.
+            </AppText>
+          </View>
+        ) : (
           <MacroFields
             cal={cal}
             prot={prot}
@@ -538,27 +633,9 @@ function SavedMealEditBody({
             onFat={setFat}
             onCarbs={setCarbs}
           />
-        </>
-      )}
-
-      <Button
-        label="Save changes"
-        onPress={() =>
-          onSave(
-            draftName.trim() || name,
-            hasItems
-              ? null
-              : { calories: toNum(cal), protein: toNum(prot), fat: toNum(fat), carbs: toNum(carbs) },
-          )
-        }
-      />
-      <Pressable onPress={onDelete} style={styles.removeBtn}>
-        <Trash2 size={18} color={colors.error} strokeWidth={1.5} />
-        <AppText variant="bodyStrong" color={colors.error}>
-          Remove from My Menu
-        </AppText>
-      </Pressable>
-    </View>
+        )}
+      </View>
+    </SheetShell>
   );
 }
 
@@ -583,20 +660,18 @@ export function SavedMealEditSheet({
   onEditItem: (index: number) => void;
   onRemoveItem: (index: number) => void;
 }) {
+  if (!visible) return null;
   return (
-    <Sheet visible={visible} onClose={onClose} title="Edit saved meal">
-      {visible ? (
-        <SavedMealEditBody
-          name={name}
-          totals={totals}
-          items={items}
-          onSave={onSave}
-          onDelete={onDelete}
-          onEditItem={onEditItem}
-          onRemoveItem={onRemoveItem}
-        />
-      ) : null}
-    </Sheet>
+    <SavedMealEditInner
+      name={name}
+      totals={totals}
+      items={items}
+      onClose={onClose}
+      onSave={onSave}
+      onDelete={onDelete}
+      onEditItem={onEditItem}
+      onRemoveItem={onRemoveItem}
+    />
   );
 }
 
@@ -613,20 +688,41 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: space.lg,
-    paddingTop: space.lg,
-    maxHeight: '88%',
+    paddingTop: space.sm,
+    width: '100%',
     ...shadow.float,
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.hairlineStrong,
+    marginBottom: space.sm,
   },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.md,
-    marginBottom: space.base,
+    marginBottom: space.md,
   },
   sheetTitle: { flex: 1 },
-  sheetScroll: { flexGrow: 0 },
-  body: { gap: space.base, paddingBottom: space.sm },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Scroll only for saved-meal lists; compact edit sheets use sheetBody instead.
+  sheetScroll: { flexGrow: 0, flexShrink: 1, maxHeight: 280 },
+  sheetScrollContent: { paddingBottom: space.xs },
+  sheetBody: { gap: space.sm },
+  sheetFooter: { paddingTop: space.sm },
+  footerCol: { gap: space.xs },
+  body: { gap: space.sm },
 
   sectionRow: {
     flexDirection: 'row',
@@ -677,35 +773,31 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  fieldsLabel: { marginBottom: -space.sm },
   fields: { gap: space.sm },
-  numRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: space.md,
-  },
-  numLabel: { flex: 1 },
-  numInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
+  fieldsRow: { flexDirection: 'row', gap: space.sm },
+  cell: {
+    flex: 1,
+    gap: 6,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.hairline,
     borderRadius: radius.md,
     paddingHorizontal: space.md,
-    height: 44,
-    width: 128,
+    paddingVertical: space.sm,
   },
-  numInput: {
-    flex: 1,
+  cellInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+  },
+  cellInput: {
+    flexShrink: 1,
+    minWidth: 24,
     fontFamily: fonts.serifSemibold,
-    fontSize: 18,
+    fontSize: 20,
     color: colors.ink,
     fontVariant: ['tabular-nums'],
     padding: 0,
-    textAlign: 'right',
   },
 
   nameField: { gap: space.xs },

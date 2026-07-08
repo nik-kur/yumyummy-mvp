@@ -42,7 +42,9 @@ export default function RootLayout() {
                 contentStyle: { backgroundColor: colors.bg },
               }}
             >
-              <Stack.Screen name="capture" options={{ presentation: 'modal' }} />
+              {/* Full-screen so the keyboard lifts a docked footer reliably
+                  (pageSheet modals mis-report overlap and bury the action bar). */}
+              <Stack.Screen name="capture" options={{ presentation: 'fullScreenModal' }} />
               <Stack.Screen name="advisor" options={{ presentation: 'modal' }} />
               <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
               <Stack.Screen name="meal/[id]" options={{ presentation: 'card' }} />

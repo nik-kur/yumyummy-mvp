@@ -156,23 +156,22 @@ struct BalanceHeader: View {
 
 // MARK: - Home-screen views
 
-/// Dashboard (small): header on top, macro bars pinned to the bottom. The
-/// spacer between them stretches, so the card is filled edge-to-edge with no
-/// dead zone under the C row.
+/// Dashboard (small): ring header with macro bars directly underneath — pinned
+/// to the top-left. Without `alignment: .topLeading` the outer `.infinity` frame
+/// vertically centers the stack and reads as a big dead zone between sections.
 struct BalanceDashboardView: View {
     var snap: YYSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 6) {
             BalanceHeader(snap: snap, numberSize: 26)
-            Spacer(minLength: 10)
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 MacroRow(label: "P", value: snap.protein, goal: snap.proteinGoal, color: YY.protein, compact: true)
                 MacroRow(label: "F", value: snap.fat, goal: snap.fatGoal, color: YY.fat, compact: true)
                 MacroRow(label: "C", value: snap.carbs, goal: snap.carbsGoal, color: YY.carbs, compact: true)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -205,15 +204,16 @@ struct ComboMediumView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 0) {
+            // Ring + bars as one tight top-aligned group (see BalanceDashboardView).
+            VStack(alignment: .leading, spacing: 6) {
                 BalanceHeader(snap: snap, numberSize: 24)
-                Spacer(minLength: 10)
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     MacroRow(label: "P", value: snap.protein, goal: snap.proteinGoal, color: YY.protein, compact: true)
                     MacroRow(label: "F", value: snap.fat, goal: snap.fatGoal, color: YY.fat, compact: true)
                     MacroRow(label: "C", value: snap.carbs, goal: snap.carbsGoal, color: YY.carbs, compact: true)
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
 
             Divider().padding(.vertical, 2)
 
