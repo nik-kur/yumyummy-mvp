@@ -275,6 +275,72 @@ def test_history_returns_totals_and_meal_counts():
                       params={"start": "2020-01-01", "end": "2026-03-01"}).status_code == 400
 
 
+def test_recap_requires_auth():
+    assert client.get("/app/recap/latest").status_code == 401
+    assert client.get("/app/recap", params={"week": "2026-03-02"}).status_code == 401
+
+
+def test_recap_empty_week_has_data_false_and_no_llm(monkeypatch):
+    _, token = _make_account_token(provider_id="recap0@example.com", email="recap0@example.com")
+
+    # If the LLM were called for an empty week that would be a bug — blow up.
+    async def _boom(*a, **k):  # pragma: no cover - only runs on regression
+        raise AssertionError("LLM must not be called for an empty week")
+
+    monkeypatch.setattr("app.services.weekly_recap.chat_completion", _boom)
+
+    r = client.get("/app/recap", headers=_auth(token), params={"week": "2026-03-02"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["has_data"] is False
+    assert body["days_logged"] == 0
+    assert body["week_start"] == "2026-03-02"
+    assert body["week_end"] == "2026-03-08"
+    assert body["summary"]  # non-empty fallback text
+
+
+def test_recap_with_data_computes_stats_and_caches_summary(monkeypatch):
+    _, token = _make_account_token(provider_id="recap1@example.com", email="recap1@example.com")
+
+    calls = {"n": 0}
+
+    async def _stub(messages, model="gpt-4.1-mini", temperature=0.6):
+        calls["n"] += 1
+        return "Great week — you stayed on track!"
+
+    monkeypatch.setattr("app.services.weekly_recap.chat_completion", _stub)
+
+    client.patch("/app/me", headers=_auth(token), json={"target_calories": 2000})
+
+    for d, cal in (("2026-03-02", 1800), ("2026-03-03", 2500), ("2026-03-04", 1500)):
+        client.post("/app/meals", headers=_auth(token), json={
+            "date": d, "description_user": "Meal", "calories": cal,
+            "protein_g": 40, "fat_g": 20, "carbs_g": 60,
+        })
+
+    r = client.get("/app/recap", headers=_auth(token), params={"week": "2026-03-05"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["has_data"] is True
+    assert body["week_start"] == "2026-03-02"
+    assert body["days_logged"] == 3
+    assert body["meals_count"] == 3
+    assert body["on_target_days"] == 2  # 1800 & 1500 within 2000*1.1; 2500 over
+    assert body["avg_calories"] == round((1800 + 2500 + 1500) / 3)
+    assert body["best_day"] == "2026-03-02"  # closest to the 2000 target
+    assert body["best_day_label"] == "Monday"
+    split = body["meal_time_split"]
+    assert round(split["morning"] + split["midday"] + split["evening"] + split["night"]) == 5800
+    assert body["summary"] == "Great week — you stayed on track!"
+    assert calls["n"] == 1
+
+    # Second read reuses the cached summary (no extra LLM call).
+    r2 = client.get("/app/recap", headers=_auth(token), params={"week": "2026-03-02"})
+    assert r2.status_code == 200
+    assert r2.json()["summary"] == "Great week — you stayed on track!"
+    assert calls["n"] == 1
+
+
 def test_saved_meals():
     _, token = _make_account_token(provider_id="sm@example.com", email="sm@example.com")
     r = client.post("/app/saved-meals", headers=_auth(token), json={

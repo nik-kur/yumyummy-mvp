@@ -40,6 +40,8 @@ from app.billing.account_access import account_billing_snapshot, account_has_acc
 from app.billing.plans import resolve_trial_days
 from app.services.agent_persist import persist_agent_result_for_user
 from app.services.usage_guardrails import record_usage_for_user
+from app.services.user_time import today_for_user
+from app.services.weekly_recap import build_recap
 from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.schemas.ai import WorkflowRunResponse, WorkflowTotals
 from app.schemas.meal import DaySummary, MealRead
@@ -61,6 +63,7 @@ from app.schemas.app_api import (
     AppTrialStartRequest,
     AppTrialStartResponse,
     DayTotals,
+    WeeklyRecapResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -392,6 +395,39 @@ def get_history(
         )
         for d in day_rows
     ]
+
+
+@router.get("/recap/latest", response_model=WeeklyRecapResponse)
+async def get_recap_latest(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """"Week in Recap" for the most recent completed week (Задача 6).
+
+    Additive (25(1)+): a friendly, shareable weekly summary — live stats plus a
+    cached LLM one-liner. Anchored to the user's timezone (on a Sunday it's the
+    week that ends today, otherwise the previous full week).
+    """
+    user = get_primary_user(db, account)
+    db.commit()
+    today = today_for_user(user)
+    data = await build_recap(db, user, today)
+    return WeeklyRecapResponse(**data)
+
+
+@router.get("/recap", response_model=WeeklyRecapResponse)
+async def get_recap(
+    week: str = Query(..., description="Any day inside the target week, YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Recap for a specific week (the Monday of the week containing ``week``)."""
+    user = get_primary_user(db, account)
+    db.commit()
+    today = today_for_user(user)
+    week_start = _parse_date(week)
+    data = await build_recap(db, user, today, week_start=week_start)
+    return WeeklyRecapResponse(**data)
 
 
 @router.get("/meals/recent", response_model=list[MealRead])

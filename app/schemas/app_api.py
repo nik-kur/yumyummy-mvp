@@ -72,6 +72,61 @@ class DayTotals(BaseModel):
     meal_count: int = 0
 
 
+class MealTimeSplit(BaseModel):
+    """Calories eaten by time-of-day bucket (from each meal's ``eaten_at`` in the
+    user's timezone). Buckets: morning 5–11, midday 11–16, evening 16–22,
+    night 22–5."""
+
+    morning: float = 0
+    midday: float = 0
+    evening: float = 0
+    night: float = 0
+
+
+class WeeklyRecapResponse(BaseModel):
+    """"Week in Recap" (Задача 6) — a friendly, shareable weekly summary.
+
+    All numeric stats are computed live from the diary; ``summary`` is an
+    LLM-generated (and cached) one-liner. ``prev_*`` fields carry the previous
+    week's value for the same metric so the client can render ▲/▼ deltas
+    (``None`` when there's no prior data). Additive (25(1)+).
+    """
+
+    week_start: date
+    week_end: date
+    date_range: str  # e.g. "Jul 6 – 12"
+    has_data: bool = False
+
+    days_logged: int = 0
+    meals_count: int = 0
+    on_target_days: int = 0
+
+    avg_calories: float = 0
+    avg_protein_g: float = 0
+    avg_fat_g: float = 0
+    avg_carbs_g: float = 0
+
+    target_calories: Optional[float] = None
+    target_protein_g: Optional[float] = None
+    target_fat_g: Optional[float] = None
+    target_carbs_g: Optional[float] = None
+
+    # Previous-week values for delta chips (None when no prior data).
+    prev_days_logged: Optional[int] = None
+    prev_meals_count: Optional[int] = None
+    prev_on_target_days: Optional[int] = None
+    prev_avg_calories: Optional[float] = None
+
+    best_day: Optional[date] = None
+    best_day_label: Optional[str] = None  # e.g. "Wednesday"
+    best_day_calories: Optional[float] = None
+
+    meal_time_split: MealTimeSplit = Field(default_factory=MealTimeSplit)
+    streak: int = 0
+
+    summary: str = ""
+
+
 class AppMealItemInput(BaseModel):
     """One component of a meal's breakdown, as sent by the app when creating
     or editing a meal. Mirrors the shape stored in ``MealEntry.items_json``."""
