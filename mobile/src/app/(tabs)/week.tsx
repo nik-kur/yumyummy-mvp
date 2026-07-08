@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { ChevronLeft, ChevronRight, Flame } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Flame, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 import { Screen } from '@/components/Screen';
@@ -18,6 +18,20 @@ import { colors, radius, space } from '@/theme/tokens';
 const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // Monday-first
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_FULL = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 const CHART_HEIGHT = 118;
 const HISTORY_DAYS = 63; // look-back window for the logging streak
 /** A day counts as "on target" when calories land within +10% of the goal. */
@@ -60,21 +74,19 @@ function fmtDayLabel(iso: string): string {
   return `${WEEKDAY_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
-function sumField(days: DaySummary[], key: 'total_calories' | 'total_protein_g' | 'total_fat_g' | 'total_carbs_g'): number {
-  return days.reduce((acc, d) => acc + (d[key] ?? 0), 0);
-}
+type TotalsKey = 'total_calories' | 'total_protein_g' | 'total_fat_g' | 'total_carbs_g';
+
 function isLogged(d: DaySummary): boolean {
   return d.meals.length > 0 || d.total_calories > 0;
 }
 
 /** Consecutive days (ending today) with at least one logged meal. Today not yet
  *  logged doesn't break the streak — we count from yesterday in that case. */
-function computeStreak(history: DayTotals[], todayISO: string): number {
-  const logged = new Set(history.filter((h) => h.meal_count > 0).map((h) => h.date));
+function computeStreak(loggedSet: Set<string>, todayISO: string): number {
   let cursor = fromISO(todayISO);
-  if (!logged.has(todayISO)) cursor = addDays(cursor, -1);
+  if (!loggedSet.has(todayISO)) cursor = addDays(cursor, -1);
   let count = 0;
-  while (logged.has(toISO(cursor))) {
+  while (loggedSet.has(toISO(cursor))) {
     count += 1;
     cursor = addDays(cursor, -1);
   }
@@ -210,18 +222,35 @@ export default function WeekScreen() {
   const maxCal = Math.max(target, ...weekDays.map((d) => d.total_calories ?? 0), 1);
   const goalY = hasTarget ? Math.min(CHART_HEIGHT, (target / maxCal) * CHART_HEIGHT) : 0;
 
-  const avg = (key: Parameters<typeof sumField>[1]) =>
-    loggedDays.length ? Math.round(sumField(loggedDays, key) / loggedDays.length) : 0;
-  const avgCal = avg('total_calories');
-  const avgP = avg('total_protein_g');
-  const avgF = avg('total_fat_g');
-  const avgC = avg('total_carbs_g');
+  // Cumulative averages for the current calendar month, over days actually logged.
+  // Anchored to today (not the viewed week) so the number grows through the month.
+  const monthPrefix = todayISO.slice(0, 7); // YYYY-MM
+  const monthLabel = MONTHS_FULL[today.getMonth()];
+  const monthDays = useMemo(
+    () => history.filter((h) => h.meal_count > 0 && h.date.startsWith(monthPrefix)),
+    [history, monthPrefix],
+  );
+  const monthLoggedCount = monthDays.length;
+  const monthAvg = (key: TotalsKey) =>
+    monthLoggedCount ? Math.round(monthDays.reduce((acc, d) => acc + (d[key] ?? 0), 0) / monthLoggedCount) : 0;
+  const avgCal = monthAvg('total_calories');
+  const avgP = monthAvg('total_protein_g');
+  const avgF = monthAvg('total_fat_g');
+  const avgC = monthAvg('total_carbs_g');
 
-  const onTargetCount = hasTarget
-    ? loggedDays.filter((d) => d.total_calories <= target * ON_TARGET_MULT).length
-    : 0;
+  // Logging status by date, from the history window — drives both the streak and
+  // the "current week" dots. Both are anchored to today, never the viewed week.
+  const loggedSet = useMemo(
+    () => new Set(history.filter((h) => h.meal_count > 0).map((h) => h.date)),
+    [history],
+  );
+  const currentWeekDates = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => toISO(addDays(currentWeekStart, i))),
+    [currentWeekStart],
+  );
+  const currentWeekLogged = currentWeekDates.filter((d) => loggedSet.has(d)).length;
 
-  const streak = useMemo(() => computeStreak(history, todayISO), [history, todayISO]);
+  const streak = useMemo(() => computeStreak(loggedSet, todayISO), [loggedSet, todayISO]);
   const selectedDay = weekDays.find((d) => d.date === selected);
 
   const proteinTarget = profile?.target_protein_g ?? 0;
@@ -274,11 +303,13 @@ export default function WeekScreen() {
               const isSel = d === selected;
               const isToday = d === todayISO;
               const isFuture = d > todayISO;
-              const overTarget = hasTarget && cal > target * ON_TARGET_MULT;
-              const barColor = overTarget
-                ? colors.terracottaText
-                : isSel
-                  ? colors.terracotta
+              const inGoal = hasTarget && cal > 0 && cal <= target * ON_TARGET_MULT;
+              // Selected day owns the terracotta accent; logged days read olive
+              // (inside goal) or beige (over goal); everything else stays beige.
+              const barColor = isSel
+                ? colors.terracotta
+                : inGoal
+                  ? colors.oliveSoft
                   : colors.terracottaSoft;
               const labelColor = isSel
                 ? colors.ink
@@ -312,17 +343,29 @@ export default function WeekScreen() {
         </View>
       </GestureDetector>
 
-      {/* Weekly averages (over the days you logged) */}
+      {/* Cumulative monthly averages (over the days you logged this month) */}
       <Card flat style={styles.statsCard}>
-        <View style={styles.statsRow}>
-          <StatTile label="Avg kcal" value={loggedDays.length ? formatInt(avgCal) : '—'} sub={hasTarget ? `of ${formatInt(target)}` : null} />
-          <StatTile label="Protein" value={loggedDays.length ? `${avgP}g` : '—'} sub={proteinTarget ? `of ${Math.round(proteinTarget)}g` : null} />
-          <StatTile label="Fat" value={loggedDays.length ? `${avgF}g` : '—'} sub={fatTarget ? `of ${Math.round(fatTarget)}g` : null} />
-          <StatTile label="Carbs" value={loggedDays.length ? `${avgC}g` : '—'} sub={carbsTarget ? `of ${Math.round(carbsTarget)}g` : null} />
+        <View style={styles.statsHeader}>
+          <AppText variant="overline" color={colors.inkMuted}>
+            Average in {monthLabel}
+          </AppText>
+          {monthLoggedCount ? (
+            <AppText variant="caption" color={colors.inkFaint}>
+              {monthLoggedCount} {monthLoggedCount === 1 ? 'day' : 'days'} logged
+            </AppText>
+          ) : null}
         </View>
-        <AppText variant="caption" color={colors.inkFaint} style={styles.statsFootnote}>
-          {loggedDays.length ? `Average per logged day (${loggedDays.length} of 7)` : 'No meals logged this week yet'}
-        </AppText>
+        <View style={styles.statsRow}>
+          <StatTile label="Avg kcal" value={monthLoggedCount ? formatInt(avgCal) : '—'} sub={hasTarget ? `of ${formatInt(target)}` : null} />
+          <StatTile label="Protein" value={monthLoggedCount ? `${avgP}g` : '—'} sub={proteinTarget ? `of ${Math.round(proteinTarget)}g` : null} />
+          <StatTile label="Fat" value={monthLoggedCount ? `${avgF}g` : '—'} sub={fatTarget ? `of ${Math.round(fatTarget)}g` : null} />
+          <StatTile label="Carbs" value={monthLoggedCount ? `${avgC}g` : '—'} sub={carbsTarget ? `of ${Math.round(carbsTarget)}g` : null} />
+        </View>
+        {monthLoggedCount ? null : (
+          <AppText variant="caption" color={colors.inkFaint} style={styles.statsFootnote}>
+            No meals logged in {monthLabel} yet
+          </AppText>
+        )}
       </Card>
 
       {/* Streak + on-target dots */}
@@ -342,25 +385,37 @@ export default function WeekScreen() {
         </View>
         <View style={styles.dotsWrap}>
           <View style={styles.dotsRow}>
-            {dates.map((d) => {
-              const day = weekDays.find((x) => x.date === d);
-              const logged = day ? isLogged(day) : false;
-              const onTarget = logged && hasTarget && (day?.total_calories ?? 0) <= target * ON_TARGET_MULT;
-              const dotColor = !logged
-                ? colors.hairlineStrong
-                : !hasTarget
-                  ? colors.ink
-                  : onTarget
-                    ? colors.success
-                    : colors.terracotta;
+            {currentWeekDates.map((d) => {
+              const logged = loggedSet.has(d);
+              const isFuture = d > todayISO;
+              const dotColor = logged ? colors.ink : isFuture ? colors.hairline : colors.hairlineStrong;
               return <View key={d} style={[styles.dot, { backgroundColor: dotColor }]} />;
             })}
           </View>
           <AppText variant="caption" color={colors.inkFaint}>
-            {hasTarget ? `${onTargetCount}/7 in goal` : `${loggedDays.length}/7 logged`}
+            {currentWeekLogged}/7 current week
           </AppText>
         </View>
       </Card>
+
+      {/* Entry to the shareable weekly recap (Задача 6) */}
+      <Pressable
+        onPress={() => router.push('/recap')}
+        style={({ pressed }) => [styles.recapCtaWrap, pressed && styles.recapCtaPressed]}
+      >
+        <Card style={styles.recapCta}>
+          <View style={styles.recapIcon}>
+            <Sparkles size={20} color={colors.terracotta} strokeWidth={1.75} />
+          </View>
+          <View style={styles.recapText}>
+            <AppText variant="bodyStrong">Your week in recap</AppText>
+            <AppText variant="caption" color={colors.inkFaint}>
+              A shareable summary of your week
+            </AppText>
+          </View>
+          <ChevronRight size={20} color={colors.inkMuted} strokeWidth={1.75} />
+        </Card>
+      </Pressable>
 
       <View style={styles.dayHeader}>
         <AppText variant="overline" color={colors.inkMuted}>
@@ -458,6 +513,12 @@ const styles = StyleSheet.create({
   goalCaption: { marginTop: space.md },
 
   statsCard: { marginTop: space.base },
+  statsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: space.md,
+  },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   statTile: { flex: 1, alignItems: 'center', gap: 2 },
   statValue: { marginTop: 2 },
@@ -483,6 +544,19 @@ const styles = StyleSheet.create({
   dotsWrap: { alignItems: 'flex-end', gap: 6 },
   dotsRow: { flexDirection: 'row', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: radius.pill },
+
+  recapCtaWrap: { marginTop: space.base },
+  recapCtaPressed: { opacity: 0.85 },
+  recapCta: { flexDirection: 'row', alignItems: 'center', gap: space.base },
+  recapIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.terracottaSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recapText: { flex: 1, gap: 2 },
 
   dayHeader: {
     flexDirection: 'row',

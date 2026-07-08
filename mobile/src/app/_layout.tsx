@@ -50,6 +50,7 @@ export default function RootLayout() {
               <Stack.Screen name="meal/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="edit-targets" options={{ presentation: 'card' }} />
               <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
+              <Stack.Screen name="recap" options={{ presentation: 'modal' }} />
             </Stack>
           </PendingMealsProvider>
         </AuthProvider>

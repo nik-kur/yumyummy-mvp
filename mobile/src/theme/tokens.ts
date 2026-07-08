@@ -32,6 +32,7 @@ export const colors = {
   // status — only in their semantic role
   success: '#2E6B4E',
   successSoft: '#E3F0E8',
+  oliveSoft: '#E3E6CE', // light olive tint of `protein` — in-goal chart bars
   warning: '#8A5A14',
   warningSoft: '#FBEFD6',
   error: '#9A2A1F',

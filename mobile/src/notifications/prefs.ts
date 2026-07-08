@@ -14,10 +14,21 @@ export interface ReminderPref {
   enabled: boolean;
 }
 
+/** Weekly "Week in Recap" nudge (Задача 6). A single local WEEKLY trigger that
+ *  opens the Recap screen when tapped. Weekday uses the expo-notifications
+ *  convention: 1 = Sunday … 7 = Saturday. */
+export interface WeeklyRecapPref {
+  enabled: boolean;
+  weekday: number;
+  hour: number;
+  minute: number;
+}
+
 export interface NotificationPrefs {
   /** Master switch. While off, nothing is scheduled regardless of reminders. */
   enabled: boolean;
   reminders: ReminderPref[];
+  weeklyRecap: WeeklyRecapPref;
 }
 
 const STORAGE_KEY = 'yumyummy.notif.prefs.v1';
@@ -33,6 +44,8 @@ export const DEFAULT_PREFS: NotificationPrefs = {
     { id: 'dinner', label: 'Dinner', hour: 19, minute: 0, enabled: true },
     { id: 'evening', label: 'Evening check-in', hour: 21, minute: 0, enabled: true },
   ],
+  // Sunday 18:00 — "Your weekly recap is ready".
+  weeklyRecap: { enabled: true, weekday: 1, hour: 18, minute: 0 },
 };
 
 function clampInt(v: unknown, min: number, max: number, fallback: number): number {
@@ -58,11 +71,24 @@ function reconcile(stored: Partial<NotificationPrefs> | null): NotificationPrefs
     }
   }
   const reminders = DEFAULT_PREFS.reminders.map((def) => byId.get(def.id) ?? { ...def });
-  return { enabled: Boolean(stored.enabled), reminders };
+  const sr = stored.weeklyRecap;
+  const weeklyRecap: WeeklyRecapPref = sr && typeof sr === 'object'
+    ? {
+        enabled: Boolean(sr.enabled),
+        weekday: clampInt(sr.weekday, 1, 7, DEFAULT_PREFS.weeklyRecap.weekday),
+        hour: clampInt(sr.hour, 0, 23, DEFAULT_PREFS.weeklyRecap.hour),
+        minute: clampInt(sr.minute, 0, 59, DEFAULT_PREFS.weeklyRecap.minute),
+      }
+    : { ...DEFAULT_PREFS.weeklyRecap };
+  return { enabled: Boolean(stored.enabled), reminders, weeklyRecap };
 }
 
 function clone(p: NotificationPrefs): NotificationPrefs {
-  return { enabled: p.enabled, reminders: p.reminders.map((r) => ({ ...r })) };
+  return {
+    enabled: p.enabled,
+    reminders: p.reminders.map((r) => ({ ...r })),
+    weeklyRecap: { ...p.weeklyRecap },
+  };
 }
 
 export async function loadPrefs(): Promise<NotificationPrefs> {

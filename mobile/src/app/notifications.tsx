@@ -169,6 +169,20 @@ export default function NotificationsScreen() {
     [apply, prefs],
   );
 
+  const onToggleWeeklyRecap = useCallback(
+    (enabled: boolean) => {
+      void apply({ ...prefs, weeklyRecap: { ...prefs.weeklyRecap, enabled } });
+    },
+    [apply, prefs],
+  );
+
+  const onWeeklyRecapTime = useCallback(
+    (hour: number, minute: number) => {
+      void apply({ ...prefs, weeklyRecap: { ...prefs.weeklyRecap, hour, minute } });
+    },
+    [apply, prefs],
+  );
+
   const needsPermission = prefs.enabled && granted === false;
 
   return (
@@ -250,6 +264,29 @@ export default function NotificationsScreen() {
           </Card>
           <AppText variant="caption" color={colors.inkFaint} style={styles.footnote}>
             Tap a time to change it. Reminders repeat every day.
+          </AppText>
+
+          <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
+            Weekly recap
+          </AppText>
+          <Card padded={false}>
+            <ReminderRow
+              reminder={{
+                id: 'weekly-recap',
+                label: 'Weekly recap',
+                hour: prefs.weeklyRecap.hour,
+                minute: prefs.weeklyRecap.minute,
+                enabled: prefs.weeklyRecap.enabled,
+              }}
+              dimmed={!loaded}
+              onToggle={onToggleWeeklyRecap}
+              onTime={onWeeklyRecapTime}
+              last
+            />
+          </Card>
+          <AppText variant="caption" color={colors.inkFaint} style={styles.footnote}>
+            A friendly summary of your week, delivered every Sunday. Tap it to open
+            your recap.
           </AppText>
         </>
       ) : null}

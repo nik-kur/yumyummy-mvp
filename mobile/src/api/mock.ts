@@ -16,6 +16,7 @@ import type {
   SavedMealUpdateInput,
   SavedMealsListResponse,
   TrialStartResponse,
+  WeeklyRecap,
   WorkflowItem,
   WorkflowRunResponse,
 } from './types';
@@ -252,6 +253,139 @@ export function getMockHistory(start: string, end: string): DayTotals[] {
     cursor = isoAddDays(cursor, 1);
   }
   return out;
+}
+
+const WEEKDAY_FULL = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+];
+const RECAP_MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+function mondayOf(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  const mondayIndex = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+  return isoAddDays(iso, -mondayIndex);
+}
+
+function recapRange(startISO: string, endISO: string): string {
+  const s = new Date(`${startISO}T00:00:00`);
+  const e = new Date(`${endISO}T00:00:00`);
+  return s.getMonth() === e.getMonth()
+    ? `${RECAP_MONTHS[s.getMonth()]} ${s.getDate()} – ${e.getDate()}`
+    : `${RECAP_MONTHS[s.getMonth()]} ${s.getDate()} – ${RECAP_MONTHS[e.getMonth()]} ${e.getDate()}`;
+}
+
+function weekAggregate(monday: string) {
+  const target = DEFAULT_TARGETS.calories;
+  const active: { iso: string; cal: number; p: number; f: number; c: number; meals: number }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const iso = isoAddDays(monday, i);
+    const s = seedForDate(iso);
+    if (s.meals > 0) active.push({ iso, ...s });
+  }
+  const daysLogged = active.length;
+  const round = Math.round;
+  const avg = (sel: (x: (typeof active)[number]) => number) =>
+    daysLogged ? round(active.reduce((a, x) => a + sel(x), 0) / daysLogged) : 0;
+  const best = daysLogged
+    ? active.reduce((a, b) => (Math.abs(a.cal - target) <= Math.abs(b.cal - target) ? a : b))
+    : null;
+  return {
+    daysLogged,
+    meals: active.reduce((a, x) => a + x.meals, 0),
+    onTarget: active.filter((x) => x.cal <= target * 1.1).length,
+    avgCal: avg((x) => x.cal),
+    avgP: avg((x) => x.p),
+    avgF: avg((x) => x.f),
+    avgC: avg((x) => x.c),
+    totalCal: active.reduce((a, x) => a + x.cal, 0),
+    best,
+  };
+}
+
+/** A believable "Week in Recap" so the screen renders offline / in Expo Go. */
+export function getMockRecap(week?: string): WeeklyRecap {
+  const anchor = week ?? todayISO();
+  const monday = mondayOf(anchor);
+  const sunday = isoAddDays(monday, 6);
+  const cur = weekAggregate(monday);
+  const prev = weekAggregate(isoAddDays(monday, -7));
+  const target = DEFAULT_TARGETS.calories;
+
+  const total = cur.totalCal;
+  const split = {
+    morning: Math.round(total * 0.28),
+    midday: Math.round(total * 0.37),
+    evening: Math.round(total * 0.28),
+    night: Math.round(total * 0.07),
+  };
+
+  const summary = cur.daysLogged
+    ? `You logged ${cur.daysLogged} of 7 days and stayed on target ${cur.onTarget} of them — averaging ${cur.avgCal} kcal. Keep it going! 🙌`
+    : 'No meals logged this week — an easy win for next week is to log just breakfast each day.';
+
+  const highlights = cur.daysLogged
+    ? [
+        {
+          id: 'top_dish',
+          icon: 'utensils',
+          title: 'Most logged dish',
+          value: 'Greek yogurt bowl',
+          caption: 'Logged 3 times this week',
+        },
+        {
+          id: 'on_target',
+          icon: 'target',
+          title: 'Days on target',
+          value: `${cur.onTarget} of ${cur.daysLogged}`,
+          caption: 'Calories within +10% of your goal',
+        },
+        {
+          id: 'fuel_window',
+          icon: 'sun',
+          title: 'Your fuel window',
+          value: 'Midday',
+          caption: '37% of calories between 11:00–16:00',
+        },
+        {
+          id: 'earliest_bite',
+          icon: 'sunrise',
+          title: 'Earliest bite',
+          value: '7:20',
+          caption: 'Tuesday morning',
+        },
+      ]
+    : [];
+
+  return {
+    week_start: monday,
+    week_end: sunday,
+    date_range: recapRange(monday, sunday),
+    has_data: cur.daysLogged > 0,
+    days_logged: cur.daysLogged,
+    meals_count: cur.meals,
+    on_target_days: cur.onTarget,
+    avg_calories: cur.avgCal,
+    avg_protein_g: cur.avgP,
+    avg_fat_g: cur.avgF,
+    avg_carbs_g: cur.avgC,
+    target_calories: target,
+    target_protein_g: DEFAULT_TARGETS.protein,
+    target_fat_g: DEFAULT_TARGETS.fat,
+    target_carbs_g: DEFAULT_TARGETS.carbs,
+    prev_days_logged: prev.daysLogged || null,
+    prev_meals_count: prev.meals || null,
+    prev_on_target_days: prev.daysLogged ? prev.onTarget : null,
+    prev_avg_calories: prev.daysLogged ? prev.avgCal : null,
+    best_day: cur.best ? cur.best.iso : null,
+    best_day_label: cur.best ? WEEKDAY_FULL[new Date(`${cur.best.iso}T00:00:00`).getDay()] : null,
+    best_day_calories: cur.best ? cur.best.cal : null,
+    meal_time_split: split,
+    streak: cur.daysLogged,
+    highlights,
+    summary,
+  };
 }
 
 export function addMockMeal(input: {

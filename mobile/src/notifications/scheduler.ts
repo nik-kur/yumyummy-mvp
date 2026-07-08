@@ -13,6 +13,7 @@ import type { NotificationPrefs, ReminderPref } from './prefs';
 
 const ANDROID_CHANNEL_ID = 'reminders';
 const IDENTIFIER_PREFIX = 'yum.reminder.';
+const WEEKLY_RECAP_ID = 'yum.weekly.recap';
 
 /** Per-reminder copy. Falls back to a generic nudge for unknown ids so adding a
  *  reminder to prefs never ships an empty notification. */
@@ -112,6 +113,29 @@ export async function syncFromPrefs(prefs: NotificationPrefs): Promise<void> {
       });
     } catch {
       // Skip a single bad reminder rather than aborting the whole sync.
+    }
+  }
+
+  // Weekly "Week in Recap" nudge → opens the Recap screen when tapped.
+  if (prefs.weeklyRecap?.enabled) {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: WEEKLY_RECAP_ID,
+        content: {
+          title: 'Your weekly recap is ready',
+          body: 'See how your week went — tap to open your recap.',
+          data: { route: '/recap' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: prefs.weeklyRecap.weekday,
+          hour: prefs.weeklyRecap.hour,
+          minute: prefs.weeklyRecap.minute,
+          channelId: ANDROID_CHANNEL_ID,
+        },
+      });
+    } catch {
+      // Non-fatal: keep daily reminders even if the weekly trigger fails.
     }
   }
 }

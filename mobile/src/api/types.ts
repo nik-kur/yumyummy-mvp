@@ -131,6 +131,65 @@ export interface DayTotals {
   meal_count: number;
 }
 
+/** Calories by time-of-day bucket (25(1)+). */
+export interface MealTimeSplit {
+  morning: number;
+  midday: number;
+  evening: number;
+  night: number;
+}
+
+/** One rotating "fun fact" card on the Recap screen. Copy is server-owned;
+ *  `icon` is a hint mapped to a local icon (unknown → fallback). */
+export interface RecapHighlight {
+  id: string;
+  icon: string;
+  title: string;
+  value: string;
+  caption?: string | null;
+}
+
+/** GET /app/recap/latest (or /app/recap?week=) — "Week in Recap" (25(1)+).
+ *  Live weekly stats + a cached, friendly LLM one-liner. `prev_*` carry the
+ *  previous week's value for the same metric (null when there's no prior data)
+ *  so the client can render ▲/▼ deltas. */
+export interface WeeklyRecap {
+  week_start: string;
+  week_end: string;
+  date_range: string;
+  has_data: boolean;
+
+  days_logged: number;
+  meals_count: number;
+  on_target_days: number;
+
+  avg_calories: number;
+  avg_protein_g: number;
+  avg_fat_g: number;
+  avg_carbs_g: number;
+
+  target_calories?: number | null;
+  target_protein_g?: number | null;
+  target_fat_g?: number | null;
+  target_carbs_g?: number | null;
+
+  prev_days_logged?: number | null;
+  prev_meals_count?: number | null;
+  prev_on_target_days?: number | null;
+  prev_avg_calories?: number | null;
+
+  best_day?: string | null;
+  best_day_label?: string | null;
+  best_day_calories?: number | null;
+
+  meal_time_split: MealTimeSplit;
+  streak: number;
+  /** 3–4 rotating fun-fact cards; empty when there's no data or the server
+   *  predates 25(2). */
+  highlights?: RecapHighlight[];
+  summary: string;
+}
+
 export interface AppMealCreate {
   date: string; // YYYY-MM-DD
   description_user: string;

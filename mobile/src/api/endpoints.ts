@@ -24,6 +24,7 @@ import type {
   SavedMealsListResponse,
   TelegramLinkRedeemResponse,
   TrialStartResponse,
+  WeeklyRecap,
   WorkflowRunResponse,
 } from './types';
 
@@ -157,6 +158,22 @@ export async function getHistory(start: string, end: string): Promise<DayTotals[
   return readWithFallback(
     () => apiFetch<DayTotals[]>('/app/history', { query: { start, end } }),
     () => mock.getMockHistory(start, end),
+  );
+}
+
+/**
+ * "Week in Recap" (Задача 6, 25(1)+): the most recent completed week's
+ * shareable summary, or a specific week when `week` (any day inside it) is
+ * given. Falls back to mock data so the screen renders offline / against an
+ * older server that doesn't have the route yet.
+ */
+export async function getRecap(week?: string): Promise<WeeklyRecap> {
+  return readWithFallback(
+    () =>
+      apiFetch<WeeklyRecap>(week ? '/app/recap' : '/app/recap/latest', {
+        query: week ? { week } : undefined,
+      }),
+    () => mock.getMockRecap(week),
   );
 }
 
