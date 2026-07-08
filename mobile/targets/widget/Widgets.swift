@@ -156,9 +156,10 @@ struct BalanceHeader: View {
 
 // MARK: - Home-screen views
 
-/// Dashboard (small): ring header with macro bars directly underneath — pinned
-/// to the top-left. Without `alignment: .topLeading` the outer `.infinity` frame
-/// vertically centers the stack and reads as a big dead zone between sections.
+/// Dashboard (small): ring header with macro bars directly underneath as one
+/// tight group (spacing 6, no internal gap), then centered vertically in the
+/// card. `.leading` = horizontally leading + vertically centered, so the group
+/// is balanced with no top or bottom dead zone.
 struct BalanceDashboardView: View {
     var snap: YYSnapshot
 
@@ -171,7 +172,7 @@ struct BalanceDashboardView: View {
                 MacroRow(label: "C", value: snap.carbs, goal: snap.carbsGoal, color: YY.carbs, compact: true)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
@@ -204,7 +205,8 @@ struct ComboMediumView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            // Ring + bars as one tight top-aligned group (see BalanceDashboardView).
+            // Ring + bars as one tight group (spacing 6), centered vertically in
+            // the card so it lines up with the button grid (see BalanceDashboardView).
             VStack(alignment: .leading, spacing: 6) {
                 BalanceHeader(snap: snap, numberSize: 24)
                 VStack(spacing: 6) {
@@ -213,7 +215,7 @@ struct ComboMediumView: View {
                     MacroRow(label: "C", value: snap.carbs, goal: snap.carbsGoal, color: YY.carbs, compact: true)
                 }
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            .frame(maxHeight: .infinity, alignment: .leading)
 
             Divider().padding(.vertical, 2)
 

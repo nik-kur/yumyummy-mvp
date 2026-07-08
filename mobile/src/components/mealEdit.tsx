@@ -210,15 +210,19 @@ function MacroCell({
   value,
   onChangeText,
   tint,
+  wide,
 }: {
   label: string;
   unit: string;
   value: string;
   onChangeText: (t: string) => void;
   tint: string;
+  /** Full-width cell (calories). Overrides the row `flex: 1` so it hugs its
+   * content vertically instead of collapsing to a thin line. */
+  wide?: boolean;
 }) {
   return (
-    <View style={styles.cell}>
+    <View style={[styles.cell, wide && styles.cellWide]}>
       <AppText variant="overline" color={tint} numberOfLines={1}>
         {label}
       </AppText>
@@ -264,7 +268,7 @@ function MacroFields({
 }) {
   return (
     <View style={styles.fields}>
-      <MacroCell label="Calories" unit="kcal" value={cal} onChangeText={onCal} tint={colors.terracottaText} />
+      <MacroCell label="Calories" unit="kcal" value={cal} onChangeText={onCal} tint={colors.terracottaText} wide />
       <View style={styles.fieldsRow}>
         <MacroCell label="Protein" unit="g" value={prot} onChangeText={onProt} tint={colors.protein} />
         <MacroCell label="Fat" unit="g" value={fat} onChangeText={onFat} tint={colors.fat} />
@@ -785,6 +789,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
   },
+  // Full-width calories cell: `flex: 0` cancels the row's `flex: 1`
+  // (flexBasis 0) so the box sizes to its content height instead of
+  // collapsing into a thin line under the tall serif number.
+  cellWide: { flex: 0 },
   cellInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
