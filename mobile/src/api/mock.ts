@@ -8,6 +8,7 @@ import type {
   AccountProfileUpdate,
   BillingSnapshot,
   DaySummary,
+  DayTotals,
   MealItem,
   MealRead,
   MealUpdateInput,
@@ -139,6 +140,118 @@ export function getMockDay(date?: string): DaySummary {
     total_carbs_g: sum(state.meals, 'carbs_g'),
     meals: [...state.meals],
   };
+}
+
+// ---- Week / history mocks (for the Week tab in dev / offline) -----------
+
+function isoAddDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Deterministic per-date pseudo-values so the mock week/history look alive
+ *  and stable across reloads (same date → same numbers). */
+function seedForDate(iso: string): { cal: number; p: number; f: number; c: number; meals: number } {
+  let h = 0;
+  const key = iso.replace(/-/g, '');
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) & 0x7fffffff;
+  // ~1 in 6 days is a "missed" day (no log) so streaks/heatmaps have gaps.
+  if (h % 6 === 0) return { cal: 0, p: 0, f: 0, c: 0, meals: 0 };
+  const cal = 1500 + (h % 1100); // 1500..2600
+  return {
+    cal,
+    p: Math.round((cal * 0.22) / 4),
+    f: Math.round((cal * 0.3) / 9),
+    c: Math.round((cal * 0.48) / 4),
+    meals: 2 + (h % 3),
+  };
+}
+
+function synthMeals(date: string, s: { cal: number; p: number; f: number; c: number; meals: number }): MealRead[] {
+  if (s.meals <= 0) return [];
+  const names = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+  const out: MealRead[] = [];
+  const per = 1 / s.meals;
+  for (let i = 0; i < s.meals; i++) {
+    const hour = 8 + i * 4;
+    out.push({
+      id: Number(`${date.replace(/-/g, '')}${i}`) % 2_000_000_000,
+      eaten_at: `${date}T${String(hour).padStart(2, '0')}:00:00.000Z`,
+      description_user: names[i] ?? `Meal ${i + 1}`,
+      calories: Math.round(s.cal * per),
+      protein_g: Math.round(s.p * per),
+      fat_g: Math.round(s.f * per),
+      carbs_g: Math.round(s.c * per),
+      accuracy_level: 'ESTIMATE',
+    });
+  }
+  return out;
+}
+
+export function getMockWeek(start: string): DaySummary[] {
+  const today = todayISO();
+  const out: DaySummary[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = isoAddDays(start, i);
+    if (date > today) {
+      out.push({ user_id: 1, date, total_calories: 0, total_protein_g: 0, total_fat_g: 0, total_carbs_g: 0, meals: [] });
+      continue;
+    }
+    if (date === today) {
+      out.push({ ...getMockDay(today), date });
+      continue;
+    }
+    const s = seedForDate(date);
+    out.push({
+      user_id: 1,
+      date,
+      total_calories: s.cal,
+      total_protein_g: s.p,
+      total_fat_g: s.f,
+      total_carbs_g: s.c,
+      meals: synthMeals(date, s),
+    });
+  }
+  return out;
+}
+
+export function getMockHistory(start: string, end: string): DayTotals[] {
+  const today = todayISO();
+  const out: DayTotals[] = [];
+  let cursor = start;
+  // Guard against a runaway loop on bad input.
+  for (let i = 0; i < 800 && cursor <= end; i++) {
+    if (cursor <= today) {
+      if (cursor === today) {
+        const d = getMockDay(today);
+        if (d.meals.length > 0) {
+          out.push({
+            date: cursor,
+            total_calories: d.total_calories,
+            total_protein_g: d.total_protein_g,
+            total_fat_g: d.total_fat_g,
+            total_carbs_g: d.total_carbs_g,
+            meal_count: d.meals.length,
+          });
+        }
+      } else {
+        const s = seedForDate(cursor);
+        if (s.meals > 0) {
+          out.push({
+            date: cursor,
+            total_calories: s.cal,
+            total_protein_g: s.p,
+            total_fat_g: s.f,
+            total_carbs_g: s.c,
+            meal_count: s.meals,
+          });
+        }
+      }
+    }
+    cursor = isoAddDays(cursor, 1);
+  }
+  return out;
 }
 
 export function addMockMeal(input: {

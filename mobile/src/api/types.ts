@@ -120,6 +120,17 @@ export interface DaySummary {
   meals: MealRead[];
 }
 
+/** Lightweight per-day aggregate for the Week tab's history/streak (25(1)+).
+ *  `GET /app/history` returns these WITHOUT the meal breakdown. */
+export interface DayTotals {
+  date: string;
+  total_calories: number;
+  total_protein_g: number;
+  total_fat_g: number;
+  total_carbs_g: number;
+  meal_count: number;
+}
+
 export interface AppMealCreate {
   date: string; // YYYY-MM-DD
   description_user: string;

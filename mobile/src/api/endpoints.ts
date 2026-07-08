@@ -14,6 +14,7 @@ import type {
   AuthTokenResponse,
   BillingSnapshot,
   DaySummary,
+  DayTotals,
   EmailCodeRequestResponse,
   MealItem,
   MealRead,
@@ -133,6 +134,30 @@ export async function getToday(date?: string): Promise<DaySummary> {
 export async function getTodayStrict(date?: string): Promise<DaySummary> {
   if (USE_MOCKS) return mock.getMockDay(date);
   return apiFetch<DaySummary>('/app/today', { query: { date } });
+}
+
+/**
+ * Seven consecutive {@link DaySummary} starting at `start` (YYYY-MM-DD, the
+ * Monday of the week) in a single round-trip — powers the Week tab's bars,
+ * weekly averages and the selected day's meal list. Additive (25(1)+); falls
+ * back to mock data so the tab still renders offline / against an old server.
+ */
+export async function getWeek(start: string): Promise<DaySummary[]> {
+  return readWithFallback(
+    () => apiFetch<DaySummary[]>('/app/week', { query: { start } }),
+    () => mock.getMockWeek(start),
+  );
+}
+
+/**
+ * Lightweight per-day totals over [start, end] (no meal breakdown) for the
+ * logging-streak counter. Additive (25(1)+).
+ */
+export async function getHistory(start: string, end: string): Promise<DayTotals[]> {
+  return readWithFallback(
+    () => apiFetch<DayTotals[]>('/app/history', { query: { start, end } }),
+    () => mock.getMockHistory(start, end),
+  );
 }
 
 export async function getRecentMeals(limit = 20): Promise<MealRead[]> {
