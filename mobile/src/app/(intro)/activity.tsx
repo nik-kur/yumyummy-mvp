@@ -1,52 +1,71 @@
 /**
- * S7 Activity level — single select list.
+ * S7 Activity — 4 levels per prototype v3, single-select with auto-advance.
+ * Routes to pain-points (S8).
  */
+import { useEffect, useRef } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CircleCheck } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
-import { Button } from '@/components/Button';
+import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
-import { ACTIVITY_LABELS, type ActivityLevel } from '@/utils/calories';
+import type { ActivityLevel } from '@/utils/calories';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 
-const LEVELS: { key: ActivityLevel; desc: string }[] = [
-  { key: 'sedentary', desc: 'Desk job, little exercise' },
-  { key: 'light', desc: '1–3 light workouts/week' },
-  { key: 'moderate', desc: '3–5 moderate sessions/week' },
-  { key: 'active', desc: '6–7 hard sessions/week' },
-  { key: 'very_active', desc: 'Athlete / physical job' },
+const OPTIONS: { key: ActivityLevel; emoji: string; label: string; sub: string }[] = [
+  { key: 'sedentary', emoji: '🪑', label: 'Mostly sitting', sub: 'Desk job, little movement' },
+  { key: 'light', emoji: '🚶', label: 'Lightly active', sub: 'Walks, 1–2 workouts a week' },
+  { key: 'moderate', emoji: '🏃', label: 'Active', sub: '3–5 workouts a week' },
+  { key: 'active', emoji: '🏋️', label: 'Very active', sub: 'Training 6–7 days a week' },
 ];
+
+const AUTO_ADVANCE_MS = 280;
 
 export default function ActivityScreen() {
   const router = useRouter();
   const { activity_level, set } = useIntro();
+  const navigating = useRef(false);
+
+  useEffect(() => {
+    track('onboarding_screen_viewed', { screen: 'S7_activity' });
+  }, []);
+
+  const pick = (key: ActivityLevel) => {
+    if (navigating.current) return;
+    navigating.current = true;
+    set({ activity_level: key });
+    track('onboarding_screen_completed', { screen: 'S7_activity' });
+    setTimeout(() => {
+      navigating.current = false;
+      router.push('/(intro)/pain-points');
+    }, AUTO_ADVANCE_MS);
+  };
 
   return (
-    <Screen scroll grow edges={['top', 'bottom', 'left', 'right']}>
+    <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <IntroHeader step={6} />
+
       <View style={s.header}>
-        <AppText variant="overline" color={colors.inkMuted}>Step 6 of 8</AppText>
-        <AppText variant="h1" style={s.title}>How active are you?</AppText>
-        <AppText variant="body" color={colors.inkMuted}>
-          Be honest — this shapes your daily calorie target.
-        </AppText>
+        <AppText variant="overline" color={colors.terracottaText}>Your metabolism</AppText>
+        <AppText variant="h1" style={s.title}>How active is your typical week?</AppText>
       </View>
 
       <View style={s.list}>
-        {LEVELS.map((l) => {
-          const selected = activity_level === l.key;
+        {OPTIONS.map((o) => {
+          const selected = activity_level === o.key;
           return (
             <Pressable
-              key={l.key}
-              onPress={() => set({ activity_level: l.key })}
+              key={o.key}
+              onPress={() => pick(o.key)}
               style={[s.card, selected && s.cardSelected]}
             >
+              <AppText style={s.emoji}>{o.emoji}</AppText>
               <View style={s.cardText}>
-                <AppText variant="bodyStrong">{ACTIVITY_LABELS[l.key]}</AppText>
-                <AppText variant="caption" color={colors.inkMuted}>{l.desc}</AppText>
+                <AppText variant="title">{o.label}</AppText>
+                <AppText variant="small" color={colors.inkMuted}>{o.sub}</AppText>
               </View>
               {selected ? (
                 <CircleCheck size={22} color={colors.terracotta} strokeWidth={1.5} />
@@ -57,31 +76,26 @@ export default function ActivityScreen() {
           );
         })}
       </View>
-
-      <Button
-        label="Continue"
-        disabled={!activity_level}
-        onPress={() => {
-          track('onboarding_screen_completed', { screen: 'S7_activity' });
-          router.push('/(intro)/cico-arc');
-        }}
-        style={s.cta}
-      />
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
+  header: { marginTop: space.md, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
-  list: { flex: 1, justifyContent: 'center', gap: space.md },
+  list: { flex: 1, justifyContent: 'center', gap: space.base },
   card: {
-    flexDirection: 'row', alignItems: 'center', gap: space.base,
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1.5, borderColor: colors.hairline, padding: space.base,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.base,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.hairline,
+    padding: space.base,
   },
-  cardSelected: { borderColor: colors.terracotta, backgroundColor: colors.surfaceAlt },
+  cardSelected: { borderColor: colors.terracotta, backgroundColor: colors.terracottaSoft },
+  emoji: { fontSize: 26, lineHeight: 32 },
   cardText: { flex: 1, gap: 2 },
   radio: { width: 22, height: 22, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.hairlineStrong },
-  cta: { marginTop: 'auto' },
 });

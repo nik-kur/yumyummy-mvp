@@ -37,7 +37,7 @@ export default function WelcomeScreen() {
             YUMYUMMY
           </AppText>
           <AppText variant="h1" center style={s.headline}>
-            The food tracker you'll actually keep up with
+            The food tracker you’ll actually keep up with
           </AppText>
           <AppText variant="body" color={colors.inkMuted} center>
             Any meal, any way — verified calories in ~10 seconds.
@@ -45,14 +45,6 @@ export default function WelcomeScreen() {
         </View>
 
         <WelcomeDemo />
-
-        <View style={s.chips}>
-          {TRUST_CHIPS.map((label) => (
-            <View key={label} style={s.chip}>
-              <AppText variant="caption" color={colors.inkMuted}>{label}</AppText>
-            </View>
-          ))}
-        </View>
       </ScrollView>
 
       <View style={s.bottom}>
@@ -64,6 +56,13 @@ export default function WelcomeScreen() {
             router.push('/(intro)/goal');
           }}
         />
+        <View style={s.chips}>
+          {TRUST_CHIPS.map((label) => (
+            <View key={label} style={s.chip}>
+              <AppText variant="caption" color={colors.inkMuted}>{label}</AppText>
+            </View>
+          ))}
+        </View>
         <Pressable onPress={() => router.replace('/(auth)/sign-in')}>
           <AppText variant="small" color={colors.terracottaText} center style={s.link}>
             Already have an account? Sign in
@@ -77,17 +76,15 @@ export default function WelcomeScreen() {
 const s = StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: space.sm },
   header: { alignItems: 'center', paddingHorizontal: space.lg, gap: space.xs },
-  emoji: { fontSize: 26 },
+  emoji: { fontSize: 26, lineHeight: 34 },
   headline: { marginTop: space.md },
-  bottom: { gap: space.base, paddingBottom: space.lg, paddingHorizontal: space.lg },
-  link: { marginTop: space.sm },
+  bottom: { gap: space.md, paddingBottom: space.lg, paddingHorizontal: space.lg },
+  link: { marginTop: space.xs },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: space.sm,
-    marginTop: space.sm,
-    paddingHorizontal: space.lg,
   },
   chip: {
     backgroundColor: colors.surface,

@@ -67,6 +67,13 @@ export default function RootLayout() {
                   gestureEnabled: false,
                 }}
               />
+              <Stack.Screen
+                name="postbuy"
+                options={{
+                  presentation: 'fullScreenModal',
+                  gestureEnabled: false,
+                }}
+              />
               <Stack.Screen name="recap" options={{ presentation: 'modal' }} />
               <Stack.Screen name="week1-report" options={{ presentation: 'card' }} />
             </Stack>

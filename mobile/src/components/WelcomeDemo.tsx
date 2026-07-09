@@ -232,28 +232,31 @@ export function WelcomeDemo() {
         {activeMode === 2 && phase.typeText && <TextStage text={phase.typeText} />}
       </View>
 
-      {resultVisible && (
-        <Animated.View
-          style={[
-            s.result,
-            { opacity: resultOpacity, transform: [{ translateY: resultY }] },
-          ]}
-        >
-          <View>
-            <AppText variant="h2">
-              {phase.kcal}
-              <AppText variant="caption" color={colors.inkMuted}> kcal</AppText>
-            </AppText>
-            <AppText variant="caption" color={colors.inkMuted}>{phase.name}</AppText>
-          </View>
-          <View style={s.resultRight}>
-            <SourceBadge source={phase.source} />
-            <AppText variant="caption" color={colors.inkMuted} style={s.macros}>
-              {phase.macros}
-            </AppText>
-          </View>
-        </Animated.View>
-      )}
+      {/* Fixed-height slot so the card fade-in never shifts the layout below. */}
+      <View style={s.resultSlot}>
+        {resultVisible && (
+          <Animated.View
+            style={[
+              s.result,
+              { opacity: resultOpacity, transform: [{ translateY: resultY }] },
+            ]}
+          >
+            <View>
+              <AppText variant="h2">
+                {phase.kcal}
+                <AppText variant="caption" color={colors.inkMuted}> kcal</AppText>
+              </AppText>
+              <AppText variant="caption" color={colors.inkMuted}>{phase.name}</AppText>
+            </View>
+            <View style={s.resultRight}>
+              <SourceBadge source={phase.source} />
+              <AppText variant="caption" color={colors.inkMuted} style={s.macros}>
+                {phase.macros}
+              </AppText>
+            </View>
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 }
@@ -290,7 +293,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   stageInner: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
-  plateEmoji: { fontSize: 42, letterSpacing: 3 },
+  // Explicit lineHeight — inherited body lineHeight (26) clips 42px emoji glyphs.
+  plateEmoji: { fontSize: 42, lineHeight: 52, letterSpacing: 3 },
   scanLine: {
     position: 'absolute',
     left: '8%',
@@ -313,6 +317,7 @@ const s = StyleSheet.create({
   wave: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36 },
   waveBar: { width: 5, borderRadius: 3, backgroundColor: colors.terracotta },
   typeBox: { paddingHorizontal: space.lg },
+  resultSlot: { height: 76, marginTop: space.md, justifyContent: 'center' },
   result: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,7 +330,6 @@ const s = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: space.base,
     paddingVertical: space.md,
-    marginTop: space.md,
   },
   resultRight: { alignItems: 'flex-end', gap: 4 },
   macros: { marginTop: 2 },

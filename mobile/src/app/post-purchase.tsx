@@ -58,7 +58,7 @@ export default function PostPurchaseScreen() {
       }
 
       await refreshProfile();
-      router.replace('/notifications');
+      router.replace('/postbuy');
     } catch (e) {
       captureException(e);
       if (e instanceof Error && e.message.includes('canceled')) {

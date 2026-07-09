@@ -1,33 +1,55 @@
 /**
- * S4 Gender — binary picker for the Mifflin–St Jeor formula.
+ * S4 Gender — binary picker for the Mifflin–St Jeor formula (prototype v3).
+ * Single-select with auto-advance.
  */
+import { useEffect, useRef } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
-import { Button } from '@/components/Button';
+import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
 import type { Gender } from '@/utils/calories';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 
 const OPTIONS: { key: Gender; label: string; emoji: string }[] = [
-  { key: 'male', label: 'Male', emoji: '♂' },
-  { key: 'female', label: 'Female', emoji: '♀' },
+  { key: 'male', label: 'Male', emoji: '👨' },
+  { key: 'female', label: 'Female', emoji: '👩' },
 ];
+
+const AUTO_ADVANCE_MS = 280;
 
 export default function GenderScreen() {
   const router = useRouter();
   const { gender, set } = useIntro();
+  const navigating = useRef(false);
+
+  useEffect(() => {
+    track('onboarding_screen_viewed', { screen: 'S4_gender' });
+  }, []);
+
+  const pick = (key: Gender) => {
+    if (navigating.current) return;
+    navigating.current = true;
+    set({ gender: key });
+    track('onboarding_screen_completed', { screen: 'S4_gender' });
+    setTimeout(() => {
+      navigating.current = false;
+      router.push('/(intro)/age');
+    }, AUTO_ADVANCE_MS);
+  };
 
   return (
     <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <IntroHeader step={3} />
+
       <View style={s.header}>
-        <AppText variant="overline" color={colors.inkMuted}>Step 3 of 8</AppText>
-        <AppText variant="h1" style={s.title}>How should we calculate?</AppText>
+        <AppText variant="overline" color={colors.terracottaText}>Your metabolism</AppText>
+        <AppText variant="h1" style={s.title}>How should we calculate your metabolism?</AppText>
         <AppText variant="body" color={colors.inkMuted}>
-          This affects your calorie target. We'll never show it publicly.
+          We use this for your calorie formula only.
         </AppText>
       </View>
 
@@ -37,31 +59,21 @@ export default function GenderScreen() {
           return (
             <Pressable
               key={o.key}
-              onPress={() => set({ gender: o.key })}
+              onPress={() => pick(o.key)}
               style={[s.option, selected && s.optionSelected]}
             >
-              <AppText variant="display">{o.emoji}</AppText>
+              <AppText style={s.emoji}>{o.emoji}</AppText>
               <AppText variant="title">{o.label}</AppText>
             </Pressable>
           );
         })}
       </View>
-
-      <Button
-        label="Continue"
-        disabled={!gender}
-        onPress={() => {
-          track('onboarding_screen_completed', { screen: 'S4_gender' });
-          router.push('/(intro)/age');
-        }}
-        style={s.cta}
-      />
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
+  header: { marginTop: space.md, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
   options: {
     flex: 1,
@@ -82,6 +94,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: space.sm,
   },
-  optionSelected: { borderColor: colors.terracotta, backgroundColor: colors.surfaceAlt },
-  cta: { marginTop: 'auto' },
+  optionSelected: { borderColor: colors.terracotta, backgroundColor: colors.terracottaSoft },
+  emoji: { fontSize: 40, lineHeight: 48 },
 });

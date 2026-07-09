@@ -67,7 +67,7 @@ export function WidgetInstructionSheet({ visible, onDismiss, onDone }: Props) {
 
           <Button label="I've added it" variant="brand" onPress={onDone} />
           <Pressable onPress={onDismiss} style={s.dismissBtn}>
-            <AppText variant="small" color={colors.inkMuted}>I'll do it later</AppText>
+            <AppText variant="small" color={colors.inkMuted}>I’ll do it later</AppText>
           </Pressable>
         </View>
       </View>

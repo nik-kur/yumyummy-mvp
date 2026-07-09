@@ -30,15 +30,21 @@
         "lose": "✦ Recommended for steady weight loss",
         "default": "✦ Recommended for building the habit"
       },
-      "price_style": "per_month_big"
+      "price_style": "per_month_big",
+      "display_price": "$7.49/mo",
+      "display_sub": "3 days free, then $89.99/yr"
     },
     {
       "product": "ai.yumyummy.app.monthly",
-      "sub": "billed monthly · no trial"
+      "sub": "billed monthly · no trial",
+      "display_price": "$9.99",
+      "display_sub": "billed monthly · no trial"
     },
     {
       "product": "ai.yumyummy.app.weekly_upd",
-      "sub": "start today · no commitment"
+      "sub": "start today · no commitment",
+      "display_price": "$4.99",
+      "display_sub": "per week · no commitment"
     }
   ],
   "cta": {

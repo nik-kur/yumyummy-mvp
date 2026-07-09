@@ -19,6 +19,7 @@ import { VariantB } from '@/components/paywall/VariantB';
 import { VariantB2 } from '@/components/paywall/VariantB2';
 import { VariantC } from '@/components/paywall/VariantC';
 import { useAuth } from '@/state/auth';
+import { loadDraft, type IntroDraft } from '@/state/introDraft';
 import {
   activateAdapty,
   isAdaptyConfigured,
@@ -48,56 +49,80 @@ export default function PaywallScreen() {
   const paywallRef = useRef<AdaptyPaywall | null>(null);
   const [products, setProducts] = useState<AdaptyPaywallProduct[]>([]);
   const configRef = useRef(FALLBACK_CONFIG);
+  // Pre-auth users have no profile — plan numbers live in the intro draft.
+  const [draft, setDraft] = useState<IntroDraft | null>(null);
 
-  // Build placeholders from profile / onboarding draft
+  useEffect(() => {
+    loadDraft().then(setDraft).catch(() => {});
+  }, []);
+
+  const targetWeightKg = draft?.target_weight_kg ?? null;
+  const targetWeeks = draft?.target_weeks ?? null;
+  const dailyKcal = draft?.target_calories ?? profile?.target_calories ?? null;
+  const goal = draft?.goal_type ?? profile?.goal_type ?? null;
+
+  const targetDate = (() => {
+    if (!targetWeeks) return undefined;
+    const d = new Date();
+    d.setDate(d.getDate() + targetWeeks * 7);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  })();
+
   const placeholders: PlaceholderValues = {
-    TARGET_WEIGHT: profile?.weight_kg
-      ? `${profile.weight_kg} kg`
-      : undefined,
-    DAILY_KCAL: profile?.target_calories
-      ? String(profile.target_calories)
-      : undefined,
+    TARGET_WEIGHT: targetWeightKg ? `${targetWeightKg} kg` : undefined,
+    TARGET_DATE: targetDate,
+    DAILY_KCAL: dailyKcal ? String(dailyKcal) : undefined,
     PRICE_M: products.find((p) => p.vendorProductId?.includes('monthly'))
       ?.price?.localizedString ?? '$9.99',
     PRICE_W: products.find((p) => p.vendorProductId?.includes('weekly'))
       ?.price?.localizedString ?? '$4.99',
   };
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const ok = await activateAdapty();
-      if (!ok) {
-        if (mounted) setPhase('fallback');
-        return;
-      }
-      try {
-        const pw = await adapty.getPaywall(ADAPTY_PLACEMENT_MAIN);
-        if (!mounted) return;
-        paywallRef.current = pw;
+  const loadPaywall = useCallback(async (mountedRef?: { current: boolean }) => {
+    const alive = () => mountedRef?.current !== false;
+    setPhase('loading');
+    const ok = await activateAdapty();
+    if (!ok) {
+      if (alive()) setPhase('fallback');
+      return;
+    }
+    try {
+      const pw = await adapty.getPaywall(ADAPTY_PLACEMENT_MAIN);
+      if (!alive()) return;
+      paywallRef.current = pw;
 
-        const config = parseRemoteConfig(pw.remoteConfig?.dataString);
-        configRef.current = config;
+      const config = parseRemoteConfig(pw.remoteConfig?.dataString);
+      configRef.current = config;
 
-        const prods = await adapty.getPaywallProducts(pw);
-        if (!mounted) return;
-        setProducts(prods);
+      const prods = await adapty.getPaywallProducts(pw);
+      if (!alive()) return;
+      setProducts(prods);
 
-        await adapty.logShowPaywall(pw);
-        track('paywall_shown', {
-          placement: ADAPTY_PLACEMENT_MAIN,
-          variant: config.variant,
-        });
-        addBreadcrumb('paywall', 'Paywall shown', { variant: config.variant });
+      await adapty.logShowPaywall(pw);
+      track('paywall_shown', {
+        placement: ADAPTY_PLACEMENT_MAIN,
+        variant: config.variant,
+        products_available: prods.length > 0,
+      });
+      addBreadcrumb('paywall', 'Paywall shown', { variant: config.variant });
 
-        setPhase('ready');
-      } catch (e) {
-        captureException(e);
-        if (mounted) setPhase('fallback');
-      }
-    })();
-    return () => { mounted = false; };
+      setPhase('ready');
+    } catch (e) {
+      captureException(e);
+      if (alive()) setPhase('fallback');
+    }
   }, []);
+
+  useEffect(() => {
+    const mountedRef = { current: true };
+    void loadPaywall(mountedRef);
+    return () => { mountedRef.current = false; };
+  }, [loadPaywall]);
+
+  const handleRetry = useCallback(() => {
+    track('paywall_retry_pressed');
+    void loadPaywall();
+  }, [loadPaywall]);
 
   const handlePurchase = useCallback(async (product: AdaptyPaywallProduct) => {
     setPurchasing(true);
@@ -171,9 +196,10 @@ export default function PaywallScreen() {
     config: configRef.current,
     products,
     placeholders,
-    goal: profile?.goal_type,
+    goal,
     onPurchase: handlePurchase,
     onRestore: handleRestore,
+    onRetry: handleRetry,
     purchasing,
   };
 

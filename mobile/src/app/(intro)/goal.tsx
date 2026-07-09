@@ -1,38 +1,56 @@
 /**
- * S2 Goal — what brings you here?
- * Same 4 options as the existing onboarding, but writes to the intro draft.
+ * S2 Goal — "What's your goal right now?" (prototype v3).
+ * Single-select with auto-advance; writes to the intro draft.
  */
+import { useEffect, useRef } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { TrendingDown, Utensils, Dumbbell, Activity, CircleCheck, type LucideIcon } from 'lucide-react-native';
+import { TrendingDown, Utensils, Dumbbell, Eye, CircleCheck, type LucideIcon } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
-import { Button } from '@/components/Button';
+import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
-import { GOAL_LABELS, type GoalType } from '@/utils/calories';
+import type { GoalType } from '@/utils/calories';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 
-const GOALS: { key: GoalType; icon: LucideIcon; desc: string }[] = [
-  { key: 'lose', icon: TrendingDown, desc: 'Gentle deficit, steady results' },
-  { key: 'maintain', icon: Utensils, desc: 'Awareness without obsessing' },
-  { key: 'gain', icon: Dumbbell, desc: 'Fuel training, build muscle' },
-  { key: 'just_track', icon: Activity, desc: 'See the numbers, set no limits' },
+const GOALS: { key: GoalType; icon: LucideIcon; label: string }[] = [
+  { key: 'lose', icon: TrendingDown, label: 'Lose weight' },
+  { key: 'maintain', icon: Utensils, label: 'Maintain & eat healthier' },
+  { key: 'gain', icon: Dumbbell, label: 'Gain muscle' },
+  { key: 'just_track', icon: Eye, label: 'Just track my food' },
 ];
+
+const AUTO_ADVANCE_MS = 280;
 
 export default function GoalScreen() {
   const router = useRouter();
   const { goal_type, set } = useIntro();
+  const navigating = useRef(false);
+
+  useEffect(() => {
+    track('onboarding_screen_viewed', { screen: 'S2_goal' });
+  }, []);
+
+  const pick = (key: GoalType) => {
+    if (navigating.current) return;
+    navigating.current = true;
+    set({ goal_type: key });
+    track('onboarding_screen_completed', { screen: 'S2_goal', goal: key });
+    setTimeout(() => {
+      navigating.current = false;
+      router.push('/(intro)/why');
+    }, AUTO_ADVANCE_MS);
+  };
 
   return (
-    <Screen scroll grow edges={['top', 'bottom', 'left', 'right']}>
+    <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <IntroHeader step={1} />
+
       <View style={s.header}>
-        <AppText variant="overline" color={colors.inkMuted}>Step 1 of 8</AppText>
-        <AppText variant="h1" style={s.title}>What brings you to YumYummy?</AppText>
-        <AppText variant="body" color={colors.inkMuted}>
-          We'll tailor your targets to this. You can change it anytime.
-        </AppText>
+        <AppText variant="overline" color={colors.terracottaText}>About you</AppText>
+        <AppText variant="h1" style={s.title}>What’s your goal right now?</AppText>
       </View>
 
       <View style={s.list}>
@@ -42,15 +60,14 @@ export default function GoalScreen() {
           return (
             <Pressable
               key={g.key}
-              onPress={() => set({ goal_type: g.key })}
+              onPress={() => pick(g.key)}
               style={[s.card, selected && s.cardSelected]}
             >
               <View style={[s.iconWrap, selected && s.iconWrapSelected]}>
                 <Icon size={22} color={selected ? colors.white : colors.terracotta} strokeWidth={1.5} />
               </View>
               <View style={s.cardText}>
-                <AppText variant="title">{GOAL_LABELS[g.key]}</AppText>
-                <AppText variant="caption" color={colors.inkMuted}>{g.desc}</AppText>
+                <AppText variant="title">{g.label}</AppText>
               </View>
               {selected ? (
                 <CircleCheck size={22} color={colors.terracotta} strokeWidth={1.5} />
@@ -61,22 +78,12 @@ export default function GoalScreen() {
           );
         })}
       </View>
-
-      <Button
-        label="Continue"
-        disabled={!goal_type}
-        onPress={() => {
-          track('onboarding_screen_completed', { screen: 'S2_goal' });
-          router.push('/(intro)/pain-points');
-        }}
-        style={s.cta}
-      />
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
+  header: { marginTop: space.md, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
   list: { flex: 1, justifyContent: 'center', gap: space.base },
   card: {
@@ -89,7 +96,7 @@ const s = StyleSheet.create({
     borderColor: colors.hairline,
     padding: space.base,
   },
-  cardSelected: { borderColor: colors.terracotta, backgroundColor: colors.surfaceAlt },
+  cardSelected: { borderColor: colors.terracotta, backgroundColor: colors.terracottaSoft },
   iconWrap: {
     width: 44, height: 44, borderRadius: radius.md,
     backgroundColor: colors.terracottaSoft,
@@ -98,5 +105,4 @@ const s = StyleSheet.create({
   iconWrapSelected: { backgroundColor: colors.terracotta },
   cardText: { flex: 1, gap: 2 },
   radio: { width: 22, height: 22, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.hairlineStrong },
-  cta: { marginTop: 'auto' },
 });

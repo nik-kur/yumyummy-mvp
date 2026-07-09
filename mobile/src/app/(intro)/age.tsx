@@ -1,7 +1,7 @@
 /**
  * S5 Age — numeric stepper/wheel.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Minus, Plus } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { Minus, Plus } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
@@ -18,18 +19,21 @@ export default function AgeScreen() {
   const intro = useIntro();
   const [age, setAge] = useState(intro.age);
 
+  useEffect(() => {
+    track('onboarding_screen_viewed', { screen: 'S5_age' });
+  }, []);
+
   const adjust = (delta: number) => {
     setAge((a) => Math.max(14, Math.min(99, a + delta)));
   };
 
   return (
     <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <IntroHeader step={4} />
+
       <View style={s.header}>
-        <AppText variant="overline" color={colors.inkMuted}>Step 4 of 8</AppText>
+        <AppText variant="overline" color={colors.terracottaText}>Your metabolism</AppText>
         <AppText variant="h1" style={s.title}>How old are you?</AppText>
-        <AppText variant="body" color={colors.inkMuted}>
-          Your age affects your base metabolic rate.
-        </AppText>
       </View>
 
       <View style={s.picker}>
@@ -44,6 +48,7 @@ export default function AgeScreen() {
 
       <Button
         label="Continue"
+        variant="brand"
         onPress={() => {
           intro.set({ age });
           track('onboarding_screen_completed', { screen: 'S5_age' });
@@ -56,7 +61,7 @@ export default function AgeScreen() {
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
+  header: { marginTop: space.md, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
   picker: {
     flex: 1,

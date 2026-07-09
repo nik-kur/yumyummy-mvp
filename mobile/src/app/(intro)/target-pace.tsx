@@ -1,196 +1,294 @@
 /**
- * N1 Target & Pace — only shown for lose/gain goals.
- *
- * Safety constraints (per spec v2):
- *   - 7700 kcal per kg body weight
- *   - Floor: M 1500 / F 1200 kcal/day
- *   - Deficit options: 10% (gentle), 15% (moderate), 20% (aggressive)
- *   - Dynamic default timeline based on delta
+ * N1 Target & Pace — two sliders (target weight, timeline) with live
+ * kcal/pace recalculation and difficulty tiers (prototype v3).
+ * Lose/gain goals only; maintain/track skips straight to the loader.
  */
-import { useMemo, useState } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Minus, Plus } from 'lucide-react-native';
+import Slider from '@react-native-community/slider';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
-import { computePlan } from '@/utils/calories';
+import { computePlan, macrosForCalories } from '@/utils/calories';
 import { colors, radius, space } from '@/theme/tokens';
+import { fonts } from '@/theme/typography';
 import { track } from '@/analytics/posthog';
 
 const KCAL_PER_KG = 7700;
 
-interface PaceOption {
-  pct: number;
-  label: string;
-  difficulty: string;
-}
-
-const PACES: PaceOption[] = [
-  { pct: 10, label: 'Gentle', difficulty: 'Easy to sustain' },
-  { pct: 15, label: 'Moderate', difficulty: 'Balanced pace' },
-  { pct: 20, label: 'Aggressive', difficulty: 'Requires discipline' },
-];
-
-function floorCalories(kcal: number, gender: string | null): number {
-  const floor = gender === 'female' ? 1200 : 1500;
-  return Math.max(kcal, floor);
+function targetDate(weeks: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + weeks * 7);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export default function TargetPaceScreen() {
   const router = useRouter();
   const intro = useIntro();
 
-  const plan = useMemo(() => {
-    if (!intro.gender || !intro.activity_level || !intro.goal_type) return null;
-    return computePlan({
-      gender: intro.gender,
-      age: intro.age,
-      height_cm: intro.height_cm,
-      weight_kg: intro.weight_kg,
-      activity_level: intro.activity_level,
-      goal_type: 'maintain',
-    });
-  }, [intro.gender, intro.age, intro.height_cm, intro.weight_kg, intro.activity_level, intro.goal_type]);
+  const goal = intro.goal_type === 'gain' ? 'gain' : 'lose';
+  const lose = goal === 'lose';
+  const weight = intro.weight_kg;
+  const gender = intro.gender ?? 'male';
 
-  const defaultTarget = intro.goal_type === 'lose'
-    ? Math.round(intro.weight_kg * 0.9)
-    : Math.round(intro.weight_kg * 1.1);
-  const [target, setTarget] = useState(intro.target_weight_kg ?? defaultTarget);
-  const [selectedPace, setSelectedPace] = useState(1);
-  const pace = PACES[selectedPace];
-
-  const delta = Math.abs(target - intro.weight_kg);
-  const tdee = plan?.tdee ?? 2000;
-  const dailyDeficit = Math.round(tdee * (pace.pct / 100));
-  const adjustedKcal = floorCalories(
-    intro.goal_type === 'lose' ? tdee - dailyDeficit : tdee + dailyDeficit,
-    intro.gender,
+  const { tdee } = useMemo(
+    () =>
+      computePlan({
+        gender,
+        age: intro.age,
+        height_cm: intro.height_cm,
+        weight_kg: weight,
+        activity_level: intro.activity_level ?? 'light',
+        goal_type: goal,
+      }),
+    [gender, intro.age, intro.height_cm, weight, intro.activity_level, goal],
   );
-  const weeks = delta > 0 ? Math.ceil((delta * KCAL_PER_KG) / (dailyDeficit * 7)) : 4;
 
-  const targetDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + weeks * 7);
-    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  }, [weeks]);
+  // Target-weight slider bounds: BMI 18.5 floor for lose, +15 kg cap for gain.
+  const tmin = lose
+    ? Math.max(45, Math.round(18.5 * (intro.height_cm / 100) ** 2))
+    : weight + 1;
+  const tmax = lose ? weight - 1 : weight + 15;
 
-  const adjustTarget = (d: number) => {
-    setTarget((t) => Math.max(30, Math.min(250, t + d)));
+  const defaultTarget = lose
+    ? Math.max(tmin, weight - 8)
+    : Math.min(tmax, weight + 6);
+
+  const defaultWeeks = useMemo(() => {
+    const dw = Math.abs(weight - defaultTarget);
+    const tgtDaily = (lose ? 0.15 : 0.08) * tdee;
+    const w = Math.ceil((dw * KCAL_PER_KG) / tgtDaily / 7);
+    return Math.min(lose ? 40 : 52, Math.max(lose ? 8 : 12, w));
+  }, [weight, defaultTarget, lose, tdee]);
+
+  const [target, setTarget] = useState(
+    intro.target_weight_kg && intro.target_weight_kg >= tmin && intro.target_weight_kg <= tmax
+      ? intro.target_weight_kg
+      : defaultTarget,
+  );
+  const [weeks, setWeeks] = useState(intro.target_weeks ?? defaultWeeks);
+
+  useEffect(() => {
+    track('onboarding_screen_viewed', { screen: 'N1_target_pace' });
+  }, []);
+
+  // Live derived values
+  const floor = gender === 'female' ? 1200 : 1500;
+  const dw = Math.abs(weight - target);
+  const dailyDelta = (dw * KCAL_PER_KG) / (weeks * 7);
+  const cal = Math.round((lose ? tdee - dailyDelta : tdee + dailyDelta) / 10) * 10;
+  const pace = dw / weeks;
+  const pct = Math.round((dailyDelta / tdee) * 100);
+
+  type Tier = { level: 'ok' | 'mid' | 'bad'; label: string; sub?: string };
+  const tier: Tier = useMemo(() => {
+    if (lose) {
+      if (cal < floor || pct > 25) {
+        const maxDelta = Math.min(0.25 * tdee, tdee - floor);
+        const suggest = Math.ceil((dw * KCAL_PER_KG) / maxDelta / 7);
+        return {
+          level: 'bad',
+          label: 'Too aggressive',
+          sub: `This pace drops you below a safe minimum. Try ${suggest} weeks or more — you'd still finish by ${targetDate(suggest)}.`,
+        };
+      }
+      if (pct > 18) return { level: 'mid', label: 'Ambitious — doable, needs consistency' };
+      if (pct > 10) return { level: 'ok', label: 'Steady — sustainable for most people' };
+      return { level: 'ok', label: 'Gentle — barely feels like a diet' };
+    }
+    if (pct > 15) {
+      const suggest = Math.ceil((dw * KCAL_PER_KG) / (0.15 * tdee) / 7);
+      return {
+        level: 'bad',
+        label: 'Aggressive — expect fat gain too',
+        sub: `Slow down to keep gains lean. Try ${suggest} weeks or more.`,
+      };
+    }
+    if (pct > 8) return { level: 'mid', label: 'Steady build' };
+    return { level: 'ok', label: 'Lean gain — slow and clean' };
+  }, [lose, cal, floor, pct, tdee, dw]);
+
+  const tierColor =
+    tier.level === 'bad' ? colors.error : tier.level === 'mid' ? colors.warning : colors.success;
+
+  const lockIn = () => {
+    // Never ship a plan below the safe calorie floor: clamp and stretch the timeline.
+    let finalCal = cal;
+    let finalWeeks = weeks;
+    if (lose && cal < floor) {
+      finalCal = floor;
+      const delta = tdee - floor;
+      if (delta > 0) finalWeeks = Math.ceil((dw * KCAL_PER_KG) / delta / 7);
+    }
+    const macros = macrosForCalories(finalCal, weight, goal);
+    intro.set({
+      target_weight_kg: target,
+      deficit_pct: pct,
+      target_weeks: finalWeeks,
+      target_calories: finalCal,
+      target_protein_g: macros.protein,
+      target_fat_g: macros.fat,
+      target_carbs_g: macros.carbs,
+    });
+    track('onboarding_screen_completed', {
+      screen: 'N1_target_pace',
+      target_weight_kg: target,
+      target_weeks: finalWeeks,
+      deficit_pct: pct,
+      tier: tier.level,
+    });
+    router.push('/(intro)/loader');
   };
 
   return (
-    <Screen scroll grow edges={['top', 'bottom', 'left', 'right']}>
-      <View style={s.header}>
-        <AppText variant="overline" color={colors.inkMuted}>YOUR PLAN</AppText>
-        <AppText variant="h1" style={s.title}>
-          Set your target
+    <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <IntroHeader step={10} />
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+        <AppText variant="overline" color={colors.terracottaText}>Your target</AppText>
+        <AppText variant="h1" style={s.title}>Set your goal — see what it takes</AppText>
+        <AppText variant="body" color={colors.inkMuted} style={s.lead}>
+          You burn about ~{Math.round(tdee).toLocaleString('en-US')} kcal a day at your
+          activity level. Drag the sliders — watch what changes.
         </AppText>
-      </View>
 
-      <View style={s.targetPicker}>
-        <AppText variant="bodyStrong">Target weight</AppText>
-        <View style={s.stepperRow}>
-          <Pressable onPress={() => adjustTarget(-1)} style={s.stepBtn} hitSlop={12}>
-            <Minus size={20} color={colors.ink} strokeWidth={1.5} />
-          </Pressable>
-          <View style={s.valBox}>
-            <AppText variant="hero">{target}</AppText>
-            <AppText variant="caption" color={colors.inkMuted}>kg</AppText>
+        {/* Slider 1 — target weight */}
+        <View style={s.sliderBlock}>
+          <View style={s.sliderHead}>
+            <AppText variant="bodyStrong">Target weight</AppText>
+            <AppText variant="bodyStrong" color={colors.terracottaText}>{target} kg</AppText>
           </View>
-          <Pressable onPress={() => adjustTarget(1)} style={s.stepBtn} hitSlop={12}>
-            <Plus size={20} color={colors.ink} strokeWidth={1.5} />
-          </Pressable>
+          <Slider
+            minimumValue={tmin}
+            maximumValue={tmax}
+            step={1}
+            value={target}
+            onValueChange={(v) => setTarget(Math.round(v))}
+            minimumTrackTintColor={colors.terracotta}
+            maximumTrackTintColor={colors.hairlineStrong}
+            thumbTintColor={colors.terracotta}
+          />
+          <View style={s.sliderScale}>
+            <AppText variant="caption" color={colors.inkFaint}>{tmin} kg</AppText>
+            <AppText variant="caption" color={colors.inkFaint}>{tmax} kg</AppText>
+          </View>
         </View>
-      </View>
 
-      <AppText variant="bodyStrong" style={s.paceLabel}>Choose your pace</AppText>
-      <View style={s.paces}>
-        {PACES.map((p, i) => (
-          <Pressable
-            key={p.pct}
-            onPress={() => setSelectedPace(i)}
-            style={[s.paceCard, selectedPace === i && s.paceCardActive]}
-          >
-            <AppText variant="title">{p.label}</AppText>
-            <AppText variant="caption" color={colors.inkMuted}>{p.difficulty}</AppText>
-            <AppText variant="caption" color={colors.terracottaText}>{p.pct}% deficit</AppText>
-          </Pressable>
-        ))}
-      </View>
-
-      <View style={s.summary}>
-        <View style={s.summaryRow}>
-          <AppText variant="body" color={colors.inkMuted}>Daily target</AppText>
-          <AppText variant="title">{adjustedKcal} kcal</AppText>
+        {/* Slider 2 — timeline */}
+        <View style={s.sliderBlock}>
+          <View style={s.sliderHead}>
+            <AppText variant="bodyStrong">By when</AppText>
+            <AppText variant="bodyStrong" color={colors.terracottaText}>
+              {weeks} wk · by {targetDate(weeks)}
+            </AppText>
+          </View>
+          <Slider
+            minimumValue={4}
+            maximumValue={52}
+            step={1}
+            value={weeks}
+            onValueChange={(v) => setWeeks(Math.round(v))}
+            minimumTrackTintColor={colors.terracotta}
+            maximumTrackTintColor={colors.hairlineStrong}
+            thumbTintColor={colors.terracotta}
+          />
+          <View style={s.sliderScale}>
+            <AppText variant="caption" color={colors.inkFaint}>4 wk</AppText>
+            <AppText variant="caption" color={colors.inkFaint}>52 wk</AppText>
+          </View>
         </View>
-        <View style={s.summaryRow}>
-          <AppText variant="body" color={colors.inkMuted}>Timeline</AppText>
-          <AppText variant="title">~{weeks} weeks</AppText>
+
+        {/* Live plan card */}
+        <View style={s.liveCard}>
+          <View style={s.kcalRow}>
+            <AppText style={s.kcalBig}>{Math.max(cal, 0).toLocaleString('en-US')}</AppText>
+            <AppText variant="small" color={colors.inkMuted}>kcal/day</AppText>
+            <View style={s.paceChip}>
+              <AppText variant="small" color={colors.ink}>
+                {lose ? '−' : '+'}{pace.toFixed(1)} kg/wk
+              </AppText>
+            </View>
+          </View>
+          <View style={s.deficitTrack}>
+            <View
+              style={[
+                s.deficitFill,
+                { width: `${(Math.min(pct, 30) / 30) * 100}%`, backgroundColor: tierColor },
+              ]}
+            />
+          </View>
+          <AppText variant="caption" color={colors.inkMuted}>
+            {pct}% {lose ? 'below' : 'above'} your burn
+          </AppText>
+          <AppText variant="bodyStrong" color={tierColor} style={s.tierLabel}>
+            {tier.label}
+          </AppText>
+          {tier.sub ? (
+            <AppText variant="small" color={colors.inkMuted}>{tier.sub}</AppText>
+          ) : null}
         </View>
-        <View style={s.summaryRow}>
-          <AppText variant="body" color={colors.inkMuted}>Target date</AppText>
-          <AppText variant="title">{targetDate}</AppText>
-        </View>
-      </View>
+      </ScrollView>
 
-      <Button
-        label="Lock it in"
-        variant="brand"
-        onPress={() => {
-          const fullPlan = computePlan({
-            gender: intro.gender!,
-            age: intro.age,
-            height_cm: intro.height_cm,
-            weight_kg: intro.weight_kg,
-            activity_level: intro.activity_level!,
-            goal_type: intro.goal_type!,
-          });
-
-          intro.set({
-            target_weight_kg: target,
-            deficit_pct: pace.pct,
-            target_weeks: weeks,
-            target_calories: adjustedKcal,
-            target_protein_g: fullPlan.protein,
-            target_fat_g: fullPlan.fat,
-            target_carbs_g: fullPlan.carbs,
-          });
-
-          track('n1_completed', { deficit_pct: pace.pct, weeks, target_kcal: adjustedKcal });
-          router.push('/(intro)/loader');
-        }}
-        style={s.cta}
-      />
+      <Button label="Lock it in" variant="brand" onPress={lockIn} style={s.cta} />
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
-  title: { marginTop: space.xs },
-  targetPicker: { alignItems: 'center', gap: space.md, marginBottom: space.lg },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: space.xl },
-  stepBtn: {
-    width: 44, height: 44, borderRadius: radius.pill,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline,
-    alignItems: 'center', justifyContent: 'center',
+  scroll: { paddingBottom: space.base },
+  title: { marginTop: space.sm },
+  lead: { marginTop: space.sm, marginBottom: space.lg },
+  sliderBlock: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingHorizontal: space.base,
+    paddingVertical: space.md,
+    marginBottom: space.md,
   },
-  valBox: { alignItems: 'center', minWidth: 80 },
-  paceLabel: { marginBottom: space.md },
-  paces: { gap: space.md, marginBottom: space.lg },
-  paceCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1.5, borderColor: colors.hairline, padding: space.base, gap: 2,
+  sliderHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: space.xs,
   },
-  paceCardActive: { borderColor: colors.terracotta, backgroundColor: colors.surfaceAlt },
-  summary: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.hairline,
-    padding: space.base, gap: space.md, marginBottom: space.lg,
+  sliderScale: { flexDirection: 'row', justifyContent: 'space-between' },
+  liveCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.hairlineStrong,
+    padding: space.base,
+    gap: space.sm,
   },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cta: { marginTop: 'auto' },
+  kcalRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+  kcalBig: {
+    fontFamily: fonts.serifBold,
+    fontSize: 36,
+    lineHeight: 42,
+    color: colors.ink,
+  },
+  paceChip: {
+    marginLeft: 'auto',
+    paddingHorizontal: space.md,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  deficitTrack: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+  },
+  deficitFill: { height: '100%', borderRadius: radius.pill },
+  tierLabel: { marginTop: space.xs },
+  cta: { marginTop: space.sm },
 });

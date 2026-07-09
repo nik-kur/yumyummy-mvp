@@ -13,15 +13,15 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  type LayoutChangeEvent,
+  Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Star, CircleCheck, type LucideIcon, LockOpen, Bell } from 'lucide-react-native';
 import type { AdaptyPaywallProduct } from 'react-native-adapty';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { colors, radius, space } from '@/theme/tokens';
-import { fonts } from '@/theme/typography';
 import type {
   PaywallRemoteConfig,
   PlaceholderValues,
@@ -30,8 +30,12 @@ import type {
 import {
   fillPlaceholders,
   findProduct,
+  hasUnresolvedPlaceholders,
   perMonthPrice,
 } from '@/billing/paywallConfig';
+
+const TERMS_URL = 'https://yumyummy.ai/terms.html';
+const PRIVACY_URL = 'https://yumyummy.ai/privacy.html';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -44,6 +48,8 @@ interface PaywallRendererProps {
   goal?: string | null;
   onPurchase: (product: AdaptyPaywallProduct) => void;
   onRestore: () => void;
+  /** Re-fetch paywall + products (shown when the store returned no products). */
+  onRetry?: () => void;
   purchasing: boolean;
 }
 
@@ -67,7 +73,7 @@ function Quote({ text, author }: { text: string; author: string }) {
   return (
     <View style={s.quoteBox}>
       <AppText variant="small" color={colors.inkMuted} style={s.quoteText}>
-        "{text}"
+        “{text}”
       </AppText>
       <AppText variant="caption" color={colors.inkFaint}>— {author}</AppText>
     </View>
@@ -140,6 +146,38 @@ function PlanCard({
     (ph) => ph.paymentMode === 'free_trial',
   );
 
+  // StoreKit unavailable (e.g. subscriptions pending Apple review) —
+  // show reference prices from the config so cards never render empty.
+  if (!product) {
+    return (
+      <Pressable onPress={onSelect} style={[s.planCard, selected && s.planCardActive]}>
+        {plan.badge && (
+          <View style={s.planBadge}>
+            <AppText variant="overline" color={colors.white}>{plan.badge}</AppText>
+          </View>
+        )}
+        <View style={s.planRow}>
+          <View style={[s.radio, selected && s.radioActive]}>
+            {selected && <View style={s.radioDot} />}
+          </View>
+          <View style={s.planInfo}>
+            <AppText variant="bodyStrong">{plan.display_price ?? '—'}</AppText>
+            {(plan.display_sub ?? plan.sub) && (
+              <AppText variant="caption" color={colors.inkMuted}>
+                {fill(plan.display_sub ?? plan.sub ?? '')}
+              </AppText>
+            )}
+          </View>
+        </View>
+        {recTag && selected && (
+          <AppText variant="caption" color={colors.protein} style={s.recTag}>
+            {recTag}
+          </AppText>
+        )}
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={onSelect}
@@ -196,6 +234,7 @@ export function PaywallRenderer({
   goal,
   onPurchase,
   onRestore,
+  onRetry,
   purchasing,
 }: PaywallRendererProps) {
   const fill = useCallback(
@@ -221,11 +260,15 @@ export function PaywallRenderer({
     return fill(template);
   }, [selectedProduct, config.cta, fill]);
 
+  // Never render a literal "{TARGET_WEIGHT}": fall back goal_line →
+  // maintain_line → hide the hero card entirely.
   const heroLine = useMemo(() => {
-    if (goal === 'maintain' || goal === 'just_track') {
-      return fill(config.hero.maintain_line);
-    }
-    return fill(config.hero.goal_line);
+    const goalLine = fill(config.hero.goal_line);
+    const maintainLine = fill(config.hero.maintain_line);
+    const preferGoal = goal === 'lose' || goal === 'gain';
+    if (preferGoal && !hasUnresolvedPlaceholders(goalLine)) return goalLine;
+    if (!hasUnresolvedPlaceholders(maintainLine)) return maintainLine;
+    return null;
   }, [goal, config.hero, fill]);
 
   const showTimeline = isYearly && config.timeline;
@@ -234,13 +277,15 @@ export function PaywallRenderer({
     [config.social.laurels, fill],
   );
 
+  const productsAvailable = products.length > 0;
+
   const handlePurchase = useCallback(() => {
     if (!selectedAdaptyProduct) return;
     onPurchase(selectedAdaptyProduct);
   }, [selectedAdaptyProduct, onPurchase]);
 
   return (
-    <View style={s.root}>
+    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
       {/* Restore — top right */}
       <View style={s.topBar}>
         <View style={s.topBarSpacer} />
@@ -259,15 +304,17 @@ export function PaywallRenderer({
           {config.headline}
         </AppText>
 
-        {/* Goal hero */}
-        <View style={s.heroCard}>
-          <AppText variant="overline" color={colors.terracottaText}>
-            {fill(config.hero.label)}
-          </AppText>
-          <AppText variant="h2" style={s.heroLine}>
-            {heroLine}
-          </AppText>
-        </View>
+        {/* Goal hero — hidden when placeholder data is missing */}
+        {heroLine && (
+          <View style={s.heroCard}>
+            <AppText variant="overline" color={colors.terracottaText}>
+              {fill(config.hero.label)}
+            </AppText>
+            <AppText variant="h2" style={s.heroLine}>
+              {heroLine}
+            </AppText>
+          </View>
+        )}
 
         {/* Social proof */}
         <Laurels items={socialLaurelsResolved} />
@@ -318,6 +365,18 @@ export function PaywallRenderer({
           disabled={!selectedAdaptyProduct}
         />
 
+        {/* Store unavailable — reference prices shown, offer a reload */}
+        {!productsAvailable && (
+          <View style={s.storeNotice}>
+            <AppText variant="caption" color={colors.inkMuted} center>
+              Prices shown for reference — the App Store connection isn’t available right now.
+            </AppText>
+            {onRetry && (
+              <Button label="Retry" variant="secondary" size="md" onPress={onRetry} />
+            )}
+          </View>
+        )}
+
         {/* Legal footer */}
         <AppText variant="caption" color={colors.inkFaint} center style={s.disclosure}>
           {isYearly
@@ -330,16 +389,16 @@ export function PaywallRenderer({
             <AppText variant="caption" color={colors.inkFaint}>Restore</AppText>
           </Pressable>
           <AppText variant="caption" color={colors.inkFaint}> · </AppText>
-          <Pressable onPress={() => {/* Linking.openURL terms */}}>
+          <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
             <AppText variant="caption" color={colors.inkFaint}>Terms</AppText>
           </Pressable>
           <AppText variant="caption" color={colors.inkFaint}> · </AppText>
-          <Pressable onPress={() => {/* Linking.openURL privacy */}}>
+          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
             <AppText variant="caption" color={colors.inkFaint}>Privacy</AppText>
           </Pressable>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -392,6 +451,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginBottom: space.lg,
     paddingHorizontal: space.base,
+    paddingVertical: space.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
   },
   quoteText: { fontStyle: 'italic', textAlign: 'center', marginBottom: space.xs },
 
@@ -457,6 +521,7 @@ const s = StyleSheet.create({
 
   // CTA area
   aboveCta: { marginBottom: space.md },
+  storeNotice: { marginTop: space.base, gap: space.md, alignItems: 'center' },
   disclosure: { marginTop: space.md, lineHeight: 16 },
   legalRow: {
     flexDirection: 'row',

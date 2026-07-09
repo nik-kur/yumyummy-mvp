@@ -1,80 +1,68 @@
 /**
- * S3 Pain points — multi-select chips, goal-dependent variants.
+ * S8 Pain points — 5 fixed options per prototype v3, multi-select.
+ * Stores stable ids (not labels) in the draft — they feed Adapty custom
+ * attributes and future paywall personalization.
  */
+import { useEffect, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Check } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 
-const PAIN_MAP: Record<string, string[]> = {
-  lose: [
-    'I keep starting and stopping',
-    'I don\'t know what to eat',
-    'Tracking feels like a chore',
-    'I eat out a lot',
-  ],
-  gain: [
-    'I forget to eat enough',
-    'Not hitting protein targets',
-    'Hard to track homemade meals',
-    'Don\'t know my ideal surplus',
-  ],
-  maintain: [
-    'I want awareness without obsessing',
-    'I snack too much',
-    'Portions feel inconsistent',
-    'Not sure my diet is balanced',
-  ],
-  just_track: [
-    'I want quick, accurate logging',
-    'Curious about my macros',
-    'Building better habits',
-    'Want data on my eating patterns',
-  ],
-};
+const OPTIONS: { id: string; emoji: string; label: string }[] = [
+  { id: 'too_long', emoji: '⏱️', label: 'Logging took too long' },
+  { id: 'gave_up', emoji: '📉', label: 'I gave up after a few days' },
+  { id: 'accuracy', emoji: '🤔', label: 'Never sure the calories were right' },
+  { id: 'eating_out', emoji: '🍽️', label: 'Eating out broke everything' },
+  { id: 'first_time', emoji: '🌱', label: 'First time tracking' },
+];
 
 export default function PainPointsScreen() {
   const router = useRouter();
-  const { goal_type, pain_points, set } = useIntro();
-  const options = PAIN_MAP[goal_type ?? 'lose'] ?? PAIN_MAP.lose;
+  const intro = useIntro();
+  const [selected, setSelected] = useState<string[]>(intro.pain_points);
 
-  const toggle = (item: string) => {
-    const next = pain_points.includes(item)
-      ? pain_points.filter((p) => p !== item)
-      : [...pain_points, item];
-    set({ pain_points: next });
+  useEffect(() => {
+    track('onboarding_screen_viewed', { screen: 'S8_pain_points' });
+  }, []);
+
+  const toggle = (id: string) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   };
 
   return (
-    <Screen scroll grow edges={['top', 'bottom', 'left', 'right']}>
+    <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <IntroHeader step={7} />
+
       <View style={s.header}>
-        <AppText variant="overline" color={colors.inkMuted}>Step 2 of 8</AppText>
-        <AppText variant="h1" style={s.title}>What's been the hardest part?</AppText>
-        <AppText variant="body" color={colors.inkMuted}>
-          Select all that apply — this helps us personalize your experience.
-        </AppText>
+        <AppText variant="overline" color={colors.terracottaText}>Be honest</AppText>
+        <AppText variant="h1" style={s.title}>What made tracking hard before?</AppText>
+        <AppText variant="body" color={colors.inkMuted}>Pick all that apply.</AppText>
       </View>
 
-      <View style={s.chips}>
-        {options.map((o) => {
-          const selected = pain_points.includes(o);
+      <View style={s.list}>
+        {OPTIONS.map((o) => {
+          const isOn = selected.includes(o.id);
           return (
             <Pressable
-              key={o}
-              onPress={() => toggle(o)}
-              style={[s.chip, selected && s.chipSelected]}
+              key={o.id}
+              onPress={() => toggle(o.id)}
+              style={[s.card, isOn && s.cardSelected]}
             >
-              <AppText
-                variant="body"
-                color={selected ? colors.terracottaText : colors.ink}
-              >
-                {o}
-              </AppText>
+              <AppText style={s.emoji}>{o.emoji}</AppText>
+              <AppText variant="title" style={s.cardLabel}>{o.label}</AppText>
+              <View style={[s.checkbox, isOn && s.checkboxOn]}>
+                {isOn && <Check size={14} color={colors.white} strokeWidth={2.5} />}
+              </View>
             </Pressable>
           );
         })}
@@ -82,10 +70,14 @@ export default function PainPointsScreen() {
 
       <Button
         label="Continue"
-        disabled={pain_points.length === 0}
+        variant="brand"
         onPress={() => {
-          track('onboarding_screen_completed', { screen: 'S3_pain_points', count: pain_points.length });
-          router.push('/(intro)/gender');
+          intro.set({ pain_points: selected });
+          track('onboarding_screen_completed', {
+            screen: 'S8_pain_points',
+            pain_points: selected,
+          });
+          router.push('/(intro)/problem');
         }}
         style={s.cta}
       />
@@ -94,17 +86,31 @@ export default function PainPointsScreen() {
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
+  header: { marginTop: space.md, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
-  chips: { flex: 1, gap: space.md },
-  chip: {
+  list: { flex: 1, justifyContent: 'center', gap: space.md },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1.5,
     borderColor: colors.hairline,
-    paddingHorizontal: space.base,
     paddingVertical: space.md,
+    paddingHorizontal: space.base,
   },
-  chipSelected: { borderColor: colors.terracotta, backgroundColor: colors.terracottaSoft },
+  cardSelected: { borderColor: colors.terracotta, backgroundColor: colors.terracottaSoft },
+  emoji: { fontSize: 20, lineHeight: 26 },
+  cardLabel: { flex: 1 },
+  checkbox: {
+    width: 22, height: 22,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.hairlineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
   cta: { marginTop: 'auto' },
 });

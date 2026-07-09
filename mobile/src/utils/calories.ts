@@ -51,6 +51,20 @@ export function computePlan(input: PlanInput): Plan {
   return { calories, protein, fat, carbs, bmr: Math.round(bmr), tdee: Math.round(tdee) };
 }
 
+/** Macro split for an N1 slider-driven calorie target (same ratios as computePlan). */
+export function macrosForCalories(
+  calories: number,
+  weight_kg: number,
+  goal_type: GoalType,
+): { protein: number; fat: number; carbs: number } {
+  const protein = Math.round(
+    weight_kg * (goal_type === 'lose' || goal_type === 'gain' ? 2.0 : 1.8),
+  );
+  const fat = Math.round((calories * 0.27) / 9);
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
+  return { protein, fat, carbs };
+}
+
 export const GOAL_LABELS: Record<GoalType, string> = {
   lose: 'Lose weight',
   maintain: 'Eat better',

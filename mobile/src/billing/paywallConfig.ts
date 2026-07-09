@@ -38,6 +38,13 @@ export interface PlanConfig {
   rec_tag_by_goal?: Record<string, string>;
   price_style?: string;
   sub?: string;
+  /**
+   * Display-only price strings shown when StoreKit products are unavailable
+   * (e.g. subscriptions not yet approved). Purchases stay disabled — these
+   * exist so the paywall never renders empty price slots.
+   */
+  display_price?: string;
+  display_sub?: string;
 }
 
 export interface PaywallRemoteConfig {
@@ -89,9 +96,21 @@ export const FALLBACK_CONFIG: PaywallRemoteConfig = {
         default: '✦ Recommended for building the habit',
       },
       price_style: 'per_month_big',
+      display_price: '$7.49/mo',
+      display_sub: '3 days free, then $89.99/yr',
     },
-    { product: 'ai.yumyummy.app.monthly', sub: 'billed monthly · no trial' },
-    { product: 'ai.yumyummy.app.weekly_upd', sub: 'start today · no commitment' },
+    {
+      product: 'ai.yumyummy.app.monthly',
+      sub: 'billed monthly · no trial',
+      display_price: '$9.99',
+      display_sub: 'billed monthly · no trial',
+    },
+    {
+      product: 'ai.yumyummy.app.weekly_upd',
+      sub: 'start today · no commitment',
+      display_price: '$4.99',
+      display_sub: 'per week · no commitment',
+    },
   ],
   cta: {
     yearly: 'Try Free for 3 Days',
@@ -130,6 +149,11 @@ export function fillPlaceholders(
     const val = merged[key as keyof PlaceholderValues];
     return val ?? match;
   });
+}
+
+/** True when a filled template still contains an unresolved {PLACEHOLDER}. */
+export function hasUnresolvedPlaceholders(text: string): boolean {
+  return /\{\w+\}/.test(text);
 }
 
 // ---------------------------------------------------------------------------

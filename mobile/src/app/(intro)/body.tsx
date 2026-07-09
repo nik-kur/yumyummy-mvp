@@ -1,7 +1,7 @@
 /**
  * S6 Height + Weight — two numeric steppers on one screen.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Minus, Plus } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { Minus, Plus } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
@@ -63,11 +64,17 @@ export default function BodyScreen() {
   const [height, setHeight] = useState(intro.height_cm);
   const [weight, setWeight] = useState(intro.weight_kg);
 
+  useEffect(() => {
+    track('onboarding_screen_viewed', { screen: 'S6_body' });
+  }, []);
+
   return (
     <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <IntroHeader step={5} />
+
       <View style={s.header}>
-        <AppText variant="overline" color={colors.inkMuted}>Step 5 of 8</AppText>
-        <AppText variant="h1" style={s.title}>Your measurements</AppText>
+        <AppText variant="overline" color={colors.terracottaText}>Your metabolism</AppText>
+        <AppText variant="h1" style={s.title}>Your height and weight</AppText>
         <AppText variant="body" color={colors.inkMuted}>
           Used to calculate your calorie target. We never share this data.
         </AppText>
@@ -80,6 +87,7 @@ export default function BodyScreen() {
 
       <Button
         label="Continue"
+        variant="brand"
         onPress={() => {
           intro.set({ height_cm: height, weight_kg: weight });
           track('onboarding_screen_completed', { screen: 'S6_body' });
@@ -92,7 +100,7 @@ export default function BodyScreen() {
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
+  header: { marginTop: space.md, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
   steppers: { flex: 1, justifyContent: 'center', gap: space.xxl },
   stepperRow: { alignItems: 'center', gap: space.md },
