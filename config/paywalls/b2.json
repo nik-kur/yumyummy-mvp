@@ -1,0 +1,32 @@
+{
+  "variant": "B2_coffee_compare",
+  "headline": "Less than your morning coffee",
+  "hero": {
+    "label": "YOUR PLAN — LOCKED IN",
+    "goal_line": "{TARGET_WEIGHT} by {TARGET_DATE}",
+    "maintain_line": "Your zone: {DAILY_KCAL} kcal"
+  },
+  "social": {
+    "laurels": ["★ {RATING} App Store", "{USERS}+ trackers", "✓ Verified data"],
+    "quote": {
+      "text": "Cheaper than a coffee — and it actually changed my body.",
+      "author": "David · −5 kg in 8 weeks"
+    }
+  },
+  "compare_card": {
+    "left": { "emoji": "☕", "label": "A coffee", "price": "$5.00" },
+    "right": { "emoji": "🍏", "label": "YumYummy / day", "price": "$0.25" }
+  },
+  "plans": [
+    { "product": "ai.yumyummy.app.yearly", "badge": "BEST VALUE · 3 DAYS FREE", "price_style": "per_month_big" },
+    { "product": "ai.yumyummy.app.monthly", "sub": "billed monthly · no trial" },
+    { "product": "ai.yumyummy.app.weekly_upd", "sub": "start today · no commitment" }
+  ],
+  "cta": {
+    "yearly": "Try Free for 3 Days",
+    "monthly": "Continue — {PRICE_M}/mo",
+    "weekly": "Start now — {PRICE_W}/week"
+  },
+  "above_cta": "✓ No payment due now · Cancel anytime in 2 taps",
+  "hard_paywall": true
+}

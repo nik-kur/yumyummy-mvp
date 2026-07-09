@@ -1,0 +1,37 @@
+{
+  "variant": "C_result_hook",
+  "headline": "Your result is ready",
+  "hero": {
+    "label": "YOUR PLAN — LOCKED IN",
+    "goal_line": "{TARGET_WEIGHT} by {TARGET_DATE}",
+    "maintain_line": "Your zone: {DAILY_KCAL} kcal"
+  },
+  "social": {
+    "laurels": ["★ {RATING} App Store", "{USERS}+ trackers", "✓ Verified data"],
+    "quote": {
+      "text": "Seeing my plan made it feel possible. I started immediately.",
+      "author": "Sarah · −6 kg in 10 weeks"
+    }
+  },
+  "result_card": {
+    "title": "Your plan snapshot",
+    "lines": [
+      { "label": "Daily target", "value": "{DAILY_KCAL} kcal" },
+      { "label": "Goal", "value": "{TARGET_WEIGHT}" },
+      { "label": "Timeline", "value": "by {TARGET_DATE}" }
+    ]
+  },
+  "show_more_plans_label": "Show more plans",
+  "plans": [
+    { "product": "ai.yumyummy.app.yearly", "badge": "BEST VALUE · 3 DAYS FREE", "price_style": "per_month_big" },
+    { "product": "ai.yumyummy.app.monthly", "sub": "billed monthly · no trial" },
+    { "product": "ai.yumyummy.app.weekly_upd", "sub": "start today · no commitment" }
+  ],
+  "cta": {
+    "yearly": "Try Free for 3 Days",
+    "monthly": "Continue — {PRICE_M}/mo",
+    "weekly": "Start now — {PRICE_W}/week"
+  },
+  "above_cta": "✓ No payment due now · Cancel anytime in 2 taps",
+  "hard_paywall": true
+}

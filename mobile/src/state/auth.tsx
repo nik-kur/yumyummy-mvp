@@ -13,6 +13,8 @@ import { getToken, setToken, USE_MOCKS } from '@/api/client';
 import * as api from '@/api/endpoints';
 import type { AccountProfile } from '@/api/types';
 import { identifyAdapty, logoutAdapty } from '@/billing/adapty';
+import { identify as phIdentify, reset as phReset } from '@/analytics/posthog';
+import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
 
 type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
@@ -42,10 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const me = await api.getMe();
     setProfile(me);
     setStatus('signedIn');
-    // Bind this account to its Adapty profile so App Store purchases (and the
-    // Adapty webhook) resolve to the right account. No-op until a public SDK
-    // key is configured.
     void identifyAdapty(me.account_id);
+    phIdentify(String(me.account_id), { goal: me.goal_type });
+    sentrySetUser(String(me.account_id));
+    void api.syncBilling().catch(() => {});
   }, []);
 
   // Boot: if a token is stored, resolve the account.
@@ -201,6 +203,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setStatus('signedOut');
     void logoutAdapty();
+    phReset();
+    sentryClearUser();
   }, []);
 
   const value = useMemo<AuthContextValue>(

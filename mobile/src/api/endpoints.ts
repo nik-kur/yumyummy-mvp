@@ -256,6 +256,35 @@ export async function startTrial(trialDays?: number): Promise<TrialStartResponse
   });
 }
 
+/**
+ * Post-identify billing reconciliation: after `identifyAdapty()` merges the
+ * anonymous Adapty profile, the backend pulls the subscription state from the
+ * Adapty Server API to close the gap where the initial purchase webhook arrived
+ * before the profile was identified. */
+export async function syncBilling(): Promise<BillingSnapshot> {
+  if (USE_MOCKS) return mock.getMockProfile().billing;
+  return apiFetch<BillingSnapshot>('/app/billing/sync', { method: 'POST' });
+}
+
+export async function getLatestInsight(): Promise<Record<string, unknown>> {
+  return readWithFallback(
+    () => apiFetch<Record<string, unknown>>('/app/insights/latest'),
+    () => ({
+      id: 'motivation',
+      icon: 'sparkle',
+      title: 'Every meal counts',
+      body: 'Keep logging — the more data you have, the smarter your insights become.',
+    }),
+  );
+}
+
+export async function getWeek1Report(): Promise<Record<string, unknown>> {
+  return readWithFallback(
+    () => apiFetch<Record<string, unknown>>('/app/report/week1'),
+    () => ({ has_data: false, days_logged: 0, summary: 'Log meals to unlock your report!' }),
+  );
+}
+
 export async function agentRun(payload: AppAgentRunRequest): Promise<WorkflowRunResponse> {
   if (USE_MOCKS) {
     return payload.force_intent === 'advice'

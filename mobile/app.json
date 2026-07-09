@@ -67,7 +67,14 @@
         }
       ],
       ["react-native-adapty", { "replaceAndroidBackupConfig": true }],
-      ["expo-build-properties", { "ios": { "deploymentTarget": "15.1" } }]
+      ["expo-build-properties", { "ios": { "deploymentTarget": "15.1" } }],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "yumyummy",
+          "project": "yumyummy-mobile"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

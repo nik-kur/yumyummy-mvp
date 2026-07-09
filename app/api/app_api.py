@@ -887,6 +887,42 @@ def start_trial(
     )
 
 
+@router.post("/billing/sync", response_model=BillingSnapshot)
+def billing_sync(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Post-identify reconciliation: pull subscription state from Adapty Server
+    API so purchases made on an anonymous Adapty profile (before the user signed
+    in with Apple) are reflected in our entitlement."""
+    from app.billing.adapty_sync import sync_from_adapty
+    user = get_primary_user(db, account)
+    sync_from_adapty(db, user, account)
+    return BillingSnapshot(**account_billing_snapshot(db, account))
+
+
+@router.get("/insights/latest")
+def get_latest_insight(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Generate the latest rule-based insight for the user."""
+    from app.services.insights import generate_insight
+    user = get_primary_user(db, account)
+    return generate_insight(db, user)
+
+
+@router.get("/report/week1")
+def get_week1_report(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+):
+    """Week 1 Report — aggregate stats from the first 7 days."""
+    from app.services.week1_report import build_week1_report
+    user = get_primary_user(db, account)
+    return build_week1_report(db, user)
+
+
 def _empty_totals() -> WorkflowTotals:
     return WorkflowTotals(calories_kcal=0, protein_g=0, fat_g=0, carbs_g=0)
 

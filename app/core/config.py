@@ -138,6 +138,8 @@ class Settings(BaseSettings):
     adapty_enabled: bool = False
     # Shared secret Adapty sends in the webhook's Authorization header.
     adapty_webhook_secret: Optional[str] = None
+    # Server-side API key for pulling subscription status (billing/sync).
+    adapty_server_api_key: Optional[str] = None
     # Map Adapty vendor product ids -> our internal plan ids.
     adapty_product_weekly: Optional[str] = None
     adapty_product_monthly: Optional[str] = None

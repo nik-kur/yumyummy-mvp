@@ -14,6 +14,7 @@ import type { NotificationPrefs, ReminderPref } from './prefs';
 const ANDROID_CHANNEL_ID = 'reminders';
 const IDENTIFIER_PREFIX = 'yum.reminder.';
 const WEEKLY_RECAP_ID = 'yum.weekly.recap';
+const QUEST_NUDGE_ID = 'yum.quest.nudge';
 
 /** Per-reminder copy. Falls back to a generic nudge for unknown ids so adding a
  *  reminder to prefs never ships an empty notification. */
@@ -114,6 +115,26 @@ export async function syncFromPrefs(prefs: NotificationPrefs): Promise<void> {
     } catch {
       // Skip a single bad reminder rather than aborting the whole sync.
     }
+  }
+
+  // Quest nudge — daily at 19:00 during the first week
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: QUEST_NUDGE_ID,
+      content: {
+        title: 'Your daily quest awaits',
+        body: 'Complete today\'s step to keep your streak going.',
+        data: { route: '/' },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: 19,
+        minute: 0,
+        channelId: ANDROID_CHANNEL_ID,
+      },
+    });
+  } catch {
+    // non-fatal
   }
 
   // Weekly "Week in Recap" nudge → opens the Recap screen when tapped.

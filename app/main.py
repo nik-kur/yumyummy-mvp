@@ -209,6 +209,10 @@ app.include_router(app_api_router)
 from app.api.uploads import router as uploads_router
 app.include_router(uploads_router)
 
+# Unauthenticated config (onboarding, journey ladder)
+from app.api.config_api import router as config_api_router
+app.include_router(config_api_router)
+
 # Adapty webhook (App Store / Play entitlement -> account)
 from app.api.adapty_webhook import router as adapty_webhook_router
 app.include_router(adapty_webhook_router)

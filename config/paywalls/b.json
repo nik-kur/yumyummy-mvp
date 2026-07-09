@@ -1,0 +1,35 @@
+{
+  "variant": "B_trial_designer",
+  "headline": "Design your trial",
+  "hero": {
+    "label": "YOUR PLAN — LOCKED IN",
+    "goal_line": "{TARGET_WEIGHT} by {TARGET_DATE}",
+    "maintain_line": "Your zone: {DAILY_KCAL} kcal"
+  },
+  "social": {
+    "laurels": ["★ {RATING} App Store", "{USERS}+ trackers", "✓ Verified data"],
+    "quote": {
+      "text": "I didn't believe a 3-day trial could prove anything. It did.",
+      "author": "Alex · −3.2 kg in 4 weeks"
+    }
+  },
+  "primary_selector": {
+    "options": [
+      { "key": "trial", "label": "3-day free trial", "desc": "Full access, cancel anytime", "product": "ai.yumyummy.app.yearly" },
+      { "key": "weekly", "label": "Weekly pass", "desc": "No commitment, instant access", "product": "ai.yumyummy.app.weekly_upd" }
+    ]
+  },
+  "view_all_plans_label": "View all plans",
+  "plans": [
+    { "product": "ai.yumyummy.app.yearly", "badge": "BEST VALUE · 3 DAYS FREE", "price_style": "per_month_big" },
+    { "product": "ai.yumyummy.app.monthly", "sub": "billed monthly · no trial" },
+    { "product": "ai.yumyummy.app.weekly_upd", "sub": "start today · no commitment" }
+  ],
+  "cta": {
+    "yearly": "Try Free for 3 Days",
+    "monthly": "Continue — {PRICE_M}/mo",
+    "weekly": "Start now — {PRICE_W}/week"
+  },
+  "above_cta": "✓ No payment due now · Cancel anytime in 2 taps",
+  "hard_paywall": true
+}

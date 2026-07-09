@@ -12,6 +12,8 @@ import { NotificationsBridge } from '@/notifications/NotificationsBridge';
 import { WidgetActionBridge } from '@/widgets/WidgetActionBridge';
 import { useAppFonts } from '@/theme/useAppFonts';
 import { activateAdapty } from '@/billing/adapty';
+import { initPostHog } from '@/analytics/posthog';
+import { initSentry } from '@/analytics/sentry';
 import { colors } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -20,6 +22,8 @@ export default function RootLayout() {
   const fontsLoaded = useAppFonts();
 
   useEffect(() => {
+    initSentry();
+    initPostHog();
     void activateAdapty();
   }, []);
 
@@ -46,11 +50,25 @@ export default function RootLayout() {
                   (pageSheet modals mis-report overlap and bury the action bar). */}
               <Stack.Screen name="capture" options={{ presentation: 'fullScreenModal' }} />
               <Stack.Screen name="advisor" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+              <Stack.Screen
+                name="paywall"
+                options={{
+                  presentation: 'fullScreenModal',
+                  gestureEnabled: false,
+                }}
+              />
               <Stack.Screen name="meal/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="edit-targets" options={{ presentation: 'card' }} />
               <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
+              <Stack.Screen
+                name="post-purchase"
+                options={{
+                  presentation: 'fullScreenModal',
+                  gestureEnabled: false,
+                }}
+              />
               <Stack.Screen name="recap" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="week1-report" options={{ presentation: 'card' }} />
             </Stack>
           </PendingMealsProvider>
         </AuthProvider>

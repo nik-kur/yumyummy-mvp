@@ -1,0 +1,51 @@
+{
+  "variant": "A_clean_v3",
+  "headline": "Nutrition tracking that finally works",
+  "hero": {
+    "label": "YOUR PLAN — LOCKED IN",
+    "goal_line": "{TARGET_WEIGHT} by {TARGET_DATE}",
+    "maintain_line": "Your zone: {DAILY_KCAL} kcal"
+  },
+  "social": {
+    "laurels": ["★ {RATING} App Store", "{USERS}+ trackers", "✓ Verified data"],
+    "quote": {
+      "text": "Finally started losing — the numbers were just right.",
+      "author": "Maria · −4 kg in 6 weeks"
+    }
+  },
+  "timeline": {
+    "enabled_for": "yearly",
+    "steps": [
+      { "icon": "✓", "t": "Done", "d": "Your personal plan — built", "done": true },
+      { "icon": "🔓", "t": "Today", "d": "Full access unlocked" },
+      { "icon": "🔔", "t": "Day 2", "d": "We'll remind you 24h before any charge" },
+      { "icon": "★", "t": "Day 3", "d": "Trial ends — cancel anytime before" }
+    ]
+  },
+  "plans": [
+    {
+      "product": "ai.yumyummy.app.yearly",
+      "badge": "BEST VALUE · 3 DAYS FREE",
+      "rec_tag_by_goal": {
+        "lose": "✦ Recommended for steady weight loss",
+        "default": "✦ Recommended for building the habit"
+      },
+      "price_style": "per_month_big"
+    },
+    {
+      "product": "ai.yumyummy.app.monthly",
+      "sub": "billed monthly · no trial"
+    },
+    {
+      "product": "ai.yumyummy.app.weekly_upd",
+      "sub": "start today · no commitment"
+    }
+  ],
+  "cta": {
+    "yearly": "Try Free for 3 Days",
+    "monthly": "Continue — {PRICE_M}/mo",
+    "weekly": "Start now — {PRICE_W}/week"
+  },
+  "above_cta": "✓ No payment due now · Cancel anytime in 2 taps",
+  "hard_paywall": true
+}
