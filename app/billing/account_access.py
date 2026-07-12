@@ -26,6 +26,7 @@ from app.billing.access import (
     has_access,
     get_usage_cap_usd,
     check_usage_cap,
+    effective_period_cost,
     trial_days_remaining,
 )
 
@@ -69,12 +70,14 @@ def aggregate_account_billing(db: Session, account: Account) -> Dict[str, Any]:
         "subscription_provider": None,
         "subscription_auto_renew": None,
         "usage_cost_current_period": 0.0,
+        "usage_period_start": None,
     }
     if not members:
         return agg
 
     # Primary member owns the usage meter for cap checks.
     agg["usage_cost_current_period"] = float(members[0].usage_cost_current_period or 0.0)
+    agg["usage_period_start"] = members[0].usage_period_start
 
     best_sub_member = None
     for m in members:
@@ -117,7 +120,7 @@ def account_billing_snapshot(db: Session, account: Account) -> Dict[str, Any]:
         "subscription_ends_at": agg["subscription_ends_at"],
         "subscription_auto_renew": agg["subscription_auto_renew"],
         "subscription_provider": agg["subscription_provider"],
-        "usage_cost_current_period": round(float(agg["usage_cost_current_period"] or 0.0), 6),
+        "usage_cost_current_period": round(effective_period_cost(agg), 6),
         "usage_cap_usd": cap,
         "usage_exceeded": (not check_usage_cap(agg)) if cap is not None else False,
     }

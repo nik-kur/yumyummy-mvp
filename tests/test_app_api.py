@@ -715,6 +715,52 @@ def test_photo_run_multi_merges_items_confidence_and_assessment(monkeypatch):
     assert merged.assessment.method == "label"
 
 
+# ===== Anti-abuse guardrails =====
+
+def test_agent_run_throttles_after_burst(monkeypatch):
+    """A per-account minute burst is throttled with intent=rate_limited once the
+    recorded-run count reaches the configured limit (paywalled/limited responses
+    write no usage record, so they never count against the caller)."""
+    _, token = _make_account_token(provider_id="rl@example.com", email="rl@example.com")
+    monkeypatch.setattr(settings, "agent_rate_limit_per_min", 2, raising=False)
+    monkeypatch.setattr(settings, "agent_rate_limit_per_day", 1000, raising=False)
+
+    async def fake_workflow(**kwargs):
+        return {
+            "intent": "log_meal", "message_text": "ok", "confidence": "ESTIMATE",
+            "totals": {"calories_kcal": 100, "protein_g": 1, "fat_g": 1, "carbs_g": 20},
+            "items": [{"name": "x", "grams": 100, "calories_kcal": 100,
+                       "protein_g": 1, "fat_g": 1, "carbs_g": 20}],
+            "source_url": None,
+            "_usage": {"cost": {"estimated_total_cost_usd": 0.01},
+                       "input_tokens": 1, "output_tokens": 1},
+        }
+
+    monkeypatch.setattr(app_api_module, "run_yumyummy_workflow", fake_workflow)
+
+    for _ in range(2):
+        r = client.post("/app/agent/run", headers=_auth(token), json={"text": "a"})
+        assert r.json()["intent"] == "log_meal"
+    # Two runs now recorded in the last minute -> the third is throttled.
+    r = client.post("/app/agent/run", headers=_auth(token), json={"text": "a"})
+    assert r.json()["intent"] == "rate_limited"
+    assert r.json()["items"] == []
+
+
+def test_effective_period_cost_resets_after_rolling_window():
+    """Spend cap uses a rolling window: a meter older than USAGE_PERIOD_DAYS
+    reads as reset so yearly subscribers aren't locked out for the whole term."""
+    from app.billing.access import effective_period_cost, USAGE_PERIOD_DAYS
+
+    fresh = {"usage_cost_current_period": 5.0,
+             "usage_period_start": _utcnow() - timedelta(days=3)}
+    assert effective_period_cost(fresh) == 5.0
+
+    stale = {"usage_cost_current_period": 5.0,
+             "usage_period_start": _utcnow() - timedelta(days=USAGE_PERIOD_DAYS + 1)}
+    assert effective_period_cost(stale) == 0.0
+
+
 # ===== Telegram linking =====
 
 def test_telegram_link_redeem_merges(monkeypatch):

@@ -1,16 +1,29 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-# Per-status spend caps. The "new" cap is intentionally tiny — it only
-# needs to cover the single onboarding demo meal that runs *before* the
+# Per-status spend caps (anti-abuse ceilings, NOT expected budgets — normal
+# users cost a small fraction of these). The "new" cap is intentionally tiny —
+# it only needs to cover the single onboarding demo meal that runs *before* the
 # user activates a trial. Without this, server-side billing enforcement
 # on /agent/run would block the demo and the user would see "Your trial
 # has ended" during their very first interaction with the bot. Capping
 # new users at $0.50 prevents abuse (signing up many fresh accounts to
 # burn through agent runs) while keeping the demo a true wow moment.
+#
+# Trial/active caps were recalibrated for the Agent v2 engine (Jul 2026):
+# web-search intents (product/eatout/photo) cost ~$0.04-0.16/run vs the old
+# v1 baseline, so the previous $2 / $10 caps throttled legitimate heavy use.
 USAGE_CAP_NEW_USD = 0.5
-USAGE_CAP_TRIAL_USD = 2.0
-USAGE_CAP_ACTIVE_USD = 10.0
+USAGE_CAP_TRIAL_USD = 3.0
+USAGE_CAP_ACTIVE_USD = 20.0
+
+# Spend caps apply over a rolling window, NOT the whole billing period. Without
+# this a yearly subscriber's meter would only reset once a year, so a burst in
+# month one could lock them out for the rest of the term. The DB counter
+# (users.usage_cost_current_period / usage_period_start) is rolled lazily on
+# the next write in usage_guardrails.record_usage_for_user; here we treat a
+# stale window as already reset so the read-side access check agrees.
+USAGE_PERIOD_DAYS = 30
 
 
 def compute_access_status(user: Dict[str, Any]) -> str:
@@ -60,15 +73,24 @@ def get_usage_cap_usd(user: Dict[str, Any]) -> Optional[float]:
     return None
 
 
+def effective_period_cost(user: Dict[str, Any]) -> float:
+    """Current-period spend, treating a window older than ``USAGE_PERIOD_DAYS``
+    as already reset (the DB counter is rolled lazily on the next usage write).
+    Keeps the read-side cap check in sync with the write-side reset."""
+    start = _parse_dt(user.get("usage_period_start"))
+    if start is not None and (datetime.now(timezone.utc) - start) >= timedelta(days=USAGE_PERIOD_DAYS):
+        return 0.0
+    try:
+        return float(user.get("usage_cost_current_period") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def check_usage_cap(user: Dict[str, Any]) -> bool:
     cap = get_usage_cap_usd(user)
     if cap is None:
         return True
-    try:
-        current_cost = float(user.get("usage_cost_current_period") or 0.0)
-    except (TypeError, ValueError):
-        current_cost = 0.0
-    return current_cost < cap
+    return effective_period_cost(user) < cap
 
 
 def trial_days_remaining(user: Dict[str, Any]) -> float:
