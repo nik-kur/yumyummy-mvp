@@ -174,6 +174,12 @@ class Settings(BaseSettings):
     # Which v2 model variant to run (see app/agent_v2/config.py).
     agent_v2_variant: str = "v2g"
 
+    # Anti-abuse rate limits for the AI agent, per account over rolling windows.
+    # Generous vs. normal use (a heavy user logs ~10-15 meals/day); they only
+    # bite scripted bursts. Set to 0 to disable a window. Tunable via env.
+    agent_rate_limit_per_min: int = 10
+    agent_rate_limit_per_day: int = 120
+
     # ------------------------------------------------------------------
     # Object storage (Cloudflare R2 / AWS S3) for meal photos
     # ------------------------------------------------------------------

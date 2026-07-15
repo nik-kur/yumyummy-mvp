@@ -39,7 +39,11 @@ from app.auth.service import get_primary_user, account_member_users
 from app.billing.account_access import account_billing_snapshot, account_has_access
 from app.billing.plans import resolve_trial_days
 from app.services.agent_persist import persist_agent_result_for_user
-from app.services.usage_guardrails import record_usage_for_user, global_daily_cost_exceeded
+from app.services.usage_guardrails import (
+    record_usage_for_user,
+    global_daily_cost_exceeded,
+    check_rate_limit,
+)
 from app.services.llm_client import moderate_text
 from app.services.user_time import today_for_user
 from app.services.weekly_recap import build_recap
@@ -980,8 +984,20 @@ async def app_agent_run(
     account: Account = Depends(get_current_account),
 ):
     """Run the AI logging/advisor workflow for the signed-in account."""
-    # Defense-in-depth paywall, mirroring /agent/run.
+    # Defense-in-depth paywall, mirroring /agent/run. Distinguish "no access"
+    # (trial ended / not subscribed) from "fair-use spend cap reached" so an
+    # over-cap subscriber gets a fair-use notice, not a misleading upsell.
     if settings.billing_paywall_enabled and not account_has_access(db, account):
+        snapshot = account_billing_snapshot(db, account)
+        if snapshot.get("usage_exceeded"):
+            return WorkflowRunResponse(
+                intent="rate_limited",
+                message_text=(
+                    "You've reached this period's fair-use limit for AI logging. "
+                    "It resets soon — reach out to support if you need a hand."
+                ),
+                confidence=None, totals=_empty_totals(), items=[], source_url=None,
+            )
         return WorkflowRunResponse(
             intent="paywall",
             message_text="Your trial has ended. Subscribe to keep logging meals.",
@@ -989,6 +1005,23 @@ async def app_agent_run(
             totals=_empty_totals(),
             items=[],
             source_url=None,
+        )
+
+    # Anti-abuse throttle (per account, rolling minute/day windows). Placed
+    # after the paywall check so obviously-abusive bursts never reach the LLM.
+    rate_window = check_rate_limit(db, _member_ids(db, account))
+    if rate_window is not None:
+        logger.info(
+            "[/app/agent/run] rate-limited account=%s window=%s", account.id, rate_window
+        )
+        msg = (
+            "You're logging a bit too fast — give it a few seconds and try again."
+            if rate_window == "minute"
+            else "You've hit today's logging limit. Please try again tomorrow."
+        )
+        return WorkflowRunResponse(
+            intent="rate_limited", message_text=msg, confidence=None,
+            totals=_empty_totals(), items=[], source_url=None,
         )
 
     # Global daily LLM spend circuit breaker (across all users). Protects the
@@ -1016,6 +1049,7 @@ async def app_agent_run(
                 ),
                 confidence=None, totals=_empty_totals(), items=[], source_url=None,
             )
+
 
     user = get_primary_user(db, account)
     db.commit()
