@@ -63,6 +63,12 @@ function Row({
   );
 }
 
+// Launch decision: app-first users should NOT be nudged into the Telegram bot,
+// so the "connect Telegram" entry point is hidden for accounts without a linked
+// telegram identity. Bot-first users who migrated still see their "Connected"
+// status. Flip to true to re-enable the app -> Telegram linking flow.
+const TELEGRAM_CONNECT_ENABLED = false;
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { profile, linkTelegram, refreshProfile, signOut } = useAuth();
@@ -288,19 +294,23 @@ export default function ProfileScreen() {
         <Button label="Restore purchases" variant="ghost" onPress={onRestore} haptic={false} />
       </View>
 
-      <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
-        Connections
-      </AppText>
-      <Card padded={false}>
-        <Row
-          icon={Send}
-          label="Telegram bot"
-          value={telegramLinked ? 'Connected' : undefined}
-          onPress={telegramLinked ? undefined : () => setTgOpen((v) => !v)}
-          last
-        />
-      </Card>
-      {tgOpen && !telegramLinked ? (
+      {telegramLinked || TELEGRAM_CONNECT_ENABLED ? (
+        <>
+          <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
+            Connections
+          </AppText>
+          <Card padded={false}>
+            <Row
+              icon={Send}
+              label="Telegram bot"
+              value={telegramLinked ? 'Connected' : undefined}
+              onPress={telegramLinked || !TELEGRAM_CONNECT_ENABLED ? undefined : () => setTgOpen((v) => !v)}
+              last
+            />
+          </Card>
+        </>
+      ) : null}
+      {TELEGRAM_CONNECT_ENABLED && tgOpen && !telegramLinked ? (
         <Card style={styles.tgCard} flat>
           <AppText variant="body" color={colors.ink}>
             Connect the Telegram bot to log from both places — your diary and
