@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import type { NotificationPrefs, ReminderPref } from './prefs';
+import { loadJourney, rawDay } from '@/state/journey';
 
 /**
  * Local notification scheduling. Everything here is on-device: we schedule
@@ -9,12 +10,18 @@ import type { NotificationPrefs, ReminderPref } from './prefs';
  * single source of truth is `NotificationPrefs`; `syncFromPrefs` is idempotent
  * (it cancels everything we own, then re-schedules), so callers can fire it
  * after any pref change or on app launch.
+ *
+ * First-week activation (Задача from build-38 feedback): while the journey is
+ * in days 1–7 we additionally schedule one-off MORNING pushes for the
+ * remaining days — different copy each day — pointing at the daily quests.
+ * The evening check-in ("did you log everything?") is a regular repeating
+ * reminder that stays on after week one, alongside the weekly recap.
  */
 
 const ANDROID_CHANNEL_ID = 'reminders';
 const IDENTIFIER_PREFIX = 'yum.reminder.';
 const WEEKLY_RECAP_ID = 'yum.weekly.recap';
-const QUEST_NUDGE_ID = 'yum.quest.nudge';
+const QUEST_NUDGE_PREFIX = 'yum.quest.morning.';
 
 /** Per-reminder copy. Falls back to a generic nudge for unknown ids so adding a
  *  reminder to prefs never ships an empty notification. */
@@ -22,7 +29,41 @@ const CONTENT: Record<string, { title: string; body: string }> = {
   breakfast: { title: 'Breakfast time', body: 'Log what you’re having to start the day on track.' },
   lunch: { title: 'Lunch break?', body: 'Tap to log your meal — it takes a few seconds.' },
   dinner: { title: 'Dinner time', body: 'Log it now so your day stays accurate.' },
-  evening: { title: 'How did today go?', body: 'Add any meals you haven’t logged yet before the day ends.' },
+  evening: {
+    title: 'How did today go?',
+    body: 'The day’s almost over — add any meals you haven’t logged yet so today counts.',
+  },
+};
+
+/** Morning quest nudges for journey days 2–7 — habit framing, varied wording
+ *  so the first week never sends the same push twice. Fired at 10:30 local. */
+const MORNING_HOUR = 10;
+const MORNING_MINUTE = 30;
+const MORNING_NUDGES: Record<number, { title: string; body: string }> = {
+  2: {
+    title: 'Day 2 is ready 🌱',
+    body: 'Two small quests today. Two minutes now — that’s how the habit starts.',
+  },
+  3: {
+    title: 'Don’t break the chain 🔥',
+    body: 'Your Day 3 quests are waiting — including your first insight.',
+  },
+  4: {
+    title: 'Small steps, big results 💪',
+    body: 'One quick quest today. Open YumYummy and knock it out.',
+  },
+  5: {
+    title: 'Your advisor is waiting 💬',
+    body: 'Today’s quest: ask your AI advisor anything. It knows your plan.',
+  },
+  6: {
+    title: 'Almost there ⚡',
+    body: 'Day 6 of 7 — check your Week trends and keep the streak alive.',
+  },
+  7: {
+    title: 'Final day — finish strong 🏁',
+    body: 'Weigh in today and your Week 1 Report unlocks.',
+  },
 };
 
 function contentFor(r: ReminderPref): { title: string; body: string } {
@@ -117,22 +158,37 @@ export async function syncFromPrefs(prefs: NotificationPrefs): Promise<void> {
     }
   }
 
-  // Quest nudge — daily at 19:00 during the first week
+  // First-week activation: one-off morning pushes for the remaining journey
+  // days (2–7), each with its own wording. Nothing is scheduled past day 7 —
+  // after the first week the user keeps only the evening check-in + recap.
   try {
-    await Notifications.scheduleNotificationAsync({
-      identifier: QUEST_NUDGE_ID,
-      content: {
-        title: 'Your daily quest awaits',
-        body: 'Complete today\'s step to keep your streak going.',
-        data: { route: '/' },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 19,
-        minute: 0,
-        channelId: ANDROID_CHANNEL_ID,
-      },
-    });
+    const journey = await loadJourney();
+    if (journey.started_at && !journey.dismissed) {
+      const today = rawDay(journey.started_at);
+      const start = new Date(journey.started_at);
+      for (let day = Math.max(2, today); day <= 7; day++) {
+        const nudge = MORNING_NUDGES[day];
+        if (!nudge) continue;
+        const fireAt = new Date(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate() + (day - 1),
+          MORNING_HOUR,
+          MORNING_MINUTE,
+          0,
+        );
+        if (fireAt.getTime() <= Date.now()) continue; // today's slot already passed
+        await Notifications.scheduleNotificationAsync({
+          identifier: `${QUEST_NUDGE_PREFIX}${day}`,
+          content: { title: nudge.title, body: nudge.body, data: { route: '/' } },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: fireAt,
+            channelId: ANDROID_CHANNEL_ID,
+          },
+        });
+      }
+    }
   } catch {
     // non-fatal
   }

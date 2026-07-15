@@ -36,6 +36,22 @@ import {
 
 const TERMS_URL = 'https://yumyummy.ai/terms.html';
 const PRIVACY_URL = 'https://yumyummy.ai/privacy.html';
+const DONE_GREEN = '#16A34A';
+
+const PAID_TIMELINE_STEPS = [
+  { icon: '✓', t: 'Done', d: 'Your personal plan — built', done: true },
+  { icon: '🔓', t: 'Today', d: 'Full access unlocked' },
+  {
+    icon: '🔔',
+    t: 'Day 2',
+    d: "You'll set up your full tracking system and see how simple it is",
+  },
+  {
+    icon: '★',
+    t: 'Day 3',
+    d: "You'll start noticing changes in your routine and eating trends",
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Props
@@ -69,17 +85,6 @@ function Laurels({ items }: { items: string[] }) {
   );
 }
 
-function Quote({ text, author }: { text: string; author: string }) {
-  return (
-    <View style={s.quoteBox}>
-      <AppText variant="small" color={colors.inkMuted} style={s.quoteText}>
-        “{text}”
-      </AppText>
-      <AppText variant="caption" color={colors.inkFaint}>— {author}</AppText>
-    </View>
-  );
-}
-
 const TL_ICONS: Record<string, LucideIcon> = {
   '✓': CircleCheck,
   '🔓': LockOpen,
@@ -107,8 +112,8 @@ function TimelineRow({
         <View style={[s.tlIcon, done && s.tlIconDone]}>
           <Icon
             size={14}
-            color={done ? colors.success : colors.terracotta}
-            strokeWidth={1.5}
+            color={done ? colors.white : colors.terracotta}
+            strokeWidth={done ? 2.5 : 1.5}
           />
         </View>
         {!last && <View style={s.tlLine} />}
@@ -141,52 +146,39 @@ function PlanCard({
     : '';
   const monthlyLabel = product ? perMonthPrice(product) : undefined;
   const isYearly = plan.product.includes('yearly');
+  const isMonthly = plan.product.includes('monthly');
+  const isWeekly = plan.product.includes('weekly');
   const recTag = plan.rec_tag_by_goal?.[goal ?? 'default'] ?? plan.rec_tag_by_goal?.default;
   const hasIntroOffer = (product?.subscription?.offer?.phases ?? []).some(
     (ph) => ph.paymentMode === 'free_trial',
   );
 
-  // StoreKit unavailable (e.g. subscriptions pending Apple review) —
-  // show reference prices from the config so cards never render empty.
-  if (!product) {
-    return (
-      <Pressable onPress={onSelect} style={[s.planCard, selected && s.planCardActive]}>
-        {plan.badge && (
-          <View style={s.planBadge}>
-            <AppText variant="overline" color={colors.white}>{plan.badge}</AppText>
-          </View>
-        )}
-        <View style={s.planRow}>
-          <View style={[s.radio, selected && s.radioActive]}>
-            {selected && <View style={s.radioDot} />}
-          </View>
-          <View style={s.planInfo}>
-            <AppText variant="bodyStrong">{plan.display_price ?? '—'}</AppText>
-            {(plan.display_sub ?? plan.sub) && (
-              <AppText variant="caption" color={colors.inkMuted}>
-                {fill(plan.display_sub ?? plan.sub ?? '')}
-              </AppText>
-            )}
-          </View>
-        </View>
-        {recTag && selected && (
-          <AppText variant="caption" color={colors.protein} style={s.recTag}>
-            {recTag}
-          </AppText>
-        )}
-      </Pressable>
-    );
-  }
+  const mainLabel = (() => {
+    if (!product) return plan.display_price ?? '—';
+    if (isYearly) return '3 days free trial';
+    if (isMonthly) return `${priceLabel}/mo`;
+    if (isWeekly) return `${priceLabel}/wk`;
+    return priceLabel;
+  })();
+
+  const subLabel = (() => {
+    if (!product) return fill(plan.display_sub ?? plan.sub ?? '');
+    if (isYearly && monthlyLabel) {
+      return `No payment due now. Then ${monthlyLabel}/mo billed annually at ${priceLabel}.`;
+    }
+    if (isMonthly) return 'billed monthly';
+    if (isWeekly) return 'billed weekly';
+    return fill(plan.sub ?? '');
+  })();
 
   return (
-    <Pressable
-      onPress={onSelect}
-      style={[s.planCard, selected && s.planCardActive]}
-    >
+    <Pressable onPress={onSelect} style={[s.planCard, selected && s.planCardActive]}>
       {plan.badge && (
         <View style={s.planBadge}>
           <AppText variant="overline" color={colors.white}>
-            {hasIntroOffer ? plan.badge : plan.badge.replace(/\s*·\s*3 DAYS FREE/, '')}
+            {isYearly && product && !hasIntroOffer
+              ? plan.badge.replace(/\s*·\s*3 DAYS FREE/, '')
+              : plan.badge}
           </AppText>
         </View>
       )}
@@ -195,23 +187,10 @@ function PlanCard({
           {selected && <View style={s.radioDot} />}
         </View>
         <View style={s.planInfo}>
-          {isYearly && plan.price_style === 'per_month_big' && monthlyLabel ? (
-            <>
-              <AppText variant="title">{monthlyLabel}/mo</AppText>
-              <AppText variant="caption" color={colors.inkMuted}>
-                {hasIntroOffer ? '3 days free, then ' : ''}{priceLabel}/yr
-              </AppText>
-            </>
-          ) : (
-            <>
-              <AppText variant="bodyStrong">{priceLabel}</AppText>
-              {plan.sub && (
-                <AppText variant="caption" color={colors.inkMuted}>
-                  {fill(plan.sub)}
-                </AppText>
-              )}
-            </>
-          )}
+          <AppText variant="title">{mainLabel}</AppText>
+          {subLabel ? (
+            <AppText variant="caption" color={colors.inkMuted}>{subLabel}</AppText>
+          ) : null}
         </View>
       </View>
       {recTag && selected && (
@@ -246,7 +225,6 @@ export function PaywallRenderer({
     config.plans[0]?.product ?? 'ai.yumyummy.app.yearly',
   );
 
-  const selectedPlan = config.plans.find((p) => p.product === selectedProduct);
   const selectedAdaptyProduct = findProduct(products, selectedProduct);
   const isYearly = selectedProduct.includes('yearly');
 
@@ -271,7 +249,15 @@ export function PaywallRenderer({
     return null;
   }, [goal, config.hero, fill]);
 
-  const showTimeline = isYearly && config.timeline;
+  const timelineSteps = useMemo(
+    () => (isYearly && config.timeline ? config.timeline.steps : PAID_TIMELINE_STEPS),
+    [isYearly, config.timeline],
+  );
+
+  const aboveCtaText = isYearly
+    ? '✓ No payment due now · Cancel anytime'
+    : '✓ Cancel anytime';
+
   const socialLaurelsResolved = useMemo(
     () => config.social.laurels.map(fill),
     [config.social.laurels, fill],
@@ -294,17 +280,17 @@ export function PaywallRenderer({
         </Pressable>
       </View>
 
+      {/* Single scroll surface. Everything through the CTA is compacted to fit
+          the first viewport; only the legal disclaimers live below the fold. */}
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Headline */}
         <AppText variant="h1" center style={s.headline}>
           {config.headline}
         </AppText>
 
-        {/* Goal hero — hidden when placeholder data is missing */}
         {heroLine && (
           <View style={s.heroCard}>
             <AppText variant="overline" color={colors.terracottaText}>
@@ -316,27 +302,21 @@ export function PaywallRenderer({
           </View>
         )}
 
-        {/* Social proof */}
         <Laurels items={socialLaurelsResolved} />
-        <Quote text={config.social.quote.text} author={config.social.quote.author} />
 
-        {/* Timeline */}
-        {showTimeline && config.timeline && (
-          <View style={s.timeline}>
-            {config.timeline.steps.map((step, i) => (
-              <TimelineRow
-                key={step.t}
-                icon={step.icon}
-                title={step.t}
-                desc={step.d}
-                done={step.done}
-                last={i === config.timeline!.steps.length - 1}
-              />
-            ))}
-          </View>
-        )}
+        <View style={s.timeline}>
+          {timelineSteps.map((step, i) => (
+            <TimelineRow
+              key={step.t}
+              icon={step.icon}
+              title={step.t}
+              desc={step.d}
+              done={step.done}
+              last={i === timelineSteps.length - 1}
+            />
+          ))}
+        </View>
 
-        {/* Plan selector */}
         <View style={s.plans}>
           {config.plans.map((plan) => (
             <PlanCard
@@ -351,12 +331,10 @@ export function PaywallRenderer({
           ))}
         </View>
 
-        {/* Above CTA reassurance */}
-        <AppText variant="caption" color={colors.success} center style={s.aboveCta}>
-          {config.above_cta}
+        <AppText variant="caption" color={DONE_GREEN} center style={s.aboveCta}>
+          {aboveCtaText}
         </AppText>
 
-        {/* CTA */}
         <Button
           label={purchasing ? 'Processing…' : ctaLabel}
           variant="brand"
@@ -365,7 +343,6 @@ export function PaywallRenderer({
           disabled={!selectedAdaptyProduct}
         />
 
-        {/* Store unavailable — reference prices shown, offer a reload */}
         {!productsAvailable && (
           <View style={s.storeNotice}>
             <AppText variant="caption" color={colors.inkMuted} center>
@@ -377,7 +354,7 @@ export function PaywallRenderer({
           </View>
         )}
 
-        {/* Legal footer */}
+        {/* Below the fold — legal disclaimers */}
         <AppText variant="caption" color={colors.inkFaint} center style={s.disclosure}>
           {isYearly
             ? 'After the free trial, your subscription auto-renews at the price shown unless cancelled at least 24 hours before the end of the current period.'
@@ -413,12 +390,12 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: space.lg,
-    paddingTop: space.sm,
+    paddingTop: space.xs,
     paddingBottom: space.xs,
   },
   topBarSpacer: { width: 50 },
-  scroll: { paddingHorizontal: space.lg, paddingBottom: space.xxxl },
-  headline: { marginTop: space.md, marginBottom: space.lg },
+  scroll: { paddingHorizontal: space.lg, paddingBottom: space.lg },
+  headline: { marginTop: space.xs, marginBottom: space.sm },
 
   // Hero
   heroCard: {
@@ -426,10 +403,11 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.hairline,
-    padding: space.lg,
+    paddingVertical: space.md,
+    paddingHorizontal: space.base,
     alignItems: 'center',
-    gap: space.xs,
-    marginBottom: space.base,
+    gap: 2,
+    marginBottom: space.sm,
   },
   heroLine: { textAlign: 'center' },
 
@@ -439,7 +417,7 @@ const s = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: space.sm,
-    marginBottom: space.md,
+    marginBottom: space.sm,
   },
   laurel: {
     backgroundColor: colors.surfaceAlt,
@@ -447,48 +425,37 @@ const s = StyleSheet.create({
     paddingVertical: space.xs,
     borderRadius: radius.pill,
   },
-  quoteBox: {
-    alignItems: 'center',
-    marginBottom: space.lg,
-    paddingHorizontal: space.base,
-    paddingVertical: space.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-  },
-  quoteText: { fontStyle: 'italic', textAlign: 'center', marginBottom: space.xs },
-
   // Timeline
-  timeline: { marginBottom: space.lg },
+  timeline: { marginBottom: space.sm },
   tlRow: { flexDirection: 'row', gap: space.md },
-  tlIconCol: { alignItems: 'center', width: 28 },
+  tlIconCol: { alignItems: 'center', width: 26 },
   tlIcon: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     borderRadius: radius.pill,
     backgroundColor: colors.terracottaSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tlIconDone: { backgroundColor: colors.successSoft },
+  tlIconDone: { backgroundColor: DONE_GREEN },
   tlLine: {
     width: 2,
     flex: 1,
-    minHeight: 14,
+    minHeight: 8,
     backgroundColor: colors.hairline,
     marginVertical: 2,
   },
-  tlContent: { flex: 1, paddingBottom: space.md, gap: 2 },
+  tlContent: { flex: 1, paddingBottom: space.sm, gap: 1 },
 
   // Plans
-  plans: { gap: space.md, marginBottom: space.base },
+  plans: { gap: space.sm, marginBottom: space.md },
   planCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1.5,
     borderColor: colors.hairline,
-    padding: space.base,
+    paddingVertical: space.md,
+    paddingHorizontal: space.base,
   },
   planCardActive: { borderColor: colors.terracotta },
   planBadge: {
@@ -497,7 +464,7 @@ const s = StyleSheet.create({
     paddingHorizontal: space.sm,
     paddingVertical: 2,
     borderRadius: radius.sm,
-    marginBottom: space.sm,
+    marginBottom: space.xs,
   },
   planRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   radio: {
@@ -517,12 +484,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.terracotta,
   },
   planInfo: { flex: 1 },
-  recTag: { marginTop: space.sm },
+  recTag: { marginTop: space.xs },
 
   // CTA area
-  aboveCta: { marginBottom: space.md },
+  aboveCta: { marginBottom: space.sm },
   storeNotice: { marginTop: space.base, gap: space.md, alignItems: 'center' },
-  disclosure: { marginTop: space.md, lineHeight: 16 },
+  disclosure: { marginTop: space.lg, lineHeight: 16 },
   legalRow: {
     flexDirection: 'row',
     justifyContent: 'center',

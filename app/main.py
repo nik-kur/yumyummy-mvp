@@ -57,7 +57,8 @@ from app.schemas.ai import ParseMealRequest, MealParsed, ProductMealRequest, Res
 from app.services.agent_runner import run_agent
 from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
 from app.services.agent_persist import persist_agent_result
-from app.services.usage_guardrails import record_usage_for_telegram_user
+from app.services.usage_guardrails import record_usage_for_telegram_user, global_daily_cost_exceeded
+from app.services.llm_client import moderate_text
 from app.billing.access import has_access, compute_access_status
 from app.core import (
     posthog_client,
@@ -108,6 +109,19 @@ app.add_middleware(
     allow_methods=["POST", "OPTIONS"],
     allow_headers=["Content-Type"],
     max_age=86400,
+)
+
+
+# Coarse per-IP rate limiting + request-body size cap. Sits in front of every
+# route (except /health) to blunt scripted abuse of the unauthenticated auth
+# endpoints and the expensive AI endpoints. Per-user LLM cost is bounded
+# separately by the billing usage caps + global daily breaker.
+from app.core.rate_limit import RateLimitMiddleware
+
+app.add_middleware(
+    RateLimitMiddleware,
+    enabled=settings.rate_limit_enabled,
+    max_body_bytes=settings.max_request_body_bytes,
 )
 
 
@@ -240,19 +254,7 @@ def health_check(db: Session = Depends(get_db)):
         "alembic_head": head,
     }
 
-@app.get("/ai/test")
-async def ai_test():
-    """
-    Тестовый endpoint, чтобы проверить связку с OpenAI.
-    """
-    messages = [
-        {"role": "system", "content": "You are a concise assistant."},
-        {"role": "user", "content": "Reply in one short sentence: what is YumYummy?"},
-    ]
-    answer = await chat_completion(messages)
-    return {"answer": answer}
-
-@app.post("/ai/parse_meal", response_model=MealParsed)
+@app.post("/ai/parse_meal", response_model=MealParsed, dependencies=[Depends(verify_internal_token)])
 async def ai_parse_meal(payload: ParseMealRequest):
     """
     Получить оценку КБЖУ по тексту описания приёма пищи.
@@ -269,7 +271,7 @@ async def ai_parse_meal(payload: ParseMealRequest):
     return MealParsed(**parsed)
 
 
-@app.post("/ai/voice_parse_meal")
+@app.post("/ai/voice_parse_meal", dependencies=[Depends(verify_internal_token)])
 async def ai_voice_parse_meal(audio: UploadFile = File(...)):
     """
     Получить оценку КБЖУ по голосовому сообщению.
@@ -283,6 +285,9 @@ async def ai_voice_parse_meal(audio: UploadFile = File(...)):
 
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Empty audio file")
+
+    if len(file_bytes) > settings.max_audio_upload_bytes:
+        raise HTTPException(status_code=413, detail="Audio file too large")
 
     try:
         transcript = await transcribe_audio(
@@ -474,7 +479,7 @@ async def _product_parse_logic(payload: ProductMealRequest) -> dict:
     }
 
 
-@app.post("/ai/product_parse_meal")
+@app.post("/ai/product_parse_meal", dependencies=[Depends(verify_internal_token)])
 async def ai_product_parse_meal(payload: ProductMealRequest):
     """
     Получить оценку КБЖУ по штрихкоду или названию продукта.
@@ -489,7 +494,7 @@ async def ai_product_parse_meal(payload: ProductMealRequest):
     return await _product_parse_logic(payload)
 
 
-@app.post("/ai/restaurant_parse_meal")
+@app.post("/ai/restaurant_parse_meal", dependencies=[Depends(verify_internal_token)])
 async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
     """
     Получить оценку КБЖУ блюда из ресторана/кафе/доставки.
@@ -552,7 +557,7 @@ async def ai_restaurant_parse_meal(payload: RestaurantMealRequest):
     }
 
 
-@app.post("/ai/restaurant_parse_text")
+@app.post("/ai/restaurant_parse_text", dependencies=[Depends(verify_internal_token)])
 async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
     """
     Получить оценку КБЖУ блюда из ресторана по свободному тексту.
@@ -688,7 +693,7 @@ async def ai_restaurant_parse_text(payload: RestaurantTextRequest):
         raise HTTPException(status_code=500, detail="Error processing request")
 
 
-@app.post("/ai/restaurant_parse_text_openai")
+@app.post("/ai/restaurant_parse_text_openai", dependencies=[Depends(verify_internal_token)])
 async def ai_restaurant_parse_text_openai(payload: RestaurantTextRequest):
     """
     EXPERIMENTAL: Получить оценку КБЖУ блюда из ресторана через OpenAI Responses API с web_search.
@@ -1275,6 +1280,36 @@ async def agent_run(
         finally:
             billing_db.close()
 
+    # Global daily LLM spend circuit breaker (across all users).
+    breaker_db = SessionLocal()
+    try:
+        if global_daily_cost_exceeded(breaker_db):
+            logger.warning("[/agent/run %s] global daily LLM cost cap hit; refusing telegram_id=%s", request_id, telegram_id)
+            return WorkflowRunResponse(
+                intent="help",
+                message_text=tr("main.workflow_overloaded", LANG),
+                confidence=None,
+                totals=WorkflowTotals(calories_kcal=0, protein_g=0, fat_g=0, carbs_g=0),
+                items=[],
+                source_url=None,
+            )
+    finally:
+        breaker_db.close()
+
+    # Content moderation on the user's free text (fail-open).
+    if user_text:
+        flagged, categories = await moderate_text(user_text)
+        if flagged:
+            logger.warning("[/agent/run %s] moderation flagged telegram_id=%s categories=%s", request_id, telegram_id, categories)
+            return WorkflowRunResponse(
+                intent="help",
+                message_text="I can only help with food logging and nutrition questions.",
+                confidence=None,
+                totals=WorkflowTotals(calories_kcal=0, protein_g=0, fat_g=0, carbs_g=0),
+                items=[],
+                source_url=None,
+            )
+
     try:
         # Run the workflow WITHOUT DB connection
         result = await run_yumyummy_workflow(
@@ -1636,7 +1671,7 @@ def _normalise_acquisition_source(value: Optional[str]) -> Optional[str]:
     return value
 
 
-@app.post("/users", response_model=UserRead)
+@app.post("/users", response_model=UserRead, dependencies=[Depends(verify_internal_token)])
 def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Создать пользователя по telegram_id.
@@ -1757,7 +1792,7 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     return user
 
 
-@app.get("/users/{telegram_id}", response_model=UserRead)
+@app.get("/users/{telegram_id}", response_model=UserRead, dependencies=[Depends(verify_internal_token)])
 def get_user_by_telegram_id(telegram_id: str, db: Session = Depends(get_db)):
     """
     Получить пользователя по telegram_id.
@@ -1768,7 +1803,7 @@ def get_user_by_telegram_id(telegram_id: str, db: Session = Depends(get_db)):
     return user
 
 
-@app.patch("/users/{telegram_id}", response_model=UserRead)
+@app.patch("/users/{telegram_id}", response_model=UserRead, dependencies=[Depends(verify_internal_token)])
 def update_user_profile(telegram_id: str, user_update: UserUpdate, db: Session = Depends(get_db)):
     """
     Обновить профиль пользователя (онбординг, цели КБЖУ и т.д.)
@@ -1817,7 +1852,7 @@ def update_user_profile(telegram_id: str, user_update: UserUpdate, db: Session =
     return user
 
 
-@app.get("/users/{telegram_id}/export")
+@app.get("/users/{telegram_id}/export", dependencies=[Depends(verify_internal_token)])
 def export_user_meals(telegram_id: str, db: Session = Depends(get_db)):
     """
     Экспорт всех приёмов пищи пользователя в CSV формате.
@@ -1876,7 +1911,7 @@ def export_user_meals(telegram_id: str, db: Session = Depends(get_db)):
 # ---------- MEALS ----------
 
 
-@app.get("/meals/{meal_id}", response_model=MealRead)
+@app.get("/meals/{meal_id}", response_model=MealRead, dependencies=[Depends(verify_internal_token)])
 def get_meal(meal_id: int, db: Session = Depends(get_db)):
     meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
     if not meal:
@@ -1884,7 +1919,7 @@ def get_meal(meal_id: int, db: Session = Depends(get_db)):
     return meal
 
 
-@app.post("/meals", response_model=MealRead)
+@app.post("/meals", response_model=MealRead, dependencies=[Depends(verify_internal_token)])
 def create_meal(meal_in: MealCreate, db: Session = Depends(get_db)):
     """
     Залогировать приём пищи:
@@ -1952,7 +1987,7 @@ def create_meal(meal_in: MealCreate, db: Session = Depends(get_db)):
     return meal
 
 
-@app.patch("/meals/{meal_id}", response_model=MealRead)
+@app.patch("/meals/{meal_id}", response_model=MealRead, dependencies=[Depends(verify_internal_token)])
 def update_meal(
     meal_id: int,
     meal_in: MealUpdate,
@@ -2035,7 +2070,7 @@ def update_meal(
     return meal
 
 
-@app.delete("/meals/{meal_id}")
+@app.delete("/meals/{meal_id}", dependencies=[Depends(verify_internal_token)])
 def delete_meal(meal_id: int, db: Session = Depends(get_db)):
     meal = db.query(MealEntry).filter(MealEntry.id == meal_id).first()
     if not meal:
@@ -2056,7 +2091,7 @@ def delete_meal(meal_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 
-@app.post("/meals/{meal_id}/repeat", response_model=MealRead)
+@app.post("/meals/{meal_id}/repeat", response_model=MealRead, dependencies=[Depends(verify_internal_token)])
 def repeat_meal(meal_id: int, db: Session = Depends(get_db)):
     """Clone an existing meal entry into today's UserDay (in user timezone)."""
     import pytz
@@ -2123,7 +2158,7 @@ def repeat_meal(meal_id: int, db: Session = Depends(get_db)):
 # ---------- DAY SUMMARY ----------
 
 
-@app.get("/day/{user_id}/{day}", response_model=DaySummary)
+@app.get("/day/{user_id}/{day}", response_model=DaySummary, dependencies=[Depends(verify_internal_token)])
 def get_day_summary(
     user_id: int,
     day: date_type,
@@ -2163,7 +2198,7 @@ def get_day_summary(
 # ---------- SAVED MEALS ("Моё меню") ----------
 
 
-@app.post("/saved-meals", response_model=SavedMealRead)
+@app.post("/saved-meals", response_model=SavedMealRead, dependencies=[Depends(verify_internal_token)])
 def create_saved_meal(payload: SavedMealCreate, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == payload.user_id).first()
     if not user:
@@ -2197,7 +2232,7 @@ def create_saved_meal(payload: SavedMealCreate, db: Session = Depends(get_db)):
     return saved
 
 
-@app.get("/saved-meals/by-user/{telegram_id}", response_model=SavedMealsListResponse)
+@app.get("/saved-meals/by-user/{telegram_id}", response_model=SavedMealsListResponse, dependencies=[Depends(verify_internal_token)])
 def list_saved_meals(
     telegram_id: str,
     page: int = 1,
@@ -2220,7 +2255,7 @@ def list_saved_meals(
     return SavedMealsListResponse(items=meals, total=total, page=page, per_page=per_page)
 
 
-@app.get("/saved-meals/{saved_meal_id}", response_model=SavedMealRead)
+@app.get("/saved-meals/{saved_meal_id}", response_model=SavedMealRead, dependencies=[Depends(verify_internal_token)])
 def get_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
     saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
     if not saved:
@@ -2228,7 +2263,7 @@ def get_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
     return saved
 
 
-@app.patch("/saved-meals/{saved_meal_id}", response_model=SavedMealRead)
+@app.patch("/saved-meals/{saved_meal_id}", response_model=SavedMealRead, dependencies=[Depends(verify_internal_token)])
 def update_saved_meal(
     saved_meal_id: int,
     payload: SavedMealUpdate,
@@ -2254,7 +2289,7 @@ def update_saved_meal(
     return saved
 
 
-@app.delete("/saved-meals/{saved_meal_id}")
+@app.delete("/saved-meals/{saved_meal_id}", dependencies=[Depends(verify_internal_token)])
 def delete_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
     saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
     if not saved:
@@ -2265,7 +2300,7 @@ def delete_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 
-@app.post("/saved-meals/{saved_meal_id}/use", response_model=SavedMealRead)
+@app.post("/saved-meals/{saved_meal_id}/use", response_model=SavedMealRead, dependencies=[Depends(verify_internal_token)])
 def use_saved_meal(saved_meal_id: int, db: Session = Depends(get_db)):
     saved = db.query(SavedMeal).filter(SavedMeal.id == saved_meal_id).first()
     if not saved:

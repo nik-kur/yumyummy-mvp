@@ -17,6 +17,7 @@ import {
 } from '@/components/mealEdit';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
+import { reportJourneyEvent } from '@/state/journey';
 import type { AccuracyLevel, MealItem, MealRead } from '@/api/types';
 import { formatInt, formatTime } from '@/utils/format';
 import { assessmentText } from '@/utils/assessment';
@@ -272,6 +273,7 @@ export default function MealDetailScreen() {
     setRepeating(true);
     try {
       await api.repeatMeal(id);
+      void reportJourneyEvent({ type: 'log_created', source: 'saved' }).catch(() => {});
       Alert.alert('Logged again', 'Added to today exactly as before — no new search.');
       router.back();
     } catch {
@@ -294,6 +296,7 @@ export default function MealDetailScreen() {
         // Keep the breakdown so the saved meal stays editable per component.
         items,
       });
+      void reportJourneyEvent({ type: 'menu_item_created' }).catch(() => {});
       Alert.alert('Saved to My Menu', 'Log it again anytime in one tap.');
     } catch {
       Alert.alert('Could not save', 'Please try again.');

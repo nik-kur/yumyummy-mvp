@@ -25,9 +25,13 @@ import type { DaySummary, MealRead } from '@/api/types';
 import { updateWidgetSnapshot } from '@/widgets/snapshot';
 import { JourneyCard } from '@/components/JourneyCard';
 import { JourneyPopup } from '@/components/JourneyPopup';
+import { JourneyPathSheet } from '@/components/JourneyPathSheet';
+import { QuestInfoSheet } from '@/components/QuestInfoSheet';
 import { InsightCard } from '@/components/InsightCard';
 import { WidgetInstructionSheet } from '@/components/WidgetInstructionSheet';
-import { loadJourney, saveJourney, currentDay, activeQuest, type JourneyState, type QuestDef } from '@/state/journey';
+import { loadJourney, reconcileJourney, currentDay, rawDay, activeDay, takeNextPopup, subscribeJourney, reportJourneyEvent, type JourneyState, type QuestDef, type QuestId } from '@/state/journey';
+import { requestPermission, syncFromPrefs } from '@/notifications/scheduler';
+import { loadPrefs, savePrefs } from '@/notifications/prefs';
 import { isAnyWidgetInstalled } from '../../../modules/widget-status';
 import { formatInt, formatTime } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
@@ -187,50 +191,54 @@ export default function TodayScreen() {
   const [loading, setLoading] = useState(true);
   const [journey, setJourney] = useState<JourneyState | null>(null);
   const [insight, setInsight] = useState<Record<string, unknown> | null>(null);
-  const [popupQuest, setPopupQuest] = useState<QuestDef | null>(null);
+  const [popupQuestId, setPopupQuestId] = useState<QuestId | null>(null);
   const [widgetSheetVisible, setWidgetSheetVisible] = useState(false);
-
-  const JOURNEY_QUESTS: QuestDef[] = [
-    { day: 1, quest: 'log_first_meal', label: 'Log your first meal', desc: 'Text, voice, or photo — any way you like.' },
-    { day: 2, quest: 'log_3_meals', label: 'Log 3 meals', desc: 'Build the habit with breakfast, lunch, and dinner.' },
-    { day: 3, quest: 'check_insight', label: 'Check your first insight', desc: 'See what the data says about Day 1.' },
-    { day: 4, quest: 'try_photo', label: 'Try a photo log', desc: 'Snap a pic — we\'ll do the rest.' },
-    { day: 5, quest: 'save_meal', label: 'Save a meal to My Menu', desc: 'One-tap re-logging for your favorites.' },
-    { day: 6, quest: 'add_widget', label: 'Add the home widget', desc: 'Track at a glance without opening the app.' },
-    { day: 7, quest: 'complete_week', label: 'Complete your first week!', desc: 'Review your Week 1 Report.' },
-  ];
+  const [pathSheetVisible, setPathSheetVisible] = useState(false);
+  const [infoQuest, setInfoQuest] = useState<QuestDef | null>(null);
 
   const load = useCallback(async () => {
     try {
       const [d, journeyRaw, ins] = await Promise.all([
         api.getToday(),
-        loadJourney(),
+        // Settle any actions done earlier whose day has unlocked overnight
+        // (a day can open at midnight without a fresh domain event).
+        reconcileJourney().catch(() => {}).then(() => loadJourney()),
         api.getLatestInsight().catch(() => null),
       ]);
       setDay(d);
       let j = journeyRaw;
-      if (ins) {
+      // Real insights only (no 'motivation' fallback), and never before
+      // journey Day 3 — that's when the ladder promises the first one
+      // ("Tomorrow unlocks: your first insight"). Users without a journey
+      // (pre-journey accounts) see insights whenever the backend has one.
+      const insightUnlocked = !j.started_at || rawDay(j.started_at) >= 3;
+      if (ins && ins.id !== 'motivation' && insightUnlocked) {
         setInsight(ins);
-        track('insight_viewed', { id: ins.id });
+      } else {
+        setInsight(null);
       }
 
       if (j.started_at) {
-        const day = currentDay(j.started_at);
-        if (day >= 1 && day <= 7) {
-          if (!j.completed['add_widget'] && day >= 6) {
-            const hasWidget = await isAnyWidgetInstalled();
-            if (hasWidget) {
-              j = { ...j, completed: { ...j.completed, add_widget: true } };
-              await saveJourney(j);
-              track('quest_auto_completed', { quest: 'add_widget' });
-            }
+        const journeyDay = currentDay(j.started_at);
+        if (journeyDay >= 1 && journeyDay <= 7) {
+          const mealCount = d?.meals?.length ?? 0;
+          if (mealCount > 0) {
+            await reportJourneyEvent({
+              type: 'log_created',
+              source: 'unknown',
+              todayCount: mealCount,
+            }).catch(() => {});
+            j = await loadJourney();
           }
 
-          const quest = activeQuest(JOURNEY_QUESTS, j, day);
-          const sessionKey = new Date().toISOString().slice(0, 13);
-          if (quest && j.last_popup_session !== sessionKey && !j.dismissed_popups.includes(quest.quest)) {
-            setPopupQuest(quest);
+          const hasWidget = await isAnyWidgetInstalled();
+          if (hasWidget) {
+            await reportJourneyEvent({ type: 'widget_installed' }).catch(() => {});
+            j = await loadJourney();
           }
+
+          const popup = await takeNextPopup();
+          if (popup) setPopupQuestId(popup);
         }
       }
       setJourney(j);
@@ -244,6 +252,8 @@ export default function TodayScreen() {
       load();
     }, [load]),
   );
+
+  useEffect(() => subscribeJourney(() => { void load(); }), [load]);
 
   // Refetch whenever a background meal finishes so the new entry appears.
   useEffect(() => {
@@ -274,43 +284,74 @@ export default function TodayScreen() {
     [retry, dismiss],
   );
 
-  const dismissPopup = useCallback(async () => {
-    setPopupQuest(null);
-    if (!journey) return;
-    const sessionKey = new Date().toISOString().slice(0, 13);
-    const updated: JourneyState = {
-      ...journey,
-      last_popup_session: sessionKey,
-      dismissed_popups: [...journey.dismissed_popups, popupQuest?.quest ?? ''].filter(Boolean),
-    };
-    setJourney(updated);
-    await saveJourney(updated);
-  }, [journey, popupQuest]);
-
-  const onPopupGo = useCallback(async () => {
-    track('quest_popup_go', { quest: popupQuest?.quest, day: popupQuest?.day });
-    const quest = popupQuest?.quest;
-    await dismissPopup();
-    if (quest === 'try_photo' || quest === 'log_first_meal' || quest === 'log_3_meals') {
-      router.push('/capture');
-    } else if (quest === 'add_widget') {
-      setWidgetSheetVisible(true);
-    } else if (quest === 'complete_week') {
-      router.push('/week1-report');
-    }
-  }, [popupQuest, dismissPopup, router]);
+  const dismissPopup = useCallback(() => {
+    setPopupQuestId(null);
+  }, []);
 
   const onWidgetDone = useCallback(async () => {
     setWidgetSheetVisible(false);
-    if (!journey) return;
-    const updated: JourneyState = {
-      ...journey,
-      completed: { ...journey.completed, add_widget: true },
-    };
-    setJourney(updated);
-    await saveJourney(updated);
-    track('quest_completed', { quest: 'add_widget' });
-  }, [journey]);
+    await reportJourneyEvent({ type: 'widget_installed' }).catch(() => {});
+    void load();
+  }, [load]);
+
+  // One-tap reminder enable (no per-meal choices in onboarding): ask the OS,
+  // flip the master switch, schedule the default set. Only when permission is
+  // denied do we fall back to the Notifications screen (it shows the
+  // "blocked → Open Settings" card).
+  const enableRemindersOneTap = useCallback(async () => {
+    try {
+      const granted = await requestPermission();
+      if (!granted) {
+        router.push('/notifications');
+        return;
+      }
+      const prefs = await loadPrefs();
+      prefs.enabled = true;
+      await savePrefs(prefs);
+      await syncFromPrefs(prefs);
+      await reportJourneyEvent({ type: 'push_permission_granted' }).catch(() => {});
+    } catch {
+      router.push('/notifications');
+    }
+  }, [router]);
+
+  const onQuestGo = useCallback(
+    (quest: QuestDef) => {
+      setInfoQuest(null);
+      switch (quest.id) {
+        case 'widget':
+          setWidgetSheetVisible(true);
+          break;
+        case 'reminders':
+          void enableRemindersOneTap();
+          break;
+        case 'ai_question':
+          router.push('/advisor');
+          break;
+        case 'week_trends':
+          router.push('/(tabs)/week');
+          break;
+        case 'menu':
+          router.push('/(tabs)/menu');
+          break;
+        case 'weigh_in':
+          router.push('/(tabs)/profile');
+          break;
+        default:
+          router.push('/capture');
+      }
+    },
+    [router, enableRemindersOneTap],
+  );
+
+  const onQuestPress = useCallback((quest: QuestDef) => {
+    track('quest_info_opened', { quest: quest.id, day: quest.day });
+    if (quest.id === 'widget') {
+      setWidgetSheetVisible(true);
+    } else {
+      setInfoQuest(quest);
+    }
+  }, []);
 
   const now = new Date();
   const hour = now.getHours();
@@ -386,18 +427,18 @@ export default function TodayScreen() {
             </View>
           </Card>
 
-          {journey && journey.started_at && currentDay(journey.started_at) <= 7 && (
-            <JourneyCard
-              quests={JOURNEY_QUESTS}
-              state={journey}
-              activeQuest={activeQuest(JOURNEY_QUESTS, journey, currentDay(journey.started_at))}
-              day={currentDay(journey.started_at)}
-              onPress={() => {
-                if (journey.started_at && currentDay(journey.started_at) >= 7) {
-                  router.push('/week1-report');
-                }
-              }}
-            />
+          {journey && journey.started_at && !journey.dismissed && currentDay(journey.started_at) <= 7 && (
+            <View style={styles.journeyWrap}>
+              <JourneyCard
+                state={journey}
+                day={activeDay(journey)}
+                onHeaderPress={() => {
+                  track('journey_path_opened');
+                  setPathSheetVisible(true);
+                }}
+                onQuestPress={onQuestPress}
+              />
+            </View>
           )}
 
           {insight && (
@@ -436,7 +477,7 @@ export default function TodayScreen() {
 
           {meals.length === 0 && pending.length === 0 ? (
             <EmptyState
-              glyph={'\u{1F37D}'}
+              mascot="hungry"
               title="Nothing logged yet"
               subtitle="Tap the + below and tell me what you ate — a sentence is enough."
               ctaLabel="Log something"
@@ -488,12 +529,11 @@ export default function TodayScreen() {
         </>
       )}
 
-      {popupQuest && (
+      {popupQuestId && (
         <JourneyPopup
-          quest={popupQuest}
-          visible={!!popupQuest}
+          questId={popupQuestId}
+          visible={!!popupQuestId}
           onDismiss={dismissPopup}
-          onGo={onPopupGo}
         />
       )}
 
@@ -501,6 +541,20 @@ export default function TodayScreen() {
         visible={widgetSheetVisible}
         onDismiss={() => setWidgetSheetVisible(false)}
         onDone={onWidgetDone}
+      />
+
+      {journey && (
+        <JourneyPathSheet
+          visible={pathSheetVisible}
+          state={journey}
+          onDismiss={() => setPathSheetVisible(false)}
+        />
+      )}
+
+      <QuestInfoSheet
+        quest={infoQuest}
+        onDismiss={() => setInfoQuest(null)}
+        onGo={onQuestGo}
       />
     </Screen>
   );
@@ -514,7 +568,8 @@ const styles = StyleSheet.create({
   ringCenter: { alignItems: 'center', justifyContent: 'center' },
   heroCaption: { marginTop: space.md },
   macros: { alignSelf: 'stretch', gap: space.md, marginTop: space.lg },
-  insightWrap: { marginTop: space.sm },
+  journeyWrap: { marginTop: space.base },
+  insightWrap: { marginTop: space.base },
   advisorCard: {
     flexDirection: 'row',
     alignItems: 'center',

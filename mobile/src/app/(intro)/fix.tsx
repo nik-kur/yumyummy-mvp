@@ -1,8 +1,6 @@
 /**
  * S10 Fix — "So we built both into one app" (prototype v3).
- * Two numbered fix-cards (frictionless + precise, with the Oikos proof meal),
- * a synthesis block, then CTA "Build my plan" branching by goal:
- * lose/gain → target-pace, maintain/track → loader.
+ * Precise first, frictionless second; mascot + brand line instead of synth banner.
  */
 import { useEffect } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
@@ -12,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { IntroHeader } from '@/components/IntroHeader';
+import { MascotBadge } from '@/components/MascotBadge';
 import { SourceBadge } from '@/components/Badges';
 import { useIntro } from '@/state/introContext';
 import { colors, radius, space } from '@/theme/tokens';
@@ -40,42 +39,26 @@ export default function FixScreen() {
       <IntroHeader step={9} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-        <AppText variant="overline" color={colors.terracottaText}>The answer</AppText>
-        <AppText variant="h1" style={s.title}>So we built both into one app</AppText>
+        <View>
+          <AppText variant="overline" color={colors.terracottaText}>The answer</AppText>
+          <AppText variant="h1" style={s.title}>So we built both into one app</AppText>
+        </View>
 
-        {/* Fix 1 — frictionless */}
+        <View style={s.cards}>
+        {/* Fix 1 — precise (with Oikos proof meal) */}
         <View style={s.fixCard}>
           <View style={s.fixHead}>
             <View style={s.fixNum}><AppText style={s.fixNumText}>1</AppText></View>
-            <AppText variant="title" style={s.fixTitle}>Frictionless — so you keep it up</AppText>
-          </View>
-          <AppText variant="small" color={colors.inkMuted}>
-            Say it, snap it, or type it — logging a meal takes seconds, not minutes.
-            No barcode hunting, no database digging.
-          </AppText>
-          <View style={s.waysRow}>
-            {['🎙️ Voice', '📸 Photo', '⌨️ Text'].map((w) => (
-              <View key={w} style={s.wayChip}>
-                <AppText variant="small">{w}</AppText>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Fix 2 — precise, with the Oikos proof meal */}
-        <View style={s.fixCard}>
-          <View style={s.fixHead}>
-            <View style={s.fixNum}><AppText style={s.fixNumText}>2</AppText></View>
             <AppText variant="title" style={s.fixTitle}>Precise — so it actually counts</AppText>
           </View>
           <AppText variant="small" color={colors.inkMuted}>
-            Numbers come from verified sources — USDA, EU labels, manufacturers —
-            not AI guesses. Here’s a real one:
+            Every meal checked against official databases and verified brand data — USDA,
+            restaurant menus, packaged foods. Not AI guesses.
           </AppText>
           <View style={s.mealCard}>
             <View style={s.mealHead}>
               <AppText variant="bodyStrong" style={s.mealName}>
-                Oikos Greek yogurt, 150 g
+                Oikos Greek yogurt, 150g
               </AppText>
               <SourceBadge source="Danone" />
             </View>
@@ -85,25 +68,44 @@ export default function FixScreen() {
             </View>
             <View style={s.macroRow}>
               <View style={[s.macroPill, { backgroundColor: colors.oliveSoft }]}>
-                <AppText variant="caption" color={colors.protein}>P 15 g</AppText>
+                <AppText variant="caption" color={colors.protein}>P 15g</AppText>
               </View>
               <View style={[s.macroPill, { backgroundColor: colors.warningSoft }]}>
-                <AppText variant="caption" color={colors.fat}>F 0 g</AppText>
+                <AppText variant="caption" color={colors.fat}>F 0g</AppText>
               </View>
               <View style={[s.macroPill, { backgroundColor: colors.infoBlueSoft }]}>
-                <AppText variant="caption" color={colors.carbs}>C 6 g</AppText>
+                <AppText variant="caption" color={colors.carbs}>C 6g</AppText>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Synthesis */}
-        <View style={s.synth}>
-          <AppText variant="body" color={colors.white} center>
-            Frictionless, so you stick with it.{'\n'}
-            <AppText style={s.synthSerif}>Precise, so it works. That’s YumYummy.</AppText>
+        {/* Fix 2 — frictionless */}
+        <View style={s.fixCard}>
+          <View style={s.fixHead}>
+            <View style={s.fixNum}><AppText style={s.fixNumText}>2</AppText></View>
+            <AppText variant="title" style={s.fixTitle}>Frictionless — so you keep it up</AppText>
+          </View>
+          <AppText variant="small" color={colors.inkMuted}>
+            Log any meal in ~10 seconds — photo, text, or voice. No barcodes, no scrolling.
           </AppText>
+          <View style={s.waysRow}>
+            {['📷 Photo', '🎤 Voice', '⌨️ Text'].map((w) => (
+              <View key={w} style={s.wayChip}>
+                <AppText variant="small">{w}</AppText>
+              </View>
+            ))}
+          </View>
         </View>
+
+        </View>
+
+        <MascotBadge
+          variant="thumbsUp"
+          size={104}
+          label="That's YumYummy"
+          style={s.mascotRow}
+        />
       </ScrollView>
 
       <Button label="Build my plan" variant="brand" onPress={onContinue} style={s.cta} />
@@ -112,8 +114,16 @@ export default function FixScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { paddingBottom: space.base },
-  title: { marginTop: space.sm, marginBottom: space.base },
+  // flexGrow + space-between: header / cards / mascot spread over the full
+  // height instead of stacking at the top (falls back to scrolling if tall).
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingTop: space.sm,
+    paddingBottom: space.base,
+  },
+  title: { marginTop: space.sm },
+  cards: { gap: space.base, paddingVertical: space.md },
   fixCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -121,7 +131,6 @@ const s = StyleSheet.create({
     borderColor: colors.hairline,
     padding: space.base,
     gap: space.md,
-    marginBottom: space.md,
   },
   fixHead: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   fixNum: {
@@ -169,12 +178,8 @@ const s = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radius.pill,
   },
-  synth: {
-    backgroundColor: colors.terracotta,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    marginTop: space.xs,
+  mascotRow: {
+    paddingVertical: space.sm,
   },
-  synthSerif: { fontFamily: fonts.serifBold, color: colors.white },
-  cta: { marginTop: space.sm },
+  cta: { marginTop: space.md },
 });

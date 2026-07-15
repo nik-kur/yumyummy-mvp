@@ -164,7 +164,12 @@ export default function ProblemScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { paddingBottom: space.base },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingTop: space.sm,
+    paddingBottom: space.base,
+  },
   title: { marginTop: space.sm },
   lead: { marginTop: space.sm },
   balanceCard: {

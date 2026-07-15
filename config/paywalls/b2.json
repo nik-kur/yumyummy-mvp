@@ -18,7 +18,7 @@
     "right": { "emoji": "🍏", "label": "YumYummy / day", "price": "$0.25" }
   },
   "plans": [
-    { "product": "ai.yumyummy.app.yearly", "badge": "BEST VALUE · 3 DAYS FREE", "price_style": "per_month_big" },
+    { "product": "ai.yumyummy.app.yearly", "badge": "MOST POPULAR · 3 DAYS FREE", "price_style": "per_month_big" },
     { "product": "ai.yumyummy.app.monthly", "sub": "billed monthly · no trial" },
     { "product": "ai.yumyummy.app.weekly_upd", "sub": "start today · no commitment" }
   ],

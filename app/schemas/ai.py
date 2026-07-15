@@ -1,10 +1,10 @@
 from typing import Optional, List
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ParseMealRequest(BaseModel):
-    text: str
+    text: str = Field(..., max_length=4000)
 
 
 class MealParsed(BaseModel):
@@ -37,16 +37,16 @@ class RestaurantMealRequest(BaseModel):
 
 class RestaurantTextRequest(BaseModel):
     """Запрос на парсинг блюда из ресторана по свободному тексту."""
-    text: str
+    text: str = Field(..., max_length=4000)
     locale: str = "ru-RU"
 
 
 class AgentRequest(BaseModel):
     """Запрос к агенту."""
     user_id: int
-    text: str
+    text: str = Field(..., max_length=4000)
     date: Optional[str] = None  # YYYY-MM-DD format, defaults to today
-    conversation_context: Optional[str] = None  # Previous conversation context for clarifications
+    conversation_context: Optional[str] = Field(default=None, max_length=8000)  # Previous conversation context for clarifications
 
 
 class AgentResponse(BaseModel):
@@ -61,12 +61,12 @@ class AgentResponse(BaseModel):
 class WorkflowRunRequest(BaseModel):
     """Запрос на запуск workflow."""
     telegram_id: str
-    text: str
-    image_url: Optional[str] = None
+    text: str = Field(..., max_length=4000)
+    image_url: Optional[str] = Field(default=None, max_length=2048)
     # Additive (25(1)+): multi-photo meals. image_url stays for old callers.
-    image_urls: Optional[List[str]] = None
-    force_intent: Optional[str] = None
-    nutrition_context: Optional[str] = None
+    image_urls: Optional[List[str]] = Field(default=None, max_length=5)
+    force_intent: Optional[str] = Field(default=None, max_length=64)
+    nutrition_context: Optional[str] = Field(default=None, max_length=8000)
 
 
 class WorkflowTotals(BaseModel):

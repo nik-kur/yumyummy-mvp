@@ -2,12 +2,9 @@
  * N3 Plan Reveal — daily target card, weight trajectory (lose/gain) or
  * maintenance zone (maintain/track), facts chips and an auto-rotating
  * testimonial carousel (prototype v3).
- *
- * Before navigating to the paywall, pushes custom attributes to Adapty
- * for audience segmentation (anonymous profile, pre-purchase).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { adapty } from 'react-native-adapty';
 import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
@@ -24,19 +21,30 @@ import { addBreadcrumb } from '@/analytics/sentry';
 
 const STAR_GOLD = '#D99A28';
 
+const AVATARS: Record<string, number> = {
+  Maria: require('../../../assets/avatars/maria.jpg'),
+  Denis: require('../../../assets/avatars/denis.jpg'),
+  Sara: require('../../../assets/avatars/sara.jpg'),
+  James: require('../../../assets/avatars/james.jpg'),
+  Priya: require('../../../assets/avatars/priya.jpg'),
+  Tom: require('../../../assets/avatars/tom.jpg'),
+  Elena: require('../../../assets/avatars/elena.jpg'),
+  Chris: require('../../../assets/avatars/chris.jpg'),
+  Sophie: require('../../../assets/avatars/sophie.jpg'),
+  Alex: require('../../../assets/avatars/alex.jpg'),
+};
+
 const TESTIMONIALS = [
-  {
-    text: 'Six weeks in and down 4 kg. Logging takes me maybe a minute a day — that\'s the whole trick.',
-    who: 'Maria · lost 4 kg',
-  },
-  {
-    text: 'I stopped guessing. The app knows the real numbers, so I finally trust what I eat.',
-    who: 'Denis · maintaining',
-  },
-  {
-    text: 'Tried three trackers before. This is the first one I didn\'t quit.',
-    who: 'Sara · lost 6 kg',
-  },
+  { name: 'Maria', text: 'Six weeks in and down 4 kg. Logging takes me maybe a minute a day — that\'s the whole trick.', who: 'lost 4 kg' },
+  { name: 'Denis', text: 'I stopped guessing. The app knows the real numbers, so I finally trust what I eat.', who: 'maintaining' },
+  { name: 'Sara', text: 'Tried three trackers before. This is the first one I didn\'t quit.', who: 'lost 6 kg' },
+  { name: 'James', text: 'The weight graph actually matched reality — small ups and downs, but the trend was right.', who: 'lost 8 kg' },
+  { name: 'Priya', text: 'Gaining lean mass without guessing portions. Macros finally make sense day to day.', who: 'gaining lean mass' },
+  { name: 'Tom', text: 'Maintenance used to feel like a second job. Now I just check in and move on.', who: 'maintaining' },
+  { name: 'Elena', text: 'Photo logging changed everything — I log restaurant meals I used to skip entirely.', who: 'lost 3 kg' },
+  { name: 'Chris', text: 'Voice logging at lunch is stupidly fast. I\'m on a 19-day streak now.', who: 'lost 5 kg' },
+  { name: 'Sophie', text: 'First tracker where the numbers felt verified, not made up by AI.', who: 'first-time tracker' },
+  { name: 'Alex', text: 'Down 7 kg in 10 weeks. The plan felt realistic from day one — no crash-diet vibes.', who: 'lost 7 kg' },
 ];
 
 function fmtDate(weeksFromNow: number): string {
@@ -45,26 +53,48 @@ function fmtDate(weeksFromNow: number): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/** Weight trajectory: fast start easing into the target (v = t1 + Δ·(1−t)^1.5). */
-function Trajectory({ weight, target, weeks }: { weight: number; target: number; weeks: number }) {
+/** Weight trajectory with realistic week-to-week fluctuation. */
+function Trajectory({
+  weight,
+  target,
+  weeks,
+  gaining,
+}: {
+  weight: number;
+  target: number;
+  weeks: number;
+  gaining?: boolean;
+}) {
   const W = 330;
-  const H = 150;
+  const H = 190;
   const padL = 14;
   const padR = 60;
-  const padT = 20;
-  const padB = 28;
+  const padT = 22;
+  const padB = 30;
 
-  const lo = Math.min(weight, target);
-  const hi = Math.max(weight, target);
-  const span = Math.max(1, hi - lo);
+  const lo = Math.min(weight, target) - 0.8;
+  const hi = Math.max(weight, target) + 0.8;
+  const span = Math.max(1.5, hi - lo);
   const x = (t: number) => padL + t * (W - padL - padR);
   const y = (v: number) => padT + ((hi - v) / span) * (H - padT - padB);
 
-  const pts = Array.from({ length: 25 }, (_, i) => {
-    const t = i / 24;
-    const v = target + (weight - target) * (1 - t) ** 1.5;
+  const pts = Array.from({ length: 40 }, (_, i) => {
+    const t = i / 39;
+    const progress = gaining ? t : t;
+    const base = gaining
+      ? weight + (target - weight) * progress ** 1.35
+      : target + (weight - target) * (1 - progress) ** 1.35;
+    const waveAmp = span * 0.07 * (1 - progress * 0.65);
+    const wave =
+      waveAmp *
+      (Math.sin(progress * Math.PI * 5.2) * 0.55 +
+        Math.sin(progress * Math.PI * 2.4 + 0.8) * 0.35 +
+        Math.sin(progress * Math.PI * 8.1 + 1.4) * 0.1);
+    const plateau = progress > 0.32 && progress < 0.48 ? waveAmp * 0.45 : 0;
+    const v = base + wave + plateau;
     return { px: x(t), py: y(v) };
   });
+
   const d = pts
     .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.px.toFixed(1)} ${p.py.toFixed(1)}`)
     .join(' ');
@@ -83,13 +113,13 @@ function Trajectory({ weight, target, weeks }: { weight: number; target: number;
       />
       <Path d={d} stroke={colors.terracotta} strokeWidth={2.5} fill="none" />
       <Circle cx={pts[0].px} cy={pts[0].py} r={4.5} fill={colors.ink} />
-      <Circle cx={pts[24].px} cy={pts[24].py} r={5.5} fill={colors.terracotta} />
+      <Circle cx={pts[39].px} cy={pts[39].py} r={5.5} fill={colors.terracotta} />
       <SvgText x={pts[0].px + 8} y={pts[0].py - 8} fontSize={11} fill={colors.inkMuted}>
         {`${weight} kg`}
       </SvgText>
       <SvgText
-        x={pts[24].px + 10}
-        y={pts[24].py + 4}
+        x={pts[39].px + 10}
+        y={pts[39].py + 4}
         fontSize={11}
         fontWeight="bold"
         fill={colors.terracottaText}
@@ -104,6 +134,18 @@ function Trajectory({ weight, target, weeks }: { weight: number; target: number;
       </SvgText>
     </Svg>
   );
+}
+
+function Avatar({ name }: { name: string }) {
+  const src = AVATARS[name];
+  if (!src) {
+    return (
+      <View style={[s.avatar, { backgroundColor: colors.terracottaSoft }]}>
+        <AppText variant="bodyStrong" color={colors.ink}>{name.charAt(0)}</AppText>
+      </View>
+    );
+  }
+  return <Image source={src} style={s.avatar} />;
 }
 
 function TestimonialCarousel() {
@@ -123,12 +165,18 @@ function TestimonialCarousel() {
   const t = TESTIMONIALS[idx];
   return (
     <View style={s.carousel}>
-      <Animated.View style={{ opacity }}>
+      <Animated.View style={[s.carouselInner, { opacity }]}>
+        <View style={s.carouselTop}>
+          <Avatar name={t.name} />
+          <View style={s.carouselMeta}>
+            <AppText variant="bodyStrong">{t.name}</AppText>
+            <AppText variant="caption" color={colors.terracottaText}>{t.who}</AppText>
+          </View>
+        </View>
         <AppText style={s.stars}>★★★★★</AppText>
-        <AppText variant="small" color={colors.inkMuted} style={s.quote}>
+        <AppText variant="body" style={s.quote}>
           “{t.text}”
         </AppText>
-        <AppText variant="caption" color={colors.terracottaText}>— {t.who}</AppText>
       </Animated.View>
       <View style={s.dots}>
         {TESTIMONIALS.map((_, i) => (
@@ -176,7 +224,7 @@ export default function PlanRevealScreen() {
           },
         });
       } catch {
-        // non-fatal: segmentation just won't work
+        // non-fatal
       }
     }
 
@@ -184,71 +232,78 @@ export default function PlanRevealScreen() {
   };
 
   return (
-    <Screen scroll grow edges={['top', 'bottom', 'left', 'right']}>
-      <View style={s.header}>
-        <AppText variant="overline" color={colors.terracottaText} center>
-          Your plan is ready
-        </AppText>
-        <AppText variant="h1" center>Here’s your daily target</AppText>
-      </View>
-
-      {/* Daily target card */}
-      <View style={s.planCard}>
-        <View style={s.kcalRow}>
-          <AppText style={s.kcalBig}>{cal.toLocaleString('en-US')}</AppText>
-          <AppText variant="small" color={colors.inkMuted}>kcal/day</AppText>
+    <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+      <View style={s.body}>
+        <View style={s.header}>
+          <AppText variant="overline" color={colors.terracottaText} center>
+            Your plan is ready
+          </AppText>
+          <AppText variant="h1" center>Here’s your daily target</AppText>
         </View>
-        <View style={s.macroRow}>
-          <View style={[s.macroBox, { backgroundColor: colors.oliveSoft }]}>
-            <AppText variant="bodyStrong" color={colors.protein}>{intro.target_protein_g ?? '—'} g</AppText>
-            <AppText variant="caption" color={colors.protein}>Protein</AppText>
+
+        <View style={s.planCard}>
+          <View style={s.kcalRow}>
+            <AppText style={s.kcalBig}>{cal.toLocaleString('en-US')}</AppText>
+            <AppText variant="small" color={colors.inkMuted}>kcal/day</AppText>
           </View>
-          <View style={[s.macroBox, { backgroundColor: colors.warningSoft }]}>
-            <AppText variant="bodyStrong" color={colors.fat}>{intro.target_fat_g ?? '—'} g</AppText>
-            <AppText variant="caption" color={colors.fat}>Fat</AppText>
-          </View>
-          <View style={[s.macroBox, { backgroundColor: colors.infoBlueSoft }]}>
-            <AppText variant="bodyStrong" color={colors.carbs}>{intro.target_carbs_g ?? '—'} g</AppText>
-            <AppText variant="caption" color={colors.carbs}>Carbs</AppText>
+          <View style={s.macroRow}>
+            <View style={[s.macroBox, { backgroundColor: colors.oliveSoft }]}>
+              <AppText variant="bodyStrong" color={colors.protein}>{intro.target_protein_g ?? '—'} g</AppText>
+              <AppText variant="caption" color={colors.protein}>Protein</AppText>
+            </View>
+            <View style={[s.macroBox, { backgroundColor: colors.warningSoft }]}>
+              <AppText variant="bodyStrong" color={colors.fat}>{intro.target_fat_g ?? '—'} g</AppText>
+              <AppText variant="caption" color={colors.fat}>Fat</AppText>
+            </View>
+            <View style={[s.macroBox, { backgroundColor: colors.infoBlueSoft }]}>
+              <AppText variant="bodyStrong" color={colors.carbs}>{intro.target_carbs_g ?? '—'} g</AppText>
+              <AppText variant="caption" color={colors.carbs}>Carbs</AppText>
+            </View>
           </View>
         </View>
-      </View>
 
-      {hasTarget && intro.target_weight_kg && intro.target_weeks ? (
-        <View style={s.trajCard}>
-          <Trajectory
-            weight={intro.weight_kg}
-            target={intro.target_weight_kg}
-            weeks={intro.target_weeks}
-          />
-          <View style={s.factsRow}>
-            <View style={s.factChip}>
-              <AppText variant="caption">
-                {intro.goal_type === 'lose' ? '−' : '+'}{pace.toFixed(1)} kg/week
-              </AppText>
-            </View>
-            <View style={s.factChip}>
-              <AppText variant="caption">{cal.toLocaleString('en-US')} kcal/day</AppText>
-            </View>
-            {intro.deficit_pct ? (
+        {hasTarget && intro.target_weight_kg && intro.target_weeks ? (
+          <View style={s.trajCard}>
+            <Trajectory
+              weight={intro.weight_kg}
+              target={intro.target_weight_kg}
+              weeks={intro.target_weeks}
+              gaining={intro.goal_type === 'gain'}
+            />
+            <View style={s.factsRow}>
               <View style={s.factChip}>
                 <AppText variant="caption">
-                  {intro.deficit_pct}% {intro.goal_type === 'lose' ? 'below' : 'above'} burn
+                  {intro.goal_type === 'lose' ? '−' : '+'}{pace.toFixed(1)} kg/week
                 </AppText>
               </View>
-            ) : null}
+              <View style={s.factChip}>
+                <AppText variant="caption">{cal.toLocaleString('en-US')} kcal/day</AppText>
+              </View>
+              {intro.deficit_pct ? (
+                <View style={s.factChip}>
+                  <AppText variant="caption">
+                    {intro.deficit_pct}% {intro.goal_type === 'lose' ? 'below' : 'above'} burn
+                  </AppText>
+                </View>
+              ) : null}
+            </View>
           </View>
-        </View>
-      ) : (
-        <View style={s.zoneCard}>
-          <AppText variant="body">
-            ⚖️ Your maintenance zone: <AppText variant="bodyStrong">{zoneLo.toLocaleString('en-US')}–{zoneHi.toLocaleString('en-US')} kcal</AppText>.
-            Stay inside it — weight stays put.
-          </AppText>
-        </View>
-      )}
+        ) : (
+          <View style={s.zoneCard}>
+            <AppText variant="body">
+              ⚖️ Your maintenance zone:{' '}
+              <AppText variant="bodyStrong">
+                {zoneLo.toLocaleString('en-US')}–{zoneHi.toLocaleString('en-US')} kcal
+              </AppText>
+              . Stay inside it — weight stays put.
+            </AppText>
+          </View>
+        )}
 
-      <TestimonialCarousel />
+        <View style={s.carouselWrap}>
+          <TestimonialCarousel />
+        </View>
+      </View>
 
       <Button
         label="Start my plan"
@@ -261,30 +316,32 @@ export default function PlanRevealScreen() {
 }
 
 const s = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.sm },
+  body: { flex: 1, gap: space.base },
+  header: { gap: space.sm, marginTop: space.sm },
   planCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.hairline,
-    padding: space.base,
-    gap: space.md,
+    paddingVertical: space.lg,
+    paddingHorizontal: space.base,
+    gap: space.base,
     alignItems: 'center',
   },
   kcalRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
   kcalBig: {
     fontFamily: fonts.serifBold,
-    fontSize: 52,
-    lineHeight: 60,
+    fontSize: 64,
+    lineHeight: 72,
     color: colors.ink,
   },
   macroRow: { flexDirection: 'row', gap: space.sm, alignSelf: 'stretch' },
   macroBox: {
     flex: 1,
     borderRadius: radius.md,
-    paddingVertical: space.sm,
+    paddingVertical: space.md,
     alignItems: 'center',
-    gap: 1,
+    gap: 2,
   },
   trajCard: {
     backgroundColor: colors.surface,
@@ -292,7 +349,6 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.hairline,
     padding: space.md,
-    marginTop: space.md,
     gap: space.sm,
   },
   factsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, justifyContent: 'center' },
@@ -308,26 +364,38 @@ const s = StyleSheet.create({
     backgroundColor: colors.infoBlueSoft,
     borderRadius: radius.lg,
     padding: space.base,
-    marginTop: space.md,
   },
+  carouselWrap: { flex: 1, minHeight: 140 },
   carousel: {
+    flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.hairline,
     padding: space.base,
-    marginTop: space.md,
-    minHeight: 132,
+    justifyContent: 'space-between',
   },
-  stars: { color: STAR_GOLD, fontSize: 14, lineHeight: 18, marginBottom: space.xs },
-  quote: { fontStyle: 'italic', marginBottom: space.sm },
+  carouselInner: { gap: space.sm },
+  carouselTop: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  carouselMeta: { gap: 2 },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  stars: { color: STAR_GOLD, fontSize: 15, lineHeight: 18 },
+  quote: { lineHeight: 23 },
   dots: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
     justifyContent: 'center',
-    marginTop: space.md,
+    flexWrap: 'wrap',
+    marginTop: space.sm,
   },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.hairlineStrong },
   dotActive: { backgroundColor: colors.terracotta },
-  cta: { marginTop: space.lg },
+  cta: { marginTop: space.md },
 });

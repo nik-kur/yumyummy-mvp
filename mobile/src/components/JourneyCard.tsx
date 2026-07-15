@@ -1,121 +1,140 @@
 /**
- * Journey progress card for the Today screen — "Your First Week" widget.
+ * Journey progress card for the Today screen — "Your First Week".
  *
- * Shows the current active quest, overall progress, and a CTA.
- * Olive accent per spec (protein color #5A6A3A / oliveSoft #E3E6CE).
+ * Header (ring % + day title) opens the week-path overlay. Each quest of the
+ * active day renders as an equal-size row: completed rows turn gray with a
+ * strikethrough; incomplete rows open a how-to sheet on tap.
  */
 import { View, Pressable, StyleSheet } from 'react-native';
-import { ChevronRight, CircleCheck, Circle } from 'lucide-react-native';
+import { ChevronRight, Check } from 'lucide-react-native';
 
 import { AppText } from './AppText';
 import { Card } from './Card';
+import { Ring } from './Ring';
 import { colors, radius, space } from '@/theme/tokens';
-import type { QuestDef, JourneyState } from '@/state/journey';
-import { completedCount } from '@/state/journey';
+import {
+  ALL_QUESTS,
+  LADDER,
+  completedCount,
+  isCompleted,
+  type JourneyState,
+  type QuestDef,
+} from '@/state/journey';
 
 interface JourneyCardProps {
-  quests: QuestDef[];
   state: JourneyState;
-  activeQuest: QuestDef | null;
+  /** Active (highest unlocked) day — quests of this day are listed. */
   day: number;
-  onPress: () => void;
+  onHeaderPress: () => void;
+  onQuestPress: (quest: QuestDef) => void;
 }
 
-export function JourneyCard({
-  quests,
-  state,
-  activeQuest: active,
-  day,
-  onPress,
-}: JourneyCardProps) {
+export function JourneyCard({ state, day, onHeaderPress, onQuestPress }: JourneyCardProps) {
+  // Ring = week quests done out of the whole ladder — shown as a count so
+  // the number is self-explanatory (a bare % read as random).
   const done = completedCount(state);
-  const total = quests.length;
-  const progress = total > 0 ? done / total : 0;
+  const total = ALL_QUESTS.length;
+  const dayDef = LADDER.find((d) => d.day === day);
+  if (!dayDef) return null;
 
   return (
-    <Pressable onPress={onPress}>
-      <Card style={s.card}>
-        <View style={s.header}>
-          <View style={s.dayBadge}>
-            <AppText variant="overline" color={colors.protein}>
-              DAY {day} OF 7
-            </AppText>
-          </View>
-          <AppText variant="caption" color={colors.inkMuted}>
-            {done}/{total} quests
+    <Card style={s.card}>
+      <Pressable onPress={onHeaderPress} style={s.header} hitSlop={4}>
+        <Ring size={46} stroke={4} progress={done / total} color={colors.protein} track={colors.oliveSoft}>
+          <AppText variant="caption" color={colors.protein} style={s.pct}>
+            {done}/{total}
           </AppText>
+        </Ring>
+        <View style={s.headerText}>
+          <AppText variant="overline" color={colors.terracottaText}>
+            YOUR FIRST WEEK · DAY {day} OF 7
+          </AppText>
+          <AppText variant="title">{dayDef.title}</AppText>
         </View>
+        <ChevronRight size={20} color={colors.inkFaint} strokeWidth={1.5} />
+      </Pressable>
 
-        <AppText variant="title" style={s.title}>Your First Week</AppText>
+      <View style={s.list}>
+        {dayDef.quests.map((q, i) => {
+          const done = isCompleted(state, q.id);
+          return (
+            <Pressable
+              key={q.id}
+              disabled={done}
+              onPress={() => onQuestPress(q)}
+              style={[s.questRow, i > 0 && s.questRowBorder]}
+            >
+              <View style={[s.checkbox, done && s.checkboxDone]}>
+                {done ? <Check size={14} color={colors.white} strokeWidth={3} /> : null}
+              </View>
+              <AppText
+                variant="body"
+                color={done ? colors.inkFaint : colors.ink}
+                style={[s.questLabel, done && s.questLabelDone]}
+              >
+                {q.title}
+              </AppText>
+              {!done ? (
+                <ChevronRight size={16} color={colors.inkFaint} strokeWidth={1.5} />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
 
-        {/* Progress bar */}
-        <View style={s.progressTrack}>
-          <View style={[s.progressFill, { width: `${progress * 100}%` as any }]} />
-        </View>
-
-        {/* Active quest */}
-        {active && (
-          <View style={s.questRow}>
-            <Circle size={18} color={colors.protein} strokeWidth={1.5} />
-            <View style={s.questText}>
-              <AppText variant="bodyStrong">{active.label}</AppText>
-              <AppText variant="caption" color={colors.inkMuted}>{active.desc}</AppText>
-            </View>
-            <ChevronRight size={18} color={colors.inkFaint} strokeWidth={1.5} />
-          </View>
-        )}
-
-        {/* Recent completions */}
-        {done > 0 && (
-          <View style={s.completedList}>
-            {quests
-              .filter((q) => state.completed[q.quest])
-              .slice(-2)
-              .map((q) => (
-                <View key={q.quest} style={s.completedRow}>
-                  <CircleCheck size={16} color={colors.success} strokeWidth={1.5} />
-                  <AppText variant="caption" color={colors.inkMuted}>{q.label}</AppText>
-                </View>
-              ))}
-          </View>
-        )}
-      </Card>
-    </Pressable>
+      <View style={s.unlockChip}>
+        <AppText variant="caption" color={colors.infoBlue}>
+          ✨ {dayDef.unlock}
+        </AppText>
+      </View>
+    </Card>
   );
 }
 
 const s = StyleSheet.create({
   card: { borderColor: colors.oliveSoft, borderWidth: 1.5 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
-  dayBadge: {
-    backgroundColor: colors.oliveSoft,
-    paddingHorizontal: space.sm,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-  },
-  title: { marginBottom: space.md },
-  progressTrack: {
-    height: 6,
-    backgroundColor: colors.oliveSoft,
-    borderRadius: radius.pill,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
     marginBottom: space.md,
-    overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.protein,
-    borderRadius: radius.pill,
+  pct: { fontSize: 11 },
+  headerText: { flex: 1, gap: 2 },
+  list: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
   },
   questRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    padding: space.md,
-    marginBottom: space.sm,
+    paddingVertical: space.md,
   },
-  questText: { flex: 1, gap: 2 },
-  completedList: { gap: space.xs, marginTop: space.xs },
-  completedRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  questRowBorder: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.hairlineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxDone: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  questLabel: { flex: 1 },
+  questLabelDone: { textDecorationLine: 'line-through' },
+  unlockChip: {
+    backgroundColor: colors.infoBlueSoft,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    marginTop: space.sm,
+  },
 });

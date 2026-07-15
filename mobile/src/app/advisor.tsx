@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,9 +14,13 @@ import { Sparkles, X, ArrowUp } from 'lucide-react-native';
 
 import { AppText } from '@/components/AppText';
 import { Chip } from '@/components/Chip';
+import { AIConsentSheet } from '@/components/AIConsentSheet';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as api from '@/api/endpoints';
+import { useAIConsent } from '@/state/aiConsent';
+import { reportJourneyEvent } from '@/state/journey';
+import { track } from '@/analytics/posthog';
 import { colors, radius, space } from '@/theme/tokens';
 import { fonts } from '@/theme/typography';
 
@@ -95,6 +99,13 @@ export default function AdvisorScreen() {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  // Advisor questions go to third-party AI too — same one-time consent gate
+  // as capture (Guidelines 5.1.1/5.1.2).
+  const { granted: aiConsent, grant: grantAIConsent } = useAIConsent();
+
+  useEffect(() => {
+    track('advisor_opened');
+  }, []);
 
   const send = async (raw: string) => {
     const textValue = raw.trim();
@@ -103,6 +114,7 @@ export default function AdvisorScreen() {
     const userMsg: Message = { id: nextId(), role: 'user', text: textValue };
     setMessages((prev) => [...prev, userMsg]);
     setThinking(true);
+    void reportJourneyEvent({ type: 'ai_message_sent' }).catch(() => {});
     try {
       const res = await api.agentRun({ text: textValue, force_intent: 'advice' });
       const reply: Message = {
@@ -188,6 +200,12 @@ export default function AdvisorScreen() {
           AI advisor — informational only, not medical or dietary advice.
         </AppText>
       </KeyboardAvoidingView>
+
+      <AIConsentSheet
+        visible={aiConsent === false}
+        onAgree={() => void grantAIConsent()}
+        onDismiss={() => router.back()}
+      />
     </SafeAreaView>
   );
 }

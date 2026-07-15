@@ -11,9 +11,11 @@ import { Card } from '@/components/Card';
 import { SourceBadge, AccuracyBadge } from '@/components/Badges';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
+import { reportJourneyEvent } from '@/state/journey';
 import type { DaySummary, DayTotals } from '@/api/types';
 import { formatInt, formatTime } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
+import { track } from '@/analytics/posthog';
 
 const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // Monday-first
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -171,6 +173,8 @@ export default function WeekScreen() {
     useCallback(() => {
       void loadHistory();
       void loadWeek(toISO(currentWeekStart));
+      track('week_tab_viewed');
+      void reportJourneyEvent({ type: 'week_tab_viewed' }).catch(() => {});
     }, [loadHistory, loadWeek, currentWeekStart]),
   );
 

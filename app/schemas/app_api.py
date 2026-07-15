@@ -198,13 +198,17 @@ class AppSavedMealUpdate(BaseModel):
 
 
 class AppAgentRunRequest(BaseModel):
-    text: str
-    image_url: Optional[str] = None
+    # Length caps are defense against accidental/abusive oversized payloads
+    # driving up LLM token cost. A user meal/advisor message never needs more
+    # than a few thousand chars; nutrition_context is client-assembled diary
+    # context so it gets a larger ceiling.
+    text: str = Field(..., max_length=4000)
+    image_url: Optional[str] = Field(default=None, max_length=2048)
     # Additive (25(1)+): multi-photo meals, capped server-side at 5 images.
     # image_url stays populated (first photo) so old servers keep working.
     image_urls: Optional[List[str]] = Field(default=None, max_length=5)
-    force_intent: Optional[str] = None
-    nutrition_context: Optional[str] = None
+    force_intent: Optional[str] = Field(default=None, max_length=64)
+    nutrition_context: Optional[str] = Field(default=None, max_length=8000)
 
 
 class AppTrialStartRequest(BaseModel):

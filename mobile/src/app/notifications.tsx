@@ -22,6 +22,7 @@ import {
   requestPermission,
   syncFromPrefs,
 } from '@/notifications/scheduler';
+import { reportJourneyEvent } from '@/state/journey';
 
 function dateFor(hour: number, minute: number): Date {
   const d = new Date();
@@ -143,6 +144,7 @@ export default function NotificationsScreen() {
       if (on) {
         const ok = await requestPermission();
         setGranted(ok);
+        if (ok) void reportJourneyEvent({ type: 'push_permission_granted' }).catch(() => {});
       }
       await apply({ ...prefs, enabled: on });
     },
@@ -223,7 +225,8 @@ export default function NotificationsScreen() {
         </View>
         <View style={styles.helpRow}>
           <AppText variant="caption" color={colors.inkFaint}>
-            We’ll never send marketing here — only the reminders you pick below.
+            We’ll never send marketing here. During your first week we also send
+            one morning nudge about your daily quests.
           </AppText>
         </View>
       </Card>
@@ -263,7 +266,7 @@ export default function NotificationsScreen() {
             ))}
           </Card>
           <AppText variant="caption" color={colors.inkFaint} style={styles.footnote}>
-            Tap a time to change it. Reminders repeat every day.
+            Off by default — switch on the ones you want. Tap a time to change it.
           </AppText>
 
           <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>

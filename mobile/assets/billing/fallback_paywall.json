@@ -25,33 +25,31 @@
   "plans": [
     {
       "product": "ai.yumyummy.app.yearly",
-      "badge": "BEST VALUE · 3 DAYS FREE",
+      "badge": "MOST POPULAR · 3 DAYS FREE",
       "rec_tag_by_goal": {
-        "lose": "✦ Recommended for steady weight loss",
+        "lose": "✦ Recommended for a steady habit",
         "default": "✦ Recommended for building the habit"
       },
-      "price_style": "per_month_big",
-      "display_price": "$7.49/mo",
-      "display_sub": "3 days free, then $89.99/yr"
+      "price_style": "trial_big",
+      "display_price": "3 days free trial",
+      "display_sub": "No payment due now. Then $7.50/mo billed annually at $89.99."
     },
     {
       "product": "ai.yumyummy.app.monthly",
-      "sub": "billed monthly · no trial",
-      "display_price": "$9.99",
-      "display_sub": "billed monthly · no trial"
+      "display_price": "$9.99/mo",
+      "display_sub": "billed monthly"
     },
     {
       "product": "ai.yumyummy.app.weekly_upd",
-      "sub": "start today · no commitment",
-      "display_price": "$4.99",
-      "display_sub": "per week · no commitment"
+      "display_price": "$4.99/wk",
+      "display_sub": "billed weekly"
     }
   ],
   "cta": {
-    "yearly": "Try Free for 3 Days",
+    "yearly": "Start 3 days free now",
     "monthly": "Continue — {PRICE_M}/mo",
-    "weekly": "Start now — {PRICE_W}/week"
+    "weekly": "Start now — {PRICE_W}/wk"
   },
-  "above_cta": "✓ No payment due now · Cancel anytime in 2 taps",
+  "above_cta": "✓ No payment due now · Cancel anytime",
   "hard_paywall": true
 }

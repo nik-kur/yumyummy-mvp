@@ -9,6 +9,7 @@ import {
   FileText,
   Lock,
   LogOut,
+  Sparkles,
   Trash2,
   ChevronRight,
   type LucideIcon,
@@ -23,6 +24,8 @@ import { Button } from '@/components/Button';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
 import { activateAdapty, isAdaptyConfigured, PREMIUM_ACCESS_LEVEL } from '@/billing/adapty';
+import { track } from '@/analytics/posthog';
+import { captureException } from '@/analytics/sentry';
 import { formatInt } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
 import { fonts } from '@/theme/typography';
@@ -169,18 +172,22 @@ export default function ProfileScreen() {
       Alert.alert('Restore purchases', 'Purchases can be restored from a TestFlight or App Store build.');
       return;
     }
+    track('profile_restore_started');
     try {
       await activateAdapty();
       const adaptyProfile = await adapty.restorePurchases();
       const active = Boolean(adaptyProfile.accessLevels?.[PREMIUM_ACCESS_LEVEL]?.isActive);
       if (active) await refreshProfile();
+      track(active ? 'profile_restore_success' : 'profile_restore_empty');
       Alert.alert(
         'Restore purchases',
         active
           ? 'Your subscription has been restored.'
           : 'No active subscription was found for your Apple ID.',
       );
-    } catch {
+    } catch (e) {
+      track('profile_restore_failed', { error: e instanceof Error ? e.message : String(e) });
+      captureException(e);
       Alert.alert('Restore purchases', 'Couldn’t restore purchases. Please try again.');
     }
   }, [refreshProfile]);
@@ -274,7 +281,9 @@ export default function ProfileScreen() {
       <View style={styles.subActions}>
         <Button
           label={status === 'active' ? 'Manage plan' : 'See plans'}
-          onPress={() => router.push('/paywall')}
+          // Dismissable: unlike the onboarding gate, a member browsing plans
+          // must always be able to close the paywall and come back here.
+          onPress={() => router.push({ pathname: '/paywall', params: { dismissable: '1' } })}
         />
         <Button label="Restore purchases" variant="ghost" onPress={onRestore} haptic={false} />
       </View>
@@ -367,6 +376,11 @@ export default function ProfileScreen() {
           icon={Lock}
           label="Privacy Policy"
           onPress={() => Linking.openURL('https://yumyummy.ai/privacy.html')}
+        />
+        <Row
+          icon={Sparkles}
+          label="AI data processing"
+          onPress={() => Linking.openURL('https://yumyummy.ai/privacy.html#ai-processing')}
           last
         />
       </Card>

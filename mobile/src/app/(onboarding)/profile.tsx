@@ -1,5 +1,6 @@
-import { View, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
@@ -28,6 +29,11 @@ export default function ProfileScreen() {
 
   return (
     <Screen scroll grow edges={['top', 'bottom', 'left', 'right']}>
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.back()} hitSlop={10}>
+          <ChevronLeft size={26} color={colors.inkMuted} strokeWidth={1.5} />
+        </Pressable>
+      </View>
       <View style={styles.header}>
         <AppText variant="overline" color={colors.inkMuted}>
           Step 2 of 3
@@ -102,7 +108,8 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
+  topBar: { marginTop: space.sm, marginLeft: -space.xs, alignSelf: 'flex-start' },
+  header: { marginTop: space.md, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
   block: { gap: space.sm, marginBottom: space.xl },
   wheelsRow: { flexDirection: 'row', gap: space.sm, marginBottom: space.xl },

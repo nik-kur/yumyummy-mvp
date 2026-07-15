@@ -39,7 +39,8 @@ from app.auth.service import get_primary_user, account_member_users
 from app.billing.account_access import account_billing_snapshot, account_has_access
 from app.billing.plans import resolve_trial_days
 from app.services.agent_persist import persist_agent_result_for_user
-from app.services.usage_guardrails import record_usage_for_user
+from app.services.usage_guardrails import record_usage_for_user, global_daily_cost_exceeded
+from app.services.llm_client import moderate_text
 from app.services.user_time import today_for_user
 from app.services.weekly_recap import build_recap
 from app.agent_runner import run_yumyummy_workflow, WorkflowNotInstalledError
@@ -990,6 +991,32 @@ async def app_agent_run(
             source_url=None,
         )
 
+    # Global daily LLM spend circuit breaker (across all users). Protects the
+    # OpenAI/Gemini budget from a coordinated attack or runaway bug even while
+    # per-user caps individually hold.
+    if global_daily_cost_exceeded(db):
+        logger.warning("[/app/agent/run] global daily LLM cost cap hit; refusing account=%s", account.id)
+        return WorkflowRunResponse(
+            intent="help",
+            message_text="The assistant is very busy right now. Please try again in a little while.",
+            confidence=None, totals=_empty_totals(), items=[], source_url=None,
+        )
+
+    # Content moderation on the user's free text (fail-open). Refuse clearly
+    # abusive/harmful input rather than paying to send it to the model.
+    if payload.text:
+        flagged, categories = await moderate_text(payload.text)
+        if flagged:
+            logger.warning("[/app/agent/run] moderation flagged account=%s categories=%s", account.id, categories)
+            return WorkflowRunResponse(
+                intent="help",
+                message_text=(
+                    "I can only help with food logging and nutrition. "
+                    "Let's keep it to what you ate or your nutrition goals."
+                ),
+                confidence=None, totals=_empty_totals(), items=[], source_url=None,
+            )
+
     user = get_primary_user(db, account)
     db.commit()
     # The workflow only uses this id as an opaque context key.
@@ -1110,6 +1137,8 @@ async def app_voice_transcribe(
         raise HTTPException(status_code=400, detail="Could not read audio file")
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Empty audio file")
+    if len(file_bytes) > settings.max_audio_upload_bytes:
+        raise HTTPException(status_code=413, detail="Audio file too large")
 
     try:
         transcript = await transcribe_audio(

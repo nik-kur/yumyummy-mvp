@@ -40,6 +40,33 @@ npx expo start -c   # -c clears the cache so the new env is picked up
 When an API URL is set, the app calls the real endpoints; read calls fall back to mock data
 if the server is unreachable, so the UI never breaks during development.
 
+## Environment variables & build secrets (release)
+
+Public (`EXPO_PUBLIC_*`) values are safe in `eas.json` (they ship in the bundle). Secrets must
+be set as **EAS environment variables / secrets** (`eas env:create` or the EAS dashboard) —
+never committed.
+
+Public build env (already in `eas.json`):
+
+| Var | Purpose |
+|---|---|
+| `EXPO_PUBLIC_API_BASE_URL` | Backend base URL (Render) |
+| `EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY` | Adapty public SDK key |
+| `EXPO_PUBLIC_POSTHOG_API_KEY` / `EXPO_PUBLIC_POSTHOG_HOST` | PostHog analytics |
+| `EXPO_PUBLIC_SENTRY_DSN` | Sentry crash reporting |
+| `EXPO_PUBLIC_APPSFLYER_DEV_KEY` / `EXPO_PUBLIC_APPSFLYER_APP_ID` | Attribution (AppsFlyer). If unset, attribution is an inert no-op — the app still works. |
+
+Secrets (EAS env, **not** in the repo):
+
+| Secret | Purpose |
+|---|---|
+| `SENTRY_AUTH_TOKEN` | **Required for readable crashes.** Enables source map upload during `preview`/`production` builds (auto-upload is on; `development` keeps `SENTRY_DISABLE_AUTO_UPLOAD: "true"`). Without it the build still succeeds but stack traces stay minified. Scope: `project:releases`. |
+
+Attribution & analytics wiring lives in `src/analytics/attribution.ts` (ATT + AppsFlyer),
+`src/analytics/posthog.ts`, and `src/analytics/sentry.ts`. Source maps use Debug IDs injected
+via `metro.config.js` (`getSentryExpoConfig`). See `../docs/analytics/` for the event taxonomy
+and launch dashboard, and `../docs/aso/` for the App Store listing package.
+
 ## Useful scripts
 
 - `npm run start` — start Metro / Expo

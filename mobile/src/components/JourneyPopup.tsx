@@ -1,44 +1,45 @@
 /**
- * Journey quest popup — shown once per session when a new quest becomes active.
- *
- * Uses a simple modal overlay; production version should use a proper bottom sheet.
+ * Journey completion popup — one at a time, with why-it-matters copy.
  */
 import { View, Pressable, StyleSheet, Modal } from 'react-native';
+import { CircleCheck } from 'lucide-react-native';
 
 import { AppText } from './AppText';
 import { Button } from './Button';
 import { colors, radius, space } from '@/theme/tokens';
-import type { QuestDef } from '@/state/journey';
+import { QUEST_WHY, type QuestId } from '@/state/journey';
 
 interface JourneyPopupProps {
-  quest: QuestDef;
+  questId: QuestId;
   visible: boolean;
   onDismiss: () => void;
-  onGo: () => void;
 }
 
-export function JourneyPopup({ quest, visible, onDismiss, onGo }: JourneyPopupProps) {
+export function JourneyPopup({ questId, visible, onDismiss }: JourneyPopupProps) {
+  const copy = QUEST_WHY[questId];
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
       <View style={s.overlay}>
         <View style={s.sheet}>
           <View style={s.handle} />
+          <View style={s.iconWrap}>
+            <CircleCheck size={28} color={colors.white} strokeWidth={2.5} />
+          </View>
 
-          <AppText variant="overline" color={colors.protein}>
-            DAY {quest.day} QUEST
+          <AppText variant="overline" color={colors.protein} center>
+            QUEST COMPLETE
           </AppText>
-          <AppText variant="h2" style={s.headline}>{quest.label}</AppText>
-          <AppText variant="body" color={colors.inkMuted} style={s.body}>
-            {quest.desc}
+          <AppText variant="h2" center style={s.headline}>
+            {copy?.title ?? questId}
           </AppText>
-          <AppText variant="small" color={colors.inkFaint} style={s.why}>
-            Small steps build lasting habits. This quest is designed to help you
-            get the most out of YumYummy.
+          <AppText variant="body" color={colors.inkMuted} center style={s.body}>
+            {copy?.why ?? ''}
           </AppText>
 
-          <Button label="Let's go" variant="brand" onPress={onGo} />
+          <Button label="Nice — keep going" variant="brand" onPress={onDismiss} />
           <Pressable onPress={onDismiss} style={s.dismissBtn}>
-            <AppText variant="small" color={colors.inkMuted}>Maybe later</AppText>
+            <AppText variant="small" color={colors.inkMuted}>Dismiss</AppText>
           </Pressable>
         </View>
       </View>
@@ -68,8 +69,17 @@ const s = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: space.lg,
   },
+  iconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: space.md,
+  },
   headline: { marginTop: space.sm },
-  body: { marginTop: space.md },
-  why: { marginTop: space.md, marginBottom: space.lg },
+  body: { marginTop: space.md, marginBottom: space.lg, lineHeight: 22 },
   dismissBtn: { alignSelf: 'center', marginTop: space.md },
 });

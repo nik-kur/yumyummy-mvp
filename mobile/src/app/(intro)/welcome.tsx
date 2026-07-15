@@ -1,17 +1,15 @@
 /**
  * S1 Welcome demo — first screen of the intro flow.
- *
- * Autoplay logging demo (photo → voice → text) from onboarding_prototype_v3.html.
- * "Already have an account? Sign in" link for returning users.
  */
 import { useEffect } from 'react';
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { WelcomeDemo } from '@/components/WelcomeDemo';
+import { MascotBadge } from '@/components/MascotBadge';
 import { track } from '@/analytics/posthog';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -26,26 +24,21 @@ export default function WelcomeScreen() {
 
   return (
     <Screen grow edges={['top', 'bottom', 'left', 'right']}>
-      <ScrollView
-        contentContainerStyle={s.scroll}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+      <View style={s.body}>
         <View style={s.header}>
-          <AppText style={s.emoji}>🥑</AppText>
-          <AppText variant="overline" color={colors.inkMuted} center>
-            YUMYUMMY
-          </AppText>
+          <MascotBadge variant="welcome" size={64} style={s.mascot} />
           <AppText variant="h1" center style={s.headline}>
-            The food tracker you’ll actually keep up with
+            The food tracker you&rsquo;ll actually keep up with
           </AppText>
-          <AppText variant="body" color={colors.inkMuted} center>
+          <AppText variant="title" color={colors.inkMuted} center style={s.sub}>
             Any meal, any way — verified calories in ~10 seconds.
           </AppText>
         </View>
 
-        <WelcomeDemo />
-      </ScrollView>
+        <View style={s.demoWrap}>
+          <WelcomeDemo />
+        </View>
+      </View>
 
       <View style={s.bottom}>
         <Button
@@ -74,10 +67,17 @@ export default function WelcomeScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { flexGrow: 1, paddingTop: space.sm },
-  header: { alignItems: 'center', paddingHorizontal: space.lg, gap: space.xs },
-  emoji: { fontSize: 26, lineHeight: 34 },
-  headline: { marginTop: space.md },
+  body: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: space.lg,
+    gap: space.lg,
+  },
+  header: { alignItems: 'center', gap: space.sm },
+  mascot: { marginBottom: space.xs },
+  headline: { marginTop: space.xs },
+  sub: { lineHeight: 26, maxWidth: 320 },
+  demoWrap: { alignSelf: 'stretch' },
   bottom: { gap: space.md, paddingBottom: space.lg, paddingHorizontal: space.lg },
   link: { marginTop: space.xs },
   chips: {

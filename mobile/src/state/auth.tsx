@@ -13,8 +13,9 @@ import { getToken, setToken, USE_MOCKS } from '@/api/client';
 import * as api from '@/api/endpoints';
 import type { AccountProfile } from '@/api/types';
 import { identifyAdapty, logoutAdapty } from '@/billing/adapty';
-import { identify as phIdentify, reset as phReset } from '@/analytics/posthog';
+import { identify as phIdentify, reset as phReset, track } from '@/analytics/posthog';
 import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
+import { setAttributionCustomerId } from '@/analytics/attribution';
 
 type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
@@ -40,13 +41,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [profile, setProfile] = useState<AccountProfile | null>(null);
 
-  const loadProfile = useCallback(async () => {
+  // `method` is set only on a genuine sign-in (Apple/Google/email/…), not on
+  // boot session-restore, so `signin_success` fires exactly once per login.
+  const loadProfile = useCallback(async (method?: string) => {
     const me = await api.getMe();
     setProfile(me);
     setStatus('signedIn');
     void identifyAdapty(me.account_id);
+    setAttributionCustomerId(me.account_id);
+    // identify() links the anonymous onboarding distinct_id to account_id, so
+    // pre-login funnel events (paywall_shown, onboarding_*) stitch to the user.
     phIdentify(String(me.account_id), { goal: me.goal_type });
     sentrySetUser(String(me.account_id));
+    if (method) track('signin_success', { method });
     void api.syncBilling().catch(() => {});
   }, []);
 
@@ -81,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, code: string) => {
       const res = await api.verifyEmailCode(email, code);
       await setToken(res.access_token);
-      await loadProfile();
+      await loadProfile('email');
     },
     [loadProfile],
   );
@@ -98,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const token = await api.verifyEmailCode(email, code);
     await setToken(token.access_token);
-    await loadProfile();
+    await loadProfile('demo');
   }, [loadProfile]);
 
   const signInWithApple = useCallback(async () => {
@@ -127,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!identityToken) throw new Error('Apple did not return an identity token. Please try again.');
     const res = await api.signInApple(identityToken);
     await setToken(res.access_token);
-    await loadProfile();
+    await loadProfile('apple');
   }, [loadProfile]);
 
   const signInWithProvider = useCallback(
@@ -136,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (USE_MOCKS) {
           const res = await api.signInApple('apple-placeholder-identity-token');
           await setToken(res.access_token);
-          await loadProfile();
+          await loadProfile('apple');
           return;
         }
         await signInWithApple();
@@ -148,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (USE_MOCKS) {
         const res = await api.signInGoogle('google-placeholder-identity-token');
         await setToken(res.access_token);
-        await loadProfile();
+        await loadProfile('google');
         return;
       }
       throw new Error('Google sign-in arrives in the next build — use Apple or email for now.');
@@ -166,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (USE_MOCKS) {
         await setToken('telegram.session.token');
         await api.redeemTelegramLink(code);
-        await loadProfile();
+        await loadProfile('telegram');
         return;
       }
       const token = await getToken();
@@ -176,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
       }
       await api.redeemTelegramLink(code);
-      await loadProfile();
+      await loadProfile('telegram');
     },
     [loadProfile],
   );

@@ -1,6 +1,6 @@
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { TrendingDown, Utensils, Dumbbell, Activity, CircleCheck, type LucideIcon } from 'lucide-react-native';
+import { TrendingDown, Utensils, Dumbbell, Activity, CircleCheck, ChevronLeft, type LucideIcon } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
@@ -19,9 +19,20 @@ const GOALS: { key: GoalType; icon: LucideIcon; desc: string }[] = [
 export default function GoalScreen() {
   const router = useRouter();
   const { goal_type, set } = useOnboarding();
+  // First-run onboarding arrives via Redirect (no back stack) — the flow is
+  // mandatory there. Entered from Profile ("Recalculate") there IS a stack,
+  // so give the user a way out instead of trapping them in the questionnaire.
+  const canLeave = router.canGoBack();
 
   return (
     <Screen scroll grow edges={['top', 'bottom', 'left', 'right']}>
+      {canLeave ? (
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.back()} hitSlop={10}>
+            <ChevronLeft size={26} color={colors.inkMuted} strokeWidth={1.5} />
+          </Pressable>
+        </View>
+      ) : null}
       <View style={styles.header}>
         <AppText variant="overline" color={colors.inkMuted}>
           Step 1 of 3
@@ -78,6 +89,7 @@ export default function GoalScreen() {
 }
 
 const styles = StyleSheet.create({
+  topBar: { marginTop: space.sm, marginLeft: -space.xs, alignSelf: 'flex-start' },
   header: { marginTop: space.xl, marginBottom: space.lg, gap: space.xs },
   title: { marginTop: space.xs },
   list: { flex: 1, justifyContent: 'center', gap: space.base },

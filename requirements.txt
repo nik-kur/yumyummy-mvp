@@ -9,7 +9,11 @@ httpx
 python-dotenv
 redis
 pydantic-settings>=2.3.0
-openai>=2.9.0,<3
+# openai 2.45.0 made `cache_write_tokens` a required field on
+# InputTokensDetails, which openai-agents==0.4.0 does not pass when it
+# builds Usage() -> every Runner.run() crashes at entry. Cap below 2.45
+# until openai-agents is upgraded to a release with the fix (>=0.18.x).
+openai>=2.9.0,<2.45
 openai-agents==0.4.0
 pyyaml>=6.0
 python-multipart

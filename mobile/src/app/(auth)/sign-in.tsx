@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, TextInput, StyleSheet, Pressable, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Apple, Send } from 'lucide-react-native';
+import { Send } from 'lucide-react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
@@ -24,6 +25,13 @@ export default function SignInScreen() {
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
 
   const run = async (fn: () => Promise<void>) => {
     setError(null);
@@ -83,12 +91,24 @@ export default function SignInScreen() {
       </View>
 
       <View style={styles.section}>
-        <Button
-          label="Continue with Apple"
-          variant="dark"
-          onPress={() => run(async () => { await auth.signInWithProvider('apple'); goHome(); })}
-          icon={<Apple size={18} color={colors.bg} strokeWidth={1.5} />}
-        />
+        {/* Official Sign in with Apple button (HIG-compliant artwork — App Review
+            Guideline 4). Falls back to a plain button where the native module is
+            unavailable (Expo Go / Android). */}
+        {appleAvailable ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={radius.md}
+            style={styles.appleButton}
+            onPress={() => run(async () => { await auth.signInWithProvider('apple'); goHome(); })}
+          />
+        ) : (
+          <Button
+            label="Continue with Apple"
+            variant="dark"
+            onPress={() => run(async () => { await auth.signInWithProvider('apple'); goHome(); })}
+          />
+        )}
         {/* Google sign-in ships in a later build (native @react-native-google-signin
             + OAuth client). Hidden until then so we don't present a dead control. */}
       </View>
@@ -213,6 +233,7 @@ const styles = StyleSheet.create({
   wordmark: { marginTop: space.xs },
   tagline: { marginTop: space.sm, maxWidth: 320 },
   section: { gap: space.md, marginBottom: space.lg },
+  appleButton: { alignSelf: 'stretch', height: 54 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg },
   line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.hairline },
   input: {

@@ -44,6 +44,24 @@ class Settings(BaseSettings):
     gumroad_monthly_price_cents: int = 999
     gumroad_yearly_price_cents: int = 8999
 
+    # ------------------------------------------------------------------
+    # Abuse protection (rate limiting, request/upload size caps)
+    # ------------------------------------------------------------------
+    # In-memory per-IP rate limiting (see app/core/rate_limit.py). Enabled by
+    # default; set false to disable entirely (e.g. behind an external limiter).
+    rate_limit_enabled: bool = True
+    # Reject any request whose Content-Length exceeds this (bytes). Only the
+    # voice endpoints send large bodies; meal photos go straight to R2 via a
+    # presigned URL and never transit our API.
+    max_request_body_bytes: int = 15 * 1024 * 1024  # 15 MB
+    # Hard cap on a single voice-note upload (bytes) before we hand it to STT.
+    max_audio_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
+
+    # Global per-day LLM spend circuit breaker (USD) across ALL users. Guards
+    # against a coordinated attack or runaway bug blowing the OpenAI/Gemini
+    # budget even while per-user caps hold. 0 disables the global breaker.
+    global_daily_llm_cost_cap_usd: float = 200.0
+
     # Sentry / observability
     sentry_dsn: Optional[str] = None
     sentry_environment: Optional[str] = None  # e.g. "production" / "staging" / "dev"

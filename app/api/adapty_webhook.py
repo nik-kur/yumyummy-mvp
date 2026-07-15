@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.deps import get_db
 from app.core.config import settings
+from app.core import posthog_client
 from app.models.account import Account
 from app.models.user import User
 from app.auth.service import get_primary_user
@@ -30,6 +31,76 @@ from app.billing import adapty as adapty_billing
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["webhooks"])
+
+
+def _extract_revenue(props: dict) -> Optional[float]:
+    """Best-effort revenue amount from an Adapty webhook payload.
+
+    Adapty property names vary by app config, so we probe the common ones and
+    a nested ``price`` object. Returns ``None`` when nothing usable is found.
+    """
+    for key in ("revenue_usd", "price_usd", "proceeds_usd", "net_revenue_usd", "price", "revenue", "proceeds"):
+        val = props.get(key)
+        if isinstance(val, (int, float)):
+            return float(val)
+        if isinstance(val, str):
+            try:
+                return float(val)
+            except ValueError:
+                continue
+        if isinstance(val, dict):
+            for sub in ("amount", "value", "usd"):
+                sv = val.get(sub)
+                if isinstance(sv, (int, float)):
+                    return float(sv)
+                if isinstance(sv, str):
+                    try:
+                        return float(sv)
+                    except ValueError:
+                        continue
+    return None
+
+
+def _mirror_adapty_to_posthog(*, account_id: int, event_type: str, result: str,
+                              plan_id: str, props: dict) -> None:
+    """Emit the App Store subscription event to PostHog so IAP revenue lands in
+    the same funnels/LTV as the web + Telegram paths.
+
+    distinct_id = account_id — the mobile app identifies PostHog with the same
+    value (``phIdentify(String(account_id))``), so events collapse onto the
+    correct person. Silent on any failure; analytics never blocks billing.
+    """
+    et = (event_type or "").lower()
+    ph_event: Optional[str] = None
+    if result == "active":
+        if "trial" in et:
+            ph_event = "trial_started"
+        elif "renew" in et:
+            ph_event = "subscription_renewed"
+        else:
+            ph_event = "subscription_purchased"
+    elif result == "cancelled":
+        ph_event = "subscription_cancelled"
+    elif result == "refund":
+        ph_event = "subscription_refunded"
+    elif result == "expiration":
+        ph_event = "subscription_expired"
+    if not ph_event:
+        return
+
+    properties: dict = {"plan_id": plan_id, "provider": "adapty",
+                        "store": props.get("store") or "app_store"}
+    revenue = _extract_revenue(props)
+    if revenue is not None:
+        properties["revenue"] = revenue
+        properties["currency"] = props.get("currency") or props.get("price_currency") or "USD"
+
+    posthog_client.capture(
+        ph_event,
+        posthog_distinct_id=str(account_id),
+        properties=properties,
+        set_properties={"subscription_provider": "adapty", "subscription_plan_id": plan_id},
+    )
 
 
 def _verify_secret(authorization: Optional[str]) -> None:
@@ -151,5 +222,16 @@ async def adapty_webhook(
     else:
         logger.info("[ADAPTY] event=%s had no actionable expiry; ignored (account_id=%s)", event_type, account_id)
         result = "ignored"
+
+    # Mirror the billing outcome to PostHog (revenue / funnel). Never let an
+    # analytics hiccup fail the webhook — Adapty would retry and we'd double
+    # process the entitlement.
+    try:
+        _mirror_adapty_to_posthog(
+            account_id=account_id, event_type=event_type, result=result,
+            plan_id=plan_id, props=props,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("[ADAPTY] posthog mirror failed: %s", exc)
 
     return {"status": result, "account_id": account_id, "event_type": event_type}

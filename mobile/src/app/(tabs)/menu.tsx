@@ -17,6 +17,7 @@ import {
   type MacroTotals,
 } from '@/components/mealEdit';
 import * as api from '@/api/endpoints';
+import { reportJourneyEvent } from '@/state/journey';
 import type { MealItem, SavedMealListItem } from '@/api/types';
 import { formatInt } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
@@ -54,6 +55,7 @@ export default function MenuScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    void reportJourneyEvent({ type: 'log_created', source: 'saved' }).catch(() => {});
     setJustLogged(item.id);
     setItems((cur) =>
       cur.map((s) => (s.id === item.id ? { ...s, use_count: s.use_count + 1 } : s)),

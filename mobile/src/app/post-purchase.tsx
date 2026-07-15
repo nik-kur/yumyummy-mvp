@@ -14,7 +14,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/state/auth';
 import { loadDraft, clearDraft } from '@/state/introDraft';
-import { loadJourney, saveJourney } from '@/state/journey';
+import { startJourney } from '@/state/journey';
 import * as api from '@/api/endpoints';
 import { colors, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
@@ -51,11 +51,8 @@ export default function PostPurchaseScreen() {
         await clearDraft();
       }
 
-      const j = await loadJourney();
-      if (!j.started_at) {
-        j.started_at = new Date().toISOString();
-        await saveJourney(j);
-      }
+      // Fallback: normally the paywall starts the journey at purchase time.
+      await startJourney();
 
       await refreshProfile();
       router.replace('/postbuy');

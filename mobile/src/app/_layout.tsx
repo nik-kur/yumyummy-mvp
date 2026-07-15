@@ -14,6 +14,7 @@ import { useAppFonts } from '@/theme/useAppFonts';
 import { activateAdapty } from '@/billing/adapty';
 import { initPostHog } from '@/analytics/posthog';
 import { initSentry } from '@/analytics/sentry';
+import { initAttribution } from '@/analytics/attribution';
 import { colors } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -25,6 +26,8 @@ export default function RootLayout() {
     initSentry();
     initPostHog();
     void activateAdapty();
+    // ATT prompt + AppsFlyer start (no-op without a configured dev key).
+    void initAttribution();
   }, []);
 
   useEffect(() => {

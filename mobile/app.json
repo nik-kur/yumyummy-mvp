@@ -14,7 +14,20 @@
       "appleTeamId": "WZAXY7M3G5",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "SKAdNetworkItems": [
+          { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
+          { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" },
+          { "SKAdNetworkIdentifier": "238da6jt44.skadnetwork" },
+          { "SKAdNetworkIdentifier": "22mmun2rn5.skadnetwork" },
+          { "SKAdNetworkIdentifier": "4468km3ulz.skadnetwork" },
+          { "SKAdNetworkIdentifier": "2u9pt9hc89.skadnetwork" },
+          { "SKAdNetworkIdentifier": "hs6bdukanm.skadnetwork" },
+          { "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork" },
+          { "SKAdNetworkIdentifier": "424m5254lk.skadnetwork" },
+          { "SKAdNetworkIdentifier": "4dzt52r2t5.skadnetwork" },
+          { "SKAdNetworkIdentifier": "ludvb6z3bs.skadnetwork" }
+        ]
       },
       "entitlements": {
         "com.apple.security.application-groups": [
@@ -67,6 +80,13 @@
         }
       ],
       ["react-native-adapty", { "replaceAndroidBackupConfig": true }],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "YumYummy uses this to measure ad performance and improve your experience. Your data is never sold."
+        }
+      ],
+      ["react-native-appsflyer", { "shouldUseStrictMode": false, "shouldUsePurchaseConnector": false }],
       ["expo-build-properties", { "ios": { "deploymentTarget": "15.1" } }],
       [
         "@sentry/react-native/expo",

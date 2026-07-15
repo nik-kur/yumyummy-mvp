@@ -11,6 +11,7 @@ import { MacroBar } from '@/components/MacroBar';
 import { useOnboarding } from '@/state/onboarding';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
+import { reportJourneyEvent } from '@/state/journey';
 import { computePlan } from '@/utils/calories';
 import { formatInt } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
@@ -69,6 +70,9 @@ export default function PlanScreen() {
         onboarding_completed: true,
       });
       auth.applyProfile(updated);
+      // Saving the questionnaire records fresh weight — that IS the Day 7
+      // weigh-in, however the user got here (quest card or Profile).
+      void reportJourneyEvent({ type: 'weight_updated' }).catch(() => {});
     } catch {
       // Offline: continue anyway so onboarding isn't a dead end.
     } finally {

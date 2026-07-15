@@ -26,6 +26,8 @@ import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
+import { AIConsentSheet } from '@/components/AIConsentSheet';
+import { useAIConsent } from '@/state/aiConsent';
 import { usePendingMeals } from '@/state/pendingMeals';
 import { useKeyboardHeight } from '@/utils/keyboard';
 import { colors, radius, space } from '@/theme/tokens';
@@ -83,6 +85,9 @@ export default function CaptureScreen() {
   const params = useLocalSearchParams<{ prefill?: string; mode?: string }>();
   const { submit } = usePendingMeals();
   const keyboardHeight = useKeyboardHeight();
+  // One-time AI consent gate (Guidelines 5.1.1/5.1.2): everything logged here
+  // is processed by third-party AI, so ask before the first capture.
+  const { granted: aiConsent, grant: grantAIConsent } = useAIConsent();
 
   const [mode, setMode] = useState<Mode>('input');
   const [text, setText] = useState(typeof params.prefill === 'string' ? params.prefill : '');
@@ -216,6 +221,9 @@ export default function CaptureScreen() {
   const handledDeepLink = useRef(false);
   useEffect(() => {
     if (handledDeepLink.current) return;
+    // Hold widget/deep-link auto-actions until AI consent is granted, so the
+    // consent sheet isn't buried under the camera or the mic permission alert.
+    if (aiConsent !== true) return;
     if (params.mode === 'photo') {
       handledDeepLink.current = true;
       onPhoto();
@@ -224,7 +232,7 @@ export default function CaptureScreen() {
       void startRecording();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.mode]);
+  }, [params.mode, aiConsent]);
 
   if (mode === 'accepted') {
     return (
@@ -379,6 +387,12 @@ export default function CaptureScreen() {
           </>
         )}
       </View>
+
+      <AIConsentSheet
+        visible={aiConsent === false}
+        onAgree={() => void grantAIConsent()}
+        onDismiss={() => router.back()}
+      />
     </Screen>
   );
 }

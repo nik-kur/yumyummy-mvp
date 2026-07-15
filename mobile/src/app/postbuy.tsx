@@ -13,14 +13,15 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { requestPermission, syncFromPrefs } from '@/notifications/scheduler';
 import { loadPrefs, savePrefs } from '@/notifications/prefs';
+import { reportJourneyEvent } from '@/state/journey';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 
 const WHY_ROWS = [
-  { emoji: '⏰', text: 'A gentle nudge at your usual meal times — so days don\'t slip' },
-  { emoji: '🔥', text: 'Streak celebrations when you keep it going' },
-  { emoji: '🎯', text: 'A heads-up when you\'re close to your daily target' },
+  { emoji: '🌱', text: 'Morning nudges for your first-week quests — tiny steps that build the habit' },
+  { emoji: '🌙', text: 'One evening check-in so no day slips by unlogged' },
+  { emoji: '📊', text: 'A heads-up when your weekly recap is ready' },
 ];
 
 export default function PostbuyPushScreen() {
@@ -48,6 +49,7 @@ export default function PostbuyPushScreen() {
         prefs.enabled = true;
         await savePrefs(prefs);
         await syncFromPrefs(prefs);
+        await reportJourneyEvent({ type: 'push_permission_granted' }).catch(() => {});
       }
     } catch (e) {
       captureException(e);

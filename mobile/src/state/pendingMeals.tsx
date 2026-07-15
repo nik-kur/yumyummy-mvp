@@ -10,7 +10,9 @@ import {
 
 import * as api from '@/api/endpoints';
 import { uploadMealPhoto, transcribeAudio } from '@/api/upload';
-import type { WorkflowItem } from '@/api/types';
+import type { WorkflowItem, WorkflowRunResponse } from '@/api/types';
+import { reportJourneyEvent, type LogOrigin, type LogSource } from '@/state/journey';
+import { track } from '@/analytics/posthog';
 
 /**
  * Background meal logging.
@@ -84,6 +86,45 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function kindOf(input: SubmitInput): LogSource {
+  if (input.audioUri) return 'voice';
+  if (allImageUris(input).length > 0) return 'photo';
+  return 'text';
+}
+
+// Generic nutrition-database hosts. Any other source host means the numbers
+// came from a brand or restaurant page — which is what the Day 4 quest
+// ("log a meal you didn't cook") detects (spec §5.3 v0 rule).
+const GENERIC_SOURCE_HOSTS = [
+  'usda.gov',
+  'nal.usda.gov',
+  'nutritionix.com',
+  'fatsecret.com',
+  'myfitnesspal.com',
+  'wikipedia.org',
+  'healthline.com',
+  'eatthismuch.com',
+  'nutritionvalue.org',
+];
+
+function originOf(res: WorkflowRunResponse): LogOrigin | undefined {
+  const urls = [res.source_url, ...(res.items ?? []).map((it) => it.source_url)].filter(
+    (u): u is string => Boolean(u),
+  );
+  if (urls.length === 0) return undefined;
+  for (const u of urls) {
+    try {
+      const host = new URL(u).hostname.toLowerCase();
+      if (!GENERIC_SOURCE_HOSTS.some((g) => host === g || host.endsWith(`.${g}`))) {
+        return 'brand';
+      }
+    } catch {
+      // unparseable URL — ignore
+    }
+  }
+  return 'generic';
+}
+
 /**
  * Confirm the backend actually logged the meal even though our request didn't
  * return a clean success. This is the key fix for photo meals: the source-checked
@@ -139,9 +180,28 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
         // retryable error (the prior behavior). Best-effort only.
       }
 
-      const clearAsLogged = () => {
+      const clearAsLogged = (res?: WorkflowRunResponse) => {
         delete inputsRef.current[id];
         removeOrPatch(id); // backend logged it; Today refetches and shows the real meal
+        // Activation event — the single funnel step that says the user got
+        // real value. Fired once per confirmed log, from both the direct
+        // success path and the timeout-reconciliation path.
+        const totals = res ? sumItems(res.items ?? []) : null;
+        track('meal_logged', {
+          source: kindOf(input),
+          origin: res ? originOf(res) : undefined,
+          calories: res?.totals?.calories_kcal ?? totals?.calories,
+          items_count: res?.items?.length,
+          day_meal_index: baselineCount >= 0 ? baselineCount + 1 : undefined,
+        });
+        // First-week journey: a settled log is a quest event (first_log,
+        // photo/voice, restaurant, full_day via today's count).
+        void reportJourneyEvent({
+          type: 'log_created',
+          source: kindOf(input),
+          origin: res ? originOf(res) : undefined,
+          todayCount: baselineCount >= 0 ? baselineCount + 1 : undefined,
+        }).catch(() => {});
       };
 
       try {
@@ -204,7 +264,7 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
         const loggedFood =
           (res.items?.length ?? 0) > 0 || totals.calories > 0 || (res.totals?.calories_kcal ?? 0) > 0;
         if (loggedFood) {
-          clearAsLogged();
+          clearAsLogged(res);
           return;
         }
 

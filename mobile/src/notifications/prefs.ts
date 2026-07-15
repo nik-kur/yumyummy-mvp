@@ -31,17 +31,22 @@ export interface NotificationPrefs {
   weeklyRecap: WeeklyRecapPref;
 }
 
-const STORAGE_KEY = 'yumyummy.notif.prefs.v1';
+// v2: meal reminders became opt-in (breakfast/lunch/dinner default OFF).
+// v1 blobs migrate once: master switch and weekly recap are kept, per-meal
+// reminders reset to the new opt-in defaults.
+const STORAGE_KEY = 'yumyummy.notif.prefs.v2';
+const LEGACY_STORAGE_KEY = 'yumyummy.notif.prefs.v1';
 
 /** Built-in reminders. Master defaults OFF so we never schedule (or prompt for
- *  permission) until the user opts in; individual reminders default ON so that
- *  flipping the master switch immediately gives a sensible daily set. */
+ *  permission) until the user opts in. Per-meal reminders are opt-in from
+ *  Settings; only the evening check-in is on out of the box, so "enable
+ *  reminders" in onboarding stays a single-tap, zero-decision step. */
 export const DEFAULT_PREFS: NotificationPrefs = {
   enabled: false,
   reminders: [
-    { id: 'breakfast', label: 'Breakfast', hour: 9, minute: 0, enabled: true },
-    { id: 'lunch', label: 'Lunch', hour: 13, minute: 0, enabled: true },
-    { id: 'dinner', label: 'Dinner', hour: 19, minute: 0, enabled: true },
+    { id: 'breakfast', label: 'Breakfast', hour: 9, minute: 0, enabled: false },
+    { id: 'lunch', label: 'Lunch', hour: 13, minute: 0, enabled: false },
+    { id: 'dinner', label: 'Dinner', hour: 19, minute: 0, enabled: false },
     { id: 'evening', label: 'Evening check-in', hour: 21, minute: 0, enabled: true },
   ],
   // Sunday 18:00 — "Your weekly recap is ready".
@@ -94,8 +99,24 @@ function clone(p: NotificationPrefs): NotificationPrefs {
 export async function loadPrefs(): Promise<NotificationPrefs> {
   try {
     const raw = await SecureStore.getItemAsync(STORAGE_KEY);
-    if (!raw) return clone(DEFAULT_PREFS);
-    return reconcile(JSON.parse(raw));
+    if (raw) return reconcile(JSON.parse(raw));
+
+    // One-time v1 → v2 migration: keep the master switch + weekly recap, drop
+    // per-meal reminders back to defaults (they're opt-in now).
+    const legacy = await SecureStore.getItemAsync(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const old = JSON.parse(legacy) as Partial<NotificationPrefs>;
+      const migrated = clone(DEFAULT_PREFS);
+      migrated.enabled = Boolean(old.enabled);
+      if (old.weeklyRecap && typeof old.weeklyRecap === 'object') {
+        migrated.weeklyRecap = reconcile(old).weeklyRecap;
+      }
+      await savePrefs(migrated);
+      await SecureStore.deleteItemAsync(LEGACY_STORAGE_KEY).catch(() => {});
+      return migrated;
+    }
+
+    return clone(DEFAULT_PREFS);
   } catch {
     return clone(DEFAULT_PREFS);
   }

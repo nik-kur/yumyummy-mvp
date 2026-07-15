@@ -1,6 +1,6 @@
 /**
  * WidgetInstructionSheet — bottom-sheet modal that walks the user through
- * adding the YumYummy home-screen widget (quest "add_widget", Day 6).
+ * adding the YumYummy home-screen widget (quest "widget").
  */
 import { View, StyleSheet, Modal, Pressable } from 'react-native';
 import { Smartphone, Plus, CheckCircle } from 'lucide-react-native';
@@ -8,6 +8,9 @@ import { Smartphone, Plus, CheckCircle } from 'lucide-react-native';
 import { AppText } from './AppText';
 import { Button } from './Button';
 import { colors, radius, space } from '@/theme/tokens';
+import { ALL_QUESTS } from '@/state/journey';
+
+const WIDGET_QUEST_DAY = ALL_QUESTS.find((q) => q.id === 'widget')?.day ?? 1;
 
 interface Props {
   visible: boolean;
@@ -41,7 +44,7 @@ export function WidgetInstructionSheet({ visible, onDismiss, onDone }: Props) {
           <View style={s.handle} />
 
           <AppText variant="overline" color={colors.protein}>
-            DAY 6 QUEST
+            DAY {WIDGET_QUEST_DAY} QUEST
           </AppText>
           <AppText variant="h2" style={s.headline}>Add the home widget</AppText>
           <AppText variant="body" color={colors.inkMuted} style={s.subtitle}>
