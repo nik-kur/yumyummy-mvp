@@ -30,6 +30,7 @@
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_u8XVgBexJVuggFASRTw7AL6mmpwoZDa6moycSxz7FrpD",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
         "EXPO_PUBLIC_SENTRY_DSN": "https://0169e00e2ce77d6122ac134c2f81cff9@o4511348872380416.ingest.de.sentry.io/4511704535924816",
+        "SENTRY_URL": "https://de.sentry.io/",
         "SENTRY_ALLOW_FAILURE": "true"
       }
     },
@@ -41,6 +42,7 @@
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_u8XVgBexJVuggFASRTw7AL6mmpwoZDa6moycSxz7FrpD",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
         "EXPO_PUBLIC_SENTRY_DSN": "https://0169e00e2ce77d6122ac134c2f81cff9@o4511348872380416.ingest.de.sentry.io/4511704535924816",
+        "SENTRY_URL": "https://de.sentry.io/",
         "SENTRY_ALLOW_FAILURE": "true"
       }
     }
