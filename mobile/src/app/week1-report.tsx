@@ -17,6 +17,7 @@ import { Button } from '@/components/Button';
 import * as api from '@/api/endpoints';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
+import { maybeRequestReview } from '@/state/rateReview';
 
 export default function Week1ReportScreen() {
   const router = useRouter();
@@ -25,7 +26,12 @@ export default function Week1ReportScreen() {
 
   useEffect(() => {
     api.getWeek1Report()
-      .then(setReport)
+      .then((r) => {
+        setReport(r);
+        // Finishing the first week is a high point — a good, non-intrusive
+        // moment to ask for a rating (guarded so it never nags).
+        if (r?.has_data) void maybeRequestReview('week1_report');
+      })
       .finally(() => setLoading(false));
     track('week1_report_viewed');
   }, []);

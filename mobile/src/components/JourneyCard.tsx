@@ -1,9 +1,9 @@
 /**
  * Journey progress card for the Today screen — "Your First Week".
  *
- * Header (ring % + day title) opens the week-path overlay. Each quest of the
- * active day renders as an equal-size row: completed rows turn gray with a
- * strikethrough; incomplete rows open a how-to sheet on tap.
+ * Header (ring + day title) opens the week-path overlay. The card lists today's
+ * quests; if the user has fallen behind (earlier-day quests still open) those
+ * appear first under a "Catch up" heading and the ring turns amber.
  */
 import { View, Pressable, StyleSheet } from 'react-native';
 import { ChevronRight, Check } from 'lucide-react-native';
@@ -17,31 +17,67 @@ import {
   LADDER,
   completedCount,
   isCompleted,
+  overdueQuests,
   type JourneyState,
   type QuestDef,
 } from '@/state/journey';
 
 interface JourneyCardProps {
   state: JourneyState;
-  /** Active (highest unlocked) day — quests of this day are listed. */
+  /** Active (calendar) day — quests of this day are listed. */
   day: number;
   onHeaderPress: () => void;
   onQuestPress: (quest: QuestDef) => void;
 }
 
+function QuestRow({
+  quest,
+  done,
+  showBorder,
+  onPress,
+}: {
+  quest: QuestDef;
+  done: boolean;
+  showBorder: boolean;
+  onPress: (q: QuestDef) => void;
+}) {
+  return (
+    <Pressable
+      disabled={done}
+      onPress={() => onPress(quest)}
+      style={[s.questRow, showBorder && s.questRowBorder]}
+    >
+      <View style={[s.checkbox, done && s.checkboxDone]}>
+        {done ? <Check size={14} color={colors.white} strokeWidth={3} /> : null}
+      </View>
+      <AppText
+        variant="body"
+        color={done ? colors.inkFaint : colors.ink}
+        style={[s.questLabel, done && s.questLabelDone]}
+      >
+        {quest.title}
+      </AppText>
+      {!done ? <ChevronRight size={16} color={colors.inkFaint} strokeWidth={1.5} /> : null}
+    </Pressable>
+  );
+}
+
 export function JourneyCard({ state, day, onHeaderPress, onQuestPress }: JourneyCardProps) {
-  // Ring = week quests done out of the whole ladder — shown as a count so
-  // the number is self-explanatory (a bare % read as random).
   const done = completedCount(state);
   const total = ALL_QUESTS.length;
   const dayDef = LADDER.find((d) => d.day === day);
   if (!dayDef) return null;
 
+  const overdue = overdueQuests(state);
+  const behind = overdue.length > 0;
+  const ringColor = behind ? colors.warning : colors.protein;
+  const ringTrack = behind ? colors.warningSoft : colors.oliveSoft;
+
   return (
-    <Card style={s.card}>
+    <Card style={[s.card, behind && s.cardBehind]}>
       <Pressable onPress={onHeaderPress} style={s.header} hitSlop={4}>
-        <Ring size={46} stroke={4} progress={done / total} color={colors.protein} track={colors.oliveSoft}>
-          <AppText variant="caption" color={colors.protein} style={s.pct}>
+        <Ring size={46} stroke={4} progress={done / total} color={ringColor} track={ringTrack}>
+          <AppText variant="caption" color={ringColor} style={s.pct}>
             {done}/{total}
           </AppText>
         </Ring>
@@ -54,37 +90,41 @@ export function JourneyCard({ state, day, onHeaderPress, onQuestPress }: Journey
         <ChevronRight size={20} color={colors.inkFaint} strokeWidth={1.5} />
       </Pressable>
 
+      {behind ? (
+        <View style={s.catchUp}>
+          <AppText variant="overline" color={colors.warning} style={s.catchUpLabel}>
+            CATCH UP
+          </AppText>
+          {overdue.map((q, i) => (
+            <QuestRow key={q.id} quest={q} done={false} showBorder={i > 0} onPress={onQuestPress} />
+          ))}
+        </View>
+      ) : null}
+
       <View style={s.list}>
-        {dayDef.quests.map((q, i) => {
-          const done = isCompleted(state, q.id);
-          return (
-            <Pressable
-              key={q.id}
-              disabled={done}
-              onPress={() => onQuestPress(q)}
-              style={[s.questRow, i > 0 && s.questRowBorder]}
-            >
-              <View style={[s.checkbox, done && s.checkboxDone]}>
-                {done ? <Check size={14} color={colors.white} strokeWidth={3} /> : null}
-              </View>
-              <AppText
-                variant="body"
-                color={done ? colors.inkFaint : colors.ink}
-                style={[s.questLabel, done && s.questLabelDone]}
-              >
-                {q.title}
-              </AppText>
-              {!done ? (
-                <ChevronRight size={16} color={colors.inkFaint} strokeWidth={1.5} />
-              ) : null}
-            </Pressable>
-          );
-        })}
+        {behind ? (
+          <AppText variant="overline" color={colors.inkMuted} style={s.todayLabel}>
+            TODAY
+          </AppText>
+        ) : null}
+        {dayDef.quests.map((q, i) => (
+          <QuestRow
+            key={q.id}
+            quest={q}
+            done={isCompleted(state, q.id)}
+            showBorder={i > 0}
+            onPress={onQuestPress}
+          />
+        ))}
       </View>
 
-      <View style={s.unlockChip}>
-        <AppText variant="caption" color={colors.infoBlue}>
-          ✨ {dayDef.unlock}
+      <View style={[s.chip, behind ? s.chipBehind : s.chipAhead]}>
+        <AppText variant="caption" color={behind ? colors.warning : colors.infoBlue}>
+          {behind
+            ? `You're behind — finish ${overdue.length} earlier ${
+                overdue.length === 1 ? 'quest' : 'quests'
+              } to get back on track.`
+            : `✨ ${dayDef.unlock}`}
         </AppText>
       </View>
     </Card>
@@ -93,6 +133,7 @@ export function JourneyCard({ state, day, onHeaderPress, onQuestPress }: Journey
 
 const s = StyleSheet.create({
   card: { borderColor: colors.oliveSoft, borderWidth: 1.5 },
+  cardBehind: { borderColor: colors.warningSoft },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -101,10 +142,17 @@ const s = StyleSheet.create({
   },
   pct: { fontSize: 11 },
   headerText: { flex: 1, gap: 2 },
+  catchUp: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    marginBottom: space.xs,
+  },
+  catchUpLabel: { marginTop: space.sm },
   list: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
   },
+  todayLabel: { marginTop: space.sm },
   questRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -130,11 +178,12 @@ const s = StyleSheet.create({
   },
   questLabel: { flex: 1 },
   questLabelDone: { textDecorationLine: 'line-through' },
-  unlockChip: {
-    backgroundColor: colors.infoBlueSoft,
+  chip: {
     borderRadius: radius.md,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     marginTop: space.sm,
   },
+  chipAhead: { backgroundColor: colors.infoBlueSoft },
+  chipBehind: { backgroundColor: colors.warningSoft },
 });

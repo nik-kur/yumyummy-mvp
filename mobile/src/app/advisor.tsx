@@ -38,28 +38,49 @@ interface Message {
   card?: SuggestionCard;
 }
 
+// Two supported scenarios, surfaced as starter chips: meal recommendations and
+// analysis of the user's own diary.
 const SUGGESTIONS = [
-  'What should I eat for dinner?',
+  'What should I eat next?',
+  'Ideas for eating out tonight',
+  'How’s my nutrition this week?',
   'Am I getting enough protein?',
-  'Ideas under 500 kcal',
 ];
 
 const GREETING: Message = {
   id: 'greeting',
   role: 'assistant',
-  text: 'Hi! I’m your nutrition advisor. Ask me what to eat next, how your day looks, or for ideas that fit your remaining budget.',
-};
-
-const DEMO_CARD: SuggestionCard = {
-  name: 'Salmon & greens bowl',
-  kcal: 560,
-  protein: 42,
-  carbs: 38,
-  fat: 24,
+  text: 'Hi! I’m your nutrition advisor. Ask me what to eat or order next, or how your day and week are looking — I’ll use your real numbers.',
 };
 
 let counter = 0;
 const nextId = () => `m${++counter}`;
+
+/** Build an option card from an agent response — only recommendations carry
+ *  option items; analysis/off-topic replies are text-only. */
+function cardFromResponse(res: {
+  intent?: string;
+  items?: { name: string; calories_kcal: number; protein_g: number; fat_g: number; carbs_g: number }[];
+}): SuggestionCard | undefined {
+  const top = res.items?.[0];
+  if (!top) return undefined;
+  return {
+    name: top.name,
+    kcal: Math.round(top.calories_kcal),
+    protein: Math.round(top.protein_g),
+    carbs: Math.round(top.carbs_g),
+    fat: Math.round(top.fat_g),
+  };
+}
+
+/** Last few turns as plain text for follow-up context (kept small for cost). */
+function conversationContext(messages: Message[]): string {
+  return messages
+    .filter((m) => m.id !== 'greeting')
+    .slice(-6)
+    .map((m) => `${m.role === 'user' ? 'User' : 'Advisor'}: ${m.text}`)
+    .join('\n');
+}
 
 function Bubble({ message }: { message: Message }) {
   const isUser = message.role === 'user';
@@ -115,13 +136,19 @@ export default function AdvisorScreen() {
     setMessages((prev) => [...prev, userMsg]);
     setThinking(true);
     void reportJourneyEvent({ type: 'ai_message_sent' }).catch(() => {});
+    // Snapshot the thread (incl. the just-added user turn) for follow-up context.
+    const convo = conversationContext([...messages, userMsg]);
     try {
-      const res = await api.agentRun({ text: textValue, force_intent: 'advice' });
+      const res = await api.agentRun({
+        text: textValue,
+        force_intent: 'advice',
+        conversation_context: convo || null,
+      });
       const reply: Message = {
         id: nextId(),
         role: 'assistant',
         text: res.message_text,
-        card: DEMO_CARD,
+        card: cardFromResponse(res),
       };
       setMessages((prev) => [...prev, reply]);
     } catch {

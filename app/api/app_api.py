@@ -977,6 +977,73 @@ def _build_nutrition_context(db: Session, user: User) -> str:
     )
 
 
+def _build_history_context(db: Session, user: User, days: int = 7) -> str:
+    """Last `days` days of the diary as compact JSON for the advisor's analysis
+    scenario — per-day totals plus simple aggregates so the model can answer
+    "how's my week / am I getting enough protein" from real data."""
+    import json
+
+    import pytz
+
+    try:
+        tz = pytz.timezone(user.timezone or "Europe/Moscow")
+    except pytz.exceptions.UnknownTimeZoneError:
+        tz = pytz.timezone("Europe/Moscow")
+    today = datetime.now(tz).date()
+    start = today - timedelta(days=days - 1)
+
+    rows = (
+        db.query(UserDay)
+        .filter(UserDay.user_id == user.id, UserDay.date >= start, UserDay.date <= today)
+        .order_by(UserDay.date.asc())
+        .all()
+    )
+    target_cal = user.target_calories or 2000
+    day_list = []
+    logged = 0
+    on_target = 0
+    sum_cal = sum_prot = sum_fat = sum_carbs = 0.0
+    for r in rows:
+        cal = (r.total_calories or 0) or 0
+        prot = (r.total_protein_g or 0) or 0
+        fat = (r.total_fat_g or 0) or 0
+        carbs = (r.total_carbs_g or 0) or 0
+        if cal > 0:
+            logged += 1
+            sum_cal += cal
+            sum_prot += prot
+            sum_fat += fat
+            sum_carbs += carbs
+            if target_cal and abs(cal - target_cal) <= 0.1 * target_cal:
+                on_target += 1
+        day_list.append(
+            {
+                "date": r.date.isoformat(),
+                "calories": round(cal),
+                "protein_g": round(prot),
+                "fat_g": round(fat),
+                "carbs_g": round(carbs),
+            }
+        )
+
+    return json.dumps(
+        {
+            "days": day_list,
+            "days_logged": logged,
+            "days_on_target": on_target,
+            "avg_calories": round(sum_cal / logged) if logged else 0,
+            "avg_protein_g": round(sum_prot / logged) if logged else 0,
+            "avg_fat_g": round(sum_fat / logged) if logged else 0,
+            "avg_carbs_g": round(sum_carbs / logged) if logged else 0,
+            "target_calories": user.target_calories,
+            "target_protein_g": user.target_protein_g,
+            "target_fat_g": user.target_fat_g,
+            "target_carbs_g": user.target_carbs_g,
+        },
+        ensure_ascii=False,
+    )
+
+
 @router.post("/agent/run", response_model=WorkflowRunResponse)
 async def app_agent_run(
     payload: AppAgentRunRequest,
@@ -1060,17 +1127,25 @@ async def app_agent_run(
     # Any v2 failure falls through to the v1 workflow, so beta accounts can
     # never end up worse off than production.
     result = None
+    is_advisor = (payload.force_intent or "").lower() in ("advice", "food_advice")
+    # The advisor surface is a distinct, v2-only experience (recommendations +
+    # diary analysis), so route it through v2 for everyone regardless of the
+    # per-account logging-engine beta gate. Any v2 error still falls back to v1.
     use_v2 = (
         settings.agent_engine_default == "v2"
         or account.id in settings.agent_v2_account_id_set
+        or is_advisor
     )
     if use_v2:
         try:
             from app.agent_v2.adapter import run_v2_workflow
 
             nutrition_context = payload.nutrition_context
-            if (payload.force_intent or "").lower() in ("advice", "food_advice") and not nutrition_context:
-                nutrition_context = _build_nutrition_context(db, user)
+            history_context = None
+            if is_advisor:
+                if not nutrition_context:
+                    nutrition_context = _build_nutrition_context(db, user)
+                history_context = _build_history_context(db, user)
 
             result = await run_v2_workflow(
                 user_text=payload.text,
@@ -1079,6 +1154,8 @@ async def app_agent_run(
                 image_urls=payload.image_urls,
                 force_intent=payload.force_intent,
                 nutrition_context=nutrition_context,
+                history_context=history_context,
+                conversation_context=payload.conversation_context,
                 variant=settings.agent_v2_variant,
             )
             logger.info(

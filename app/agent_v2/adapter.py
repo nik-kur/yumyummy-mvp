@@ -75,6 +75,8 @@ async def run_v2_workflow(
     image_urls: Optional[List[str]] = None,
     force_intent: Optional[str] = None,
     nutrition_context: Optional[str] = None,
+    history_context: Optional[str] = None,
+    conversation_context: Optional[str] = None,
     variant: Optional[str] = None,
 ) -> dict:
     intent = _INTENT_MAP.get((force_intent or "").strip().lower())
@@ -89,6 +91,8 @@ async def run_v2_workflow(
         image_url=image_url,
         image_urls=image_urls,
         nutrition_context=nutrition_context or "",
+        history_context=history_context or "",
+        conversation_context=conversation_context or "",
     )
     if res.error:
         # Surface as an exception so the endpoint's try/except can fall back to v1.

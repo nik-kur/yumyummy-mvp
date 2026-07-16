@@ -209,6 +209,9 @@ class AppAgentRunRequest(BaseModel):
     image_urls: Optional[List[str]] = Field(default=None, max_length=5)
     force_intent: Optional[str] = Field(default=None, max_length=64)
     nutrition_context: Optional[str] = Field(default=None, max_length=8000)
+    # Advisor only: the last few chat turns as plain text so follow-up
+    # questions ("and for dinner?") keep context. Capped to bound token cost.
+    conversation_context: Optional[str] = Field(default=None, max_length=6000)
 
 
 class AppTrialStartRequest(BaseModel):

@@ -29,9 +29,10 @@ import { JourneyPathSheet } from '@/components/JourneyPathSheet';
 import { QuestInfoSheet } from '@/components/QuestInfoSheet';
 import { InsightCard } from '@/components/InsightCard';
 import { WidgetInstructionSheet } from '@/components/WidgetInstructionSheet';
-import { loadJourney, reconcileJourney, currentDay, rawDay, activeDay, takeNextPopup, subscribeJourney, reportJourneyEvent, type JourneyState, type QuestDef, type QuestId } from '@/state/journey';
+import { loadJourney, reconcileJourney, rawDay, activeDay, takeNextPopup, subscribeJourney, reportJourneyEvent, type JourneyState, type QuestDef, type QuestId } from '@/state/journey';
 import { requestPermission, syncFromPrefs } from '@/notifications/scheduler';
 import { loadPrefs, savePrefs } from '@/notifications/prefs';
+import { maybeRequestReview } from '@/state/rateReview';
 import { isAnyWidgetInstalled } from '../../../modules/widget-status';
 import { formatInt, formatTime } from '@/utils/format';
 import { colors, radius, space } from '@/theme/tokens';
@@ -207,19 +208,20 @@ export default function TodayScreen() {
       ]);
       setDay(d);
       let j = journeyRaw;
-      // Real insights only (no 'motivation' fallback), and never before
-      // journey Day 3 — that's when the ladder promises the first one
-      // ("Tomorrow unlocks: your first insight"). Users without a journey
-      // (pre-journey accounts) see insights whenever the backend has one.
-      const insightUnlocked = !j.started_at || rawDay(j.started_at) >= 3;
-      if (ins && ins.id !== 'motivation' && insightUnlocked) {
+      // Real insights only (no 'motivation' fallback), and only from journey
+      // Day 3 onward. After the first week we also drop the low-value
+      // "N days logged" consistency banner so it doesn't linger forever.
+      const rd = j.started_at ? rawDay(j.started_at) : null;
+      const insightUnlocked = rd === null || rd >= 3;
+      const consistencyStale = rd !== null && rd > 7 && ins?.id === 'consistency';
+      if (ins && ins.id !== 'motivation' && insightUnlocked && !consistencyStale) {
         setInsight(ins);
       } else {
         setInsight(null);
       }
 
       if (j.started_at) {
-        const journeyDay = currentDay(j.started_at);
+        const journeyDay = rawDay(j.started_at);
         if (journeyDay >= 1 && journeyDay <= 7) {
           const mealCount = d?.meals?.length ?? 0;
           if (mealCount > 0) {
@@ -285,8 +287,11 @@ export default function TodayScreen() {
   );
 
   const dismissPopup = useCallback(() => {
+    // Closing a full day is the first big "it works" moment — ask for a rating
+    // right after the celebratory popup (guarded so it never nags).
+    if (popupQuestId === 'full_day') void maybeRequestReview('full_day_closed');
     setPopupQuestId(null);
-  }, []);
+  }, [popupQuestId]);
 
   const onWidgetDone = useCallback(async () => {
     setWidgetSheetVisible(false);
@@ -337,8 +342,14 @@ export default function TodayScreen() {
         case 'weigh_in':
           router.push('/(tabs)/profile');
           break;
+        case 'delete_meal':
+        case 'edit_meal':
+          // Both are done from a logged meal — send the user to Today's list.
+          router.push('/(tabs)');
+          break;
         default:
-          router.push('/capture');
+          if (quest.id.startsWith('menu_log')) router.push('/(tabs)/menu');
+          else router.push('/capture');
       }
     },
     [router, enableRemindersOneTap],
@@ -427,7 +438,7 @@ export default function TodayScreen() {
             </View>
           </Card>
 
-          {journey && journey.started_at && !journey.dismissed && currentDay(journey.started_at) <= 7 && (
+          {journey && journey.started_at && !journey.dismissed && rawDay(journey.started_at) <= 7 && (
             <View style={styles.journeyWrap}>
               <JourneyCard
                 state={journey}

@@ -28,10 +28,27 @@ export type QuestId =
   | 'insight'
   | 'photo_log'
   | 'voice_log'
+  | 'delete_meal'
   | 'restaurant_log'
-  | 'ai_question'
+  | 'edit_meal'
   | 'week_trends'
-  | 'weigh_in';
+  | 'ai_question'
+  | 'weigh_in'
+  // Daily "log from My Menu" habit quest, one per day from Day 3 onward.
+  | 'menu_log_3'
+  | 'menu_log_4'
+  | 'menu_log_5'
+  | 'menu_log_6'
+  | 'menu_log_7';
+
+/** menu_log ids in day order — the daily "log from My Menu" habit quests. */
+export const MENU_LOG_IDS: QuestId[] = [
+  'menu_log_3',
+  'menu_log_4',
+  'menu_log_5',
+  'menu_log_6',
+  'menu_log_7',
+];
 
 export interface QuestDef {
   id: QuestId;
@@ -49,11 +66,16 @@ export interface DayDef {
   quests: QuestDef[];
 }
 
+// A "log from My Menu" quest for the given day (Days 3–7 each get one).
+function menuLogQuest(day: number): QuestDef {
+  return { id: `menu_log_${day}` as QuestId, day, title: 'Log a meal from My Menu 🍱' };
+}
+
 export const LADDER: DayDef[] = [
   {
     day: 1,
     title: 'Start',
-    unlock: 'Tomorrow: close your first full day',
+    unlock: 'Log your first meal to get going.',
     quests: [
       { id: 'plan_built', day: 1, title: 'Plan built', precompleted: true },
       { id: 'first_log', day: 1, title: 'Log your first meal' },
@@ -64,7 +86,7 @@ export const LADDER: DayDef[] = [
   {
     day: 2,
     title: 'Make it yours',
-    unlock: 'Tomorrow unlocks: your first insight ✨',
+    unlock: 'Close a full day and save your go-to meals.',
     quests: [
       { id: 'full_day', day: 2, title: 'Close a full day', target: 3 },
       { id: 'menu', day: 2, title: 'Build your menu', target: 2 },
@@ -72,42 +94,59 @@ export const LADDER: DayDef[] = [
   },
   {
     day: 3,
-    // The first insight still lands on Day 3 (see Today), it's just not a
-    // quest anymore — checking a card felt like a chore, not an achievement.
     title: 'Faster ways to log',
-    unlock: 'Your plan is already working — see what we spotted',
+    unlock: 'Photo, voice, and cleaning up your diary.',
     quests: [
       { id: 'photo_log', day: 3, title: 'Try a photo log 📷' },
       { id: 'voice_log', day: 3, title: 'Try a voice log 🎤' },
+      { id: 'delete_meal', day: 3, title: 'Delete a meal you didn’t eat 🗑️' },
+      menuLogQuest(3),
     ],
   },
   {
     day: 4,
     title: 'Eating out — handled',
-    unlock: 'Eating out — handled',
-    quests: [{ id: 'restaurant_log', day: 4, title: 'Log a meal you didn’t cook 🍽️' }],
+    unlock: 'Log a cafe or restaurant meal.',
+    quests: [
+      { id: 'restaurant_log', day: 4, title: 'Log a meal from cafe/restaurant 🍽️' },
+      menuLogQuest(4),
+    ],
   },
   {
     day: 5,
-    title: 'Meet your AI advisor',
-    unlock: 'It knows your plan and your day',
-    quests: [{ id: 'ai_question', day: 5, title: 'Ask your AI advisor anything' }],
+    title: 'Fix a meal',
+    unlock: 'Edit a logged meal to fix its numbers.',
+    quests: [
+      { id: 'edit_meal', day: 5, title: 'Edit a logged meal ✏️' },
+      menuLogQuest(5),
+    ],
   },
   {
     day: 6,
     title: 'Explore your Week trends',
-    unlock: 'Tomorrow: your Week 1 Report',
-    quests: [{ id: 'week_trends', day: 6, title: 'Explore your Week trends 📊' }],
+    unlock: 'See how your first week is shaping up.',
+    quests: [
+      { id: 'week_trends', day: 6, title: 'Explore your Week trends 📊' },
+      menuLogQuest(6),
+    ],
   },
   {
     day: 7,
-    title: 'Weigh-in + Week 1 Report',
-    unlock: 'Week 1 Report is ready',
-    quests: [{ id: 'weigh_in', day: 7, title: 'Update your weight ⚖️' }],
+    title: 'Meet your AI advisor',
+    unlock: 'Ask your advisor anything — it knows your plan.',
+    quests: [
+      { id: 'ai_question', day: 7, title: 'Ask your AI advisor anything 💬' },
+      menuLogQuest(7),
+    ],
   },
 ];
 
 export const ALL_QUESTS: QuestDef[] = LADDER.flatMap((d) => d.quests);
+
+const MENU_LOG_WHY = {
+  title: 'Logged from your menu',
+  why: 'Re-logging a saved meal is the fastest way to track — one tap, no waiting, no new search. Do it daily and tracking stops feeling like work.',
+};
 
 /** Why-it-matters copy for completion popups (spec §3, final EN). */
 export const QUEST_WHY: Record<QuestId, { title: string; why: string }> = {
@@ -144,9 +183,17 @@ export const QUEST_WHY: Record<QuestId, { title: string; why: string }> = {
     title: 'Voice log',
     why: 'Voice is the fastest hands-free log — just say it like you’d tell a friend. YumYummy parses dishes, portions and brands from plain speech, then verifies the numbers.',
   },
+  delete_meal: {
+    title: 'Diary cleaned up',
+    why: 'Logged something by mistake? Deleting it keeps your day honest — your numbers should always match what you actually ate.',
+  },
   restaurant_log: {
     title: 'Eating out — handled',
     why: 'Eating out is where most trackers break — and most diets stall. YumYummy matched your meal to official restaurant data, so your numbers stayed right.',
+  },
+  edit_meal: {
+    title: 'Meal fine-tuned',
+    why: 'Portions vary — a bigger bowl, an extra spoon. Editing an entry keeps your calorie math accurate, and it takes two seconds.',
   },
   ai_question: {
     title: 'Advisor unlocked',
@@ -160,6 +207,11 @@ export const QUEST_WHY: Record<QuestId, { title: string; why: string }> = {
     title: 'Weigh-in done',
     why: 'Weight closes the loop: your graph now shows plan vs reality — and your targets can adapt to it.',
   },
+  menu_log_3: MENU_LOG_WHY,
+  menu_log_4: MENU_LOG_WHY,
+  menu_log_5: MENU_LOG_WHY,
+  menu_log_6: MENU_LOG_WHY,
+  menu_log_7: MENU_LOG_WHY,
 };
 
 // ---------------------------------------------------------------------------
@@ -294,26 +346,32 @@ export function hasUserProgress(state: JourneyState): boolean {
   return ALL_QUESTS.some((q) => !q.precompleted && isCompleted(state, q.id));
 }
 
-/** First incomplete quest, today's day first, then earlier days (for "Next up"). */
+/** First incomplete quest, today's day first, then earlier (overdue) days. */
 export function nextQuest(state: JourneyState, day: number): QuestDef | null {
   const unlocked = ALL_QUESTS.filter((q) => isDayUnlocked(state, q.day));
   const ordered = [
+    ...unlocked.filter((q) => q.day < day), // overdue catch-up first
     ...unlocked.filter((q) => q.day === day),
-    ...unlocked.filter((q) => q.day < day),
     ...unlocked.filter((q) => q.day > day),
   ];
   return ordered.find((q) => !isCompleted(state, q.id)) ?? null;
 }
 
 // ---------------------------------------------------------------------------
-// Day locking (sequential unlock)
+// Day progression (calendar-based, with catch-up)
 // ---------------------------------------------------------------------------
 //
-// Days unlock strictly in order: day D opens only when the calendar reached it
-// AND every quest of days 1..D−1 is done. Actions performed while a quest's
-// day is still locked ARE remembered (state.actions) and the quest completes
-// automatically the moment its day unlocks — doing the thing "directly",
-// outside the checklist, always counts.
+// Days advance by the CALENDAR, not by completion: Day N's quests appear on the
+// N-th calendar day whether or not earlier days are done. Unfinished quests
+// from earlier days stay open as "catch-up"; while any are open the user is
+// "behind" (shown with an amber ring). Doing a thing early still counts —
+// state.actions is remembered and the quest completes the moment its day
+// arrives (see settle()).
+
+/** The calendar day the card is centred on (1..7); 0 when not started. */
+export function activeDay(state: JourneyState): number {
+  return state.started_at ? currentDay(state.started_at) : 0;
+}
 
 /** All quests of `day` completed? */
 export function dayCompleted(state: JourneyState, day: number): boolean {
@@ -322,44 +380,38 @@ export function dayCompleted(state: JourneyState, day: number): boolean {
   return def.quests.every((q) => isCompleted(state, q.id));
 }
 
-function prevDaysCompleted(state: JourneyState, day: number): boolean {
-  for (let d = 1; d < day; d++) {
-    if (!dayCompleted(state, d)) return false;
-  }
-  return true;
-}
-
-/** Day is unlocked: journey started, calendar reached it, all previous days done. */
+/** Day is unlocked once the calendar reaches it (no completion gate). */
 export function isDayUnlocked(state: JourneyState, day: number): boolean {
   if (!state.started_at) return false;
-  if (day === 1) return true;
-  return rawDay(state.started_at) >= day && prevDaysCompleted(state, day);
+  return rawDay(state.started_at) >= day;
 }
 
-/** Highest unlocked day — the day the Today card shows. */
-export function activeDay(state: JourneyState): number {
-  let active = 1;
-  for (let d = 2; d <= 7; d++) {
-    if (isDayUnlocked(state, d)) active = d;
-  }
-  return active;
+/** Incomplete quests from days strictly before today — the catch-up backlog. */
+export function overdueQuests(state: JourneyState): QuestDef[] {
+  const today = activeDay(state);
+  return ALL_QUESTS.filter((q) => q.day < today && !isCompleted(state, q.id));
 }
 
-export type DayStatus = 'complete' | 'active' | 'preview' | 'locked';
+/** User is behind when earlier-day quests are still open. */
+export function isBehind(state: JourneyState): boolean {
+  return overdueQuests(state).length > 0;
+}
+
+export type DayStatus = 'complete' | 'active' | 'overdue' | 'preview';
 
 /**
  * Status for the week-path overlay:
  * - complete — every quest done;
- * - active   — unlocked, in progress;
- * - preview  — all previous days done, only the calendar gate remains
- *              ("opens tomorrow", quests visible but locked);
- * - locked   — previous days unfinished; quest details hidden.
+ * - active   — today's day (calendar), in progress;
+ * - overdue  — a past day with quests still open (catch-up);
+ * - preview  — a future day not reached yet.
  */
 export function dayStatus(state: JourneyState, day: number): DayStatus {
   if (dayCompleted(state, day)) return 'complete';
-  if (isDayUnlocked(state, day)) return 'active';
-  if (prevDaysCompleted(state, day)) return 'preview';
-  return 'locked';
+  const today = activeDay(state);
+  if (day < today) return 'overdue';
+  if (day === today) return 'active';
+  return 'preview';
 }
 
 // ---------------------------------------------------------------------------
@@ -374,6 +426,8 @@ export type LogOrigin = 'generic' | 'brand';
 export type JourneyEvent =
   | { type: 'log_created'; source: LogSource; origin?: LogOrigin; todayCount?: number }
   | { type: 'menu_item_created' }
+  | { type: 'meal_deleted' }
+  | { type: 'meal_edited' }
   | { type: 'ai_message_sent' }
   | { type: 'weight_updated' }
   | { type: 'week_tab_viewed' }
@@ -471,10 +525,25 @@ export async function reportJourneyEvent(event: JourneyEvent): Promise<QuestId[]
   const counters = { ...s.counters };
   const actions = { ...s.actions };
 
-  // Doing the thing counts, whenever and however it happened — locked days
-  // just defer the completion until the day opens (see settle()).
+  // Doing the thing counts, whenever and however it happened — a day not yet
+  // reached just defers the completion until it opens (see settle()).
   const record = (id: QuestId) => {
     if (!actions[id]) actions[id] = new Date().toISOString();
+  };
+
+  // A "log from My Menu" clears the oldest still-open daily menu quest (up to
+  // today). This makes the daily habit catch-up-able: one saved re-log always
+  // moves the backlog forward instead of stranding a past day forever.
+  const recordMenuLog = () => {
+    const today = activeDay(s);
+    for (const id of MENU_LOG_IDS) {
+      const day = Number(id.split('_')[2]);
+      if (day > today) break;
+      if (!s.quests[id] && !actions[id]) {
+        record(id);
+        return;
+      }
+    }
   };
 
   switch (event.type) {
@@ -483,11 +552,18 @@ export async function reportJourneyEvent(event: JourneyEvent): Promise<QuestId[]
       if (event.source === 'photo') record('photo_log');
       if (event.source === 'voice') record('voice_log');
       if (event.origin === 'brand') record('restaurant_log');
+      if (event.source === 'saved') recordMenuLog();
       if ((event.todayCount ?? 0) >= 3) record('full_day');
       break;
     case 'menu_item_created':
       counters.menu += 1;
       if (counters.menu >= 2) record('menu');
+      break;
+    case 'meal_deleted':
+      record('delete_meal');
+      break;
+    case 'meal_edited':
+      record('edit_meal');
       break;
     case 'ai_message_sent':
       record('ai_question');

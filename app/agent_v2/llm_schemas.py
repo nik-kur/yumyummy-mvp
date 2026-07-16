@@ -95,9 +95,17 @@ _ADVISOR_OPTION = {
 ADVISOR_SCHEMA = {
     "type": "object",
     "properties": {
+        # What the model decided the question is:
+        #   recommendation — "what should I eat/order" (fills 3 options)
+        #   analysis       — a question about the user's own intake/history
+        #   offtopic       — anything outside food & nutrition
+        "answer_kind": {
+            "type": "string",
+            "enum": ["recommendation", "analysis", "offtopic"],
+        },
         "message_text": {"type": "string"},
         "items": {"type": "array", "items": _ADVISOR_OPTION},
         "source_url": {"type": "string"},
     },
-    "required": ["message_text", "items"],
+    "required": ["answer_kind", "message_text", "items"],
 }

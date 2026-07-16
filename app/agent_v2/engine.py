@@ -190,6 +190,8 @@ async def run(
     serving_hint: str = "",
     language: str = "ru",
     nutrition_context: str = "",
+    history_context: str = "",
+    conversation_context: str = "",
     photo_mode: str = "b",
 ) -> V2Result:
     spec: VariantSpec = VARIANTS[variant]
@@ -242,7 +244,12 @@ async def run(
         if intent == "food_advice":
             image_bytes = await _load_image(image_path, image_url)
             return await advisor.run(
-                text, spec, nutrition_context=nutrition_context, image_bytes=image_bytes
+                text,
+                spec,
+                nutrition_context=nutrition_context,
+                history_context=history_context,
+                conversation_context=conversation_context,
+                image_bytes=image_bytes,
             )
 
         raise ValueError(f"unsupported intent: {intent}")

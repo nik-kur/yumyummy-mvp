@@ -168,6 +168,7 @@ class AdvisorOption(NullTolerantModel):
 
 
 class AdvisorResult(NullTolerantModel):
+    answer_kind: str = "recommendation"  # recommendation | analysis | offtopic
     message_text: str
     items: List[AdvisorOption]
     source_url: str = ""

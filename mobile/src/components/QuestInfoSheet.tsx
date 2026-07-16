@@ -14,6 +14,11 @@ interface QuestHow {
   cta: string;
 }
 
+const MENU_LOG_HOW: QuestHow = {
+  how: 'Open My Menu and tap a saved meal to log it in one tap — no waiting, no new search. Do it daily to build the habit.',
+  cta: 'Open My Menu',
+};
+
 const QUEST_HOW: Partial<Record<QuestId, QuestHow>> = {
   first_log: {
     how: 'Tap the + button and tell us what you ate — type it, say it, or snap a photo. A sentence is enough.',
@@ -39,9 +44,17 @@ const QUEST_HOW: Partial<Record<QuestId, QuestHow>> = {
     how: "Hold the mic and say your meal like you'd tell a friend — we'll parse dishes, portions and brands.",
     cta: 'Try a voice log',
   },
+  delete_meal: {
+    how: 'Logged something by mistake? Open any meal from Today and tap “Delete meal” — your day updates instantly.',
+    cta: 'Go to Today',
+  },
   restaurant_log: {
-    how: "Eating out? Log the meal like any other — we'll match it to the restaurant's official data.",
+    how: "Eating out? Log the meal like any other — we'll match it to the cafe or restaurant's official data.",
     cta: 'Log a meal',
+  },
+  edit_meal: {
+    how: 'Portion off? Open a logged meal from Today, tap “Edit”, and adjust the amount or macros — takes two seconds.',
+    cta: 'Go to Today',
   },
   ai_question: {
     how: 'Your AI advisor knows your plan and your day. Ask what to eat next — or anything else.',
@@ -55,6 +68,11 @@ const QUEST_HOW: Partial<Record<QuestId, QuestHow>> = {
     how: "Log today's weight to close the loop — your graph shows plan vs reality.",
     cta: 'Update weight',
   },
+  menu_log_3: MENU_LOG_HOW,
+  menu_log_4: MENU_LOG_HOW,
+  menu_log_5: MENU_LOG_HOW,
+  menu_log_6: MENU_LOG_HOW,
+  menu_log_7: MENU_LOG_HOW,
 };
 
 interface QuestInfoSheetProps {

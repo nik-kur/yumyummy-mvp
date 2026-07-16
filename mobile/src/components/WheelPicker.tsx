@@ -18,6 +18,8 @@ interface WheelPickerProps {
   itemHeight?: number;
   visibleCount?: number; // should be odd
   suffix?: string;
+  /** Custom label for each value (e.g. imperial "5'6\""). Overrides suffix. */
+  format?: (value: number) => string;
 }
 
 /** Lightweight snapping wheel picker (no native deps; runs in Expo Go). */
@@ -28,6 +30,7 @@ export function WheelPicker({
   itemHeight = 44,
   visibleCount = 5,
   suffix,
+  format,
 }: WheelPickerProps) {
   const pad = Math.floor(visibleCount / 2);
   const height = itemHeight * visibleCount;
@@ -52,13 +55,12 @@ export function WheelPicker({
             variant={selected ? 'h2' : 'title'}
             color={selected ? colors.ink : colors.inkFaint}
           >
-            {item}
-            {suffix ? ` ${suffix}` : ''}
+            {format ? format(item) : `${item}${suffix ? ` ${suffix}` : ''}`}
           </AppText>
         </View>
       );
     },
-    [itemHeight, value, suffix],
+    [itemHeight, value, suffix, format],
   );
 
   return (

@@ -1,15 +1,14 @@
 /**
  * JourneyPathSheet — full-week overview of the activation ladder.
  *
- * Sequential-unlock rendering:
+ * Calendar-based rendering:
  * - complete — green check, quests listed with their states;
- * - active   — current day, quests listed;
- * - preview  — all previous days done, calendar gate remains: quest titles
- *              visible but grayed under a lock, "opens tomorrow" note;
- * - locked   — quest details hidden behind a lock with an unlock hint.
+ * - active   — today's day, quests listed;
+ * - overdue  — a past day with open quests (amber "catch up");
+ * - preview  — a future day, quests visible but grayed with "opens Day N".
  */
 import { View, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
-import { X, Check, Lock } from 'lucide-react-native';
+import { X, Check, Lock, AlertCircle } from 'lucide-react-native';
 
 import { AppText } from './AppText';
 import { colors, radius, space } from '@/theme/tokens';
@@ -61,6 +60,10 @@ export function JourneyPathSheet({ visible, state, onDismiss }: JourneyPathSheet
                           {dayDef.day}
                         </AppText>
                       </View>
+                    ) : status === 'overdue' ? (
+                      <View style={[s.dayBadge, s.badgeOverdue]}>
+                        <AlertCircle size={16} color={colors.white} strokeWidth={2.5} />
+                      </View>
                     ) : (
                       <View style={[s.dayBadge, s.badgeLocked]}>
                         <Lock size={14} color={colors.inkFaint} strokeWidth={1.75} />
@@ -72,59 +75,56 @@ export function JourneyPathSheet({ visible, state, onDismiss }: JourneyPathSheet
                   </View>
 
                   <View style={s.dayContent}>
-                    {status === 'locked' ? (
-                      <>
-                        <AppText variant="bodyStrong" color={colors.inkFaint}>
-                          Locked
-                        </AppText>
-                        <AppText variant="caption" color={colors.inkFaint}>
-                          Finish all Day {dayDef.day - 1} quests to unlock
-                        </AppText>
-                      </>
-                    ) : (
-                      <>
-                        <AppText
-                          variant="bodyStrong"
-                          color={status === 'preview' ? colors.inkMuted : colors.ink}
-                        >
-                          {dayDef.title}
-                        </AppText>
+                    <AppText
+                      variant="bodyStrong"
+                      color={status === 'preview' ? colors.inkMuted : colors.ink}
+                    >
+                      {dayDef.title}
+                    </AppText>
 
-                        {dayDef.quests.map((q) => {
-                          const done = isCompleted(state, q.id);
-                          return (
-                            <View key={q.id} style={s.questRow}>
-                              {done ? (
-                                <Check size={14} color={colors.success} strokeWidth={2.5} />
-                              ) : (
-                                <View
-                                  style={[
-                                    s.questDot,
-                                    status === 'preview' && s.questDotLocked,
-                                  ]}
-                                />
-                              )}
-                              <AppText
-                                variant="caption"
-                                color={done || status === 'preview' ? colors.inkFaint : colors.inkMuted}
-                                style={done ? s.questDone : undefined}
-                              >
-                                {q.title}
-                              </AppText>
-                            </View>
-                          );
-                        })}
+                    {dayDef.quests.map((q) => {
+                      const done = isCompleted(state, q.id);
+                      return (
+                        <View key={q.id} style={s.questRow}>
+                          {done ? (
+                            <Check size={14} color={colors.success} strokeWidth={2.5} />
+                          ) : (
+                            <View
+                              style={[
+                                s.questDot,
+                                status === 'preview' && s.questDotLocked,
+                                status === 'overdue' && s.questDotOverdue,
+                              ]}
+                            />
+                          )}
+                          <AppText
+                            variant="caption"
+                            color={done || status === 'preview' ? colors.inkFaint : colors.inkMuted}
+                            style={done ? s.questDone : undefined}
+                          >
+                            {q.title}
+                          </AppText>
+                        </View>
+                      );
+                    })}
 
-                        {status === 'preview' ? (
-                          <View style={s.previewChip}>
-                            <Lock size={12} color={colors.infoBlue} strokeWidth={1.75} />
-                            <AppText variant="caption" color={colors.infoBlue}>
-                              Opens tomorrow — more achievements ahead
-                            </AppText>
-                          </View>
-                        ) : null}
-                      </>
-                    )}
+                    {status === 'overdue' ? (
+                      <View style={s.overdueChip}>
+                        <AlertCircle size={12} color={colors.warning} strokeWidth={1.75} />
+                        <AppText variant="caption" color={colors.warning}>
+                          Still open — finish these to get back on track
+                        </AppText>
+                      </View>
+                    ) : null}
+
+                    {status === 'preview' ? (
+                      <View style={s.previewChip}>
+                        <Lock size={12} color={colors.infoBlue} strokeWidth={1.75} />
+                        <AppText variant="caption" color={colors.infoBlue}>
+                          Opens Day {dayDef.day}
+                        </AppText>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               );
@@ -181,6 +181,7 @@ const s = StyleSheet.create({
   },
   badgeComplete: { backgroundColor: colors.success },
   badgeActive: { backgroundColor: colors.ink },
+  badgeOverdue: { backgroundColor: colors.warning },
   badgeLocked: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -197,12 +198,24 @@ const s = StyleSheet.create({
     marginHorizontal: 1,
   },
   questDotLocked: { borderStyle: 'dashed' },
+  questDotOverdue: { borderColor: colors.warning },
   questDone: { textDecorationLine: 'line-through' },
   previewChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.xs,
     backgroundColor: colors.infoBlueSoft,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    alignSelf: 'flex-start',
+    marginTop: space.xs,
+  },
+  overdueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    backgroundColor: colors.warningSoft,
     borderRadius: radius.sm,
     paddingHorizontal: space.sm,
     paddingVertical: space.xs,

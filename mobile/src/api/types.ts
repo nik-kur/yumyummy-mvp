@@ -279,6 +279,8 @@ export interface AppAgentRunRequest {
   image_urls?: string[] | null;
   force_intent?: string | null;
   nutrition_context?: string | null;
+  /** Advisor only: recent chat turns as plain text, for follow-up context. */
+  conversation_context?: string | null;
 }
 
 export interface AuthTokenResponse {

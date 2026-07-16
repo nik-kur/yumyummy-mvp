@@ -45,24 +45,24 @@ const MORNING_NUDGES: Record<number, { title: string; body: string }> = {
     body: 'Two small quests today. Two minutes now — that’s how the habit starts.',
   },
   3: {
-    title: 'Don’t break the chain 🔥',
-    body: 'Your Day 3 quests are waiting — including your first insight.',
+    title: 'Faster ways to log 📷',
+    body: 'Today: try a photo and a voice log, and tidy up your diary.',
   },
   4: {
-    title: 'Small steps, big results 💪',
-    body: 'One quick quest today. Open YumYummy and knock it out.',
+    title: 'Eating out? We’ve got it 🍽️',
+    body: 'Today’s quest: log a meal from a cafe or restaurant.',
   },
   5: {
-    title: 'Your advisor is waiting 💬',
-    body: 'Today’s quest: ask your AI advisor anything. It knows your plan.',
+    title: 'Fix any meal ✏️',
+    body: 'Today’s quest: edit a logged meal to get its numbers just right.',
   },
   6: {
     title: 'Almost there ⚡',
     body: 'Day 6 of 7 — check your Week trends and keep the streak alive.',
   },
   7: {
-    title: 'Final day — finish strong 🏁',
-    body: 'Weigh in today and your Week 1 Report unlocks.',
+    title: 'Final day — meet your advisor 💬',
+    body: 'Today’s quest: ask your AI advisor anything. It knows your plan.',
   },
 };
 

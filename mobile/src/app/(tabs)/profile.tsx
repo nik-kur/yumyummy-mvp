@@ -10,6 +10,7 @@ import {
   Lock,
   LogOut,
   Sparkles,
+  Star,
   Trash2,
   ChevronRight,
   type LucideIcon,
@@ -24,6 +25,7 @@ import { Button } from '@/components/Button';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
 import { activateAdapty, isAdaptyConfigured, PREMIUM_ACCESS_LEVEL } from '@/billing/adapty';
+import { openStoreReviewFromSettings } from '@/state/rateReview';
 import { track } from '@/analytics/posthog';
 import { captureException } from '@/analytics/sentry';
 import { formatInt } from '@/utils/format';
@@ -365,7 +367,8 @@ export default function ProfileScreen() {
         Preferences
       </AppText>
       <Card padded={false}>
-        <Row icon={Bell} label="Notifications" onPress={() => router.push('/notifications')} last />
+        <Row icon={Bell} label="Notifications" onPress={() => router.push('/notifications')} />
+        <Row icon={Star} label="Rate YumYummy" onPress={() => void openStoreReviewFromSettings()} last />
       </Card>
 
       <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>

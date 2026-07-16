@@ -175,6 +175,8 @@ export default function MealDetailScreen() {
     try {
       const serverMeal = await api.updateMeal(id, update);
       setMeal(serverMeal);
+      // First-week journey: editing a logged meal is the Day 5 quest.
+      void reportJourneyEvent({ type: 'meal_edited' }).catch(() => {});
     } catch {
       setMeal(before);
       Alert.alert('Could not save changes', 'Please check your connection and try again.');
@@ -314,6 +316,8 @@ export default function MealDetailScreen() {
         onPress: async () => {
           try {
             await api.deleteMeal(id);
+            // First-week journey: deleting a meal is the Day 3 quest.
+            void reportJourneyEvent({ type: 'meal_deleted' }).catch(() => {});
           } finally {
             router.back();
           }
