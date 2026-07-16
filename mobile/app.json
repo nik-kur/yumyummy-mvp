@@ -92,7 +92,7 @@
         "@sentry/react-native/expo",
         {
           "organization": "yumyummy",
-          "project": "yumyummy-mobile"
+          "project": "yumyummy-react-native"
         }
       ]
     ],
