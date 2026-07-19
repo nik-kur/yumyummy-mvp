@@ -151,7 +151,7 @@ def persist_agent_result_for_user(db: Session, user: User, agent_result: Dict[st
             if item_names:
                 description = ", ".join(item_names[:3])  # Max 3 items
                 if len(item_names) > 3:
-                    description += f" и ещё {len(item_names) - 3}"
+                    description += f" + {len(item_names) - 3} more"
         else:
             message_text = agent_result.get("message_text", "")
             description = message_text.split("\n")[0][:100] if message_text else "Meal"

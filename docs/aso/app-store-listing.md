@@ -19,20 +19,24 @@ highest-weighted field alongside the brand.
 
 ## Subtitle — max 30 chars
 ```
-Macro & food log, real data
+Macro log, verified sources
 ```
-`27/30`. Adds "macro", "food", "log", "data" to the indexed set without
-repeating name terms. Alternatives:
-- `Verified macros in seconds` (26) — leans on speed
-- `Photo, voice & text logging` (27) — leans on capture methods
+`27/30`. Leads with the differentiator ("verified sources") for conversion and
+adds "macro", "log", "verified", "sources" to the indexed set. "food" was
+moved to the Keywords field so nothing is lost from the index (cross-field
+combinations like "food log" still match). Alternatives:
+- `Macro & food log, real source` (29) — keeps "food" in the subtitle instead
+- `Verified macros & food log` (26) — same idea, different rhythm
 
 ## Keywords — max 100 chars (comma-separated, NO spaces, singular, no repeats of name/subtitle)
 ```
-counter,nutrition,diet,weight,loss,protein,carb,meal,fasting,health,fitness,kcal,scanner,coach
+counter,nutrition,diet,weight,loss,protein,carb,meal,fasting,health,fitness,kcal,scanner,coach,food
 ```
-`94/100`. Rules applied: never repeat words already in Name/Subtitle (calorie,
-tracker, macro, food, log, data, ai) — Apple indexes them together, so repeats
-waste space. Singular forms only (Apple auto-handles plurals). No spaces.
+`99/100`. Rules applied: never repeat words already in Name/Subtitle (calorie,
+tracker, macro, log, verified, sources, ai) — Apple indexes them together, so
+repeats waste space. Singular forms only (Apple auto-handles plurals). No
+spaces. "food" lives here (moved from the subtitle) and combines with name /
+subtitle terms: "food log", "food scanner", "food tracker".
 
 ## Promotional Text — max 170 chars (editable anytime, not indexed)
 ```
@@ -66,13 +70,13 @@ TARGETS CALIBRATED TO YOU
 Set your goal — lose weight, maintain, build muscle, or just track — and we calculate calorie and macro targets using the Mifflin-St Jeor equation, the same method used in clinical practice. Edit any target anytime.
 
 CALM BY DESIGN — NO SHAME
-No streaks. No fire emojis. No guilt. Just a quiet, factual record of what you ate, with a weekly summary and a monthly view that tell you what actually happened — like the week you skipped breakfast three times.
+No guilt trips. No noisy gamification. Just a quiet, factual record of what you ate, with a weekly summary and monthly averages that tell you what actually happened — like the week you skipped breakfast three times.
 
 YOUR DATA STAYS YOURS
 Export to CSV anytime. We don't sell or share your data. Photos and audio leave your device only after you confirm a log.
 
 MEMBERSHIP
-Start with a free 3-day trial — no credit card required. Keep going for $9.99/month, or save with an annual plan. Cancel anytime.
+Start with a free 3-day trial. Keep going for $9.99/month, or save with an annual plan. Cancel anytime.
 
 Download YumYummy and log your first meal in seconds — with numbers you can actually trust.
 ```

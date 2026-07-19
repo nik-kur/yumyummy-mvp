@@ -72,7 +72,7 @@ export const FALLBACK_CONFIG: PaywallRemoteConfig = {
     maintain_line: 'Your zone: {DAILY_KCAL} kcal',
   },
   social: {
-    laurels: ['★ {RATING} App Store', '{USERS}+ trackers', '✓ Verified data'],
+    laurels: ['★ {RATING} rating', '{USERS}+ trackers', '✓ Verified data'],
     quote: {
       text: 'Finally started losing — the numbers were just right.',
       author: 'Maria · −4 kg in 6 weeks',

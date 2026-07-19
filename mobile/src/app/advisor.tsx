@@ -5,8 +5,6 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -15,7 +13,8 @@ import { Sparkles, X, ArrowUp } from 'lucide-react-native';
 import { AppText } from '@/components/AppText';
 import { Chip } from '@/components/Chip';
 import { AIConsentSheet } from '@/components/AIConsentSheet';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardHeight } from '@/utils/keyboard';
 import { StatusBar } from 'expo-status-bar';
 import * as api from '@/api/endpoints';
 import { useAIConsent } from '@/state/aiConsent';
@@ -116,6 +115,11 @@ function Bubble({ message }: { message: Message }) {
 
 export default function AdvisorScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  // Deterministic keyboard offset — KeyboardAvoidingView mis-measures inside
+  // iOS modals (same issue as the capture/edit sheets), leaving the input bar
+  // partially under the keys.
+  const keyboardHeight = useKeyboardHeight();
   const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -174,10 +178,13 @@ export default function AdvisorScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={8}
+      <View
+        style={[
+          styles.flex,
+          // SafeAreaView already pads insets.bottom; add only the remainder so
+          // the input bar sits flush on top of the keyboard.
+          keyboardHeight > 0 && { marginBottom: Math.max(0, keyboardHeight - insets.bottom) },
+        ]}
       >
         <ScrollView
           ref={scrollRef}
@@ -206,27 +213,29 @@ export default function AdvisorScreen() {
           ) : null}
         </ScrollView>
 
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            placeholder="Ask anything about your nutrition…"
-            placeholderTextColor={colors.inkFaint}
-            value={input}
-            onChangeText={setInput}
-            onSubmitEditing={() => send(input)}
-            returnKeyType="send"
-          />
-          <Pressable
-            style={[styles.sendBtn, input.trim().length === 0 && styles.sendDisabled]}
-            onPress={() => send(input)}
-          >
-            <ArrowUp size={22} color={colors.bg} strokeWidth={2} />
-          </Pressable>
+        <View style={styles.footer}>
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.input}
+              placeholder="Ask anything about your nutrition…"
+              placeholderTextColor={colors.inkFaint}
+              value={input}
+              onChangeText={setInput}
+              onSubmitEditing={() => send(input)}
+              returnKeyType="send"
+            />
+            <Pressable
+              style={[styles.sendBtn, input.trim().length === 0 && styles.sendDisabled]}
+              onPress={() => send(input)}
+            >
+              <ArrowUp size={22} color={colors.bg} strokeWidth={2} />
+            </Pressable>
+          </View>
+          <AppText variant="caption" color={colors.inkFaint} style={styles.disclaimer}>
+            AI advisor — informational only, not medical or dietary advice.
+          </AppText>
         </View>
-        <AppText variant="caption" color={colors.inkFaint} style={styles.disclaimer}>
-          AI advisor — informational only, not medical or dietary advice.
-        </AppText>
-      </KeyboardAvoidingView>
+      </View>
 
       <AIConsentSheet
         visible={aiConsent === false}
@@ -272,15 +281,20 @@ const styles = StyleSheet.create({
   },
   cardMacros: { flexDirection: 'row', gap: space.md, flexWrap: 'wrap' },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
+  // Footer = input row + disclaimer on one continuous surface, so the caption
+  // reads as part of the bar instead of floating pinned beneath it.
+  footer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    backgroundColor: colors.surface,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    paddingBottom: space.sm,
+  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    backgroundColor: colors.surface,
   },
   input: {
     flex: 1,
@@ -301,5 +315,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendDisabled: { opacity: 0.4 },
-  disclaimer: { textAlign: 'center', paddingHorizontal: space.lg, paddingBottom: space.sm },
+  disclaimer: { textAlign: 'center', paddingTop: space.md },
 });

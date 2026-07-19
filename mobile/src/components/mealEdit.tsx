@@ -136,7 +136,11 @@ function SheetShell({
         <Animated.View
           style={[
             styles.sheet,
-            scrollable && { maxHeight: winH - insets.top - space.lg - kb },
+            // NOTE: don't subtract `kb` here — the keyboard offset is already
+            // handled by paddingBottom below. Subtracting it twice collapsed
+            // the scroll body to zero height (name field vanished when the
+            // keyboard opened on the saved-meal sheet).
+            scrollable && { maxHeight: winH - insets.top - space.lg },
             {
               paddingBottom: kb > 0 ? kb : insets.bottom,
               opacity: anim,
