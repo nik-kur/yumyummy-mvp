@@ -134,7 +134,7 @@ export interface PlaceholderValues {
 }
 
 const PLACEHOLDER_DEFAULTS: PlaceholderValues = {
-  RATING: '4.8',
+  RATING: '4.9',
   USERS: '12,000',
 };
 

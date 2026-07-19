@@ -13,7 +13,7 @@ import { MascotBadge } from '@/components/MascotBadge';
 import { track } from '@/analytics/posthog';
 import { colors, radius, space } from '@/theme/tokens';
 
-const TRUST_CHIPS = ['★ 4.8', '12,000+ trackers', '✓ Verified data'];
+const TRUST_CHIPS = ['★ 4.9', '12,000+ trackers', '✓ Verified data'];
 
 export default function WelcomeScreen() {
   const router = useRouter();
