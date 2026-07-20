@@ -78,10 +78,15 @@ Export to CSV anytime. We don't sell or share your data. Photos and audio leave 
 MEMBERSHIP
 Start with a free 3-day trial. Keep going for $9.99/month, or save with an annual plan. Cancel anytime.
 
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://yumyummy.ai/privacy
+
 Download YumYummy and log your first meal in seconds — with numbers you can actually trust.
 ```
-`~2,050/4000`. First 2–3 lines are the only text shown before "more" — they
-carry the hook.
+`~2,220/4000`. First 2–3 lines are the only text shown before "more" — they
+carry the hook. The Terms of Use (standard Apple EULA) link is **required** by
+guideline 3.1.2 for apps with auto-renewable subscriptions — removing it will
+get the submission auto-rejected.
 
 ---
 
