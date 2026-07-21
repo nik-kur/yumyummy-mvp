@@ -4,8 +4,9 @@
  * followed by the two "traps" that quietly break CICO.
  */
 import { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, StyleSheet, Animated } from 'react-native';
+import { View, ScrollView, StyleSheet, Animated, Pressable, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
+import { ExternalLink } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
@@ -145,9 +146,16 @@ export default function ProblemScreen() {
           </View>
         ))}
 
-        <AppText variant="caption" color={colors.inkFaint} style={s.research}>
-          Research: self-reported food intake is off by ~30% on average (NEJM).
-        </AppText>
+        <Pressable
+          onPress={() => Linking.openURL('https://pubmed.ncbi.nlm.nih.gov/1454084/').catch(() => {})}
+          hitSlop={8}
+          style={s.research}
+        >
+          <AppText variant="caption" color={colors.inkFaint}>
+            Research: self-reported food intake is off by ~30% on average (Lichtman et al., NEJM 1992).
+          </AppText>
+          <ExternalLink size={12} color={colors.infoBlue} strokeWidth={1.5} />
+        </Pressable>
       </ScrollView>
 
       <Button
@@ -219,6 +227,12 @@ const s = StyleSheet.create({
   },
   trapEmoji: { fontSize: 22, lineHeight: 28 },
   trapText: { flex: 1, gap: 2 },
-  research: { marginTop: space.base },
+  research: {
+    marginTop: space.base,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    flexWrap: 'wrap',
+  },
   cta: { marginTop: space.sm },
 });

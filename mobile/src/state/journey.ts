@@ -148,12 +148,15 @@ const MENU_LOG_WHY = {
   why: 'Re-logging a saved meal is the fastest way to track — one tap, no waiting, no new search. Do it daily and tracking stops feeling like work.',
 };
 
-/** Why-it-matters copy for completion popups (spec §3, final EN). */
-export const QUEST_WHY: Record<QuestId, { title: string; why: string }> = {
+/** Why-it-matters copy for completion popups (spec §3, final EN).
+ *  `sourceUrl` links the cited study when the copy makes a health claim
+ *  (App Review Guideline 1.4.1). */
+export const QUEST_WHY: Record<QuestId, { title: string; why: string; sourceUrl?: string }> = {
   plan_built: { title: 'Plan built', why: 'Your targets are set — everything you log now counts against them.' },
   first_log: {
     title: 'First log',
     why: 'That was the single highest-impact habit in nutrition. People who log consistently lose about 2× more weight — and your first one took seconds.',
+    sourceUrl: 'https://pubmed.ncbi.nlm.nih.gov/18617080/',
   },
   reminders: {
     title: 'Reminders on',

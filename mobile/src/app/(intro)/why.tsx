@@ -4,8 +4,9 @@
  * Copy is final per Onboarding_Flow_Spec_v3.md §2 (concrete citations).
  */
 import { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Pressable, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
+import { ExternalLink } from 'lucide-react-native';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
@@ -23,6 +24,8 @@ interface WhyCopy {
   h: string;
   b: string;
   foot: string;
+  /** Link to the cited study (Guideline 1.4.1 — citations must be tappable). */
+  url: string;
 }
 
 const GOAL_COPY: Record<GoalType, WhyCopy> = {
@@ -32,13 +35,15 @@ const GOAL_COPY: Record<GoalType, WhyCopy> = {
     h: 'Tracking is your biggest lever',
     b: "People who log their meals consistently lose about twice as much weight as those who don't — and keep it off longer.",
     foot: 'Kaiser Permanente study of 1,685 adults · Am J Prev Med, 2008',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/18617080/',
   },
   maintain: {
     stat: '#1',
     statcap: 'predictor of keeping it off',
     h: 'The habit that makes it stick',
     b: 'Simply writing down what you eat is one of the strongest predictors of maintaining a healthy weight for good.',
-    foot: 'National Weight Control Registry · 10,000+ tracked members',
+    foot: 'National Weight Control Registry · Am J Clin Nutr, 2005',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/16002825/',
   },
   gain: {
     stat: '2×',
@@ -46,6 +51,7 @@ const GOAL_COPY: Record<GoalType, WhyCopy> = {
     h: 'Muscle is a numbers game',
     b: 'Hit your protein and calorie targets consistently and you build lean mass far faster than training alone.',
     foot: 'Meta-analysis of 49 trials · Br J Sports Med, 2018',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/28698222/',
   },
   just_track: {
     stat: '~30%',
@@ -53,6 +59,7 @@ const GOAL_COPY: Record<GoalType, WhyCopy> = {
     h: 'Awareness changes everything',
     b: 'Most people misjudge what they eat by about a third. Just seeing the real numbers is often enough to shift habits.',
     foot: 'Lichtman et al. · New England Journal of Medicine, 1992',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/1454084/',
   },
 };
 
@@ -82,9 +89,16 @@ export default function WhyScreen() {
         <AppText variant="body" color={colors.inkMuted} center style={s.body}>
           {copy.b}
         </AppText>
-        <AppText variant="caption" color={colors.inkFaint} center style={s.foot}>
-          {copy.foot}
-        </AppText>
+        <Pressable
+          onPress={() => Linking.openURL(copy.url).catch(() => {})}
+          hitSlop={8}
+          style={s.footLink}
+        >
+          <AppText variant="caption" color={colors.inkFaint} center>
+            {copy.foot}
+          </AppText>
+          <ExternalLink size={12} color={colors.infoBlue} strokeWidth={1.5} />
+        </Pressable>
       </View>
 
       <Button
@@ -112,6 +126,12 @@ const s = StyleSheet.create({
   statCap: { marginTop: space.xs },
   headline: { marginTop: space.base },
   body: { marginTop: space.sm },
-  foot: { marginTop: space.base },
+  footLink: {
+    marginTop: space.base,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+  },
   cta: { marginTop: 'auto' },
 });

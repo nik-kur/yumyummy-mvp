@@ -12,6 +12,7 @@ import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { SourcesLink } from '@/components/SourcesLink';
 import { useIntro } from '@/state/introContext';
 import { isAdaptyConfigured } from '@/billing/adapty';
 import { colors, radius, space } from '@/theme/tokens';
@@ -260,6 +261,7 @@ export default function PlanRevealScreen() {
               <AppText variant="caption" color={colors.carbs}>Carbs</AppText>
             </View>
           </View>
+          <SourcesLink label="Mifflin–St Jeor equation — see the science" center />
         </View>
 
         {hasTarget && intro.target_weight_kg && intro.target_weeks ? (

@@ -79,6 +79,7 @@ export default function RootLayout() {
               />
               <Stack.Screen name="recap" options={{ presentation: 'modal' }} />
               <Stack.Screen name="week1-report" options={{ presentation: 'card' }} />
+              <Stack.Screen name="sources" options={{ presentation: 'card' }} />
             </Stack>
           </PendingMealsProvider>
         </AuthProvider>

@@ -8,6 +8,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { MacroBar } from '@/components/MacroBar';
+import { SourcesLink } from '@/components/SourcesLink';
 import { useOnboarding } from '@/state/onboarding';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
@@ -138,6 +139,7 @@ export default function PlanScreen() {
             Mifflin–St Jeor · TDEE ≈ {formatInt(plan.tdee)} kcal. Adjusts as you log and your weight
             changes.
           </AppText>
+          <SourcesLink label="See the science behind these numbers" />
         </Card>
       </View>
 

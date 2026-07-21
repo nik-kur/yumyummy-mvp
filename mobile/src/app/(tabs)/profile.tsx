@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Alert, Linking, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  BookOpen,
   CreditCard,
   Send,
   Bell,
@@ -380,6 +381,7 @@ export default function ProfileScreen() {
           label="Help & contact"
           onPress={() => Linking.openURL('https://t.me/yumyummy_support')}
         />
+        <Row icon={BookOpen} label="Science & sources" onPress={() => router.push('/sources')} />
         <Row
           icon={FileText}
           label="Terms of Service"

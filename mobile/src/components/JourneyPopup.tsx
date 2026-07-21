@@ -1,8 +1,8 @@
 /**
  * Journey completion popup — one at a time, with why-it-matters copy.
  */
-import { View, Pressable, StyleSheet, Modal } from 'react-native';
-import { CircleCheck } from 'lucide-react-native';
+import { View, Pressable, StyleSheet, Modal, Linking } from 'react-native';
+import { CircleCheck, ExternalLink } from 'lucide-react-native';
 
 import { AppText } from './AppText';
 import { Button } from './Button';
@@ -36,6 +36,18 @@ export function JourneyPopup({ questId, visible, onDismiss }: JourneyPopupProps)
           <AppText variant="body" color={colors.inkMuted} center style={s.body}>
             {copy?.why ?? ''}
           </AppText>
+          {copy?.sourceUrl ? (
+            <Pressable
+              onPress={() => Linking.openURL(copy.sourceUrl!).catch(() => {})}
+              hitSlop={8}
+              style={s.sourceLink}
+            >
+              <ExternalLink size={12} color={colors.infoBlue} strokeWidth={1.5} />
+              <AppText variant="caption" color={colors.infoBlue}>
+                View the study
+              </AppText>
+            </Pressable>
+          ) : null}
 
           <Button label="Nice — keep going" variant="brand" onPress={onDismiss} />
           <Pressable onPress={onDismiss} style={s.dismissBtn}>
@@ -81,5 +93,13 @@ const s = StyleSheet.create({
   },
   headline: { marginTop: space.sm },
   body: { marginTop: space.md, marginBottom: space.lg, lineHeight: 22 },
+  sourceLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    marginBottom: space.lg,
+    marginTop: -space.sm,
+  },
   dismissBtn: { alignSelf: 'center', marginTop: space.md },
 });

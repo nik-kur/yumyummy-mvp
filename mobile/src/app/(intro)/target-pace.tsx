@@ -11,6 +11,7 @@ import Slider from '@react-native-community/slider';
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { SourcesLink } from '@/components/SourcesLink';
 import { IntroHeader } from '@/components/IntroHeader';
 import { useIntro } from '@/state/introContext';
 import { computePlan, macrosForCalories } from '@/utils/calories';
@@ -231,6 +232,12 @@ export default function TargetPaceScreen() {
             <AppText variant="small" color={colors.inkMuted}>{tier.sub}</AppText>
           ) : null}
         </View>
+
+        <SourcesLink
+          label="Burn & pacing based on published research — see sources"
+          center
+          style={s.sources}
+        />
       </ScrollView>
 
       <Button label="Lock it in" variant="brand" onPress={lockIn} style={s.cta} />
@@ -290,5 +297,6 @@ const s = StyleSheet.create({
   },
   deficitFill: { height: '100%', borderRadius: radius.pill },
   tierLabel: { marginTop: space.xs },
+  sources: { marginTop: space.md },
   cta: { marginTop: space.sm },
 });
