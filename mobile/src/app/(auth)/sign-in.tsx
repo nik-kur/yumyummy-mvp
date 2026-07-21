@@ -25,7 +25,10 @@ export default function SignInScreen() {
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [appleAvailable, setAppleAvailable] = useState(false);
+  // null = unknown (still checking). Render no Apple button at all until we
+  // know, so a non-compliant fallback never flashes on devices where the
+  // official button is available (App Review Guideline 4).
+  const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync()
@@ -94,7 +97,9 @@ export default function SignInScreen() {
         {/* Official Sign in with Apple button (HIG-compliant artwork — App Review
             Guideline 4). Falls back to a plain button where the native module is
             unavailable (Expo Go / Android). */}
-        {appleAvailable ? (
+        {appleAvailable === null ? (
+          <View style={styles.appleButton} />
+        ) : appleAvailable ? (
           <AppleAuthentication.AppleAuthenticationButton
             buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
             buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}

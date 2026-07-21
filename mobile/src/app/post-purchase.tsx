@@ -5,9 +5,10 @@
  * prompted to create an account. This merges the Adapty anonymous profile
  * with the identified one and syncs the onboarding draft to the backend.
  */
-import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
@@ -16,7 +17,7 @@ import { useAuth } from '@/state/auth';
 import { loadDraft, clearDraft } from '@/state/introDraft';
 import { startJourney } from '@/state/journey';
 import * as api from '@/api/endpoints';
-import { colors, space } from '@/theme/tokens';
+import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 
@@ -24,8 +25,16 @@ export default function PostPurchaseScreen() {
   const router = useRouter();
   const { signInWithProvider, refreshProfile } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
 
   const handleSignIn = useCallback(async () => {
+    if (busy) return;
     setBusy(true);
     addBreadcrumb('auth', 'Post-purchase Apple sign-in started');
 
@@ -66,7 +75,7 @@ export default function PostPurchaseScreen() {
     } finally {
       setBusy(false);
     }
-  }, [signInWithProvider, refreshProfile, router]);
+  }, [busy, signInWithProvider, refreshProfile, router]);
 
   return (
     <Screen grow edges={['top', 'bottom', 'left', 'right']}>
@@ -84,12 +93,24 @@ export default function PostPurchaseScreen() {
       </View>
 
       <View style={s.bottom}>
-        <Button
-          label={busy ? 'Signing in…' : 'Sign in with Apple'}
-          variant="primary"
-          loading={busy}
-          onPress={handleSignIn}
-        />
+        {/* Official Sign in with Apple button — HIG-required artwork with the
+            Apple logo (App Review Guideline 4). The plain-button fallback only
+            exists for environments without the native module (Expo Go). */}
+        {busy ? (
+          <View style={s.busyBox}>
+            <ActivityIndicator color={colors.ink} />
+          </View>
+        ) : appleAvailable ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={radius.md}
+            style={s.appleButton}
+            onPress={handleSignIn}
+          />
+        ) : (
+          <Button label="Sign in with Apple" variant="primary" onPress={handleSignIn} />
+        )}
       </View>
     </Screen>
   );
@@ -100,4 +121,6 @@ const s = StyleSheet.create({
   title: { marginTop: space.md, textAlign: 'center' },
   sub: { marginTop: space.md },
   bottom: { paddingBottom: space.lg, gap: space.md },
+  appleButton: { alignSelf: 'stretch', height: 54 },
+  busyBox: { height: 54, alignItems: 'center', justifyContent: 'center' },
 });
