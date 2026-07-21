@@ -12,7 +12,6 @@ import { Sparkles, X, ArrowUp } from 'lucide-react-native';
 
 import { AppText } from '@/components/AppText';
 import { Chip } from '@/components/Chip';
-import { SourcesLink } from '@/components/SourcesLink';
 import { AIConsentSheet } from '@/components/AIConsentSheet';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardHeight } from '@/utils/keyboard';
@@ -232,12 +231,9 @@ export default function AdvisorScreen() {
               <ArrowUp size={22} color={colors.bg} strokeWidth={2} />
             </Pressable>
           </View>
-          <View style={styles.disclaimer}>
-            <AppText variant="caption" color={colors.inkFaint} center>
-              AI advisor — informational only, not medical or dietary advice.
-            </AppText>
-            <SourcesLink label="Science & sources" center />
-          </View>
+          <AppText variant="caption" color={colors.inkFaint} style={styles.disclaimer}>
+            AI advisor — informational only, not medical or dietary advice.
+          </AppText>
         </View>
       </View>
 
@@ -319,5 +315,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendDisabled: { opacity: 0.4 },
-  disclaimer: { paddingTop: space.md, gap: space.xs, alignItems: 'center' },
+  disclaimer: { textAlign: 'center', paddingTop: space.md },
 });

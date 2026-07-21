@@ -163,6 +163,17 @@ export default function SourcesScreen() {
         published research and public guidelines. Tap any source to read it.
       </AppText>
 
+      <Card flat style={styles.disclaimerCard}>
+        <AppText variant="bodyStrong">Not medical advice</AppText>
+        <AppText variant="small" color={colors.inkMuted}>
+          YumYummy provides general nutrition information for healthy adults. It is not medical
+          advice, diagnosis or treatment, and it is not a substitute for guidance from a doctor or
+          registered dietitian. Always consult a qualified professional before making significant
+          changes to your diet — especially if you are pregnant, nursing, under 18, or managing a
+          medical condition such as diabetes or an eating disorder.
+        </AppText>
+      </Card>
+
       {SECTIONS.map((section) => (
         <View key={section.heading}>
           <AppText variant="overline" color={colors.inkMuted} style={styles.sectionLabel}>
@@ -179,16 +190,7 @@ export default function SourcesScreen() {
         </View>
       ))}
 
-      <Card flat style={styles.disclaimerCard}>
-        <AppText variant="bodyStrong">Not medical advice</AppText>
-        <AppText variant="small" color={colors.inkMuted}>
-          YumYummy provides general nutrition information for healthy adults. It is not medical
-          advice, diagnosis or treatment, and it is not a substitute for guidance from a doctor or
-          registered dietitian. Always consult a qualified professional before making significant
-          changes to your diet — especially if you are pregnant, nursing, under 18, or managing a
-          medical condition such as diabetes or an eating disorder.
-        </AppText>
-      </Card>
+      <View style={styles.bottomPad} />
     </Screen>
   );
 }
@@ -215,8 +217,8 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   disclaimerCard: {
     marginTop: space.lg,
-    marginBottom: space.base,
     gap: space.sm,
     backgroundColor: colors.surfaceAlt,
   },
+  bottomPad: { height: space.base },
 });

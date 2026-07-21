@@ -16,7 +16,6 @@ import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
 import { Ring } from '@/components/Ring';
 import { MacroBar } from '@/components/MacroBar';
-import { SourcesLink } from '@/components/SourcesLink';
 import { SourceBadge, AccuracyBadge } from '@/components/Badges';
 import { EmptyState } from '@/components/EmptyState';
 import { useAuth } from '@/state/auth';
@@ -29,8 +28,10 @@ import { JourneyPopup } from '@/components/JourneyPopup';
 import { JourneyPathSheet } from '@/components/JourneyPathSheet';
 import { QuestInfoSheet } from '@/components/QuestInfoSheet';
 import { InsightCard } from '@/components/InsightCard';
+import { SourcesIntroPopup } from '@/components/SourcesIntroPopup';
 import { WidgetInstructionSheet } from '@/components/WidgetInstructionSheet';
 import { loadJourney, reconcileJourney, rawDay, activeDay, takeNextPopup, subscribeJourney, reportJourneyEvent, type JourneyState, type QuestDef, type QuestId } from '@/state/journey';
+import { hasSeenSourcesIntro, markSourcesIntroSeen } from '@/state/sourcesIntro';
 import { requestPermission, syncFromPrefs } from '@/notifications/scheduler';
 import { loadPrefs, savePrefs } from '@/notifications/prefs';
 import { maybeRequestReview } from '@/state/rateReview';
@@ -197,6 +198,26 @@ export default function TodayScreen() {
   const [widgetSheetVisible, setWidgetSheetVisible] = useState(false);
   const [pathSheetVisible, setPathSheetVisible] = useState(false);
   const [infoQuest, setInfoQuest] = useState<QuestDef | null>(null);
+  const [sourcesIntroVisible, setSourcesIntroVisible] = useState(false);
+
+  // One-time "backed by science" popup on the very first visit to Today
+  // (Guideline 1.4.1 — tells the user where the citations live). Quest popups
+  // hold back while it's on screen so two sheets never stack.
+  useEffect(() => {
+    let active = true;
+    void hasSeenSourcesIntro().then((seen) => {
+      if (active && !seen) setSourcesIntroVisible(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const dismissSourcesIntro = useCallback(() => {
+    setSourcesIntroVisible(false);
+    void markSourcesIntroSeen();
+    track('sources_intro_dismissed');
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -437,12 +458,6 @@ export default function TodayScreen() {
               <MacroBar label="Fat" macro="fat" value={day?.total_fat_g ?? 0} target={profile?.target_fat_g} />
               <MacroBar label="Carbs" macro="carbs" value={day?.total_carbs_g ?? 0} target={profile?.target_carbs_g} />
             </View>
-            {/* Targets are health calculations — keep their citations one tap
-                away right where they're shown (Guideline 1.4.1; this exact
-                screen was in Apple's rejection screenshot). */}
-            {hasTarget ? (
-              <SourcesLink label="How your targets are calculated" center style={styles.sources} />
-            ) : null}
           </Card>
 
           {journey && journey.started_at && !journey.dismissed && rawDay(journey.started_at) <= 7 && (
@@ -547,7 +562,11 @@ export default function TodayScreen() {
         </>
       )}
 
-      {popupQuestId && (
+      <SourcesIntroPopup visible={sourcesIntroVisible} onDismiss={dismissSourcesIntro} />
+
+      {/* Mount at most one bottom sheet at a time — the sources intro takes
+          priority; a pending quest popup appears right after it's dismissed. */}
+      {popupQuestId && !sourcesIntroVisible && (
         <JourneyPopup
           questId={popupQuestId}
           visible={!!popupQuestId}
@@ -586,7 +605,6 @@ const styles = StyleSheet.create({
   ringCenter: { alignItems: 'center', justifyContent: 'center' },
   heroCaption: { marginTop: space.md },
   macros: { alignSelf: 'stretch', gap: space.md, marginTop: space.lg },
-  sources: { marginTop: space.md },
   journeyWrap: { marginTop: space.base },
   insightWrap: { marginTop: space.base },
   advisorCard: {

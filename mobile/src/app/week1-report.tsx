@@ -14,7 +14,6 @@ import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
-import { SourcesLink } from '@/components/SourcesLink';
 import * as api from '@/api/endpoints';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
@@ -91,16 +90,12 @@ export default function Week1ReportScreen() {
               <AppText variant="body" color={colors.inkMuted} style={s.adjustBody}>
                 {(report.target_adjustment as any).reason}
               </AppText>
-              <SourcesLink label="How we calculate targets — see sources" />
             </Card>
           )}
 
           <Card style={s.summaryCard}>
             <AppText variant="body" color={colors.inkMuted}>
               {report.summary as string}
-            </AppText>
-            <AppText variant="caption" color={colors.inkFaint} style={s.reportDisclaimer}>
-              Informational only — not medical advice.
             </AppText>
           </Card>
         </>
@@ -148,10 +143,9 @@ const s = StyleSheet.create({
   macroCard: { marginBottom: space.lg },
   macroRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: space.md },
   macroStat: { alignItems: 'center', gap: 2 },
-  adjustCard: { marginBottom: space.lg, borderColor: colors.warningSoft, borderWidth: 1.5, gap: space.sm },
+  adjustCard: { marginBottom: space.lg, borderColor: colors.warningSoft, borderWidth: 1.5 },
   adjustBody: { marginTop: space.sm },
-  summaryCard: { marginBottom: space.lg, gap: space.sm },
-  reportDisclaimer: { marginTop: space.xs },
+  summaryCard: { marginBottom: space.lg },
   emptyCard: { marginBottom: space.lg },
   cta: { marginTop: 'auto' },
 });
