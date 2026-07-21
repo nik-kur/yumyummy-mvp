@@ -16,6 +16,7 @@ import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
 import { Ring } from '@/components/Ring';
 import { MacroBar } from '@/components/MacroBar';
+import { SourcesLink } from '@/components/SourcesLink';
 import { SourceBadge, AccuracyBadge } from '@/components/Badges';
 import { EmptyState } from '@/components/EmptyState';
 import { useAuth } from '@/state/auth';
@@ -436,6 +437,12 @@ export default function TodayScreen() {
               <MacroBar label="Fat" macro="fat" value={day?.total_fat_g ?? 0} target={profile?.target_fat_g} />
               <MacroBar label="Carbs" macro="carbs" value={day?.total_carbs_g ?? 0} target={profile?.target_carbs_g} />
             </View>
+            {/* Targets are health calculations — keep their citations one tap
+                away right where they're shown (Guideline 1.4.1; this exact
+                screen was in Apple's rejection screenshot). */}
+            {hasTarget ? (
+              <SourcesLink label="How your targets are calculated" center style={styles.sources} />
+            ) : null}
           </Card>
 
           {journey && journey.started_at && !journey.dismissed && rawDay(journey.started_at) <= 7 && (
@@ -579,6 +586,7 @@ const styles = StyleSheet.create({
   ringCenter: { alignItems: 'center', justifyContent: 'center' },
   heroCaption: { marginTop: space.md },
   macros: { alignSelf: 'stretch', gap: space.md, marginTop: space.lg },
+  sources: { marginTop: space.md },
   journeyWrap: { marginTop: space.base },
   insightWrap: { marginTop: space.base },
   advisorCard: {
