@@ -219,6 +219,12 @@ class AppTrialStartRequest(BaseModel):
     trial_days: Optional[int] = None
 
 
+class AppBillingSyncRequest(BaseModel):
+    # Read from the local Adapty SDK. Lets the backend resolve a purchase that
+    # landed on an anonymous profile, before identify() propagated.
+    adapty_profile_id: Optional[str] = Field(default=None, max_length=64)
+
+
 class AppTrialStartResponse(BaseModel):
     access_status: str
     trial_started_at: Optional[datetime] = None

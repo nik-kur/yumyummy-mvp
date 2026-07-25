@@ -14,6 +14,7 @@ These endpoints intentionally reuse the existing services
 import json
 import logging
 from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import func
@@ -65,6 +66,7 @@ from app.schemas.app_api import (
     AppMealUpdate,
     AppSavedMealUpdate,
     AppAgentRunRequest,
+    AppBillingSyncRequest,
     AppTrialStartRequest,
     AppTrialStartResponse,
     DayTotals,
@@ -894,6 +896,7 @@ def start_trial(
 
 @router.post("/billing/sync", response_model=BillingSnapshot)
 def billing_sync(
+    payload: Optional[AppBillingSyncRequest] = None,
     db: Session = Depends(get_db),
     account: Account = Depends(get_current_account),
 ):
@@ -902,7 +905,7 @@ def billing_sync(
     in with Apple) are reflected in our entitlement."""
     from app.billing.adapty_sync import sync_from_adapty
     user = get_primary_user(db, account)
-    sync_from_adapty(db, user, account)
+    sync_from_adapty(db, user, account, adapty_profile_id=payload.adapty_profile_id if payload else None)
     return BillingSnapshot(**account_billing_snapshot(db, account))
 
 

@@ -12,7 +12,12 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { getToken, setToken, USE_MOCKS } from '@/api/client';
 import * as api from '@/api/endpoints';
 import type { AccountProfile } from '@/api/types';
-import { identifyAdapty, logoutAdapty } from '@/billing/adapty';
+import {
+  identifyAdapty,
+  logoutAdapty,
+  getAdaptyProfileId,
+  setAdaptyIntegrationIdentifier,
+} from '@/billing/adapty';
 import { identify as phIdentify, reset as phReset, track } from '@/analytics/posthog';
 import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
 import { setAttributionCustomerId } from '@/analytics/attribution';
@@ -47,14 +52,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const me = await api.getMe();
     setProfile(me);
     setStatus('signedIn');
-    void identifyAdapty(me.account_id);
     setAttributionCustomerId(me.account_id);
     // identify() links the anonymous onboarding distinct_id to account_id, so
     // pre-login funnel events (paywall_shown, onboarding_*) stitch to the user.
     phIdentify(String(me.account_id), { goal: me.goal_type });
     sentrySetUser(String(me.account_id));
     if (method) track('signin_success', { method });
-    void api.syncBilling().catch(() => {});
+
+    // People buy before signing in, so the purchase sits on an anonymous Adapty
+    // profile and its webhook reached us with no customer_user_id. Read that
+    // profile id first, then identify (awaited — a racing sync would resolve
+    // against the pre-merge profile and find nothing), then reconcile.
+    void (async () => {
+      const adaptyProfileId = await getAdaptyProfileId();
+      await identifyAdapty(me.account_id);
+      await setAdaptyIntegrationIdentifier(
+        'posthog_distinct_user_id',
+        String(me.account_id),
+      );
+      try {
+        const billing = await api.syncBilling(adaptyProfileId);
+        setProfile((prev) => (prev ? { ...prev, billing } : prev));
+      } catch {
+        // entitlement stays as the backend last reported it
+      }
+    })();
   }, []);
 
   // Boot: if a token is stored, resolve the account.

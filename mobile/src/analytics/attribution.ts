@@ -90,6 +90,35 @@ export async function initAttribution(): Promise<void> {
   }
 }
 
+/**
+ * AppsFlyer's device id, once the SDK has one. Adapty needs it to stitch the
+ * install to its profile; resolves to null when AppsFlyer isn't configured or
+ * doesn't answer within `timeoutMs`, so callers are never blocked.
+ */
+export function getAppsFlyerId(timeoutMs = 3000): Promise<string | null> {
+  if (!isAppsFlyerConfigured()) return Promise.resolve(null);
+  const appsFlyer = loadAppsFlyer();
+  if (!appsFlyer) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    try {
+      appsFlyer.getAppsFlyerUID((error: unknown, uid: string) => {
+        finish(error || !uid ? null : uid);
+      });
+    } catch {
+      finish(null);
+    }
+  });
+}
+
 /** Bind AppsFlyer's customer id to our account id (matches Adapty/PostHog). */
 export function setAttributionCustomerId(accountId: number | string): void {
   if (!isAppsFlyerConfigured()) return;

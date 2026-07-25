@@ -11,10 +11,7 @@ import { PendingMealsProvider } from '@/state/pendingMeals';
 import { NotificationsBridge } from '@/notifications/NotificationsBridge';
 import { WidgetActionBridge } from '@/widgets/WidgetActionBridge';
 import { useAppFonts } from '@/theme/useAppFonts';
-import { activateAdapty } from '@/billing/adapty';
-import { initPostHog } from '@/analytics/posthog';
-import { initSentry } from '@/analytics/sentry';
-import { initAttribution } from '@/analytics/attribution';
+import { bootstrapSdks } from '@/analytics/bootstrap';
 import { colors } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -23,11 +20,8 @@ export default function RootLayout() {
   const fontsLoaded = useAppFonts();
 
   useEffect(() => {
-    initSentry();
-    initPostHog();
-    void activateAdapty();
-    // ATT prompt + AppsFlyer start (no-op without a configured dev key).
-    void initAttribution();
+    // Sentry + PostHog + ATT/AppsFlyer + Adapty, in the order Adapty requires.
+    void bootstrapSdks();
   }, []);
 
   useEffect(() => {

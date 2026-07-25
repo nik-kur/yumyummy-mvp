@@ -32,3 +32,14 @@ export function reset(): void {
 export function getAnonymousId(): string | undefined {
   return client?.getAnonymousId();
 }
+
+/** Current distinct id (anonymous before login). Sent to Adapty so its
+ *  server-side events land on this same person instead of a second one. */
+export function getDistinctId(): string | undefined {
+  return client?.getDistinctId();
+}
+
+/** Attach a property to every future event on this device. */
+export function register(properties: Record<string, unknown>): void {
+  void client?.register(properties as Record<string, string | number | boolean | null>);
+}

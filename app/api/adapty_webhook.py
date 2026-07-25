@@ -176,8 +176,20 @@ async def adapty_webhook(
         or (body.get("profile") or {}).get("customer_user_id")
     )
     if not customer_user_id:
-        logger.warning("[ADAPTY] webhook missing customer_user_id event=%s", event_type)
-        return {"status": "ignored", "reason": "no customer_user_id"}
+        # Expected for purchases made before sign-in: the profile is still
+        # anonymous, so there is nothing to map onto yet. The app reconciles via
+        # /app/billing/sync once the user signs in — log the profile id so that
+        # path can be traced (and replayed by hand if it ever fails).
+        profile_id = (
+            body.get("profile_id")
+            or props.get("profile_id")
+            or (body.get("profile") or {}).get("profile_id")
+        )
+        logger.warning(
+            "[ADAPTY] anonymous profile, deferring to /billing/sync event=%s profile_id=%s",
+            event_type, profile_id,
+        )
+        return {"status": "deferred", "reason": "anonymous profile", "profile_id": profile_id}
 
     try:
         account_id = int(customer_user_id)
@@ -218,6 +230,8 @@ async def adapty_webhook(
         result = adapty_billing.grant_or_extend(
             db, user, plan_id=plan_id, expires_at=expires_at,
             transaction_id=transaction_id, event_type=event_type or "purchase", raw_payload=raw_payload,
+            is_trial="trial" in et,
+            purchased_at=_parse_dt(props.get("purchased_at") or props.get("event_datetime")),
         )
     else:
         logger.info("[ADAPTY] event=%s had no actionable expiry; ignored (account_id=%s)", event_type, account_id)

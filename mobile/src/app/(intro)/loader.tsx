@@ -63,6 +63,7 @@ export default function LoaderScreen() {
         if (next >= 100 && !navigated.current) {
           navigated.current = true;
           clearInterval(interval);
+          track('onboarding_screen_completed', { screen: 'N2_loader' });
           setTimeout(() => router.replace('/(intro)/plan-reveal'), 400);
         }
         return next;

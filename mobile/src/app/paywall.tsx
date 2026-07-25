@@ -28,6 +28,7 @@ import { startJourney } from '@/state/journey';
 import {
   activateAdapty,
   isAdaptyConfigured,
+  waitForAppleAdsAttribution,
   ADAPTY_PLACEMENT_MAIN,
   PREMIUM_ACCESS_LEVEL,
 } from '@/billing/adapty';
@@ -45,6 +46,12 @@ import { USE_MOCKS } from '@/api/client';
 
 type Phase = 'loading' | 'ready' | 'fallback';
 
+/** Cap the fetch so a slow network shows the fallback instead of a blank screen. */
+const PAYWALL_LOAD_TIMEOUT_MS = 5000;
+
+/** How long to keep waiting for Apple Ads attribution before giving up on it. */
+const APPLE_ADS_ATTRIBUTION_TIMEOUT_MS = 20000;
+
 export default function PaywallScreen() {
   const router = useRouter();
   const { profile, refreshProfile } = useAuth();
@@ -58,12 +65,20 @@ export default function PaywallScreen() {
   const paywallRef = useRef<AdaptyPaywall | null>(null);
   const [products, setProducts] = useState<AdaptyPaywallProduct[]>([]);
   const configRef = useRef(FALLBACK_CONFIG);
+  // Guards for the Apple Ads paywall swap: do it at most once, and never while
+  // a purchase is in flight.
+  const upgradedRef = useRef(false);
+  const purchasingRef = useRef(false);
   // Pre-auth users have no profile — plan numbers live in the intro draft.
   const [draft, setDraft] = useState<IntroDraft | null>(null);
 
   useEffect(() => {
     loadDraft().then(setDraft).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    purchasingRef.current = purchasing;
+  }, [purchasing]);
 
   const targetWeightKg = draft?.target_weight_kg ?? null;
   const targetWeeks = draft?.target_weeks ?? null;
@@ -96,7 +111,9 @@ export default function PaywallScreen() {
       return;
     }
     try {
-      const pw = await adapty.getPaywall(ADAPTY_PLACEMENT_MAIN);
+      const pw = await adapty.getPaywall(ADAPTY_PLACEMENT_MAIN, undefined, {
+        loadTimeoutMs: PAYWALL_LOAD_TIMEOUT_MS,
+      });
       if (!alive()) return;
       paywallRef.current = pw;
 
@@ -127,6 +144,53 @@ export default function PaywallScreen() {
     void loadPaywall(mountedRef);
     return () => { mountedRef.current = false; };
   }, [loadPaywall]);
+
+  // Apple Ads attribution lands asynchronously after launch, so the fetch above
+  // usually resolves against the default audience and an Apple Ads user would
+  // never see their targeted paywall. Rather than delay the first paint, swap
+  // the paywall out once attribution arrives. No-op for everyone else, and from
+  // the second launch on the first fetch is already targeted.
+  useEffect(() => {
+    if (phase !== 'ready' || upgradedRef.current) return;
+    const mountedRef = { current: true };
+
+    void (async () => {
+      const applied = await waitForAppleAdsAttribution(APPLE_ADS_ATTRIBUTION_TIMEOUT_MS);
+      if (!applied || !mountedRef.current || upgradedRef.current) return;
+      // Never pull the paywall out from under an in-flight StoreKit sheet.
+      if (purchasingRef.current) return;
+
+      try {
+        const targeted = await adapty.getPaywall(ADAPTY_PLACEMENT_MAIN, undefined, {
+          loadTimeoutMs: PAYWALL_LOAD_TIMEOUT_MS,
+        });
+        if (!mountedRef.current || purchasingRef.current) return;
+        if (targeted.variationId === paywallRef.current?.variationId) return;
+
+        const targetedProducts = await adapty.getPaywallProducts(targeted);
+        if (!mountedRef.current || purchasingRef.current) return;
+
+        const previousVariant = configRef.current.variant;
+        upgradedRef.current = true;
+        paywallRef.current = targeted;
+        configRef.current = parseRemoteConfig(targeted.remoteConfig?.dataString);
+        setProducts(targetedProducts);
+
+        await adapty.logShowPaywall(targeted);
+        track('paywall_variant_swapped', {
+          placement: ADAPTY_PLACEMENT_MAIN,
+          from_variant: previousVariant,
+          to_variant: configRef.current.variant,
+          reason: 'apple_search_ads',
+        });
+      } catch (e) {
+        // Keep the paywall already on screen; it's a valid one.
+        captureException(e);
+      }
+    })();
+
+    return () => { mountedRef.current = false; };
+  }, [phase]);
 
   const handleRetry = useCallback(() => {
     track('paywall_retry_pressed');

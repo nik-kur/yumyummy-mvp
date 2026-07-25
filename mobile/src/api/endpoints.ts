@@ -260,10 +260,17 @@ export async function startTrial(trialDays?: number): Promise<TrialStartResponse
  * Post-identify billing reconciliation: after `identifyAdapty()` merges the
  * anonymous Adapty profile, the backend pulls the subscription state from the
  * Adapty Server API to close the gap where the initial purchase webhook arrived
- * before the profile was identified. */
-export async function syncBilling(): Promise<BillingSnapshot> {
+ * before the profile was identified.
+ *
+ * `adaptyProfileId` is the fallback lookup key: our funnel lets people buy
+ * before signing in, so the purchase may still sit on an anonymous profile that
+ * `customer_user_id` can't resolve. */
+export async function syncBilling(adaptyProfileId?: string | null): Promise<BillingSnapshot> {
   if (USE_MOCKS) return mock.getMockProfile().billing;
-  return apiFetch<BillingSnapshot>('/app/billing/sync', { method: 'POST' });
+  return apiFetch<BillingSnapshot>('/app/billing/sync', {
+    method: 'POST',
+    body: { adapty_profile_id: adaptyProfileId ?? null },
+  });
 }
 
 export async function getLatestInsight(): Promise<Record<string, unknown>> {

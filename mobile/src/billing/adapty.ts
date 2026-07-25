@@ -12,6 +12,9 @@
  */
 import { Platform } from 'react-native';
 import { adapty, LogLevel } from 'react-native-adapty';
+import type { AdaptyProfile } from 'react-native-adapty';
+
+import { captureException } from '@/analytics/sentry';
 
 /** Access level configured in Adapty; both yearly & monthly unlock `premium`. */
 export const PREMIUM_ACCESS_LEVEL = 'premium';
@@ -62,14 +65,108 @@ export function activateAdapty(): Promise<boolean> {
   return activationPromise;
 }
 
-/** Tie the current Adapty profile to our account id (idempotent). */
-export async function identifyAdapty(accountId: number | string): Promise<void> {
-  if (!(await activateAdapty())) return;
+/**
+ * Tie the current Adapty profile to our account id (idempotent).
+ *
+ * Callers must await this before any other Adapty call: racing `identify()`
+ * either fails with #3006 profileWasChanged or lands the call on the anonymous
+ * profile created at activation, which loses the purchase and its attribution.
+ */
+export async function identifyAdapty(accountId: number | string): Promise<boolean> {
+  if (!(await activateAdapty())) return false;
   try {
     await adapty.identify(String(accountId));
-  } catch {
-    // non-fatal: purchases still work anonymously and can be linked later
+    return true;
+  } catch (e) {
+    // Non-fatal: the purchase still exists on the anonymous profile, and
+    // `/billing/sync` can find it by profile id. Report it so we notice if
+    // this starts happening at scale.
+    captureException(e);
+    return false;
   }
+}
+
+/**
+ * Id of the Adapty profile this device is currently using. Before sign-in this
+ * is an anonymous profile — the one a purchase actually lands on — so we hand
+ * it to the backend to reconcile entitlements that the webhook couldn't map.
+ */
+export async function getAdaptyProfileId(): Promise<string | null> {
+  if (!(await activateAdapty())) return null;
+  try {
+    const profile = await adapty.getProfile();
+    return profile.profileId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Link a third-party id to the Adapty profile (`posthog_distinct_user_id`,
+ * `appsflyer_id`, …) so Adapty's server-side events land on the same person
+ * instead of creating a second one keyed by its own profile id.
+ */
+export async function setAdaptyIntegrationIdentifier(
+  key: string,
+  value: string,
+): Promise<void> {
+  if (!value) return;
+  if (!(await activateAdapty())) return;
+  try {
+    await adapty.setIntegrationIdentifier(key, value);
+  } catch {
+    // analytics stitching only — never block the app on it
+  }
+}
+
+const APPLE_ADS_SOURCE = 'apple_search_ads';
+
+function hasAppleAdsAttribution(profile: AdaptyProfile): boolean {
+  return profile.appliedAttributionSources?.includes(APPLE_ADS_SOURCE) ?? false;
+}
+
+/**
+ * Resolves once Apple Ads attribution has been applied to the profile, or
+ * `false` if it hasn't within `timeoutMs`.
+ *
+ * Apple Ads attribution lands asynchronously after `activate()`, so the first
+ * `getPaywall()` on a cold launch resolves against the default audience. Rather
+ * than delay the paywall, callers show it immediately and use this to re-fetch
+ * the Apple-Ads-targeted variant when attribution arrives. From the second
+ * launch on the cached profile already carries it and this resolves at once.
+ */
+export async function waitForAppleAdsAttribution(timeoutMs: number): Promise<boolean> {
+  if (!(await activateAdapty())) return false;
+
+  try {
+    const current = await adapty.getProfile();
+    if (hasAppleAdsAttribution(current)) return true;
+  } catch {
+    // fall through to the listener
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let subscription: { remove: () => void } | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      subscription?.remove();
+      resolve(value);
+    };
+
+    subscription = adapty.addEventListener('onLatestProfileLoad', (profile) => {
+      if (hasAppleAdsAttribution(profile)) finish(true);
+    });
+    timer = setTimeout(() => finish(false), timeoutMs);
+
+    // A listener that fired during registration would have left the
+    // subscription dangling — drop it now that we hold the handle.
+    if (settled) subscription.remove();
+  });
 }
 
 /** Detach on sign-out; Adapty creates a fresh anonymous profile. */

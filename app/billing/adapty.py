@@ -61,13 +61,20 @@ def _record_event(db: Session, user: User, *, event_type: str, plan_id: str,
 
 def grant_or_extend(db: Session, user: User, *, plan_id: str, expires_at: datetime,
                     auto_renew: bool = True, transaction_id: Optional[str] = None,
-                    event_type: str = "purchase", raw_payload: Optional[str] = None) -> str:
+                    event_type: str = "purchase", raw_payload: Optional[str] = None,
+                    is_trial: bool = False, purchased_at: Optional[datetime] = None) -> str:
     if _is_duplicate(db, transaction_id, event_type):
         return "already_processed"
 
     now = _now()
     _record_event(db, user, event_type=event_type, plan_id=plan_id,
                   transaction_id=transaction_id, raw_payload=raw_payload)
+
+    # Store-side free trials are still subscriptions, but the trial columns are
+    # what the activation funnel reads — fill them in on the first grant.
+    if is_trial and user.trial_started_at is None:
+        user.trial_started_at = purchased_at or now
+        user.trial_ends_at = expires_at
 
     if user.subscription_started_at is None:
         user.subscription_started_at = now
