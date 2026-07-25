@@ -13,6 +13,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { SourcesLink } from '@/components/SourcesLink';
 import { IntroHeader } from '@/components/IntroHeader';
+import { WheelPicker } from '@/components/WheelPicker';
 import { useIntro } from '@/state/introContext';
 import { computePlan, macrosForCalories } from '@/utils/calories';
 import { colors, radius, space } from '@/theme/tokens';
@@ -20,6 +21,10 @@ import { fonts } from '@/theme/typography';
 import { track } from '@/analytics/posthog';
 
 const KCAL_PER_KG = 7700;
+
+function range(start: number, end: number): number[] {
+  return Array.from({ length: Math.max(1, end - start + 1) }, (_, i) => start + i);
+}
 
 function targetDate(weeks: number): string {
   const d = new Date();
@@ -49,11 +54,16 @@ export default function TargetPaceScreen() {
     [gender, intro.age, intro.height_cm, weight, intro.activity_level, goal],
   );
 
-  // Target-weight slider bounds: BMI 18.5 floor for lose, +15 kg cap for gain.
-  const tmin = lose
-    ? Math.max(45, Math.round(18.5 * (intro.height_cm / 100) ** 2))
-    : weight + 1;
-  const tmax = lose ? weight - 1 : weight + 15;
+  // Target-weight wheel bounds. Down to 40 kg for lose, up to +30 kg for gain.
+  // Both clamped against the current weight so the range can never invert or
+  // trap the user above their own weight (the old BMI-18.5 floor did exactly
+  // that for light users — it exceeded their current weight).
+  const tmax = lose ? weight - 1 : Math.max(weight + 1, Math.min(weight + 30, 250));
+  const tmin = lose ? Math.min(40, tmax) : weight + 1;
+  const targetValues = useMemo(() => range(tmin, tmax), [tmin, tmax]);
+
+  // Weight at BMI 18.5 — used for a gentle, non-blocking underweight note.
+  const bmiFloor = Math.round(18.5 * (intro.height_cm / 100) ** 2);
 
   const defaultTarget = lose
     ? Math.max(tmin, weight - 8)
@@ -157,26 +167,24 @@ export default function TargetPaceScreen() {
           activity level. Drag the sliders — watch what changes.
         </AppText>
 
-        {/* Slider 1 — target weight */}
+        {/* Target weight — wheel picker (same as the height/weight screen) so
+            hard slider edges never trap anyone above or below their goal. */}
         <View style={s.sliderBlock}>
           <View style={s.sliderHead}>
             <AppText variant="bodyStrong">Target weight</AppText>
             <AppText variant="bodyStrong" color={colors.terracottaText}>{target} kg</AppText>
           </View>
-          <Slider
-            minimumValue={tmin}
-            maximumValue={tmax}
-            step={1}
+          <WheelPicker
+            values={targetValues}
             value={target}
-            onValueChange={(v) => setTarget(Math.round(v))}
-            minimumTrackTintColor={colors.terracotta}
-            maximumTrackTintColor={colors.hairlineStrong}
-            thumbTintColor={colors.terracotta}
+            suffix="kg"
+            onChange={setTarget}
           />
-          <View style={s.sliderScale}>
-            <AppText variant="caption" color={colors.inkFaint}>{tmin} kg</AppText>
-            <AppText variant="caption" color={colors.inkFaint}>{tmax} kg</AppText>
-          </View>
+          {lose && target < bmiFloor ? (
+            <AppText variant="caption" color={colors.warning} center style={s.bmiNote}>
+              Heads up: this is below the healthy BMI range for your height ({bmiFloor} kg).
+            </AppText>
+          ) : null}
         </View>
 
         {/* Slider 2 — timeline */}
@@ -265,6 +273,7 @@ const s = StyleSheet.create({
     marginBottom: space.xs,
   },
   sliderScale: { flexDirection: 'row', justifyContent: 'space-between' },
+  bmiNote: { marginTop: space.sm },
   liveCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
