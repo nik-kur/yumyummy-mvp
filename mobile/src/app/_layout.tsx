@@ -3,7 +3,7 @@ import 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { AuthProvider } from '@/state/auth';
@@ -32,7 +32,10 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <SafeAreaProvider>
+      {/* Seed the provider with the natively-measured metrics so the very first
+          frame already knows the insets — without them a screen can mount with
+          zero padding and render under the Dynamic Island. */}
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <AuthProvider>
           <PendingMealsProvider>
             <NotificationsBridge />
@@ -57,13 +60,6 @@ export default function RootLayout() {
               <Stack.Screen name="meal/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="edit-targets" options={{ presentation: 'card' }} />
               <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
-              <Stack.Screen
-                name="post-purchase"
-                options={{
-                  presentation: 'fullScreenModal',
-                  gestureEnabled: false,
-                }}
-              />
               <Stack.Screen
                 name="postbuy"
                 options={{

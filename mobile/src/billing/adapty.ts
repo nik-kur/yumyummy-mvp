@@ -65,6 +65,8 @@ export function activateAdapty(): Promise<boolean> {
   return activationPromise;
 }
 
+let identifyPromise: Promise<boolean> | null = null;
+
 /**
  * Tie the current Adapty profile to our account id (idempotent).
  *
@@ -73,17 +75,39 @@ export function activateAdapty(): Promise<boolean> {
  * profile created at activation, which loses the purchase and its attribution.
  */
 export async function identifyAdapty(accountId: number | string): Promise<boolean> {
-  if (!(await activateAdapty())) return false;
-  try {
-    await adapty.identify(String(accountId));
-    return true;
-  } catch (e) {
-    // Non-fatal: the purchase still exists on the anonymous profile, and
-    // `/billing/sync` can find it by profile id. Report it so we notice if
-    // this starts happening at scale.
-    captureException(e);
-    return false;
-  }
+  const run = (async () => {
+    if (!(await activateAdapty())) return false;
+    try {
+      await adapty.identify(String(accountId));
+      return true;
+    } catch (e) {
+      // Non-fatal: the purchase still exists on the anonymous profile, and
+      // `/billing/sync` can find it by profile id. Report it so we notice if
+      // this starts happening at scale.
+      captureException(e);
+      return false;
+    }
+  })();
+  identifyPromise = run;
+  return run;
+}
+
+/**
+ * Wait for an in-flight `identifyAdapty` to settle.
+ *
+ * Sign-in runs identify() in the background so no screen blocks on the network.
+ * Anything that must not touch the anonymous profile — a purchase above all,
+ * whose receipt would otherwise arrive at our webhook with no account behind
+ * it — awaits this first. Resolves at once when nothing is in flight, and gives
+ * up after `timeoutMs` rather than trapping the buyer behind a slow network.
+ */
+export async function waitForAdaptyIdentify(timeoutMs = 4000): Promise<void> {
+  const pending = identifyPromise;
+  if (!pending) return;
+  await Promise.race([
+    pending.catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
 }
 
 /**

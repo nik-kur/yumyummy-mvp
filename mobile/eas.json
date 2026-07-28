@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "simulator": false
       },
@@ -21,6 +22,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "ios": {
         "simulator": false
       },
@@ -36,6 +38,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://yumyummy-mvp-eu.onrender.com",
         "EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY": "public_live_yn88NC6V.qkUHucx8YFaYUh6XnSID",

@@ -8,6 +8,13 @@
     "scheme": "yumyummy",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d466930c-0c2b-4540-91d5-3660bd3c8157",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.yumyummy.app",

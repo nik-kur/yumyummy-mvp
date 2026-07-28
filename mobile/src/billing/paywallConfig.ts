@@ -134,6 +134,27 @@ export const FALLBACK_CONFIG: PaywallRemoteConfig = {
   hard_paywall: true,
 };
 
+/**
+ * Timeline for customers the store granted no trial. Apple allows one
+ * introductory offer per subscription group, so a returning customer is
+ * charged today — telling them "trial ends on day 3" would be a lie. Shared by
+ * every layout that renders a timeline.
+ */
+export const PAID_TIMELINE_STEPS: TimelineStep[] = [
+  { icon: '✓', t: 'Done', d: 'Your personal plan — built', done: true },
+  { icon: '🔓', t: 'Today', d: 'Full access unlocked' },
+  {
+    icon: '🔔',
+    t: 'Day 2',
+    d: "You'll set up your full tracking system and see how simple it is",
+  },
+  {
+    icon: '★',
+    t: 'Day 3',
+    d: "You'll start noticing changes in your routine and eating trends",
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Placeholder substitution
 // ---------------------------------------------------------------------------
@@ -188,13 +209,18 @@ export function parseRemoteConfig(raw: string | null | undefined): PaywallRemote
  * Resolve the variant key to a known renderer layout.
  * Unknown variants degrade to 'A' (forward-compatible).
  */
-export type RendererVariant = 'A' | 'B' | 'B2' | 'C';
+export type RendererVariant = 'A' | 'B' | 'B2' | 'C' | 'S';
 
 const VARIANT_MAP: Record<string, RendererVariant> = {
   A_clean_v3: 'A',
+  A_trial_all_v1: 'A',
   B_trial_designer: 'B',
   B2_coffee_compare: 'B2',
   C_result_hook: 'C',
+  // 'S' is the single-plan layout: hero timeline, one compact plan card.
+  S_hero_v1: 'S',
+  M_single_trial_v1: 'S',
+  W_single_trial_v1: 'S',
 };
 
 export function resolveVariant(variant: string): RendererVariant {
@@ -299,6 +325,35 @@ export function periodPriceLabel(product: AdaptyPaywallProduct | undefined): str
   if (!product) return '';
   const weekly = perWeekPrice(product);
   return weekly ? `${weekly}/wk` : priceLabel(product);
+}
+
+/**
+ * Which `cta` key the selected plan should render.
+ *
+ * The trial wording wins whenever the store actually granted this customer a
+ * trial; otherwise the key is the plan's billing period, which is what a
+ * customer out of introductory offers must see. The product id is only
+ * consulted when StoreKit told us nothing at all (no products loaded).
+ */
+export function resolveCtaKey(
+  config: PaywallRemoteConfig,
+  product: AdaptyPaywallProduct | undefined,
+  productId: string,
+): string {
+  if (trialLength(product) !== undefined && config.cta.trial) return 'trial';
+  switch (billingPeriod(product)) {
+    case 'year':
+      return 'yearly';
+    case 'month':
+      return 'monthly';
+    case 'week':
+      return 'weekly';
+    default:
+      break;
+  }
+  if (productId.includes('yearly')) return 'yearly';
+  if (productId.includes('monthly')) return 'monthly';
+  return 'weekly';
 }
 
 /**

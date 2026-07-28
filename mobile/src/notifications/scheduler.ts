@@ -1,7 +1,8 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
-import type { NotificationPrefs, ReminderPref } from './prefs';
+import { loadPrefs, type NotificationPrefs, type ReminderPref } from './prefs';
 import { loadJourney, rawDay } from '@/state/journey';
 
 /**
@@ -16,12 +17,33 @@ import { loadJourney, rawDay } from '@/state/journey';
  * remaining days — different copy each day — pointing at the daily quests.
  * The evening check-in ("did you log everything?") is a regular repeating
  * reminder that stays on after week one, alongside the weekly recap.
+ *
+ * One notification outlives prefs changes: the trial-ending nudge. Its fire
+ * time is stored at purchase and re-armed on every sync, because the purchase
+ * happens before the user has been asked for push permission.
  */
 
 const ANDROID_CHANNEL_ID = 'reminders';
 const IDENTIFIER_PREFIX = 'yum.reminder.';
 const WEEKLY_RECAP_ID = 'yum.weekly.recap';
 const QUEST_NUDGE_PREFIX = 'yum.quest.morning.';
+const TRIAL_REMINDER_ID = 'yum.trial.ending';
+const TRIAL_REMINDER_KEY = '@yy_trial_reminder_at';
+
+/**
+ * The one-off nudge before a free trial converts. Kept as data so the copy and
+ * the timing can be changed over the air without a new binary.
+ *
+ * 48 hours after the trial starts is 24 hours before the first charge on the
+ * 3-day trials we sell — early enough to be a courtesy rather than a surprise,
+ * late enough that the user has had a real day with the app.
+ */
+export const TRIAL_ENDING_REMINDER = {
+  delayHours: 48,
+  title: 'Your free trial',
+  body: 'You have 1 more day of your free trial. Have you tried photo logging yet?',
+  route: '/capture?mode=photo',
+} as const;
 
 /** Per-reminder copy. Falls back to a generic nudge for unknown ids so adding a
  *  reminder to prefs never ships an empty notification. */
@@ -128,6 +150,70 @@ async function cancelOurNotifications(): Promise<void> {
 }
 
 /**
+ * Put the stored trial nudge back on the OS schedule. Separate from the
+ * scheduling call because `syncFromPrefs` wipes everything we own before
+ * re-scheduling, and because at purchase time the user usually hasn't granted
+ * push permission yet — the intent is stored then and honoured here, the first
+ * time both the master switch and permission are in place.
+ *
+ * No-op when nothing is stored or the moment has already passed.
+ */
+async function scheduleStoredTrialReminder(): Promise<void> {
+  let iso: string | null = null;
+  try {
+    iso = await AsyncStorage.getItem(TRIAL_REMINDER_KEY);
+  } catch {
+    return;
+  }
+  if (!iso) return;
+
+  const fireAt = new Date(iso);
+  if (Number.isNaN(fireAt.getTime()) || fireAt.getTime() <= Date.now()) return;
+
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: TRIAL_REMINDER_ID,
+      content: {
+        title: TRIAL_ENDING_REMINDER.title,
+        body: TRIAL_ENDING_REMINDER.body,
+        data: { route: TRIAL_ENDING_REMINDER.route },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: fireAt,
+        channelId: ANDROID_CHANNEL_ID,
+      },
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
+/**
+ * Arm the pre-conversion nudge for a trial that started at `trialStartedAt`.
+ * Call this only for purchases that actually carry a free-trial phase —
+ * customers who already used their one introductory offer are charged straight
+ * away and would find the message untrue.
+ */
+export async function scheduleTrialEndingReminder(trialStartedAt: Date): Promise<void> {
+  const fireAt = new Date(
+    trialStartedAt.getTime() + TRIAL_ENDING_REMINDER.delayHours * 60 * 60 * 1000,
+  );
+  try {
+    await AsyncStorage.setItem(TRIAL_REMINDER_KEY, fireAt.toISOString());
+  } catch {
+    // The nudge is a nicety; losing it must never fail a purchase.
+    return;
+  }
+
+  const prefs = await loadPrefs();
+  if (!prefs.enabled) return;
+  if (!(await getPermissionGranted())) return;
+  await ensureAndroidChannel();
+  await scheduleStoredTrialReminder();
+}
+
+/**
  * Reconcile the OS schedule with `prefs`. No-ops gracefully when notifications
  * are off or permission is missing (we still clear anything we'd scheduled, so
  * turning the master switch off immediately stops reminders).
@@ -192,6 +278,8 @@ export async function syncFromPrefs(prefs: NotificationPrefs): Promise<void> {
   } catch {
     // non-fatal
   }
+
+  await scheduleStoredTrialReminder();
 
   // Weekly "Week in Recap" nudge → opens the Recap screen when tapped.
   if (prefs.weeklyRecap?.enabled) {

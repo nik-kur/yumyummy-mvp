@@ -14,7 +14,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { SourcesLink } from '@/components/SourcesLink';
 import { useIntro } from '@/state/introContext';
-import { isAdaptyConfigured } from '@/billing/adapty';
+import { isAdaptyConfigured, waitForAdaptyIdentify } from '@/billing/adapty';
 import { colors, radius, space } from '@/theme/tokens';
 import { fonts } from '@/theme/typography';
 import { track } from '@/analytics/posthog';
@@ -216,6 +216,10 @@ export default function PlanRevealScreen() {
 
     if (isAdaptyConfigured()) {
       try {
+        // The gate before this screen fires identify() in the background;
+        // writing attributes across it would either hit #3006 or land them on
+        // the anonymous profile the paywall no longer uses.
+        await waitForAdaptyIdentify();
         await adapty.updateProfile({
           codableCustomAttributes: {
             goal: intro.goal_type ?? 'track',

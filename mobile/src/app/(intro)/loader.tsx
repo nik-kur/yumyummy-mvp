@@ -1,6 +1,6 @@
 /**
  * N2 Loader — percentage ring building the plan (prototype v3).
- * Four staged status lines, then auto-navigates to the plan reveal.
+ * Four staged status lines, then auto-navigates to the sign-in gate.
  * For maintain/track goals (which skip N1) the plan is computed here.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -64,7 +64,7 @@ export default function LoaderScreen() {
           navigated.current = true;
           clearInterval(interval);
           track('onboarding_screen_completed', { screen: 'N2_loader' });
-          setTimeout(() => router.replace('/(intro)/plan-reveal'), 400);
+          setTimeout(() => router.replace('/(intro)/save-plan'), 400);
         }
         return next;
       });

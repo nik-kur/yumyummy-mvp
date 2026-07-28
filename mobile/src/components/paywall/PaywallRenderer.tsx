@@ -29,32 +29,18 @@ import type {
 } from '@/billing/paywallConfig';
 import {
   billingCadence,
-  billingPeriod,
   fillPlaceholders,
   findProduct,
   hasUnresolvedPlaceholders,
   periodPriceLabel,
+  resolveCtaKey,
   trialLength,
+  PAID_TIMELINE_STEPS,
 } from '@/billing/paywallConfig';
 
 const TERMS_URL = 'https://yumyummy.ai/terms.html';
 const PRIVACY_URL = 'https://yumyummy.ai/privacy.html';
 const DONE_GREEN = '#16A34A';
-
-const PAID_TIMELINE_STEPS = [
-  { icon: '✓', t: 'Done', d: 'Your personal plan — built', done: true },
-  { icon: '🔓', t: 'Today', d: 'Full access unlocked' },
-  {
-    icon: '🔔',
-    t: 'Day 2',
-    d: "You'll set up your full tracking system and see how simple it is",
-  },
-  {
-    icon: '★',
-    t: 'Day 3',
-    d: "You'll start noticing changes in your routine and eating trends",
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Props
@@ -227,18 +213,9 @@ export function PaywallRenderer({
   const hasTrial = trialLength(selectedAdaptyProduct) !== undefined;
 
   const ctaLabel = useMemo(() => {
-    const period = billingPeriod(selectedAdaptyProduct);
-    const byPeriod =
-      period === 'year' ? 'yearly' : period === 'week' ? 'weekly' : period === 'month' ? 'monthly' : undefined;
-    // Fall back to the id only when the store gave us nothing to read.
-    const idKey = selectedProduct.includes('yearly')
-      ? 'yearly'
-      : selectedProduct.includes('monthly')
-        ? 'monthly'
-        : 'weekly';
-    const key = hasTrial && config.cta.trial ? 'trial' : (byPeriod ?? idKey);
+    const key = resolveCtaKey(config, selectedAdaptyProduct, selectedProduct);
     return fill(config.cta[key] ?? config.cta.yearly ?? 'Continue');
-  }, [selectedAdaptyProduct, selectedProduct, hasTrial, config.cta, fill]);
+  }, [config, selectedAdaptyProduct, selectedProduct, fill]);
 
   // Never render a literal "{TARGET_WEIGHT}": fall back goal_line →
   // maintain_line → hide the hero card entirely.

@@ -2,7 +2,9 @@
  * Paywall screen — code-rendered via PaywallRenderer.
  *
  * Flow: fetch placement 'main' from Adapty → parse remote config →
- * logShowPaywall → render → purchase/restore → post-purchase.
+ * logShowPaywall → render → purchase/restore → postbuy push opt-in. The user
+ * is already signed in by this point (the intro gates on it), so the purchase
+ * lands on an identified Adapty profile.
  *
  * Hard paywall by default: no close button, gesture-dismiss disabled — exits
  * only via successful purchase or restore. Opened from Profile
@@ -22,22 +24,26 @@ import { PaywallRenderer } from '@/components/paywall/PaywallRenderer';
 import { VariantB } from '@/components/paywall/VariantB';
 import { VariantB2 } from '@/components/paywall/VariantB2';
 import { VariantC } from '@/components/paywall/VariantC';
+import { VariantSHero } from '@/components/paywall/VariantSHero';
 import { useAuth } from '@/state/auth';
 import { loadDraft, type IntroDraft } from '@/state/introDraft';
 import { startJourney } from '@/state/journey';
 import {
   activateAdapty,
   isAdaptyConfigured,
+  waitForAdaptyIdentify,
   waitForAppleAdsAttribution,
   ADAPTY_PLACEMENT_MAIN,
   PREMIUM_ACCESS_LEVEL,
 } from '@/billing/adapty';
 import {
+  freeTrialPhase,
   parseRemoteConfig,
   resolveVariant,
   FALLBACK_CONFIG,
   type PlaceholderValues,
 } from '@/billing/paywallConfig';
+import { scheduleTrialEndingReminder } from '@/notifications/scheduler';
 import { track } from '@/analytics/posthog';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 import { colors, radius, space } from '@/theme/tokens';
@@ -199,30 +205,48 @@ export default function PaywallScreen() {
 
   const handlePurchase = useCallback(async (product: AdaptyPaywallProduct) => {
     setPurchasing(true);
+    const variant = configRef.current.variant;
     addBreadcrumb('purchase', 'Purchase started', { product: product.vendorProductId });
-    track('paywall_plan_selected', { product: product.vendorProductId });
+    track('paywall_plan_selected', { product: product.vendorProductId, variant });
 
     try {
       if (!isAdaptyConfigured()) {
         await api.startTrial(3);
         await refreshProfile();
-        track('paywall_purchase_success', { product: product.vendorProductId, mode: 'dev_trial' });
+        track('paywall_purchase_success', {
+          product: product.vendorProductId,
+          variant,
+          mode: 'dev_trial',
+        });
         await startJourney(); // journey Day 1 = purchase moment
-        router.replace('/post-purchase');
+        router.replace('/postbuy');
         return;
       }
+
+      // Sign-in identifies the Adapty profile in the background. Buying before
+      // that lands means the receipt arrives at our webhook with no
+      // customer_user_id and the entitlement has to be reconciled after the
+      // fact — so give identify() its moment first.
+      await waitForAdaptyIdentify();
 
       const result = await adapty.makePurchase(product);
       if (result.type === 'success') {
         track('paywall_purchase_success', {
           product: product.vendorProductId,
+          variant,
           price: product.price?.amount,
           currency: product.price?.currencyCode,
+          has_trial: freeTrialPhase(product) !== undefined,
         });
         addBreadcrumb('purchase', 'Purchase succeeded');
         await refreshProfile();
         await startJourney(); // journey Day 1 = purchase moment
-        router.replace('/post-purchase');
+        // A reminder is only honest when a trial is actually running: customers
+        // who already used their one intro offer are charged immediately.
+        if (freeTrialPhase(product)) {
+          await scheduleTrialEndingReminder(new Date());
+        }
+        router.replace('/postbuy');
       } else if (result.type === 'user_cancelled') {
         // User backed out of the StoreKit sheet — expected, not an error.
         track('paywall_purchase_cancelled', { product: product.vendorProductId });
@@ -254,14 +278,17 @@ export default function PaywallScreen() {
 
     try {
       if (!isAdaptyConfigured()) {
-        router.replace('/post-purchase');
+        router.replace('/postbuy');
         return;
       }
       const adaptyProfile = await adapty.restorePurchases();
       if (adaptyProfile.accessLevels?.[PREMIUM_ACCESS_LEVEL]?.isActive) {
         track('paywall_restore_success');
         await refreshProfile();
-        router.replace('/post-purchase');
+        // Idempotent — a reinstall gets the first-week ladder, an existing
+        // journey is left where it is.
+        await startJourney();
+        router.replace('/postbuy');
       } else {
         Alert.alert('No subscription found', 'We couldn\'t find an active subscription for this Apple ID.');
         track('paywall_restore_empty');
@@ -327,6 +354,8 @@ export default function PaywallScreen() {
       return withClose(<VariantB2 {...rendererProps} />);
     case 'C':
       return withClose(<VariantC {...rendererProps} />);
+    case 'S':
+      return withClose(<VariantSHero {...rendererProps} />);
     default:
       return withClose(<PaywallRenderer {...rendererProps} />);
   }

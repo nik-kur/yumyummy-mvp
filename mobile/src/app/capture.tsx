@@ -11,6 +11,7 @@ import {
   Easing,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { X, Mic, Camera, Check, Trash2, ArrowUp, Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -85,6 +86,13 @@ export default function CaptureScreen() {
   const params = useLocalSearchParams<{ prefill?: string; mode?: string }>();
   const { submit } = usePendingMeals();
   const keyboardHeight = useKeyboardHeight();
+  // Pad the top by hand instead of letting SafeAreaView do it. Inside a
+  // fullScreenModal the per-screen safe-area context can report a zero top
+  // inset, which slides the header under the Dynamic Island and leaves the
+  // close button untappable — the user's only way out is killing the app.
+  // The window metrics captured natively at launch are the reliable floor.
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, initialWindowMetrics?.insets.top ?? 0);
   // One-time AI consent gate (Guidelines 5.1.1/5.1.2): everything logged here
   // is processed by third-party AI, so ask before the first capture.
   const { granted: aiConsent, grant: grantAIConsent } = useAIConsent();
@@ -236,7 +244,7 @@ export default function CaptureScreen() {
 
   if (mode === 'accepted') {
     return (
-      <Screen edges={['top', 'bottom', 'left', 'right']}>
+      <Screen edges={['bottom', 'left', 'right']} contentStyle={{ paddingTop: topInset }}>
         <View style={styles.accepted}>
           <View style={styles.tick}>
             <Check size={44} color={colors.white} strokeWidth={2.5} />
@@ -258,7 +266,7 @@ export default function CaptureScreen() {
   // the flex input column — it sits in its own row and moves up with
   // marginBottom = keyboard height so Mic / Camera / Analyze stay visible.
   return (
-    <Screen edges={['top', 'bottom', 'left', 'right']}>
+    <Screen edges={['bottom', 'left', 'right']} contentStyle={{ paddingTop: topInset }}>
       <View style={styles.flex}>
         <View style={styles.topBar}>
           <View>
