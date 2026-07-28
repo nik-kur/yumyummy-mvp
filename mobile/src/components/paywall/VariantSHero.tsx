@@ -79,7 +79,7 @@ function HeroTimelineRow({
         </View>
         {!last && <View style={s.tlLine} />}
       </View>
-      <View style={s.tlContent}>
+      <View style={[s.tlContent, last && s.tlContentLast]}>
         <AppText variant="title">{step.t}</AppText>
         <AppText variant="small" color={colors.inkMuted} style={s.tlDesc}>
           {step.d}
@@ -130,6 +130,11 @@ export function VariantSHero({
     [hasTrial, config.timeline],
   );
 
+  const laurels = useMemo(
+    () => config.social.laurels.map(fill).filter((l) => !hasUnresolvedPlaceholders(l)),
+    [config.social.laurels, fill],
+  );
+
   const priceText = periodPriceLabel(product);
   const cadence = billingCadence(product);
 
@@ -174,6 +179,15 @@ export function VariantSHero({
             {heroLine}
           </AppText>
         )}
+        {laurels.length > 0 && (
+          <View style={s.laurels}>
+            {laurels.map((l) => (
+              <View key={l} style={s.laurel}>
+                <AppText variant="caption" color={colors.inkMuted}>{l}</AppText>
+              </View>
+            ))}
+          </View>
+        )}
 
         <View style={s.timeline}>
           {timelineSteps.map((step, i) => (
@@ -184,6 +198,17 @@ export function VariantSHero({
             />
           ))}
         </View>
+
+        {config.social.quote.text ? (
+          <View style={s.quote}>
+            <AppText variant="small" color={colors.ink} center>
+              “{fill(config.social.quote.text)}”
+            </AppText>
+            <AppText variant="caption" color={colors.inkFaint} center>
+              {fill(config.social.quote.author)}
+            </AppText>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={s.footer}>
@@ -252,21 +277,33 @@ const s = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingVertical: space.xs,
   },
-  // `justifyContent: center` on a grown container is what keeps the timeline
-  // optically centred on tall screens instead of hugging the headline.
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: space.lg,
-    paddingBottom: space.base,
-  },
+  scroll: { flexGrow: 1, paddingHorizontal: space.lg, paddingBottom: space.base },
   topBarSpacer: { width: 50 },
   headline: { marginBottom: space.sm },
-  heroLine: { marginBottom: space.xl },
+  heroLine: { marginBottom: space.sm },
+  laurels: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: space.sm,
+  },
+  laurel: {
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+  },
 
   // Timeline — the centrepiece, so everything about it is a size up from the
   // multi-plan layout: 40px dials, a 3px rail, body-sized descriptions.
-  timeline: { paddingHorizontal: space.xs },
+  // `flexGrow` (not `flex`) claims the space between header and footer without
+  // letting the rows shrink when a small screen can't spare it.
+  timeline: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: space.xs,
+    paddingVertical: space.lg,
+  },
   tlRow: { flexDirection: 'row', gap: space.base },
   tlIconCol: { alignItems: 'center', width: 40 },
   tlIcon: {
@@ -287,7 +324,9 @@ const s = StyleSheet.create({
     marginVertical: space.xs,
   },
   tlContent: { flex: 1, paddingBottom: space.lg, gap: 2 },
+  tlContentLast: { paddingBottom: 0 },
   tlDesc: { lineHeight: 20 },
+  quote: { gap: 2, paddingHorizontal: space.md },
 
   // Footer — plan, reassurance, CTA and legal, pinned as one block.
   footer: { paddingHorizontal: space.lg, paddingBottom: space.sm, gap: space.md },
