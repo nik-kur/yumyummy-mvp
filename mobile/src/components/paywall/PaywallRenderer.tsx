@@ -28,10 +28,13 @@ import type {
   PlanConfig,
 } from '@/billing/paywallConfig';
 import {
+  billingCadence,
+  billingPeriod,
   fillPlaceholders,
   findProduct,
   hasUnresolvedPlaceholders,
-  perMonthPrice,
+  periodPriceLabel,
+  trialLength,
 } from '@/billing/paywallConfig';
 
 const TERMS_URL = 'https://yumyummy.ai/terms.html';
@@ -141,34 +144,25 @@ function PlanCard({
   onSelect: () => void;
   fill: (t: string) => string;
 }) {
-  const priceLabel = product?.price
-    ? `${product.price.currencySymbol ?? ''}${product.price.amount?.toFixed(2) ?? ''}`
-    : '';
-  const monthlyLabel = product ? perMonthPrice(product) : undefined;
-  const isYearly = plan.product.includes('yearly');
-  const isMonthly = plan.product.includes('monthly');
-  const isWeekly = plan.product.includes('weekly');
   const recTag = plan.rec_tag_by_goal?.[goal ?? 'default'] ?? plan.rec_tag_by_goal?.default;
-  const hasIntroOffer = (product?.subscription?.offer?.phases ?? []).some(
-    (ph) => ph.paymentMode === 'free_trial',
-  );
+  const trial = trialLength(product);
+  const priceText = periodPriceLabel(product);
+  const cadence = billingCadence(product);
+  // Leading with the trial reads better on a single-plan paywall; leading with
+  // the price is what lets several plans be compared.
+  const trialFirst = trial !== undefined && plan.price_style === 'trial_big';
 
   const mainLabel = (() => {
     if (!product) return plan.display_price ?? '—';
-    if (isYearly) return '3 days free trial';
-    if (isMonthly) return `${priceLabel}/mo`;
-    if (isWeekly) return `${priceLabel}/wk`;
-    return priceLabel;
+    if (trialFirst) return `${trial} free trial`;
+    return priceText;
   })();
 
   const subLabel = (() => {
     if (!product) return fill(plan.display_sub ?? plan.sub ?? '');
-    if (isYearly && monthlyLabel) {
-      return `No payment due now. Then ${monthlyLabel}/mo billed annually at ${priceLabel}.`;
-    }
-    if (isMonthly) return 'billed monthly';
-    if (isWeekly) return 'billed weekly';
-    return fill(plan.sub ?? '');
+    if (trialFirst) return `No payment due now. Then ${priceText} ${cadence}.`;
+    if (trial) return `${trial} free, then ${cadence}`;
+    return cadence || fill(plan.sub ?? '');
   })();
 
   return (
@@ -176,8 +170,9 @@ function PlanCard({
       {plan.badge && (
         <View style={s.planBadge}>
           <AppText variant="overline" color={colors.white}>
-            {isYearly && product && !hasIntroOffer
-              ? plan.badge.replace(/\s*·\s*3 DAYS FREE/, '')
+            {/* Ineligible customers see no offer — don't promise them one. */}
+            {product && !trial
+              ? plan.badge.replace(/\s*·\s*\d+\s*DAYS?\s*FREE/i, '')
               : plan.badge}
           </AppText>
         </View>
@@ -226,17 +221,24 @@ export function PaywallRenderer({
   );
 
   const selectedAdaptyProduct = findProduct(products, selectedProduct);
-  const isYearly = selectedProduct.includes('yearly');
+  // Whether *this* customer gets a trial on the selected plan, per StoreKit.
+  // Not every eligible-looking plan carries one: Apple grants one introductory
+  // offer per subscription group, so a returning customer sees none.
+  const hasTrial = trialLength(selectedAdaptyProduct) !== undefined;
 
   const ctaLabel = useMemo(() => {
-    const key = selectedProduct.includes('yearly')
+    const period = billingPeriod(selectedAdaptyProduct);
+    const byPeriod =
+      period === 'year' ? 'yearly' : period === 'week' ? 'weekly' : period === 'month' ? 'monthly' : undefined;
+    // Fall back to the id only when the store gave us nothing to read.
+    const idKey = selectedProduct.includes('yearly')
       ? 'yearly'
       : selectedProduct.includes('monthly')
         ? 'monthly'
         : 'weekly';
-    const template = config.cta[key] ?? 'Continue';
-    return fill(template);
-  }, [selectedProduct, config.cta, fill]);
+    const key = hasTrial && config.cta.trial ? 'trial' : (byPeriod ?? idKey);
+    return fill(config.cta[key] ?? config.cta.yearly ?? 'Continue');
+  }, [selectedAdaptyProduct, selectedProduct, hasTrial, config.cta, fill]);
 
   // Never render a literal "{TARGET_WEIGHT}": fall back goal_line →
   // maintain_line → hide the hero card entirely.
@@ -250,12 +252,12 @@ export function PaywallRenderer({
   }, [goal, config.hero, fill]);
 
   const timelineSteps = useMemo(
-    () => (isYearly && config.timeline ? config.timeline.steps : PAID_TIMELINE_STEPS),
-    [isYearly, config.timeline],
+    () => (hasTrial && config.timeline ? config.timeline.steps : PAID_TIMELINE_STEPS),
+    [hasTrial, config.timeline],
   );
 
-  const aboveCtaText = isYearly
-    ? '✓ No payment due now · Cancel anytime'
+  const aboveCtaText = hasTrial
+    ? config.above_cta || '✓ No payment due now · Cancel anytime'
     : '✓ Cancel anytime';
 
   const socialLaurelsResolved = useMemo(
@@ -356,7 +358,7 @@ export function PaywallRenderer({
 
         {/* Below the fold — legal disclaimers */}
         <AppText variant="caption" color={colors.inkFaint} center style={s.disclosure}>
-          {isYearly
+          {hasTrial
             ? 'After the free trial, your subscription auto-renews at the price shown unless cancelled at least 24 hours before the end of the current period.'
             : 'Subscription auto-renews at the price shown unless cancelled at least 24 hours before the end of the current period.'}{' '}
           Manage or cancel anytime in your Apple Account settings.
