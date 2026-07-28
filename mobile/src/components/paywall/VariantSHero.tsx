@@ -4,9 +4,14 @@
  * The multi-plan layout (`PaywallRenderer`) is built around comparing cards, so
  * with one plan its content collapses to the top of the screen and leaves the
  * CTA stranded mid-viewport. Here the trial timeline is the argument and takes
- * the centre of the screen, the plan is a single compact card stating what will
- * be charged, and the reassurance line plus CTA are pinned to the bottom where
- * a thumb expects them.
+ * the centre of the screen, and the reassurance line plus CTA are pinned to the
+ * bottom where a thumb expects them.
+ *
+ * With one plan there is nothing to compare, so there is no price card either:
+ * the decision is "start the trial or don't", and a card would only invite the
+ * customer to weigh a number instead. The price lives in the terms line under
+ * the CTA, which is where Apple requires it and where it stops competing with
+ * the button.
  *
  * Same iron rule as everywhere else: prices and trial eligibility come from
  * `products` (StoreKit), never from `config`.
@@ -26,12 +31,11 @@ import type {
   TimelineStep,
 } from '@/billing/paywallConfig';
 import {
-  billingCadence,
   fillPlaceholders,
   findProduct,
   hasUnresolvedPlaceholders,
-  periodPriceLabel,
   resolveCtaKey,
+  subscriptionTerms,
   trialLength,
   PAID_TIMELINE_STEPS,
 } from '@/billing/paywallConfig';
@@ -135,15 +139,11 @@ export function VariantSHero({
     [config.social.laurels, fill],
   );
 
-  const priceText = periodPriceLabel(product);
-  const cadence = billingCadence(product);
-
-  const planMain = product ? priceText : (plan?.display_price ?? '—');
-  const planSub = (() => {
-    if (!product) return fill(plan?.display_sub ?? plan?.sub ?? '');
-    if (trial) return `${trial} free, then ${cadence}`;
-    return cadence || fill(plan?.sub ?? '');
-  })();
+  // Store data when we have it; the config's display copy is the offline
+  // stand-in, since without a price this line would say nothing at all.
+  const terms = product
+    ? subscriptionTerms(product)
+    : fill(plan?.display_sub ?? plan?.sub ?? '');
 
   const aboveCtaText = hasTrial
     ? config.above_cta || '✓ No payment due now · Cancel anytime'
@@ -199,29 +199,9 @@ export function VariantSHero({
           ))}
         </View>
 
-        {config.social.quote.text ? (
-          <View style={s.quote}>
-            <AppText variant="small" color={colors.ink} center>
-              “{fill(config.social.quote.text)}”
-            </AppText>
-            <AppText variant="caption" color={colors.inkFaint} center>
-              {fill(config.social.quote.author)}
-            </AppText>
-          </View>
-        ) : null}
       </ScrollView>
 
       <View style={s.footer}>
-        <View style={s.planCard}>
-          <View style={s.planInfo}>
-            <AppText variant="h2">{planMain}</AppText>
-            {planSub ? (
-              <AppText variant="caption" color={colors.inkMuted}>{planSub}</AppText>
-            ) : null}
-          </View>
-          <CircleCheck size={24} color={colors.terracotta} strokeWidth={2} />
-        </View>
-
         <AppText variant="caption" color={DONE_GREEN} center>
           {aboveCtaText}
         </AppText>
@@ -246,9 +226,7 @@ export function VariantSHero({
         )}
 
         <AppText variant="caption" color={colors.inkFaint} center style={s.disclosure}>
-          {hasTrial
-            ? 'After the free trial, your subscription auto-renews at the price shown unless cancelled at least 24 hours before the end of the current period.'
-            : 'Subscription auto-renews at the price shown unless cancelled at least 24 hours before the end of the current period.'}
+          {terms}
         </AppText>
         <View style={s.legalRow}>
           <Pressable onPress={onRestore}>
@@ -279,7 +257,10 @@ const s = StyleSheet.create({
   },
   scroll: { flexGrow: 1, paddingHorizontal: space.lg, paddingBottom: space.base },
   topBarSpacer: { width: 50 },
-  headline: { marginBottom: space.sm },
+  // Dropped off the top bar rather than pinned to it: with only the timeline
+  // below, a headline flush against "Restore" leaves the whole screen
+  // top-heavy.
+  headline: { marginTop: space.xl, marginBottom: space.sm },
   heroLine: { marginBottom: space.sm },
   laurels: {
     flexDirection: 'row',
@@ -326,22 +307,9 @@ const s = StyleSheet.create({
   tlContent: { flex: 1, paddingBottom: space.lg, gap: 2 },
   tlContentLast: { paddingBottom: 0 },
   tlDesc: { lineHeight: 20 },
-  quote: { gap: 2, paddingHorizontal: space.md },
 
-  // Footer — plan, reassurance, CTA and legal, pinned as one block.
+  // Footer — reassurance, CTA, terms and legal, pinned as one block.
   footer: { paddingHorizontal: space.lg, paddingBottom: space.sm, gap: space.md },
-  planCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderColor: colors.terracotta,
-    paddingVertical: space.md,
-    paddingHorizontal: space.base,
-  },
-  planInfo: { flex: 1, gap: 2 },
   storeNotice: { gap: space.md, alignItems: 'center' },
   disclosure: { lineHeight: 15 },
   legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },

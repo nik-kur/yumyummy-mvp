@@ -94,10 +94,9 @@ export const FALLBACK_CONFIG: PaywallRemoteConfig = {
     },
   },
   timeline: {
-    enabled_for: 'yearly',
     steps: [
       { icon: '✓', t: 'Done', d: 'Your personal plan — built', done: true },
-      { icon: '🔓', t: 'Today', d: 'Full access unlocked' },
+      { icon: '🔓', t: 'Today', d: 'Full access unlocked — you pay nothing' },
       { icon: '🔔', t: 'Day 2', d: "We'll remind you 24h before any charge" },
       { icon: '★', t: 'Day 3', d: 'Trial ends — cancel anytime before' },
     ],
@@ -111,24 +110,27 @@ export const FALLBACK_CONFIG: PaywallRemoteConfig = {
         default: '✦ Recommended for building the habit',
       },
       display_price: '$1.73/wk',
-      display_sub: '3 days free, then billed annually at $89.99',
+      display_sub: '3 days free trial, then billed annually at $89.99',
     },
     {
       product: 'ai.yumyummy.app.monthly',
-      display_price: '$2.31/wk',
-      display_sub: '3 days free, then billed monthly at $9.99',
+      display_price: '$2.30/wk',
+      display_sub: '3 days free trial, then billed monthly at $9.99',
     },
     {
       product: 'ai.yumyummy.app.weekly_upd',
       display_price: '$4.99/wk',
-      display_sub: '3 days free, then billed weekly',
+      display_sub: '3 days free trial, then billed weekly',
     },
   ],
+  // Every plan carries a trial, so `trial` is what customers normally see. The
+  // period keys are the wording for someone out of introductory offers — they
+  // must never promise free days.
   cta: {
-    trial: 'Start my 3-day free trial',
-    yearly: 'Start 3 days free now',
-    monthly: 'Continue — {PRICE_M}/mo',
-    weekly: 'Start now — {PRICE_W}/wk',
+    trial: 'Start 3 days free now',
+    yearly: 'Continue',
+    monthly: 'Continue',
+    weekly: 'Continue',
   },
   above_cta: '✓ No payment due now · Cancel anytime',
   hard_paywall: true,
@@ -250,12 +252,17 @@ export function perMonthPrice(product: AdaptyPaywallProduct): string | undefined
   return `${symbol}${monthly.toFixed(2)}`;
 }
 
-/** Weeks in one unit of each billing period — the divisor behind `perWeekPrice`. */
-const WEEKS_PER_UNIT: Record<string, number> = {
-  year: 52,
-  month: 52 / 12,
-  week: 1,
-  day: 1 / 7,
+/**
+ * Days in one unit of each billing period. These are Apple's own figures for
+ * normalising a subscription price — a month is 30.4 days, a year 365 — so our
+ * "/wk" number matches what the App Store shows for the same product instead of
+ * drifting a cent away from it.
+ */
+const DAYS_PER_UNIT: Record<string, number> = {
+  year: 365,
+  month: 30.4,
+  week: 7,
+  day: 1,
 };
 
 /**
@@ -269,10 +276,10 @@ export function perWeekPrice(product: AdaptyPaywallProduct): string | undefined 
   const price = product.price;
   if (!price?.amount) return undefined;
   const period = product.subscription?.subscriptionPeriod;
-  const weeks = (WEEKS_PER_UNIT[period?.unit ?? ''] ?? 0) * (period?.numberOfUnits || 1);
-  if (!weeks) return undefined;
+  const days = (DAYS_PER_UNIT[period?.unit ?? ''] ?? 0) * (period?.numberOfUnits || 1);
+  if (!days) return undefined;
   const symbol = price.currencySymbol ?? price.currencyCode ?? '$';
-  return `${symbol}${(price.amount / weeks).toFixed(2)}`;
+  return `${symbol}${((price.amount / days) * 7).toFixed(2)}`;
 }
 
 type AdaptySubscription = NonNullable<AdaptyPaywallProduct['subscription']>;
@@ -375,4 +382,35 @@ export function billingCadence(product: AdaptyPaywallProduct | undefined): strin
     default:
       return '';
   }
+}
+
+/** "per month" / "every 3 months" — how often the charge repeats. */
+function chargeInterval(product: AdaptyPaywallProduct | undefined): string {
+  const period = product?.subscription?.subscriptionPeriod;
+  if (!period?.unit) return '';
+  const n = period.numberOfUnits || 1;
+  return n === 1 ? `per ${period.unit}` : `every ${n} ${period.unit}s`;
+}
+
+/**
+ * The full subscription terms, with the price filled in from StoreKit.
+ *
+ * The single-plan layouts deliberately show no price card — the whole point is
+ * one button and no haggling over the number — so this line is the only place
+ * the customer is told what they will be charged, which Apple requires it to be
+ * (Guideline 3.1.2). Kept here rather than in the renderer so the wording can be
+ * changed over the air.
+ */
+export function subscriptionTerms(product: AdaptyPaywallProduct | undefined): string {
+  const renewal =
+    'Renews automatically unless cancelled at least 24 hours before the end of the current period. Cancel anytime in your Apple Account settings.';
+  const price = priceLabel(product);
+  const interval = chargeInterval(product);
+  if (!price || !interval) return renewal;
+
+  const trial = trialLength(product);
+  const charge = `${price} ${interval}`;
+  return trial
+    ? `Free for ${trial}, then ${charge}. ${renewal}`
+    : `${charge}. ${renewal}`;
 }

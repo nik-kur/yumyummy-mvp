@@ -147,7 +147,7 @@ function PlanCard({
   const subLabel = (() => {
     if (!product) return fill(plan.display_sub ?? plan.sub ?? '');
     if (trialFirst) return `No payment due now. Then ${priceText} ${cadence}.`;
-    if (trial) return `${trial} free, then ${cadence}`;
+    if (trial) return `${trial} free trial, then ${cadence}`;
     return cadence || fill(plan.sub ?? '');
   })();
 

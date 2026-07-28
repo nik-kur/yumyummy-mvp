@@ -30,21 +30,21 @@
         "default": "✦ Recommended for building the habit"
       },
       "display_price": "$1.73/wk",
-      "display_sub": "3 days free, then billed annually at $89.99"
+      "display_sub": "3 days free trial, then billed annually at $89.99"
     },
     {
       "product": "ai.yumyummy.app.monthly",
-      "display_price": "$2.31/wk",
-      "display_sub": "3 days free, then billed monthly at $9.99"
+      "display_price": "$2.30/wk",
+      "display_sub": "3 days free trial, then billed monthly at $9.99"
     },
     {
       "product": "ai.yumyummy.app.weekly_upd",
       "display_price": "$4.99/wk",
-      "display_sub": "3 days free, then billed weekly"
+      "display_sub": "3 days free trial, then billed weekly"
     }
   ],
   "cta": {
-    "trial": "Start my 3-day free trial",
+    "trial": "Start 3 days free now",
     "yearly": "Continue",
     "monthly": "Continue",
     "weekly": "Continue"
