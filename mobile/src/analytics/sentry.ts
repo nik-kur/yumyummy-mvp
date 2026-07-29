@@ -42,6 +42,10 @@ export function addBreadcrumb(
   Sentry.addBreadcrumb({ category, message, data, level: 'info' });
 }
 
-export function captureException(error: unknown): void {
+export function captureException(error: unknown, context?: Record<string, unknown>): void {
+  if (context) {
+    Sentry.captureException(error, { contexts: { details: context } });
+    return;
+  }
   Sentry.captureException(error);
 }

@@ -22,9 +22,13 @@ import { Button } from '@/components/Button';
 import { useAuth } from '@/state/auth';
 import { useIntro } from '@/state/introContext';
 import * as api from '@/api/endpoints';
+import { ApiError, getToken } from '@/api/client';
 import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
+
+const MAX_SYNC_ATTEMPTS = 3;
+const SYNC_RETRY_DELAY_MS = 500;
 
 const REASONS = [
   { emoji: '🔒', text: 'Your plan and targets are saved to your account, not just this phone' },
@@ -53,6 +57,52 @@ export default function SavePlanScreen() {
       .catch(() => setAppleAvailable(false));
   }, []);
 
+  // Pushing the draft has failed in the wild with a 401 immediately after a
+  // sign-in that reported success, losing the whole questionnaire. We still
+  // refuse to strand the user, so instead of surfacing it we retry, then record
+  // enough context (status, whether a token was even present) to diagnose it.
+  const syncDraft = useCallback(async () => {
+    if (!intro.goal_type) return;
+    const payload = {
+      goal_type: intro.goal_type,
+      gender: intro.gender,
+      age: intro.age,
+      height_cm: intro.height_cm,
+      weight_kg: intro.weight_kg,
+      activity_level: intro.activity_level,
+      target_calories: intro.target_calories,
+      target_protein_g: intro.target_protein_g,
+      target_fat_g: intro.target_fat_g,
+      target_carbs_g: intro.target_carbs_g,
+      onboarding_completed: true,
+    };
+
+    for (let attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt += 1) {
+      try {
+        await api.updateMe(payload);
+        if (attempt > 1) track('signin_profile_sync_recovered', { attempts: attempt });
+        return;
+      } catch (e) {
+        const httpStatus = e instanceof ApiError ? e.status : null;
+        const hasToken = Boolean(await getToken());
+        addBreadcrumb('auth', `Profile sync attempt ${attempt} failed`, {
+          status: httpStatus,
+          has_token: hasToken,
+        });
+        if (attempt === MAX_SYNC_ATTEMPTS) {
+          track('signin_profile_sync_failed', {
+            status: httpStatus,
+            has_token: hasToken,
+            error: e instanceof Error ? e.message : String(e),
+          });
+          captureException(e, { attempts: attempt, status: httpStatus, has_token: hasToken });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, SYNC_RETRY_DELAY_MS * attempt));
+      }
+    }
+  }, [intro]);
+
   const handleSignIn = useCallback(async () => {
     if (busy) return;
     setBusy(true);
@@ -62,27 +112,7 @@ export default function SavePlanScreen() {
       await signInWithProvider('apple');
       track('signin_gate_success');
 
-      if (intro.goal_type) {
-        try {
-          await api.updateMe({
-            goal_type: intro.goal_type,
-            gender: intro.gender,
-            age: intro.age,
-            height_cm: intro.height_cm,
-            weight_kg: intro.weight_kg,
-            activity_level: intro.activity_level,
-            target_calories: intro.target_calories,
-            target_protein_g: intro.target_protein_g,
-            target_fat_g: intro.target_fat_g,
-            target_carbs_g: intro.target_carbs_g,
-            onboarding_completed: true,
-          });
-        } catch (e) {
-          // The account exists and the draft is still on disk — a failed sync
-          // must not strand the user one screen short of the paywall.
-          captureException(e);
-        }
-      }
+      await syncDraft();
 
       track('onboarding_screen_completed', { screen: 'N2b_save_plan' });
       router.replace('/(intro)/plan-reveal');
@@ -95,7 +125,7 @@ export default function SavePlanScreen() {
     } finally {
       setBusy(false);
     }
-  }, [busy, signInWithProvider, intro, router]);
+  }, [busy, signInWithProvider, syncDraft, router]);
 
   return (
     <Screen grow edges={['top', 'bottom', 'left', 'right']}>

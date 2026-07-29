@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 
 class AppleSignInRequest(BaseModel):
     identity_token: str = Field(..., min_length=1)
+    # Apple hands the name to the client on the first authorisation only, and
+    # never puts it in the identity token — so it can only reach us this way.
+    full_name: Optional[str] = Field(None, max_length=200)
 
 
 class GoogleSignInRequest(BaseModel):

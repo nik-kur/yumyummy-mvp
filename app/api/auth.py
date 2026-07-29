@@ -66,9 +66,16 @@ def sign_in_with_apple(payload: AppleSignInRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
 
     account, created = find_or_create_account_for_identity(
-        db, provider=identity.provider, provider_id=identity.provider_id, email=identity.email
+        db,
+        provider=identity.provider,
+        provider_id=identity.provider_id,
+        email=identity.email,
+        display_name=payload.full_name,
     )
-    logger.info("[AUTH] apple sign-in account_id=%s created=%s", account.id, created)
+    logger.info(
+        "[AUTH] apple sign-in account_id=%s created=%s named=%s",
+        account.id, created, bool(account.display_name),
+    )
     return _mint_token(account, created=created)
 
 

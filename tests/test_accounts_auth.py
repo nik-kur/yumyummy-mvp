@@ -145,6 +145,30 @@ class TestFindOrCreate:
         assert c1 is True and c2 is False
         assert a1.id == a2.id
 
+    def test_stores_display_name_from_first_authorisation(self, db):
+        acct, _ = find_or_create_account_for_identity(
+            db, provider="apple", provider_id="apple-named", display_name="  Ada Lovelace  "
+        )
+        assert acct.display_name == "Ada Lovelace"
+
+    def test_blank_display_name_never_overwrites(self, db):
+        acct, _ = find_or_create_account_for_identity(
+            db, provider="apple", provider_id="apple-named-2", display_name="Ada"
+        )
+        # Apple omits the name on every sign-in after the first one.
+        again, created = find_or_create_account_for_identity(
+            db, provider="apple", provider_id="apple-named-2", display_name=None
+        )
+        assert created is False
+        assert again.display_name == "Ada"
+
+    def test_backfills_display_name_on_later_sign_in(self, db):
+        find_or_create_account_for_identity(db, provider="apple", provider_id="apple-late")
+        acct, _ = find_or_create_account_for_identity(
+            db, provider="apple", provider_id="apple-late", display_name="Grace"
+        )
+        assert acct.display_name == "Grace"
+
     def test_distinct_identities_distinct_accounts(self, db):
         a1, _ = find_or_create_account_for_identity(db, provider="google", provider_id="g1")
         a2, _ = find_or_create_account_for_identity(db, provider="google", provider_id="g2")

@@ -60,23 +60,37 @@ def find_or_create_account_for_identity(
     provider: str,
     provider_id: str,
     email: Optional[str] = None,
+    display_name: Optional[str] = None,
 ) -> Tuple[Account, bool]:
     """Resolve (or provision) the account behind a provider identity.
 
     Returns ``(account, created)`` where ``created`` is True if a brand-new
     account was provisioned.
     """
+    name = display_name.strip() if display_name and display_name.strip() else None
+
     identity = get_identity(db, provider, provider_id)
     if identity is not None:
         account = db.query(Account).filter(Account.id == identity.account_id).first()
         if account is not None:
+            dirty = False
             if email and not account.primary_email:
                 account.primary_email = email.strip().lower()
+                dirty = True
+            # Apple only sends the name once, so a later sign-in almost never
+            # carries one — but if it does and we have nothing, take it.
+            if name and not account.display_name:
+                account.display_name = name
+                dirty = True
+            if dirty:
                 db.commit()
             return account, False
 
     # New identity -> new account + empty diary container.
-    account = Account(primary_email=email.strip().lower() if email else None)
+    account = Account(
+        primary_email=email.strip().lower() if email else None,
+        display_name=name,
+    )
     db.add(account)
     db.flush()
 

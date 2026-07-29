@@ -57,12 +57,20 @@ export async function verifyEmailCode(email: string, code: string): Promise<Auth
   });
 }
 
-export async function signInApple(identityToken: string): Promise<AuthTokenResponse> {
+/**
+ * `fullName` is only ever non-null on a customer's first authorisation of the
+ * app — Apple keeps it out of the identity token and never resends it, so this
+ * single call is our one chance to learn who they are.
+ */
+export async function signInApple(
+  identityToken: string,
+  fullName?: string | null,
+): Promise<AuthTokenResponse> {
   if (USE_MOCKS) return { access_token: mock.MOCK_TOKEN, token_type: 'bearer', account_id: 1, created: true };
   return apiFetch<AuthTokenResponse>('/auth/apple', {
     method: 'POST',
     auth: false,
-    body: { identity_token: identityToken },
+    body: { identity_token: identityToken, full_name: fullName ?? null },
   });
 }
 

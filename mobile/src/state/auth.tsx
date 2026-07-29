@@ -138,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Sign in with Apple isn’t available on this device — use email instead.');
     }
     let identityToken: string | null;
+    let fullName: string | null = null;
     try {
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -146,6 +147,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ],
       });
       identityToken = credential.identityToken;
+      // Populated on the first authorisation only; every later sign-in returns
+      // null, so this value has to reach the backend now or never.
+      fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean)
+        .join(' ')
+        .trim() || null;
     } catch (e) {
       // The user cancelling the native sheet shouldn't surface as an error.
       if (e && typeof e === 'object' && (e as { code?: string }).code === 'ERR_REQUEST_CANCELED') {
@@ -154,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw e;
     }
     if (!identityToken) throw new Error('Apple did not return an identity token. Please try again.');
-    const res = await api.signInApple(identityToken);
+    const res = await api.signInApple(identityToken, fullName);
     await setToken(res.access_token);
     await loadProfile('apple');
   }, [loadProfile]);
