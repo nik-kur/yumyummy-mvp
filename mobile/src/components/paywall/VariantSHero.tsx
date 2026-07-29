@@ -175,9 +175,14 @@ export function VariantSHero({
           {config.headline}
         </AppText>
         {heroLine && (
-          <AppText variant="small" color={colors.inkMuted} center style={s.heroLine}>
-            {heroLine}
-          </AppText>
+          <View style={s.heroCard}>
+            <AppText variant="overline" color={colors.terracottaText}>
+              {fill(config.hero.label)}
+            </AppText>
+            <AppText variant="h2" style={s.heroLine}>
+              {heroLine}
+            </AppText>
+          </View>
         )}
         {laurels.length > 0 && (
           <View style={s.laurels}>
@@ -261,7 +266,20 @@ const s = StyleSheet.create({
   // below, a headline flush against "Restore" leaves the whole screen
   // top-heavy.
   headline: { marginTop: space.xl, marginBottom: space.sm },
-  heroLine: { marginBottom: space.sm },
+  // Same white card as the multi-plan layout, so the goal reads as "locked in"
+  // rather than a stray subtitle.
+  heroCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingVertical: space.md,
+    paddingHorizontal: space.base,
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: space.sm,
+  },
+  heroLine: { textAlign: 'center' },
   laurels: {
     flexDirection: 'row',
     flexWrap: 'wrap',
