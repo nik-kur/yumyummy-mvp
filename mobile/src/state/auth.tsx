@@ -32,7 +32,8 @@ interface AuthContextValue {
   requestEmailCode: (email: string) => Promise<string | null>;
   signInWithEmail: (email: string, code: string) => Promise<void>;
   signInWithDemoEmail: () => Promise<void>;
-  signInWithProvider: (provider: Provider) => Promise<void>;
+  /** False when the customer dismissed the provider's sheet without signing in. */
+  signInWithProvider: (provider: Provider) => Promise<boolean>;
   signInFromTelegram: (code: string) => Promise<void>;
   linkTelegram: (code: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -130,7 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadProfile('demo');
   }, [loadProfile]);
 
-  const signInWithApple = useCallback(async () => {
+  /**
+   * Resolves `false` when the customer dismissed Apple's sheet, `true` once an
+   * account is actually signed in. Callers MUST branch on it: a cancel used to
+   * resolve like a success, which let people through the save-plan gate with no
+   * account at all and stranded their purchase on an anonymous Adapty profile.
+   */
+  const signInWithApple = useCallback(async (): Promise<boolean> => {
     // Native Sign in with Apple. Only available in a dev/TestFlight build
     // (the capability is compiled in) — not in Expo Go.
     const available = await AppleAuthentication.isAvailableAsync().catch(() => false);
@@ -156,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       // The user cancelling the native sheet shouldn't surface as an error.
       if (e && typeof e === 'object' && (e as { code?: string }).code === 'ERR_REQUEST_CANCELED') {
-        return;
+        return false;
       }
       throw e;
     }
@@ -164,19 +171,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await api.signInApple(identityToken, fullName);
     await setToken(res.access_token);
     await loadProfile('apple');
+    return true;
   }, [loadProfile]);
 
   const signInWithProvider = useCallback(
-    async (provider: Provider) => {
+    async (provider: Provider): Promise<boolean> => {
       if (provider === 'apple') {
         if (USE_MOCKS) {
           const res = await api.signInApple('apple-placeholder-identity-token');
           await setToken(res.access_token);
           await loadProfile('apple');
-          return;
+          return true;
         }
-        await signInWithApple();
-        return;
+        return signInWithApple();
       }
 
       // Google: native sign-in (@react-native-google-signin) lands in a later
@@ -185,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await api.signInGoogle('google-placeholder-identity-token');
         await setToken(res.access_token);
         await loadProfile('google');
-        return;
+        return true;
       }
       throw new Error('Google sign-in arrives in the next build — use Apple or email for now.');
     },

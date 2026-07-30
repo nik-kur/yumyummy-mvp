@@ -105,13 +105,13 @@ export default function SignInScreen() {
             buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
             cornerRadius={radius.md}
             style={styles.appleButton}
-            onPress={() => run(async () => { await auth.signInWithProvider('apple'); goHome(); })}
+            onPress={() => run(async () => { if (await auth.signInWithProvider('apple')) goHome(); })}
           />
         ) : (
           <Button
             label="Continue with Apple"
             variant="dark"
-            onPress={() => run(async () => { await auth.signInWithProvider('apple'); goHome(); })}
+            onPress={() => run(async () => { if (await auth.signInWithProvider('apple')) goHome(); })}
           />
         )}
         {/* Google sign-in ships in a later build (native @react-native-google-signin

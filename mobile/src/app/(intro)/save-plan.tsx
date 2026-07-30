@@ -109,7 +109,16 @@ export default function SavePlanScreen() {
     addBreadcrumb('auth', 'Save-plan gate Apple sign-in started');
 
     try {
-      await signInWithProvider('apple');
+      const signedIn = await signInWithProvider('apple');
+      const hasToken = Boolean(await getToken());
+      // Dismissing Apple's sheet is not a sign-in. Stay on the gate: letting it
+      // through produced accountless users who reached the paywall, so a
+      // purchase would have landed on an anonymous profile. The token is checked
+      // too, so any other path that fails to authenticate is caught here.
+      if (!signedIn || !hasToken) {
+        track('signin_gate_canceled', { reason: signedIn ? 'no_token' : 'dismissed' });
+        return;
+      }
       track('signin_gate_success');
 
       await syncDraft();
