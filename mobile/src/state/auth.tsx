@@ -9,7 +9,7 @@ import React, {
 
 import * as AppleAuthentication from 'expo-apple-authentication';
 
-import { getToken, setToken, USE_MOCKS } from '@/api/client';
+import { ApiError, getToken, setToken, USE_MOCKS } from '@/api/client';
 import * as api from '@/api/endpoints';
 import type { AccountProfile } from '@/api/types';
 import {
@@ -22,7 +22,12 @@ import { identify as phIdentify, reset as phReset, track } from '@/analytics/pos
 import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
 import { setAttributionCustomerId } from '@/analytics/attribution';
 
-type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
+/**
+ * `unreachable` = a session token exists but the backend couldn't be reached
+ * (offline, timeout, 5xx). The user stays signed in; the launch router shows
+ * a connection screen with a retry instead of dumping them into onboarding.
+ */
+type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'unreachable';
 
 type Provider = 'apple' | 'google';
 
@@ -39,6 +44,8 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>;
   applyProfile: (profile: AccountProfile) => void;
   signOut: () => Promise<void>;
+  /** Re-attempt session restore after the backend was unreachable at boot. */
+  retryBoot: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -81,26 +88,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Boot: if a token is stored, resolve the account.
-  useEffect(() => {
-    let active = true;
-    (async () => {
+  const restoreSession = useCallback(
+    async (isActive: () => boolean = () => true) => {
       const token = await getToken();
-      if (!active) return;
+      if (!isActive()) return;
       if (!token) {
         setStatus('signedOut');
         return;
       }
       try {
         await loadProfile();
-      } catch {
-        await setToken(null);
-        if (active) setStatus('signedOut');
+      } catch (e) {
+        if (!isActive()) return;
+        // Only a definitive rejection of the token invalidates the session.
+        // Anything else (timeout, offline, 5xx) must keep it: wiping the token
+        // on a network failure silently signed real users out and sent them
+        // back through onboarding as soon as the backend was unreachable.
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+          await setToken(null);
+          if (isActive()) setStatus('signedOut');
+        } else {
+          setStatus('unreachable');
+        }
       }
-    })();
+    },
+    [loadProfile],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void restoreSession(() => active);
     return () => {
       active = false;
     };
-  }, [loadProfile]);
+  }, [restoreSession]);
+
+  const retryBoot = useCallback(async () => {
+    setStatus('loading');
+    await restoreSession();
+  }, [restoreSession]);
 
   const requestEmailCode = useCallback(async (email: string) => {
     const res = await api.requestEmailCode(email);
@@ -263,8 +289,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshProfile,
       applyProfile,
       signOut,
+      retryBoot,
     }),
-    [status, profile, requestEmailCode, signInWithEmail, signInWithDemoEmail, signInWithProvider, signInFromTelegram, linkTelegram, refreshProfile, applyProfile, signOut],
+    [status, profile, requestEmailCode, signInWithEmail, signInWithDemoEmail, signInWithProvider, signInFromTelegram, linkTelegram, refreshProfile, applyProfile, signOut, retryBoot],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
