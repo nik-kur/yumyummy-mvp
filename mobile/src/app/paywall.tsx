@@ -16,7 +16,6 @@ import { View, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-nat
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
-import * as Updates from 'expo-updates';
 import { adapty } from 'react-native-adapty';
 import type { AdaptyPaywall, AdaptyPaywallProduct } from 'react-native-adapty';
 
@@ -114,7 +113,16 @@ export default function PaywallScreen() {
     setPhase('loading');
     const ok = await activateAdapty();
     if (!ok) {
-      if (alive()) setPhase('fallback');
+      if (alive()) {
+        setPhase('fallback');
+        // The fallback paywall renders display prices with purchases disabled —
+        // without its own event these sessions are invisible in the funnel
+        // (paywall_shown only fires on a live Adapty paywall).
+        track('paywall_fallback_shown', {
+          placement: ADAPTY_PLACEMENT_MAIN,
+          reason: 'adapty_unavailable',
+        });
+      }
       return;
     }
     try {
@@ -142,7 +150,14 @@ export default function PaywallScreen() {
       setPhase('ready');
     } catch (e) {
       captureException(e);
-      if (alive()) setPhase('fallback');
+      if (alive()) {
+        setPhase('fallback');
+        track('paywall_fallback_shown', {
+          placement: ADAPTY_PLACEMENT_MAIN,
+          reason: 'load_failed',
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
     }
   }, []);
 
@@ -152,26 +167,13 @@ export default function PaywallScreen() {
     return () => { mountedRef.current = false; };
   }, [loadPaywall]);
 
-  // A fresh install runs the binary's embedded JS while expo-updates downloads
-  // the newest OTA bundle in the background (fallbackToCacheTimeout: 0), so
-  // without this the first session — the only one an ad-driven user may ever
-  // have — always shows a stale paywall. The onboarding quiz gives the
-  // download ~30s of cover; if the bundle is ready while this screen is still
-  // a spinner, restart into it now. The launch router lands right back here
-  // (signed in, no subscription), so the swap costs one splash flash.
-  // Members browsing plans from Profile (`dismissable`) are excluded: for them
-  // the reload would land on the dashboard instead.
-  const { isUpdatePending, downloadedUpdate } = Updates.useUpdates();
-  const otaReloadRef = useRef(false);
-  useEffect(() => {
-    if (!isUpdatePending || otaReloadRef.current) return;
-    if (phase !== 'loading' || dismissable || purchasingRef.current) return;
-    otaReloadRef.current = true;
-    track('paywall_ota_reload', { update_id: downloadedUpdate?.updateId ?? null });
-    Updates.reloadAsync().catch(() => {
-      otaReloadRef.current = false;
-    });
-  }, [isUpdatePending, phase, dismissable, downloadedUpdate]);
+  // NEVER reload the app from this screen. 1.0.3 shipped an Updates.reloadAsync()
+  // call here (fired while an OTA update was pending) to swap in a fresh bundle
+  // during the loading spinner. In production the reload killed the JS context
+  // and the new bundle never booted: every ad-driven first session froze on this
+  // spinner the moment the user tapped "Start my plan" (Jul 30 – Aug 4: 10 of 12
+  // users lost, zero trials). Paywall freshness comes from Adapty remote config,
+  // which is fetched live above; OTA bundles apply on the next natural launch.
 
   // Apple Ads attribution lands asynchronously after launch, so the fetch above
   // usually resolves against the default audience and an Apple Ads user would
