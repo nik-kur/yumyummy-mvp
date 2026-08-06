@@ -31,6 +31,7 @@ import { InsightCard } from '@/components/InsightCard';
 import { SourcesIntroPopup } from '@/components/SourcesIntroPopup';
 import { WidgetInstructionSheet } from '@/components/WidgetInstructionSheet';
 import { loadJourney, reconcileJourney, rawDay, activeDay, takeNextPopup, subscribeJourney, reportJourneyEvent, type JourneyState, type QuestDef, type QuestId } from '@/state/journey';
+import { insightSeenToday } from '@/state/insightSeen';
 import { hasSeenSourcesIntro, markSourcesIntroSeen } from '@/state/sourcesIntro';
 import { requestPermission, syncFromPrefs } from '@/notifications/scheduler';
 import { loadPrefs, savePrefs } from '@/notifications/prefs';
@@ -236,11 +237,14 @@ export default function TodayScreen() {
       const rd = j.started_at ? rawDay(j.started_at) : null;
       const insightUnlocked = rd === null || rd >= 3;
       const consistencyStale = rd !== null && rd > 7 && ins?.id === 'consistency';
-      if (ins && ins.id !== 'motivation' && insightUnlocked && !consistencyStale) {
-        setInsight(ins);
-      } else {
-        setInsight(null);
+      let showInsight = Boolean(ins) && ins!.id !== 'motivation' && insightUnlocked && !consistencyStale;
+      // The consistency banner recomputes to the same value every day for an
+      // active user (and the journey-day guard above never fires when the
+      // journey hasn't started), so cap it at one calendar day per count.
+      if (showInsight && ins!.id === 'consistency') {
+        showInsight = await insightSeenToday('consistency', String(ins!.metric_value ?? ''));
       }
+      setInsight(showInsight ? ins : null);
 
       if (j.started_at) {
         const journeyDay = rawDay(j.started_at);
