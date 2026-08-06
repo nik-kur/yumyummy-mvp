@@ -13,6 +13,7 @@ import { Screen } from '@/components/Screen';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { SourcesLink } from '@/components/SourcesLink';
+import { useAuth } from '@/state/auth';
 import { useIntro } from '@/state/introContext';
 import { isAdaptyConfigured, waitForAdaptyIdentify } from '@/billing/adapty';
 import { colors, radius, space } from '@/theme/tokens';
@@ -188,9 +189,13 @@ function TestimonialCarousel() {
   );
 }
 
+/** Billing statuses the launch router treats as "let them in" (see app/index.tsx). */
+const ACTIVE_STATUSES = new Set(['trial', 'active']);
+
 export default function PlanRevealScreen() {
   const router = useRouter();
   const intro = useIntro();
+  const { profile } = useAuth();
 
   useEffect(() => {
     track('onboarding_screen_viewed', { screen: 'N3_plan_reveal' });
@@ -231,6 +236,17 @@ export default function PlanRevealScreen() {
       } catch {
         // non-fatal
       }
+    }
+
+    // Someone who already pays (e.g. bought on the web via an Adapty Mail
+    // link) can re-run onboarding after a reinstall — don't wall them. The
+    // sign-in gate before this screen refreshed `profile`, and /billing/sync
+    // runs right after it; the paywall itself has an Adapty-side check as the
+    // safety net for the race where that sync hasn't landed yet.
+    if (profile?.billing && ACTIVE_STATUSES.has(profile.billing.access_status)) {
+      track('paywall_skipped_already_premium', { source: 'plan_reveal' });
+      router.replace('/(tabs)');
+      return;
     }
 
     router.push('/paywall');

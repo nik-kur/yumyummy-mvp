@@ -30,6 +30,8 @@ import { loadDraft, type IntroDraft } from '@/state/introDraft';
 import { startJourney } from '@/state/journey';
 import {
   activateAdapty,
+  getAdaptyProfileId,
+  hasActivePremium,
   isAdaptyConfigured,
   waitForAdaptyIdentify,
   waitForAppleAdsAttribution,
@@ -166,6 +168,54 @@ export default function PaywallScreen() {
     void loadPaywall(mountedRef);
     return () => { mountedRef.current = false; };
   }, [loadPaywall]);
+
+  // Web purchases (Adapty Mail → FunnelFox → Paddle) grant `premium` on the
+  // identified Adapty profile with no StoreKit transaction, so the launch
+  // router can race ahead of /billing/sync and land a paying customer on this
+  // hard gate. Check the Adapty profile once and let them straight through.
+  //
+  // Deliberately fail-safe: runs in parallel with the paywall load (never
+  // delays first paint), and on any error or timeout simply leaves the paywall
+  // on screen — exactly today's behavior. Skipped for the Profile entry
+  // (`dismissable`), where a member opens this screen on purpose.
+  useEffect(() => {
+    if (dismissable) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await waitForAdaptyIdentify();
+        if (cancelled || !(await hasActivePremium())) return;
+        // Never yank the screen while a StoreKit sheet may be up.
+        if (cancelled || purchasingRef.current) return;
+
+        track('paywall_skipped_already_premium', {
+          placement: ADAPTY_PLACEMENT_MAIN,
+          source: 'paywall_mount',
+        });
+        addBreadcrumb('paywall', 'Active premium found on mount — skipping gate');
+
+        // Reconcile the backend so the launch router doesn't bounce the user
+        // back here on the next cold start. Best-effort: access is already
+        // proven by the Adapty profile, so failures must not keep the wall up.
+        try {
+          await api.syncBilling(await getAdaptyProfileId());
+        } catch {
+          // backend catches up via the webhook or the next sign-in sync
+        }
+        await refreshProfile().catch(() => {});
+        await startJourney(); // idempotent — journey Day 1 = purchase moment
+
+        if (!cancelled && !purchasingRef.current) router.replace('/(tabs)');
+      } catch (e) {
+        // Any failure keeps the paywall — never break the purchase path.
+        captureException(e);
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // NEVER reload the app from this screen. 1.0.3 shipped an Updates.reloadAsync()
   // call here (fired while an OTA update was pending) to swap in a fresh bundle
