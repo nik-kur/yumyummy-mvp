@@ -18,6 +18,7 @@ talks to whichever database the app itself is configured against.
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 import time
 from pathlib import Path
@@ -40,6 +41,9 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0, help="stop after N accounts (0 = all)")
     args = parser.parse_args()
 
+    # Surface push_profile_attributes' per-account logging.
+    logging.basicConfig(level=logging.INFO, format="  %(message)s")
+
     if args.apply and not settings.adapty_server_api_key:
         print("ADAPTY_SERVER_API_KEY is not set — nothing would be written.", file=sys.stderr)
         return 1
@@ -53,10 +57,10 @@ def main() -> int:
             if email:
                 targets.append((account, email))
 
+        print(f"{len(accounts)} accounts, {len(targets)} with an email on file")
         if args.limit:
             targets = targets[: args.limit]
-
-        print(f"{len(accounts)} accounts, {len(targets)} with an email on file")
+            print(f"limited to {len(targets)}")
         if not args.apply:
             for account, email in targets:
                 print(f"  would push account={account.id} email={email}")
