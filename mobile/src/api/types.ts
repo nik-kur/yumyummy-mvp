@@ -32,6 +32,8 @@ export interface AccountProfile {
   user_id: number;
   telegram_id?: string | null;
   linked_providers: string[];
+  /** From the sign-in provider; an Apple relay alias when the user hid theirs. */
+  email?: string | null;
   goal_type?: string | null;
   gender?: string | null;
   age?: number | null;

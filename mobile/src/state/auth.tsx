@@ -16,6 +16,7 @@ import {
   identifyAdapty,
   logoutAdapty,
   getAdaptyProfileId,
+  setAdaptyEmail,
   setAdaptyIntegrationIdentifier,
 } from '@/billing/adapty';
 import { identify as phIdentify, reset as phReset, track } from '@/analytics/posthog';
@@ -78,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'posthog_distinct_user_id',
         String(me.account_id),
       );
+      await setAdaptyEmail(me.email);
       try {
         const billing = await api.syncBilling(adaptyProfileId);
         setProfile((prev) => (prev ? { ...prev, billing } : prev));

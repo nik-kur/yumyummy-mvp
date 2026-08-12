@@ -38,6 +38,35 @@ def account_member_users(db: Session, account_id: int) -> List[User]:
     )
 
 
+APPLE_RELAY_DOMAIN = "@privaterelay.appleid.com"
+
+
+def resolve_account_email(db: Session, account: Account) -> Optional[str]:
+    """The best address we hold for an account, or None.
+
+    ``primary_email`` is whatever the first provider handed us, so it is often
+    an Apple relay alias. Those deliver only while our sending domain stays
+    registered with Apple, so a directly-typed address (the ``email`` provider
+    keys its identity on the address itself) wins when we have both.
+    """
+    candidates: List[str] = []
+    if account.primary_email:
+        candidates.append(account.primary_email)
+    for ident in db.query(Identity).filter(Identity.account_id == account.id).all():
+        if ident.email:
+            candidates.append(ident.email)
+        if ident.provider == "email" and ident.provider_id:
+            candidates.append(str(ident.provider_id))
+
+    normalized = [c.strip().lower() for c in candidates if c and c.strip()]
+    if not normalized:
+        return None
+    return next(
+        (e for e in normalized if not e.endswith(APPLE_RELAY_DOMAIN)),
+        normalized[0],
+    )
+
+
 def get_primary_user(db: Session, account: Account) -> User:
     """Return the account's diary container, creating one if missing.
 

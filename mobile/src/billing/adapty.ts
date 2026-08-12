@@ -126,6 +126,26 @@ export async function getAdaptyProfileId(): Promise<string | null> {
 }
 
 /**
+ * Attach the account's email to the Adapty profile.
+ *
+ * Adapty Mail can only address a profile that carries an `email` attribute, and
+ * nothing sets one implicitly — not `identify()`, not the purchase. Must run
+ * *after* `identifyAdapty`, or the address lands on the anonymous profile that
+ * the campaign audience never looks at.
+ */
+export async function setAdaptyEmail(email: string | null | undefined): Promise<void> {
+  if (!email) return;
+  if (!(await activateAdapty())) return;
+  try {
+    await adapty.updateProfile({ email });
+  } catch (e) {
+    // Lifecycle email only — never block sign-in on it. The backend pushes the
+    // same value from /billing/sync, so a failure here self-heals.
+    captureException(e);
+  }
+}
+
+/**
  * Link a third-party id to the Adapty profile (`posthog_distinct_user_id`,
  * `appsflyer_id`, …) so Adapty's server-side events land on the same person
  * instead of creating a second one keyed by its own profile id.

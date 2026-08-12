@@ -25,6 +25,10 @@ class AccountProfile(BaseModel):
     user_id: int
     telegram_id: Optional[str] = None
     linked_providers: List[str] = []
+    # Best-effort address from the sign-in provider — Apple returns a
+    # `@privaterelay.appleid.com` alias when the user hides their address. The
+    # app forwards it to Adapty so lifecycle email can reach the person.
+    email: Optional[str] = None
 
     goal_type: Optional[str] = None
     gender: Optional[str] = None

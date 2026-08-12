@@ -119,6 +119,7 @@ def test_email_login_flow_returns_token_and_me():
     assert me["onboarding_completed"] is False
     assert me["billing"]["access_status"] == "new"
     assert "email" in me["linked_providers"]
+    assert me["email"] == "foo@example.com"
 
 
 def test_email_verify_wrong_code_rejected():
@@ -145,6 +146,58 @@ def test_apple_signin_is_idempotent(monkeypatch):
 def test_me_requires_auth():
     assert client.get("/app/me").status_code == 401
     assert client.get("/app/me", headers={"Authorization": "Bearer garbage"}).status_code == 401
+
+
+def test_me_prefers_a_real_address_over_an_apple_relay_alias():
+    """Relay aliases only deliver while our domain stays registered with Apple,
+    so a directly-typed address wins whenever the account has both."""
+    db = TestingSessionLocal()
+    try:
+        account, _ = find_or_create_account_for_identity(
+            db, provider="apple", provider_id="apple-relay-1",
+            email="abc123@privaterelay.appleid.com",
+        )
+        db.add(Identity(
+            account_id=account.id, provider="email",
+            provider_id="real@example.com", email="real@example.com",
+        ))
+        db.commit()
+        account_id = account.id
+    finally:
+        db.close()
+
+    token = jwt_auth.create_access_token(account_id, secret=settings.jwt_secret)
+    assert client.get("/app/me", headers=_auth(token)).json()["email"] == "real@example.com"
+
+
+def test_billing_sync_pushes_the_email_to_adapty(monkeypatch):
+    """Adapty Mail can only address a profile that carries an email, and the
+    app calls this endpoint right after identify() — the one moment the profile
+    is known to exist and to be keyed on our account id."""
+    pushed = []
+    monkeypatch.setattr(
+        app_api_module, "push_profile_attributes",
+        lambda account_id, **kw: pushed.append((account_id, kw["email"])),
+    )
+    account_id, token = _make_account_token(
+        provider_id="mail@example.com", email="mail@example.com",
+    )
+
+    r = client.post("/app/billing/sync", headers=_auth(token), json={})
+    assert r.status_code == 200, r.text
+    assert pushed == [(account_id, "mail@example.com")]
+
+
+def test_billing_sync_skips_accounts_without_an_email(monkeypatch):
+    pushed = []
+    monkeypatch.setattr(
+        app_api_module, "push_profile_attributes",
+        lambda account_id, **kw: pushed.append(account_id),
+    )
+    _, token = _make_account_token(provider="telegram", provider_id="777", email=None)
+
+    assert client.post("/app/billing/sync", headers=_auth(token), json={}).status_code == 200
+    assert pushed == []
 
 
 # ===== Profile / trial / billing =====

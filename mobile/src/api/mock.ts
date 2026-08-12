@@ -68,6 +68,7 @@ function seedProfile(): AccountProfile {
     user_id: 1,
     telegram_id: null,
     linked_providers: ['email'],
+    email: 'demo@yumyummy.ai',
     goal_type: null,
     gender: null,
     age: null,

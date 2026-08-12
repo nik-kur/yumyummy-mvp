@@ -16,7 +16,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -36,8 +36,9 @@ from app.models.payment_event import PaymentEvent
 from app.models.notification_event import NotificationEvent
 from app.models.acquisition_event import AcquisitionEvent
 from app.models.auth_code import AuthOneTimeCode
-from app.auth.service import get_primary_user, account_member_users
+from app.auth.service import get_primary_user, account_member_users, resolve_account_email
 from app.billing.account_access import account_billing_snapshot, account_has_access
+from app.billing.adapty_profile import push_profile_attributes
 from app.billing.plans import resolve_trial_days
 from app.services.agent_persist import persist_agent_result_for_user
 from app.services.usage_guardrails import (
@@ -113,6 +114,7 @@ def _build_profile(db: Session, account: Account, user: User) -> AccountProfile:
         user_id=user.id,
         telegram_id=user.telegram_id,
         linked_providers=sorted(set(providers)),
+        email=resolve_account_email(db, account),
         goal_type=user.goal_type,
         gender=user.gender,
         age=user.age,
@@ -896,16 +898,32 @@ def start_trial(
 
 @router.post("/billing/sync", response_model=BillingSnapshot)
 def billing_sync(
+    background: BackgroundTasks,
     payload: Optional[AppBillingSyncRequest] = None,
     db: Session = Depends(get_db),
     account: Account = Depends(get_current_account),
 ):
     """Post-identify reconciliation: pull subscription state from Adapty Server
     API so purchases made on an anonymous Adapty profile (before the user signed
-    in with Apple) are reflected in our entitlement."""
+    in with Apple) are reflected in our entitlement.
+
+    The app calls this right after `adapty.identify()`, which makes it the one
+    request where the Adapty profile is guaranteed to exist and to be keyed on
+    our account id — so we piggyback the Adapty Mail email push here instead of
+    waiting for every user to install a build that sets it client-side.
+    """
     from app.billing.adapty_sync import sync_from_adapty
     user = get_primary_user(db, account)
     sync_from_adapty(db, user, account, adapty_profile_id=payload.adapty_profile_id if payload else None)
+
+    email = resolve_account_email(db, account)
+    if email:
+        background.add_task(
+            push_profile_attributes,
+            account.id,
+            email=email,
+            display_name=account.display_name,
+        )
     return BillingSnapshot(**account_billing_snapshot(db, account))
 
 
