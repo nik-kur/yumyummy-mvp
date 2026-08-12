@@ -37,6 +37,15 @@ async function readWithFallback<T>(real: () => Promise<T>, fallback: () => T): P
   }
 }
 
+/**
+ * Sign-in and session restore get more headroom than the 30s platform default.
+ * On degraded mobile paths the TLS handshake to the API alone has been measured
+ * at 8–16s, which left too little of the budget for the round-trip: the client
+ * aborted before the request ever reached the server, and a failure here costs
+ * the whole account rather than one retryable screen.
+ */
+const AUTH_TIMEOUT_MS = 60_000;
+
 // ---- Auth ---------------------------------------------------------------
 
 export async function requestEmailCode(email: string): Promise<EmailCodeRequestResponse> {
@@ -54,6 +63,7 @@ export async function verifyEmailCode(email: string, code: string): Promise<Auth
     method: 'POST',
     auth: false,
     body: { email, code },
+    timeoutMs: AUTH_TIMEOUT_MS,
   });
 }
 
@@ -71,6 +81,7 @@ export async function signInApple(
     method: 'POST',
     auth: false,
     body: { identity_token: identityToken, full_name: fullName ?? null },
+    timeoutMs: AUTH_TIMEOUT_MS,
   });
 }
 
@@ -110,8 +121,16 @@ export async function issueAppTelegramLink(): Promise<AppLinkIssueResponse> {
 
 // ---- Account / diary ----------------------------------------------------
 
+/**
+ * No mock fallback against a real backend: the seeded mock profile has
+ * `onboarding_completed: false`, so swallowing a timeout here signed real users
+ * in as a blank account and the launch router sent them straight back through
+ * onboarding. It also made the auth layer's 'unreachable' state unreachable —
+ * `restoreSession` only sees a rejection if this one propagates.
+ */
 export async function getMe(): Promise<AccountProfile> {
-  return readWithFallback(() => apiFetch<AccountProfile>('/app/me'), () => mock.getMockProfile());
+  if (USE_MOCKS) return mock.getMockProfile();
+  return apiFetch<AccountProfile>('/app/me', { timeoutMs: AUTH_TIMEOUT_MS });
 }
 
 export async function updateMe(update: AccountProfileUpdate): Promise<AccountProfile> {
