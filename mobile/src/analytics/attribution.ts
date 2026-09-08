@@ -3,9 +3,11 @@
  *
  * Why AppsFlyer: one SDK manages install attribution + SKAdNetwork conversion
  * values across Meta, TikTok and Google, which is what we need for day-one
- * paid campaigns. Purchase revenue is additionally sent server-to-server from
- * Adapty (dashboard integrations), so ad networks can optimize toward paid
- * conversions even under iOS privacy limits.
+ * paid campaigns. Trial/subscription events are logged client-side from the
+ * paywall via `logAttributionEvent` (af_start_trial / af_subscribe) rather than
+ * server-to-server from Adapty: the SKAN conversion value is computed on-device
+ * from SDK events, and AppsFlyer's Zero plan rejects S2S in-app events anyway.
+ * Do NOT also enable the Adapty → AppsFlyer integration — it would double count.
  *
  * Everything is gated on `EXPO_PUBLIC_APPSFLYER_DEV_KEY` and lazy-requires the
  * native module, so with no key (or in Expo Go where the native module is

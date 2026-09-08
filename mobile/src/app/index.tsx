@@ -7,6 +7,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/state/auth';
 import { loadDraft } from '@/state/introDraft';
+import { loadPendingPurchase } from '@/state/pendingPurchase';
 import { colors, space } from '@/theme/tokens';
 
 /**
@@ -14,8 +15,8 @@ import { colors, space } from '@/theme/tokens';
  * and billing state.
  *
  * Routes:
- *   - Signed out, no onboarding draft → (intro) flow
- *   - Signed out with existing intent → (auth) sign-in
+ *   - Signed out, purchase made but not signed in yet → /save-plan (sign-in gate)
+ *   - Signed out otherwise → (intro) flow (resumes from the local draft)
  *   - Signed in, onboarding incomplete → (onboarding) legacy flow
  *   - Signed in, no active subscription → /paywall (hard gate)
  *   - Signed in, active → (tabs)
@@ -26,11 +27,13 @@ export default function Index() {
   const { status, profile, retryBoot } = useAuth();
   const [introChecked, setIntroChecked] = useState(false);
   const [hasIntroDraft, setHasIntroDraft] = useState(false);
+  const [hasPendingPurchase, setHasPendingPurchase] = useState(false);
 
   useEffect(() => {
     if (status === 'signedOut') {
-      loadDraft().then((d) => {
+      Promise.all([loadDraft(), loadPendingPurchase()]).then(([d, pending]) => {
         setHasIntroDraft(d.goal_type !== null);
+        setHasPendingPurchase(pending !== null);
         setIntroChecked(true);
       });
     }
@@ -85,6 +88,13 @@ export default function Index() {
           <ActivityIndicator color={colors.terracotta} />
         </View>
       );
+    }
+    // Paid on the paywall, then the app was closed before signing in: the
+    // purchase sits on an anonymous Adapty profile with no account behind it.
+    // Go straight back to the gate — restarting the intro would look like the
+    // purchase was lost.
+    if (hasPendingPurchase) {
+      return <Redirect href="/save-plan" />;
     }
     return <Redirect href="/(intro)" />;
   }

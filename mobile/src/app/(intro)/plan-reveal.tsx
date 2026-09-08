@@ -221,9 +221,11 @@ export default function PlanRevealScreen() {
 
     if (isAdaptyConfigured()) {
       try {
-        // The gate before this screen fires identify() in the background;
-        // writing attributes across it would either hit #3006 or land them on
-        // the anonymous profile the paywall no longer uses.
+        // Acquisition flow: the user is signed out, so these land on the
+        // anonymous profile — the same one the purchase will land on, and the
+        // one identify() links to the account after sign-in. The wait only
+        // matters for a signed-in user re-running the intro, where identify()
+        // may still be in flight; it resolves at once otherwise.
         await waitForAdaptyIdentify();
         await adapty.updateProfile({
           codableCustomAttributes: {
@@ -238,11 +240,11 @@ export default function PlanRevealScreen() {
       }
     }
 
-    // Someone who already pays (e.g. bought on the web via an Adapty Mail
-    // link) can re-run onboarding after a reinstall — don't wall them. The
-    // sign-in gate before this screen refreshed `profile`, and /billing/sync
-    // runs right after it; the paywall itself has an Adapty-side check as the
-    // safety net for the race where that sync hasn't landed yet.
+    // A signed-in member who already pays (e.g. bought on the web via an
+    // Adapty Mail link) can re-run onboarding — don't wall them. In the
+    // acquisition flow `profile` is null (sign-in comes after the paywall), so
+    // this falls through; the paywall's own Adapty-side check then catches a
+    // returning subscriber on a fresh install and routes them via sign-in.
     if (profile?.billing && ACTIVE_STATUSES.has(profile.billing.access_status)) {
       track('paywall_skipped_already_premium', { source: 'plan_reveal' });
       router.replace('/(tabs)');

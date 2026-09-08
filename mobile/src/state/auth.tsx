@@ -22,6 +22,7 @@ import {
 import { identify as phIdentify, reset as phReset, track } from '@/analytics/posthog';
 import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
 import { setAttributionCustomerId } from '@/analytics/attribution';
+import { clearPendingPurchase } from '@/state/pendingPurchase';
 
 /**
  * `unreachable` = a session token exists but the backend couldn't be reached
@@ -273,6 +274,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setToken(null);
     setProfile(null);
     setStatus('signedOut');
+    // A stale "bought, not signed in" marker would send the next launch to the
+    // sign-in gate instead of the intro. Any purchase it referred to has been
+    // reconciled by the sign-in we are now ending.
+    void clearPendingPurchase();
     void logoutAdapty();
     phReset();
     sentryClearUser();

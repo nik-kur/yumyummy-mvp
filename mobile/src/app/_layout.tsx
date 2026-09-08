@@ -60,6 +60,14 @@ export default function RootLayout() {
               <Stack.Screen name="meal/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="edit-targets" options={{ presentation: 'card' }} />
               <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
+              {/* Post-purchase sign-in gate: hard, like the paywall it follows. */}
+              <Stack.Screen
+                name="save-plan"
+                options={{
+                  presentation: 'fullScreenModal',
+                  gestureEnabled: false,
+                }}
+              />
               <Stack.Screen
                 name="postbuy"
                 options={{

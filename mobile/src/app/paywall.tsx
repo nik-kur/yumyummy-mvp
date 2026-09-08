@@ -2,14 +2,20 @@
  * Paywall screen — code-rendered via PaywallRenderer.
  *
  * Flow: fetch placement 'main' from Adapty → parse remote config →
- * logShowPaywall → render → purchase/restore → postbuy push opt-in. The user
- * is already signed in by this point (the intro gates on it), so the purchase
- * lands on an identified Adapty profile.
+ * logShowPaywall → render → purchase/restore → next screen.
+ *
+ * Two audiences reach this screen:
+ *   - Acquisition (signed OUT): intro quiz → plan reveal → here. The purchase
+ *     lands on an anonymous Adapty profile; we record a pending-purchase marker
+ *     and hand off to /save-plan, the sign-in gate that attaches the purchase to
+ *     the freshly created account. Nothing here may call an authenticated API.
+ *   - Existing account (signed IN): the launch router's hard gate for a lapsed
+ *     subscription, or Profile ("Manage plan" / "See plans") with
+ *     `?dismissable=1`. Purchase → /postbuy as before.
  *
  * Hard paywall by default: no close button, gesture-dismiss disabled — exits
- * only via successful purchase or restore. Opened from Profile
- * ("Manage plan" / "See plans") it gets `?dismissable=1` and a close button:
- * an existing member must always be able to leave.
+ * only via successful purchase or restore. Only the Profile entry gets a close
+ * button: an existing member must always be able to leave.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { View, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
@@ -28,6 +34,7 @@ import { VariantSHero } from '@/components/paywall/VariantSHero';
 import { useAuth } from '@/state/auth';
 import { loadDraft, type IntroDraft } from '@/state/introDraft';
 import { startJourney } from '@/state/journey';
+import { savePendingPurchase, type PendingPurchase } from '@/state/pendingPurchase';
 import {
   activateAdapty,
   getAdaptyProfileId,
@@ -47,6 +54,7 @@ import {
 } from '@/billing/paywallConfig';
 import { scheduleTrialEndingReminder } from '@/notifications/scheduler';
 import { track } from '@/analytics/posthog';
+import { logAttributionEvent } from '@/analytics/attribution';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 import { colors, radius, space } from '@/theme/tokens';
 import * as api from '@/api/endpoints';
@@ -62,11 +70,37 @@ const APPLE_ADS_ATTRIBUTION_TIMEOUT_MS = 20000;
 
 export default function PaywallScreen() {
   const router = useRouter();
-  const { profile, refreshProfile } = useAuth();
+  const { status, profile, refreshProfile } = useAuth();
   const params = useLocalSearchParams<{ dismissable?: string }>();
   const insets = useSafeAreaInsets();
   // Only Profile passes this — the acquisition/gate flows stay hard.
   const dismissable = params.dismissable === '1';
+  // Acquisition flow: no account yet. Read through a ref inside the mount-time
+  // effects below, which must not re-run when auth state changes.
+  const signedIn = status === 'signedIn';
+  const signedInRef = useRef(signedIn);
+  useEffect(() => {
+    signedInRef.current = signedIn;
+  }, [signedIn]);
+
+  /**
+   * Hand a purchase made without an account to the sign-in gate. The marker
+   * carries the anonymous Adapty profile id so `/billing/sync` can grant the
+   * entitlement before `identify()` has propagated; it also lets a cold start
+   * resume at the gate instead of restarting the intro.
+   */
+  const handOffToSignIn = useCallback(async (
+    source: PendingPurchase['source'],
+    product: string | null,
+  ) => {
+    await savePendingPurchase({
+      adapty_profile_id: await getAdaptyProfileId(),
+      product,
+      source,
+    });
+    addBreadcrumb('purchase', 'Signed-out purchase → sign-in gate', { source });
+    router.replace('/save-plan');
+  }, [router]);
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [purchasing, setPurchasing] = useState(false);
@@ -192,8 +226,21 @@ export default function PaywallScreen() {
         track('paywall_skipped_already_premium', {
           placement: ADAPTY_PLACEMENT_MAIN,
           source: 'paywall_mount',
+          signed_in: signedInRef.current,
         });
         addBreadcrumb('paywall', 'Active premium found on mount — skipping gate');
+        await startJourney(); // idempotent — journey Day 1 = purchase moment
+
+        // Signed out (acquisition flow): the access sits on an anonymous Adapty
+        // profile — e.g. Adapty restored an existing App Store subscription on
+        // a reinstall. There is no account to sync to yet, so route to the
+        // sign-in gate, which reconciles the backend after sign-in.
+        if (!signedInRef.current) {
+          if (!cancelled && !purchasingRef.current) {
+            await handOffToSignIn('existing_access', null);
+          }
+          return;
+        }
 
         // Reconcile the backend so the launch router doesn't bounce the user
         // back here on the next cold start. Best-effort: access is already
@@ -204,7 +251,6 @@ export default function PaywallScreen() {
           // backend catches up via the webhook or the next sign-in sync
         }
         await refreshProfile().catch(() => {});
-        await startJourney(); // idempotent — journey Day 1 = purchase moment
 
         if (!cancelled && !purchasingRef.current) router.replace('/(tabs)');
       } catch (e) {
@@ -285,41 +331,68 @@ export default function PaywallScreen() {
 
     try {
       if (!isAdaptyConfigured()) {
-        await api.startTrial(3);
-        await refreshProfile();
         track('paywall_purchase_success', {
           product: product.vendorProductId,
           variant,
           mode: 'dev_trial',
         });
         await startJourney(); // journey Day 1 = purchase moment
+        if (!signedIn) {
+          // No account to start a trial on yet — /save-plan does it after sign-in.
+          await handOffToSignIn('purchase', product.vendorProductId);
+          return;
+        }
+        await api.startTrial(3);
+        await refreshProfile();
         router.replace('/postbuy');
         return;
       }
 
-      // Sign-in identifies the Adapty profile in the background. Buying before
-      // that lands means the receipt arrives at our webhook with no
-      // customer_user_id and the entitlement has to be reconciled after the
-      // fact — so give identify() its moment first.
+      // Signed-in entry (lapsed member / Profile): sign-in identifies the Adapty
+      // profile in the background. Buying before that lands means the receipt
+      // arrives at our webhook with no customer_user_id and the entitlement has
+      // to be reconciled after the fact — so give identify() its moment first.
+      // Resolves at once in the acquisition flow, where nothing is in flight.
       await waitForAdaptyIdentify();
 
       const result = await adapty.makePurchase(product);
       if (result.type === 'success') {
+        const hasTrial = freeTrialPhase(product) !== undefined;
         track('paywall_purchase_success', {
           product: product.vendorProductId,
           variant,
           price: product.price?.amount,
           currency: product.price?.currencyCode,
-          has_trial: freeTrialPhase(product) !== undefined,
+          has_trial: hasTrial,
         });
-        addBreadcrumb('purchase', 'Purchase succeeded');
-        await refreshProfile();
+        // AppsFlyer standard events, logged client-side: the SDK feeds them into
+        // the SKAdNetwork conversion value on-device and forwards them to ad
+        // networks (Meta maps af_start_trial → StartTrial, af_subscribe →
+        // Subscribe). A trial carries no revenue yet — af_price is the price it
+        // converts to; a direct subscription reports the charge as af_revenue.
+        logAttributionEvent(hasTrial ? 'af_start_trial' : 'af_subscribe', {
+          af_content_id: product.vendorProductId,
+          ...(product.price?.currencyCode ? { af_currency: product.price.currencyCode } : {}),
+          ...(product.price?.amount !== undefined
+            ? hasTrial
+              ? { af_price: product.price.amount }
+              : { af_revenue: product.price.amount, af_price: product.price.amount }
+            : {}),
+        });
+        addBreadcrumb('purchase', 'Purchase succeeded', { signed_in: signedIn });
         await startJourney(); // journey Day 1 = purchase moment
         // A reminder is only honest when a trial is actually running: customers
         // who already used their one intro offer are charged immediately.
-        if (freeTrialPhase(product)) {
+        if (hasTrial) {
           await scheduleTrialEndingReminder(new Date());
         }
+        if (!signedIn) {
+          // Acquisition flow: the receipt is on an anonymous Adapty profile.
+          // Create the account next; the gate attaches the purchase to it.
+          await handOffToSignIn('purchase', product.vendorProductId);
+          return;
+        }
+        await refreshProfile();
         router.replace('/postbuy');
       } else if (result.type === 'user_cancelled') {
         // User backed out of the StoreKit sheet — expected, not an error.
@@ -343,7 +416,7 @@ export default function PaywallScreen() {
     } finally {
       setPurchasing(false);
     }
-  }, [refreshProfile, router]);
+  }, [refreshProfile, router, signedIn, handOffToSignIn]);
 
   const handleRestore = useCallback(async () => {
     setPurchasing(true);
@@ -352,16 +425,26 @@ export default function PaywallScreen() {
 
     try {
       if (!isAdaptyConfigured()) {
+        if (!signedIn) {
+          await handOffToSignIn('restore', null);
+          return;
+        }
         router.replace('/postbuy');
         return;
       }
       const adaptyProfile = await adapty.restorePurchases();
       if (adaptyProfile.accessLevels?.[PREMIUM_ACCESS_LEVEL]?.isActive) {
-        track('paywall_restore_success');
-        await refreshProfile();
+        track('paywall_restore_success', { signed_in: signedIn });
         // Idempotent — a reinstall gets the first-week ladder, an existing
         // journey is left where it is.
         await startJourney();
+        if (!signedIn) {
+          // Returning customer on a fresh install: access is proven on the
+          // anonymous Adapty profile; the gate signs them in and reconciles.
+          await handOffToSignIn('restore', null);
+          return;
+        }
+        await refreshProfile();
         router.replace('/postbuy');
       } else {
         Alert.alert('No subscription found', 'We couldn\'t find an active subscription for this Apple ID.');
@@ -374,7 +457,7 @@ export default function PaywallScreen() {
     } finally {
       setPurchasing(false);
     }
-  }, [refreshProfile, router]);
+  }, [refreshProfile, router, signedIn, handOffToSignIn]);
 
   const handleClose = useCallback(() => {
     track('paywall_closed', { dismissable: true });

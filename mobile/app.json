@@ -2,7 +2,7 @@
   "expo": {
     "name": "YumYummy",
     "slug": "yumyummy-app",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "yumyummy",
@@ -23,6 +23,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": false,
+        "NSAdvertisingAttributionReportEndpoint": "https://appsflyer-skadnetwork.com/",
         "SKAdNetworkItems": [
           { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
           { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" },
