@@ -43,3 +43,15 @@ export function getDistinctId(): string | undefined {
 export function register(properties: Record<string, unknown>): void {
   void client?.register(properties as Record<string, string | number | boolean | null>);
 }
+
+type Scalars = Record<string, string | number | boolean | null>;
+
+/** Set person properties on the current distinct id (overwrites). */
+export function setPersonProperties(properties: Record<string, unknown>): void {
+  client?.capture('$set', { $set: properties as Scalars });
+}
+
+/** Set person properties only if they are not already set on the person. */
+export function setPersonPropertiesOnce(properties: Record<string, unknown>): void {
+  client?.capture('$set', { $set_once: properties as Scalars });
+}

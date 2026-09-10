@@ -21,7 +21,7 @@ import {
 } from '@/billing/adapty';
 import { identify as phIdentify, reset as phReset, track } from '@/analytics/posthog';
 import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
-import { setAttributionCustomerId } from '@/analytics/attribution';
+import { setAttributionCustomerId, logAttributionEvent } from '@/analytics/attribution';
 import { clearPendingPurchase } from '@/state/pendingPurchase';
 
 /**
@@ -58,7 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // `method` is set only on a genuine sign-in (Apple/Google/email/…), not on
   // boot session-restore, so `signin_success` fires exactly once per login.
-  const loadProfile = useCallback(async (method?: string) => {
+  // `created` is the backend's "this sign-in made a new account" flag.
+  const loadProfile = useCallback(async (method?: string, created?: boolean) => {
     const me = await api.getMe();
     setProfile(me);
     setStatus('signedIn');
@@ -68,6 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     phIdentify(String(me.account_id), { goal: me.goal_type });
     sentrySetUser(String(me.account_id));
     if (method) track('signin_success', { method });
+    // Registration is the first post-install signal Meta can optimise on before
+    // any trial starts; fire it once per account, on the sign-in that created it.
+    if (method && created) {
+      logAttributionEvent('af_complete_registration', { af_registration_method: method });
+    }
 
     // People buy before signing in, so the purchase sits on an anonymous Adapty
     // profile and its webhook reached us with no customer_user_id. Read that
@@ -140,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, code: string) => {
       const res = await api.verifyEmailCode(email, code);
       await setToken(res.access_token);
-      await loadProfile('email');
+      await loadProfile('email', res.created);
     },
     [loadProfile],
   );
@@ -199,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!identityToken) throw new Error('Apple did not return an identity token. Please try again.');
     const res = await api.signInApple(identityToken, fullName);
     await setToken(res.access_token);
-    await loadProfile('apple');
+    await loadProfile('apple', res.created);
     return true;
   }, [loadProfile]);
 
@@ -209,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (USE_MOCKS) {
           const res = await api.signInApple('apple-placeholder-identity-token');
           await setToken(res.access_token);
-          await loadProfile('apple');
+          await loadProfile('apple', res.created);
           return true;
         }
         return signInWithApple();
@@ -220,7 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (USE_MOCKS) {
         const res = await api.signInGoogle('google-placeholder-identity-token');
         await setToken(res.access_token);
-        await loadProfile('google');
+        await loadProfile('google', res.created);
         return true;
       }
       throw new Error('Google sign-in arrives in the next build — use Apple or email for now.');

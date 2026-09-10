@@ -163,6 +163,26 @@ export async function setAdaptyIntegrationIdentifier(
   }
 }
 
+/**
+ * Hand MMP install attribution (media source, campaign, adset, ad) to Adapty.
+ *
+ * Without this Adapty only ever sees Apple Search Ads (collected natively via
+ * AdServices) and reports every Meta/TikTok install as organic. `source` is
+ * Adapty's attribution source name, e.g. `'appsflyer'`.
+ */
+export async function updateAdaptyAttribution(
+  attribution: Record<string, unknown>,
+  source: string,
+): Promise<void> {
+  if (!(await activateAdapty())) return;
+  try {
+    await adapty.updateAttribution(attribution, source);
+  } catch (e) {
+    // attribution enrichment only — surface it, don't block launch
+    captureException(e);
+  }
+}
+
 const APPLE_ADS_SOURCE = 'apple_search_ads';
 
 function hasAppleAdsAttribution(profile: AdaptyProfile): boolean {
