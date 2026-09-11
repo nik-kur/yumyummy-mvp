@@ -11,19 +11,12 @@
  * can be slow, and nothing here is worth stalling the paywall for.
  */
 import { initSentry } from '@/analytics/sentry';
-import { initPostHog, getDistinctId, register } from '@/analytics/posthog';
+import { initPostHog, getDistinctId } from '@/analytics/posthog';
 import { initAttribution, getAppsFlyerId } from '@/analytics/attribution';
-import {
-  activateAdapty,
-  setAdaptyIntegrationIdentifier,
-  waitForAppleAdsAttribution,
-} from '@/billing/adapty';
+import { activateAdapty, setAdaptyIntegrationIdentifier } from '@/billing/adapty';
 
 /** How long we let ATT + AppsFlyer settle before activating Adapty anyway. */
 const PRE_ACTIVATION_TIMEOUT_MS = 5000;
-
-/** How long to keep listening for Apple Ads attribution after launch. */
-const APPLE_ADS_ATTRIBUTION_TIMEOUT_MS = 30000;
 
 let started = false;
 
@@ -54,9 +47,8 @@ export async function bootstrapSdks(): Promise<void> {
     setAdaptyIntegrationIdentifier('posthog_distinct_user_id', getDistinctId() ?? ''),
   ]);
 
-  // Tag every event from an Apple Ads install so campaign performance is
-  // sliceable in PostHog without joining against Adapty.
-  void waitForAppleAdsAttribution(APPLE_ADS_ATTRIBUTION_TIMEOUT_MS).then((applied) => {
-    if (applied) register({ acquisition_source: 'apple_search_ads' });
-  });
+  // `acquisition_source` is set only from AppsFlyer conversion data (see
+  // attribution.ts). The old Adapty-based check tagged *every* user as
+  // apple_search_ads: Adapty lists the source whenever the AdServices token
+  // was processed, not only when the install was actually attributed.
 }
