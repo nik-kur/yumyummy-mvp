@@ -24,6 +24,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": false,
         "NSAdvertisingAttributionReportEndpoint": "https://appsflyer-skadnetwork.com/",
+        "AdAttributionKit": { "AttributionCopyEndpoint": "https://appsflyer-skadnetwork.com/" },
         "SKAdNetworkItems": [
           { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
           { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" },
