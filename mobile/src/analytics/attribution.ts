@@ -123,12 +123,14 @@ async function handleConversionData(event: ConversionDataEvent): Promise<void> {
   // 2) PostHog: super properties on every event from this device + person
   //    properties. `acquisition_source` is set-once so the Apple Ads value
   //    (written by the Adapty path) is never clobbered by "Organic".
+  //    Meta names the ad `adgroup` in conversion data (not `af_ad`), and the ad
+  //    name is where we encode the custom product page, so read it too.
   const afProps: Record<string, unknown> = {
     af_status: afStatus || undefined,
     af_media_source: mediaSource || undefined,
     af_campaign: str('campaign') || undefined,
     af_adset: str('af_adset') || str('adset') || undefined,
-    af_ad: str('af_ad') || str('ad_name') || undefined,
+    af_ad: str('af_ad') || str('ad_name') || str('adgroup') || undefined,
   };
   for (const k of Object.keys(afProps)) if (afProps[k] === undefined) delete afProps[k];
 
