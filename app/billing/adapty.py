@@ -30,6 +30,13 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def lifetime_expires_at(now: Optional[datetime] = None) -> datetime:
+    """Our subscription_ends_at column cannot store 'never', so lifetime
+    grants are parked a century out. Same helper the webhook and sync use."""
+    now = now or _now()
+    return now.replace(year=now.year + 100)
+
+
 def _is_duplicate(db: Session, transaction_id: Optional[str], event_type: str) -> bool:
     if not transaction_id:
         return False

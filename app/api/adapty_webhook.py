@@ -26,6 +26,7 @@ from app.models.account import Account
 from app.models.user import User
 from app.auth.service import get_primary_user
 from app.billing import adapty as adapty_billing
+from app.billing.adapty import lifetime_expires_at
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,27 @@ def _parse_dt(value) -> Optional[datetime]:
         except ValueError:
             return None
     return None
+
+
+def _is_sandbox(body: dict, props: dict) -> bool:
+    env = (props.get("environment") or body.get("environment") or "").strip().lower()
+    return env == "sandbox"
+
+
+def _looks_like_grant(event_type: str) -> bool:
+    et = event_type.lower()
+    return any(
+        hint in et
+        for hint in (
+            "start",
+            "renew",
+            "purchase",
+            "grant",
+            "access_level",
+            "subscribe",
+            "uncancel",
+        )
+    )
 
 
 def _map_plan_id(vendor_product_id: Optional[str]) -> str:
@@ -134,6 +156,17 @@ async def adapty_webhook(
     user = get_primary_user(db, account)
     db.commit()
 
+    if _is_sandbox(body, props):
+        # Sandbox / TestFlight receipts must not overwrite a real entitlement.
+        # Accelerated weekly renewals also flood this webhook and Adapty's
+        # event feed; we drop them here so a sandbox expire cannot revoke
+        # a production or dashboard-granted lifetime.
+        logger.info(
+            "[ADAPTY] ignoring sandbox event=%s account_id=%s",
+            event_type, account_id,
+        )
+        return {"status": "ignored", "reason": "sandbox", "account_id": account_id, "event_type": event_type}
+
     vendor_product_id = props.get("vendor_product_id") or props.get("product_id")
     plan_id = _map_plan_id(vendor_product_id)
     expires_at = _parse_dt(
@@ -149,16 +182,24 @@ async def adapty_webhook(
     raw_payload = raw.decode("utf-8", errors="replace")[:8000]
 
     et = event_type.lower()
+    if "lifetime" in (vendor_product_id or "").lower() or "lifetime" in et:
+        plan_id = "lifetime"
     if "refund" in et:
         result = adapty_billing.revoke(db, user, event_type="refund", transaction_id=transaction_id, raw_payload=raw_payload)
     elif "expir" in et:
         result = adapty_billing.revoke(db, user, event_type="expiration", transaction_id=transaction_id, raw_payload=raw_payload)
     elif "cancel" in et:
         result = adapty_billing.cancel(db, user, transaction_id=transaction_id, raw_payload=raw_payload)
-    elif expires_at is not None:
+    elif expires_at is not None or (
+        _looks_like_grant(et) and props.get("profile_has_access_level") is not False
+    ):
         result = adapty_billing.grant_or_extend(
-            db, user, plan_id=plan_id, expires_at=expires_at,
-            transaction_id=transaction_id, event_type=event_type or "purchase", raw_payload=raw_payload,
+            db, user,
+            plan_id=plan_id,
+            expires_at=expires_at or lifetime_expires_at(),
+            transaction_id=transaction_id,
+            event_type=event_type or "purchase",
+            raw_payload=raw_payload,
             is_trial="trial" in et,
             purchased_at=_parse_dt(props.get("purchased_at") or props.get("event_datetime")),
         )

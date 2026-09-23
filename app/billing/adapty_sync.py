@@ -142,9 +142,7 @@ def sync_from_adapty(
 
     expires_at = _parse_iso(premium.get("expires_at"))
     if expires_at is None:
-        # Lifetime access: park the entitlement far enough out that it never
-        # lapses, since our columns can't express "no expiry".
-        expires_at = datetime.now(timezone.utc).replace(year=datetime.now(timezone.utc).year + 100)
+        expires_at = adapty_billing.lifetime_expires_at()
 
     if user.subscription_ends_at:
         current = user.subscription_ends_at

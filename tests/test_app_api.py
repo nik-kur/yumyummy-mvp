@@ -878,6 +878,73 @@ def test_adapty_webhook_activates_then_status_active():
     assert r.json()["access_status"] == "active"
 
 
+def test_adapty_webhook_lifetime_without_expiry_activates():
+    account_id, token = _make_account_token(provider_id="life@example.com", email="life@example.com")
+
+    r = client.post(
+        "/webhooks/adapty",
+        headers={"Authorization": "whsec_test"},
+        json={
+            "event_type": "access_level_updated",
+            "customer_user_id": str(account_id),
+            "event_properties": {
+                "vendor_product_id": "lifetime",
+                "transaction_id": "txn_life",
+                "profile_has_access_level": True,
+                "environment": "Production",
+            },
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "active"
+
+    r = client.get("/app/billing/status", headers=_auth(token))
+    assert r.json()["access_status"] == "active"
+
+
+def test_adapty_webhook_ignores_sandbox_and_does_not_revoke():
+    account_id, token = _make_account_token(provider_id="sand@example.com", email="sand@example.com")
+    expires = (_utcnow() + timedelta(days=30)).isoformat()
+
+    r = client.post(
+        "/webhooks/adapty",
+        headers={"Authorization": "whsec_test"},
+        json={
+            "event_type": "subscription_started",
+            "customer_user_id": str(account_id),
+            "event_properties": {
+                "vendor_product_id": "mo_monthly",
+                "subscription_expires_at": expires,
+                "transaction_id": "txn_prod",
+                "environment": "Production",
+            },
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "active"
+
+    r = client.post(
+        "/webhooks/adapty",
+        headers={"Authorization": "whsec_test"},
+        json={
+            "event_type": "subscription_expired",
+            "customer_user_id": str(account_id),
+            "event_properties": {
+                "vendor_product_id": "ai.yumyummy.app.weekly_upd",
+                "subscription_expires_at": (_utcnow() - timedelta(hours=1)).isoformat(),
+                "transaction_id": "txn_sandbox",
+                "environment": "Sandbox",
+            },
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "ignored"
+    assert r.json()["reason"] == "sandbox"
+
+    r = client.get("/app/billing/status", headers=_auth(token))
+    assert r.json()["access_status"] == "active"
+
+
 def test_adapty_webhook_rejects_bad_secret():
     r = client.post("/webhooks/adapty", headers={"Authorization": "wrong"}, json={"event_type": "x"})
     assert r.status_code == 401
