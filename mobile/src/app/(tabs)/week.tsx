@@ -147,6 +147,9 @@ export default function WeekScreen() {
     try {
       const days = await api.getWeek(startISO);
       setWeeks((prev) => ({ ...prev, [startISO]: days }));
+    } catch {
+      // Best-effort, like the streak below: keep whatever we already had rather
+      // than filling the week with numbers the server never returned.
     } finally {
       setLoadingWeek(false);
     }

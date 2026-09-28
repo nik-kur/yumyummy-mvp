@@ -4,12 +4,14 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import * as AppleAuthentication from 'expo-apple-authentication';
 
-import { ApiError, getToken, setToken, USE_MOCKS } from '@/api/client';
+import { ApiError, getToken, setToken, setUnauthorizedHandler, USE_MOCKS } from '@/api/client';
 import * as api from '@/api/endpoints';
 import type { AccountProfile } from '@/api/types';
 import {
@@ -131,6 +133,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [restoreSession]);
+
+  // The boot check above runs once per cold start, but a 30-day token can expire
+  // while the app only ever gets resumed from the background. End the session on
+  // the first refused call instead, wherever it happens, so the user is asked to
+  // sign in again rather than left staring at screens that quietly fail.
+  const endExpiredSession = useCallback(() => {
+    void setToken(null);
+    setProfile(null);
+    setStatus('signedOut');
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(endExpiredSession);
+    return () => setUnauthorizedHandler(null);
+  }, [endExpiredSession]);
+
+  // Re-validate on foreground so an expired session is caught when the user
+  // opens the app, not when they next try to log a meal.
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
+  useEffect(() => {
+    let previous: AppStateStatus = AppState.currentState;
+    const sub = AppState.addEventListener('change', (next) => {
+      const resumed = (previous === 'background' || previous === 'inactive') && next === 'active';
+      previous = next;
+      if (!resumed || statusRef.current !== 'signedIn') return;
+      // A 401 lands in endExpiredSession via the hook above. Everything else
+      // (offline, timeout, 5xx) must leave the session untouched.
+      void api
+        .getMe()
+        .then(setProfile)
+        .catch(() => {});
+    });
+    return () => sub.remove();
+  }, []);
 
   const retryBoot = useCallback(async () => {
     setStatus('loading');

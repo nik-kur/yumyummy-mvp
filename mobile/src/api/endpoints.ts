@@ -28,13 +28,19 @@ import type {
   WorkflowRunResponse,
 } from './types';
 
-async function readWithFallback<T>(real: () => Promise<T>, fallback: () => T): Promise<T> {
-  if (USE_MOCKS) return fallback();
-  try {
-    return await real();
-  } catch {
-    return fallback();
-  }
+/**
+ * Mock-mode switch for read endpoints.
+ *
+ * This deliberately does NOT fall back to the mock payload when a real request
+ * fails. It used to, which made a failed read indistinguishable from real data:
+ * an expired session rendered the seeded mock diary (three meals, ~1080 kcal)
+ * on Today, so people spent days "tracking" against numbers the server had
+ * never seen and could not add to. Real-backend errors now propagate and the
+ * screens show an honest empty/failed state instead.
+ */
+async function readOrMock<T>(real: () => Promise<T>, mocked: () => T): Promise<T> {
+  if (USE_MOCKS) return mocked();
+  return real();
 }
 
 /**
@@ -148,16 +154,17 @@ export async function deleteAccount(): Promise<void> {
 }
 
 export async function getToday(date?: string): Promise<DaySummary> {
-  return readWithFallback(
+  return readOrMock(
     () => apiFetch<DaySummary>('/app/today', { query: { date } }),
     () => mock.getMockDay(date),
   );
 }
 
 /**
- * Like {@link getToday} but WITHOUT the mock-on-error fallback. Background
- * reconciliation (pendingMeals) must see real server state — a silent mock
- * fallback would make its "did a new meal land?" count comparison meaningless.
+ * Identical to {@link getToday} today; kept as a separate entry point because
+ * background reconciliation (pendingMeals) must never be served mock data, not
+ * even in mock mode's sibling code paths — its "did a new meal land?" count
+ * comparison is only meaningful against real server state.
  */
 export async function getTodayStrict(date?: string): Promise<DaySummary> {
   if (USE_MOCKS) return mock.getMockDay(date);
@@ -167,11 +174,10 @@ export async function getTodayStrict(date?: string): Promise<DaySummary> {
 /**
  * Seven consecutive {@link DaySummary} starting at `start` (YYYY-MM-DD, the
  * Monday of the week) in a single round-trip — powers the Week tab's bars,
- * weekly averages and the selected day's meal list. Additive (25(1)+); falls
- * back to mock data so the tab still renders offline / against an old server.
+ * weekly averages and the selected day's meal list. Additive (25(1)+).
  */
 export async function getWeek(start: string): Promise<DaySummary[]> {
-  return readWithFallback(
+  return readOrMock(
     () => apiFetch<DaySummary[]>('/app/week', { query: { start } }),
     () => mock.getMockWeek(start),
   );
@@ -182,7 +188,7 @@ export async function getWeek(start: string): Promise<DaySummary[]> {
  * logging-streak counter. Additive (25(1)+).
  */
 export async function getHistory(start: string, end: string): Promise<DayTotals[]> {
-  return readWithFallback(
+  return readOrMock(
     () => apiFetch<DayTotals[]>('/app/history', { query: { start, end } }),
     () => mock.getMockHistory(start, end),
   );
@@ -191,11 +197,10 @@ export async function getHistory(start: string, end: string): Promise<DayTotals[
 /**
  * "Week in Recap" (Задача 6, 25(1)+): the most recent completed week's
  * shareable summary, or a specific week when `week` (any day inside it) is
- * given. Falls back to mock data so the screen renders offline / against an
- * older server that doesn't have the route yet.
+ * given.
  */
 export async function getRecap(week?: string): Promise<WeeklyRecap> {
-  return readWithFallback(
+  return readOrMock(
     () =>
       apiFetch<WeeklyRecap>(week ? '/app/recap' : '/app/recap/latest', {
         query: week ? { week } : undefined,
@@ -205,7 +210,7 @@ export async function getRecap(week?: string): Promise<WeeklyRecap> {
 }
 
 export async function getRecentMeals(limit = 20): Promise<MealRead[]> {
-  return readWithFallback(
+  return readOrMock(
     () => apiFetch<MealRead[]>('/app/meals/recent', { query: { limit } }),
     () => mock.getMockDay().meals,
   );
@@ -265,11 +270,11 @@ export async function deleteMeal(id: number): Promise<void> {
 }
 
 export async function getSavedMeals(): Promise<SavedMealsListResponse> {
-  return readWithFallback(() => apiFetch<SavedMealsListResponse>('/app/saved-meals'), () => mock.getMockSaved());
+  return readOrMock(() => apiFetch<SavedMealsListResponse>('/app/saved-meals'), () => mock.getMockSaved());
 }
 
 export async function getBillingStatus(): Promise<BillingSnapshot> {
-  return readWithFallback(
+  return readOrMock(
     () => apiFetch<BillingSnapshot>('/app/billing/status'),
     () => mock.getMockProfile().billing,
   );
@@ -301,7 +306,7 @@ export async function syncBilling(adaptyProfileId?: string | null): Promise<Bill
 }
 
 export async function getLatestInsight(): Promise<Record<string, unknown>> {
-  return readWithFallback(
+  return readOrMock(
     () => apiFetch<Record<string, unknown>>('/app/insights/latest'),
     () => ({
       id: 'motivation',
@@ -313,7 +318,7 @@ export async function getLatestInsight(): Promise<Record<string, unknown>> {
 }
 
 export async function getWeek1Report(): Promise<Record<string, unknown>> {
-  return readWithFallback(
+  return readOrMock(
     () => apiFetch<Record<string, unknown>>('/app/report/week1'),
     () => ({ has_data: false, days_logged: 0, summary: 'Log meals to unlock your report!' }),
   );

@@ -32,15 +32,30 @@ export default function Week1ReportScreen() {
         // moment to ask for a rating (guarded so it never nags).
         if (r?.has_data) void maybeRequestReview('week1_report');
       })
+      // A failed read leaves `report` null, which renders as the message below.
+      .catch(() => {})
       .finally(() => setLoading(false));
     track('week1_report_viewed');
   }, []);
 
-  if (loading || !report) {
+  if (loading) {
     return (
       <Screen grow edges={['top', 'bottom', 'left', 'right']}>
         <View style={s.center}>
           <ActivityIndicator color={colors.terracotta} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!report) {
+    return (
+      <Screen grow edges={['top', 'bottom', 'left', 'right']}>
+        <View style={s.failWrap}>
+          <AppText variant="body" color={colors.inkMuted} center>
+            We couldn’t load your report right now. Nothing you logged is lost — try again in a moment.
+          </AppText>
+          <Button label="Back" onPress={() => router.back()} />
         </View>
       </Screen>
     );
@@ -131,6 +146,13 @@ function MacroStat({ label, value, color }: { label: string; value: number; colo
 
 const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  failWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space.xl,
+    gap: space.lg,
+  },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginTop: space.sm,

@@ -163,8 +163,10 @@ function PendingRow({ item, onPress }: { item: PendingMeal; onPress: () => void 
         </AppText>
         {isError ? (
           <View style={styles.badgeRow}>
-            <AppText variant="caption" color={colors.terracottaText}>
-              Tap to retry
+            {/* The real reason, not a bare "Tap to retry": a paywall notice, a
+                fair-use cap and a dead session all used to look identical. */}
+            <AppText variant="caption" color={colors.terracottaText} numberOfLines={2}>
+              {item.error ?? 'Tap to retry'}
             </AppText>
           </View>
         ) : (
@@ -193,6 +195,7 @@ export default function TodayScreen() {
   const { pending, lastSettledAt, retry, dismiss } = usePendingMeals();
   const [day, setDay] = useState<DaySummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [journey, setJourney] = useState<JourneyState | null>(null);
   const [insight, setInsight] = useState<Record<string, unknown> | null>(null);
   const [popupQuestId, setPopupQuestId] = useState<QuestId | null>(null);
@@ -230,6 +233,7 @@ export default function TodayScreen() {
         api.getLatestInsight().catch(() => null),
       ]);
       setDay(d);
+      setLoadFailed(false);
       let j = journeyRaw;
       // Real insights only (no 'motivation' fallback), and only from journey
       // Day 3 onward. After the first week we also drop the low-value
@@ -270,6 +274,11 @@ export default function TodayScreen() {
         }
       }
       setJourney(j);
+    } catch {
+      // Today is never fabricated from mock data on a read failure, so say so
+      // instead of rendering an empty diary the user would read as "nothing
+      // logged". An expired session has already been handled by AuthProvider.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -513,13 +522,23 @@ export default function TodayScreen() {
           </View>
 
           {meals.length === 0 && pending.length === 0 ? (
-            <EmptyState
-              mascot="hungry"
-              title="Nothing logged yet"
-              subtitle="Tap the + below and tell me what you ate — a sentence is enough."
-              ctaLabel="Log something"
-              onCta={() => router.push('/capture')}
-            />
+            loadFailed && !day ? (
+              <EmptyState
+                glyph={'\u26A0\uFE0F'}
+                title="Couldn’t load today"
+                subtitle="We couldn’t reach the server, so this isn’t your diary. Nothing you logged is lost — try again."
+                ctaLabel="Retry"
+                onCta={() => void load()}
+              />
+            ) : (
+              <EmptyState
+                mascot="hungry"
+                title="Nothing logged yet"
+                subtitle="Tap the + below and tell me what you ate — a sentence is enough."
+                ctaLabel="Log something"
+                onCta={() => router.push('/capture')}
+              />
+            )
           ) : (
             <>
               {pending.length > 0 ? (

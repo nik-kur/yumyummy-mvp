@@ -25,6 +25,7 @@ import { colors, radius, space } from '@/theme/tokens';
 export default function MenuScreen() {
   const [items, setItems] = useState<SavedMealListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [justLogged, setJustLogged] = useState<number | null>(null);
   // Editing state: which saved meal is open, and (optionally) which of its
   // components is being edited in the nested sheet.
@@ -35,6 +36,11 @@ export default function MenuScreen() {
     try {
       const res = await api.getSavedMeals();
       setItems(res.items);
+      setLoadFailed(false);
+    } catch {
+      // No mock stand-in for saved meals, so an unreachable server must not read
+      // as "you haven't saved anything".
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -185,11 +191,19 @@ export default function MenuScreen() {
         </View>
       ) : items.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <EmptyState
-            glyph={'\u{1F4D2}'}
-            title="No saved meals yet"
-            subtitle="When you log a meal you eat often, save it here for one‑tap logging."
-          />
+          {loadFailed ? (
+            <EmptyState
+              glyph={'\u26A0\uFE0F'}
+              title="Couldn’t load your menu"
+              subtitle="We couldn’t reach the server. Your saved meals are safe — reopen this tab to try again."
+            />
+          ) : (
+            <EmptyState
+              glyph={'\u{1F4D2}'}
+              title="No saved meals yet"
+              subtitle="When you log a meal you eat often, save it here for one‑tap logging."
+            />
+          )}
         </View>
       ) : (
         <View style={styles.list}>

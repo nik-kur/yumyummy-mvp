@@ -13,6 +13,34 @@ export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace
 export const USE_MOCKS =
   API_BASE_URL === '' || process.env.EXPO_PUBLIC_USE_MOCKS === '1';
 
+/**
+ * Session-expiry hook. Access tokens are valid for 30 days and are not
+ * refreshed, so a long-lived install eventually starts getting 401s on every
+ * authenticated call. Handling that only during boot session-restore was not
+ * enough: an app that is resumed from the background (never cold-started) never
+ * re-runs that check, so it kept a dead token and every screen silently failed
+ * — a logged-out user still looking at a diary they could no longer write to.
+ *
+ * `apiFetch` reports the first 401/403 on a request that actually carried a
+ * token, once per session, so `AuthProvider` can drop the session wherever the
+ * rejection happens. Sign-in calls (`auth: false`) never trigger this — a bad
+ * credential must not look like an expired session.
+ */
+type UnauthorizedHandler = () => void;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+let unauthorizedNotified = false;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+function reportUnauthorized(): void {
+  if (unauthorizedNotified) return;
+  unauthorizedNotified = true;
+  unauthorizedHandler?.();
+}
+
 let memToken: string | null = null;
 let tokenLoaded = false;
 
@@ -30,6 +58,9 @@ export async function getToken(): Promise<string | null> {
 export async function setToken(token: string | null): Promise<void> {
   memToken = token;
   tokenLoaded = true;
+  // A fresh token starts a new session, which is allowed to report its own
+  // expiry later on.
+  if (token) unauthorizedNotified = false;
   try {
     if (token) await SecureStore.setItemAsync(TOKEN_KEY, token);
     else await SecureStore.deleteItemAsync(TOKEN_KEY);
@@ -76,9 +107,10 @@ function buildQuery(query?: Query): string {
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, auth = true, query, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  let sentToken: string | null = null;
   if (auth) {
-    const token = await getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
+    sentToken = await getToken();
+    if (sentToken) headers.Authorization = `Bearer ${sentToken}`;
   }
 
   const controller = new AbortController();
@@ -109,6 +141,10 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   if (!res.ok) {
+    // We presented a token and the server refused it: the session is over,
+    // wherever in the app this call came from.
+    if (sentToken && (res.status === 401 || res.status === 403)) reportUnauthorized();
+
     let detail = `HTTP ${res.status}`;
     if (data && typeof data === 'object') {
       const obj = data as Record<string, unknown>;
