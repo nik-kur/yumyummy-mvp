@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
-SQLAlchemy
+# SQLAlchemy 2.1 maps bare `postgresql://` URLs to psycopg (v3) instead of
+# psycopg2, so the app and `alembic upgrade head` die on import with
+# "No module named 'psycopg'". Cap below 2.1 until we move to psycopg 3.
+SQLAlchemy>=2.0,<2.1
 alembic
 psycopg2-binary
 pydantic>=2.12.3
