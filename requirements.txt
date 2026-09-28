@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
-SQLAlchemy
+# SQLAlchemy 2.1 switched the default driver for `postgresql://` URLs to
+# psycopg (v3); we ship psycopg2 only, so 2.1 crashes at create_engine() with
+# "No module named 'psycopg'". Stay on 2.0 until we migrate deliberately.
+SQLAlchemy>=2.0,<2.1
 alembic
 psycopg2-binary
 pydantic>=2.12.3
