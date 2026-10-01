@@ -5,6 +5,7 @@ import { CloudOff } from 'lucide-react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { requestTrackingConsent } from '@/analytics/attribution';
 import { useAuth } from '@/state/auth';
 import { loadDraft } from '@/state/introDraft';
 import { loadPendingPurchase } from '@/state/pendingPurchase';
@@ -28,6 +29,13 @@ export default function Index() {
   const [introChecked, setIntroChecked] = useState(false);
   const [hasIntroDraft, setHasIntroDraft] = useState(false);
   const [hasPendingPurchase, setHasPendingPurchase] = useState(false);
+
+  // The ATT prompt lives in the onboarding; a returning user who signs in
+  // straight from the welcome screen skips it, so ask once here. No-op when
+  // already answered.
+  useEffect(() => {
+    if (status === 'signedIn') void requestTrackingConsent();
+  }, [status]);
 
   useEffect(() => {
     if (status === 'signedOut') {

@@ -16,14 +16,19 @@ const LAST_STEP = 12;
 export function IntroHeader({ step }: { step: number }) {
   const router = useRouter();
   const pct = Math.min(100, Math.round((step / LAST_STEP) * 100));
+  // After the Adapty onboarding flow hands over (target & pace is then the
+  // first native screen) there is nothing to go back to: keep the layout,
+  // drop the chevron.
+  const canGoBack = router.canGoBack();
 
   return (
     <View style={s.row}>
       <Pressable
         onPress={() => router.back()}
         hitSlop={10}
-        style={s.back}
+        style={[s.back, !canGoBack && s.backHidden]}
         accessibilityLabel="Go back"
+        disabled={!canGoBack}
       >
         <ChevronLeft size={18} color={colors.ink} strokeWidth={1.5} />
       </Pressable>
@@ -42,6 +47,7 @@ const s = StyleSheet.create({
     marginTop: space.sm,
     marginBottom: space.sm,
   },
+  backHidden: { opacity: 0 },
   back: {
     width: 32,
     height: 32,

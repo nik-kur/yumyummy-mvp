@@ -12,18 +12,42 @@
  */
 import { Platform } from 'react-native';
 import { adapty, LogLevel } from 'react-native-adapty';
-import type { AdaptyProfile } from 'react-native-adapty';
+import type {
+  AdaptyExternalAttributionProvider,
+  AdaptyFlow,
+  AdaptyProfile,
+} from 'react-native-adapty';
 
 import { captureException } from '@/analytics/sentry';
 
 /** Access level configured in Adapty; both yearly & monthly unlock `premium`. */
 export const PREMIUM_ACCESS_LEVEL = 'premium';
 
-/** Placement IDs hardcoded in the app; paywall/A-B routing lives in the dashboard. */
+/**
+ * Placement IDs hardcoded in the app; paywall/A-B routing lives in the dashboard.
+ *
+ * `main` is the legacy *paywall* placement: remote-config JSON rendered by our
+ * own code (`components/paywall/*`). It stays as the fallback.
+ *
+ * `pw_main` and `onb_main` are *flow* placements (Adapty Flow & Paywall
+ * Builder, SDK v4): the whole screen sequence is designed in the dashboard and
+ * rendered natively by the SDK, so paywall and onboarding variants ship and
+ * A/B-test without an app release. A flow placement cannot reuse a paywall
+ * placement id, hence the new names.
+ */
 export const ADAPTY_PLACEMENT_MAIN =
   process.env.EXPO_PUBLIC_ADAPTY_PLACEMENT_MAIN ?? 'main';
-export const ADAPTY_PLACEMENT_ONBOARDING =
-  process.env.EXPO_PUBLIC_ADAPTY_PLACEMENT_ONBOARDING ?? 'onboarding';
+export const ADAPTY_PLACEMENT_PAYWALL_FLOW =
+  process.env.EXPO_PUBLIC_ADAPTY_PLACEMENT_PAYWALL_FLOW ?? 'pw_main';
+export const ADAPTY_PLACEMENT_ONBOARDING_FLOW =
+  process.env.EXPO_PUBLIC_ADAPTY_PLACEMENT_ONBOARDING_FLOW ?? 'onb_main';
+/**
+ * Flow shown once, right after the customer dismisses the App Store purchase
+ * sheet (`user_cancelled`) — the only moment we know they saw the real price
+ * and walked away. Empty placement or `use_native` remote config = no offer.
+ */
+export const ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW =
+  process.env.EXPO_PUBLIC_ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW ?? 'pw_after_cancel';
 
 function sdkKey(): string {
   const ios = process.env.EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY ?? '';
@@ -55,6 +79,10 @@ export function activateAdapty(): Promise<boolean> {
         // React Native fast-refresh re-runs activation; ignore the extra calls.
         __ignoreActivationOnFastRefresh: __DEV__,
         // customerUserId is set after login via identifyAdapty().
+        // Since SDK 4.1 Adapty's own attribution (Apple Search Ads via
+        // AdServices, install details) is opt-in. Without this flag
+        // `waitForAppleAdsAttribution` below would never resolve.
+        adaptyAttributionEnabled: true,
       });
       return true;
     } catch {
@@ -172,11 +200,11 @@ export async function setAdaptyIntegrationIdentifier(
  */
 export async function updateAdaptyAttribution(
   attribution: Record<string, unknown>,
-  source: string,
+  source: AdaptyExternalAttributionProvider,
 ): Promise<void> {
   if (!(await activateAdapty())) return;
   try {
-    await adapty.updateAttribution(attribution, source);
+    await adapty.updateExternalAttribution(attribution, source);
   } catch (e) {
     // attribution enrichment only — surface it, don't block launch
     captureException(e);
@@ -186,7 +214,55 @@ export async function updateAdaptyAttribution(
 const APPLE_ADS_SOURCE = 'apple_search_ads';
 
 function hasAppleAdsAttribution(profile: AdaptyProfile): boolean {
-  return profile.appliedAttributionSources?.includes(APPLE_ADS_SOURCE) ?? false;
+  return profile.appliedExternalAttributionProviders?.includes(APPLE_ADS_SOURCE) ?? false;
+}
+
+/**
+ * Custom attributes on the Adapty profile — the hook for audience targeting.
+ *
+ * Adapty segments can filter on these, and a placement (or A/B test) can serve
+ * a different flow per segment. That is how "onboarding per ad angle" is
+ * wired later without a release: the app writes the signal here, the dashboard
+ * decides what to show. Keys are capped at 30 chars and values at 50 by Adapty;
+ * anything longer is trimmed rather than rejected.
+ */
+export async function setAdaptyCustomAttributes(
+  attributes: Record<string, string | number | null | undefined>,
+): Promise<void> {
+  const codableCustomAttributes: Record<string, string | number> = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (value === null || value === undefined || value === '') continue;
+    codableCustomAttributes[key.slice(0, 30)] =
+      typeof value === 'number' ? value : String(value).slice(0, 50);
+  }
+  if (Object.keys(codableCustomAttributes).length === 0) return;
+  if (!(await activateAdapty())) return;
+  try {
+    await adapty.updateProfile({ codableCustomAttributes });
+  } catch (e) {
+    // targeting metadata only — never block the flow on it
+    captureException(e);
+  }
+}
+
+/**
+ * Fetch a flow for a placement, or `null` when Adapty is unavailable, the
+ * placement has nothing published, or the network is slower than `timeoutMs`.
+ *
+ * Callers treat `null` as "show the native fallback": a flow placement is a
+ * remote-controlled screen and the app must survive it being empty.
+ */
+export async function fetchAdaptyFlow(
+  placementId: string,
+  timeoutMs: number,
+): Promise<AdaptyFlow | null> {
+  if (!(await activateAdapty())) return null;
+  try {
+    return await adapty.getFlow(placementId, { loadTimeoutMs: timeoutMs });
+  } catch (e) {
+    captureException(e, { placement: placementId });
+    return null;
+  }
 }
 
 /**

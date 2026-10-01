@@ -1,0 +1,6 @@
+{
+  "_comment": "Real Adapty product UUIDs from `products list` (app 356b7d68-ddae-41f8-8d3a-2bac9ce1cfa2), matched on App Store product id. offer_id null: the CLI exposes no offers and no existing paywall/flow binds one; the 3-day trial is the App Store introductory offer.",
+  "yearly":  {"store_id": "ai.yumyummy.app.yearly",     "product_id": "5e30a5fb-68bd-48a9-8403-bc3ffc5c947b", "offer_id": null},
+  "monthly": {"store_id": "ai.yumyummy.app.monthly",    "product_id": "cf5874b1-a1c2-46cc-900a-2ee04db8ddde", "offer_id": null},
+  "weekly":  {"store_id": "ai.yumyummy.app.weekly_upd", "product_id": "b14a44af-2a10-4f2a-9889-7e587cb6d149", "offer_id": null}
+}

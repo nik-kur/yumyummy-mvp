@@ -196,10 +196,14 @@ export function hasUnresolvedPlaceholders(text: string): boolean {
 // Config parser
 // ---------------------------------------------------------------------------
 
-export function parseRemoteConfig(raw: string | null | undefined): PaywallRemoteConfig {
+export function parseRemoteConfig(
+  raw: string | Record<string, unknown> | null | undefined,
+): PaywallRemoteConfig {
   if (!raw) return FALLBACK_CONFIG;
   try {
-    const parsed = JSON.parse(raw) as Partial<PaywallRemoteConfig>;
+    // SDK v4 hands remote config over already parsed (`remoteConfigs[].data`);
+    // v3 gave a JSON string. Accept both so the fallback file keeps working.
+    const parsed = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Partial<PaywallRemoteConfig>;
     if (!parsed.variant || !parsed.plans?.length) return FALLBACK_CONFIG;
     return parsed as PaywallRemoteConfig;
   } catch {

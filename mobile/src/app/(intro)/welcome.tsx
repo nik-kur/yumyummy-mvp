@@ -11,6 +11,7 @@ import { Button } from '@/components/Button';
 import { WelcomeDemo } from '@/components/WelcomeDemo';
 import { MascotBadge } from '@/components/MascotBadge';
 import { track } from '@/analytics/posthog';
+import { requestTrackingConsent } from '@/analytics/attribution';
 import { colors, radius, space } from '@/theme/tokens';
 
 const TRUST_CHIPS = ['★ 4.9', '12,000+ trackers', '✓ Verified data'];
@@ -44,8 +45,13 @@ export default function WelcomeScreen() {
         <Button
           label="Get Started"
           variant="brand"
-          onPress={() => {
+          onPress={async () => {
             track('onboarding_screen_completed', { screen: 'S1_welcome' });
+            // ATT is asked here, after the value pitch, not over the splash —
+            // see ATT_PROMPT_AT_LAUNCH. The Adapty flow does the same on its
+            // welcome step; this is the native fallback's copy of it.
+            const granted = await requestTrackingConsent();
+            track('att_prompt_answered', { granted, source: 'native_welcome' });
             router.push('/(intro)/goal');
           }}
         />

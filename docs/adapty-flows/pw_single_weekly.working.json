@@ -1,0 +1,4372 @@
+{
+  "config": {
+    "screens": [
+      {
+        "id": "PW_S_weekly",
+        "props": {
+          "layout": {
+            "alignH": "start",
+            "alignV": "start",
+            "direction": "vertical",
+            "distribution": {
+              "gap": 0,
+              "type": "gap"
+            }
+          },
+          "safeArea": true,
+          "statusBar": false,
+          "scrollable": true,
+          "progressBar": {
+            "enabled": false
+          },
+          "statusBarTheme": "light",
+          "fill": [
+            {
+              "type": "color",
+              "color": {
+                "type": "color-style",
+                "colorId": "bg"
+              }
+            }
+          ],
+          "padding": {
+            "top": 0,
+            "left": 20,
+            "right": 20,
+            "bottom": 16
+          }
+        },
+        "elements": {
+          "map": {
+            "el_pk_002S": {
+              "id": "el_pk_002S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "end",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 4,
+                  "left": 0,
+                  "right": 0,
+                  "bottom": 4
+                }
+              },
+              "states": [],
+              "caption": "Top bar"
+            },
+            "el_pk_001T": {
+              "id": "el_pk_001T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "left",
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Restore",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                }
+              },
+              "states": [],
+              "caption": "Restore (top)",
+              "interactions": [
+                {
+                  "id": "int_pk_001T",
+                  "trigger": "tap",
+                  "actions": [
+                    {
+                      "id": "act_restore",
+                      "type": "restorePurchases"
+                    }
+                  ]
+                }
+              ]
+            },
+            "el_pk_003T": {
+              "id": "el_pk_003T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "fr_h1"
+                },
+                "align": "center",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Nutrition tracking that finally works",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                },
+                "margin": {
+                  "top": 24,
+                  "left": 0,
+                  "right": 0,
+                  "bottom": 8
+                }
+              },
+              "states": []
+            },
+            "el_pk_006S": {
+              "id": "el_pk_006S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Laurels (static only)"
+            },
+            "el_pk_005S": {
+              "id": "el_pk_005S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 4,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "surface_alt"
+                    }
+                  }
+                ],
+                "padding": {
+                  "top": 4,
+                  "left": 12,
+                  "right": 12,
+                  "bottom": 4
+                },
+                "borderRadius": {
+                  "tl": 999,
+                  "tr": 999,
+                  "bl": 999,
+                  "br": 999
+                }
+              },
+              "states": [],
+              "caption": "Laurel"
+            },
+            "el_pk_004T": {
+              "id": "el_pk_004T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "left",
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "✓ Verified data",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_063S": {
+              "id": "el_pk_063S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 44,
+                  "left": 0,
+                  "right": 0,
+                  "bottom": 20
+                }
+              },
+              "states": [],
+              "caption": "Timeline centerpiece"
+            },
+            "el_pk_034S": {
+              "id": "el_pk_034S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 0,
+                  "left": 4,
+                  "right": 4,
+                  "bottom": 0
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "==",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "Timeline (trial)"
+            },
+            "el_pk_013S": {
+              "id": "el_pk_013S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Done"
+            },
+            "el_pk_008S": {
+              "id": "el_pk_008S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "done_green"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_007I": {
+              "id": "el_pk_007I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "Check",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "bold",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "white"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_009S": {
+              "id": "el_pk_009S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 3
+                },
+                "height": {
+                  "type": "auto"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 44,
+                  "left": 18.5,
+                  "bottom": 4
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 2,
+                  "tr": 2,
+                  "bl": 2,
+                  "br": 2
+                }
+              },
+              "states": [],
+              "caption": "Rail"
+            },
+            "el_pk_012S": {
+              "id": "el_pk_012S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 24
+                }
+              },
+              "states": []
+            },
+            "el_pk_010T": {
+              "id": "el_pk_010T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Done",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_011T": {
+              "id": "el_pk_011T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Your personal plan — built",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_020S": {
+              "id": "el_pk_020S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Today"
+            },
+            "el_pk_015S": {
+              "id": "el_pk_015S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_014I": {
+              "id": "el_pk_014I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "LockOpen",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "regular",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "terracotta"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_016S": {
+              "id": "el_pk_016S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 3
+                },
+                "height": {
+                  "type": "auto"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 44,
+                  "left": 18.5,
+                  "bottom": 4
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 2,
+                  "tr": 2,
+                  "bl": 2,
+                  "br": 2
+                }
+              },
+              "states": [],
+              "caption": "Rail"
+            },
+            "el_pk_019S": {
+              "id": "el_pk_019S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 24
+                }
+              },
+              "states": []
+            },
+            "el_pk_017T": {
+              "id": "el_pk_017T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Today",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_018T": {
+              "id": "el_pk_018T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Full access unlocked — you pay nothing",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_027S": {
+              "id": "el_pk_027S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Day 2"
+            },
+            "el_pk_022S": {
+              "id": "el_pk_022S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_021I": {
+              "id": "el_pk_021I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "Bell",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "regular",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "terracotta"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_023S": {
+              "id": "el_pk_023S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 3
+                },
+                "height": {
+                  "type": "auto"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 44,
+                  "left": 18.5,
+                  "bottom": 4
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 2,
+                  "tr": 2,
+                  "bl": 2,
+                  "br": 2
+                }
+              },
+              "states": [],
+              "caption": "Rail"
+            },
+            "el_pk_026S": {
+              "id": "el_pk_026S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 24
+                }
+              },
+              "states": []
+            },
+            "el_pk_024T": {
+              "id": "el_pk_024T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Day 2",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_025T": {
+              "id": "el_pk_025T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "We'll remind you 24h before any charge",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_033S": {
+              "id": "el_pk_033S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Day 3"
+            },
+            "el_pk_029S": {
+              "id": "el_pk_029S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_028I": {
+              "id": "el_pk_028I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "Star",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "regular",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "terracotta"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_032S": {
+              "id": "el_pk_032S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 0
+                }
+              },
+              "states": []
+            },
+            "el_pk_030T": {
+              "id": "el_pk_030T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Day 3",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_031T": {
+              "id": "el_pk_031T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Trial ends — cancel anytime before",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_062S": {
+              "id": "el_pk_062S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 0,
+                  "left": 4,
+                  "right": 4,
+                  "bottom": 0
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "!=",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "Timeline (no trial — PAID_TIMELINE_STEPS)"
+            },
+            "el_pk_041S": {
+              "id": "el_pk_041S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Done"
+            },
+            "el_pk_036S": {
+              "id": "el_pk_036S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "done_green"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_035I": {
+              "id": "el_pk_035I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "Check",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "bold",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "white"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_037S": {
+              "id": "el_pk_037S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 3
+                },
+                "height": {
+                  "type": "auto"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 44,
+                  "left": 18.5,
+                  "bottom": 4
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 2,
+                  "tr": 2,
+                  "bl": 2,
+                  "br": 2
+                }
+              },
+              "states": [],
+              "caption": "Rail"
+            },
+            "el_pk_040S": {
+              "id": "el_pk_040S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 24
+                }
+              },
+              "states": []
+            },
+            "el_pk_038T": {
+              "id": "el_pk_038T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Done",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_039T": {
+              "id": "el_pk_039T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Your personal plan — built",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_048S": {
+              "id": "el_pk_048S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Today"
+            },
+            "el_pk_043S": {
+              "id": "el_pk_043S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_042I": {
+              "id": "el_pk_042I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "LockOpen",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "regular",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "terracotta"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_044S": {
+              "id": "el_pk_044S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 3
+                },
+                "height": {
+                  "type": "auto"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 44,
+                  "left": 18.5,
+                  "bottom": 4
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 2,
+                  "tr": 2,
+                  "bl": 2,
+                  "br": 2
+                }
+              },
+              "states": [],
+              "caption": "Rail"
+            },
+            "el_pk_047S": {
+              "id": "el_pk_047S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 24
+                }
+              },
+              "states": []
+            },
+            "el_pk_045T": {
+              "id": "el_pk_045T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Today",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_046T": {
+              "id": "el_pk_046T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Full access unlocked",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_055S": {
+              "id": "el_pk_055S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Day 2"
+            },
+            "el_pk_050S": {
+              "id": "el_pk_050S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_049I": {
+              "id": "el_pk_049I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "Bell",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "regular",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "terracotta"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_051S": {
+              "id": "el_pk_051S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 3
+                },
+                "height": {
+                  "type": "auto"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 44,
+                  "left": 18.5,
+                  "bottom": 4
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 2,
+                  "tr": 2,
+                  "bl": 2,
+                  "br": 2
+                }
+              },
+              "states": [],
+              "caption": "Rail"
+            },
+            "el_pk_054S": {
+              "id": "el_pk_054S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 24
+                }
+              },
+              "states": []
+            },
+            "el_pk_052T": {
+              "id": "el_pk_052T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Day 2",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_053T": {
+              "id": "el_pk_053T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "You'll set up your full tracking system and see how simple it is",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_061S": {
+              "id": "el_pk_061S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Step Day 3"
+            },
+            "el_pk_057S": {
+              "id": "el_pk_057S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 40
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "absolute",
+                  "top": 0,
+                  "left": 0
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta_soft"
+                    }
+                  }
+                ],
+                "borderRadius": {
+                  "tl": 20,
+                  "tr": 20,
+                  "bl": 20,
+                  "br": 20
+                }
+              },
+              "states": [],
+              "caption": "Dial"
+            },
+            "el_pk_056I": {
+              "id": "el_pk_056I",
+              "type": "icon",
+              "props": {
+                "icon": {
+                  "name": "Star",
+                  "size": 20,
+                  "type": "phosphor",
+                  "weight": "regular",
+                  "color": {
+                    "type": "color-style",
+                    "colorId": "terracotta"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": []
+            },
+            "el_pk_060S": {
+              "id": "el_pk_060S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 2,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "padding": {
+                  "top": 8,
+                  "left": 56,
+                  "right": 0,
+                  "bottom": 0
+                }
+              },
+              "states": []
+            },
+            "el_pk_058T": {
+              "id": "el_pk_058T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_title"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Day 3",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink"
+                }
+              },
+              "states": []
+            },
+            "el_pk_059T": {
+              "id": "el_pk_059T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_small_20"
+                },
+                "align": "left",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "You'll start noticing changes in your routine and eating trends",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_muted"
+                }
+              },
+              "states": []
+            },
+            "el_pk_064S": {
+              "id": "el_pk_064S",
+              "type": "product",
+              "props": {
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "visibility": {
+                  "type": "hidden"
+                },
+                "groupId": "plan",
+                "default": true,
+                "product": {
+                  "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                },
+                "caption": "Product attach point (hidden)"
+              },
+              "states": [
+                {
+                  "id": "selected",
+                  "type": "system"
+                }
+              ]
+            },
+            "el_pk_080S": {
+              "id": "el_pk_080S",
+              "type": "footer",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 12,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "bg"
+                    }
+                  }
+                ],
+                "padding": {
+                  "top": 8,
+                  "left": 20,
+                  "right": 20,
+                  "bottom": 8
+                }
+              },
+              "states": []
+            },
+            "el_pk_070S": {
+              "id": "el_pk_070S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Above CTA"
+            },
+            "el_pk_068T": {
+              "id": "el_pk_068T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "center",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "✓ No payment due now · Cancel anytime",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "done_green"
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "==",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "Above CTA (trial)"
+            },
+            "el_pk_069T": {
+              "id": "el_pk_069T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "center",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "✓ Cancel anytime",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "done_green"
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "!=",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "Above CTA (no trial)"
+            },
+            "el_pk_073S": {
+              "id": "el_pk_073S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "fixed",
+                  "value": 54
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "fill": [
+                  {
+                    "type": "color",
+                    "color": {
+                      "type": "color-style",
+                      "colorId": "terracotta"
+                    }
+                  }
+                ],
+                "padding": {
+                  "top": 0,
+                  "left": 24,
+                  "right": 24,
+                  "bottom": 0
+                },
+                "borderRadius": {
+                  "tl": 12,
+                  "tr": 12,
+                  "bl": 12,
+                  "br": 12
+                }
+              },
+              "states": [],
+              "caption": "CTA purchase",
+              "interactions": [
+                {
+                  "id": "int_pk_073S",
+                  "trigger": "tap",
+                  "actions": [
+                    {
+                      "id": "act_buy",
+                      "type": "purchase",
+                      "payload": {
+                        "product": {
+                          "type": "const",
+                          "value": {
+                            "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "el_pk_071T": {
+              "id": "el_pk_071T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_button"
+                },
+                "align": "center",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Start my 3-day free trial",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "white"
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "==",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "CTA label (trial)"
+            },
+            "el_pk_072T": {
+              "id": "el_pk_072T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_button"
+                },
+                "align": "center",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Continue",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "white"
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "!=",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "CTA label (no trial)"
+            },
+            "el_pk_067S": {
+              "id": "el_pk_067S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "start",
+                  "alignV": "start",
+                  "direction": "vertical",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Terms line"
+            },
+            "el_pk_065T": {
+              "id": "el_pk_065T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption_15"
+                },
+                "align": "center",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Free for 3 days, then ",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          },
+                          {
+                            "type": "variable",
+                            "attrs": {
+                              "variableId": "b14a44af-2a10-4f2a-9889-7e587cb6d149.prod_price",
+                              "productRef": {
+                                "target": {
+                                  "kind": "product",
+                                  "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                                },
+                                "field": "prod_price"
+                              }
+                            }
+                          },
+                          {
+                            "text": " per week. Renews automatically unless cancelled at least 24 hours before the end of the current period. Cancel anytime in your Apple Account settings.",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "==",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "Terms (trial)"
+            },
+            "el_pk_066T": {
+              "id": "el_pk_066T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption_15"
+                },
+                "align": "center",
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "variable",
+                            "attrs": {
+                              "variableId": "b14a44af-2a10-4f2a-9889-7e587cb6d149.prod_price",
+                              "productRef": {
+                                "target": {
+                                  "kind": "product",
+                                  "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                                },
+                                "field": "prod_price"
+                              }
+                            }
+                          },
+                          {
+                            "text": " per week. Renews automatically unless cancelled at least 24 hours before the end of the current period. Cancel anytime in your Apple Account settings.",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                },
+                "visibility": {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "!=",
+                    "left": {
+                      "type": "productRef",
+                      "target": {
+                        "kind": "product",
+                        "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+                      },
+                      "field": "is_free_trial"
+                    },
+                    "right": {
+                      "type": "const",
+                      "value": true
+                    }
+                  }
+                }
+              },
+              "states": [],
+              "caption": "Terms (no trial)"
+            },
+            "el_pk_079S": {
+              "id": "el_pk_079S",
+              "type": "stack",
+              "props": {
+                "width": {
+                  "type": "fill"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": {
+                  "alignH": "center",
+                  "alignV": "center",
+                  "direction": "horizontal",
+                  "distribution": {
+                    "gap": 0,
+                    "type": "gap"
+                  }
+                },
+                "position": {
+                  "type": "relative"
+                }
+              },
+              "states": [],
+              "caption": "Legal links"
+            },
+            "el_pk_074T": {
+              "id": "el_pk_074T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "left",
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Restore",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                }
+              },
+              "states": [],
+              "caption": "Restore (footer)",
+              "interactions": [
+                {
+                  "id": "int_pk_074T",
+                  "trigger": "tap",
+                  "actions": [
+                    {
+                      "id": "act_restore",
+                      "type": "restorePurchases"
+                    }
+                  ]
+                }
+              ]
+            },
+            "el_pk_075T": {
+              "id": "el_pk_075T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "left",
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": " · ",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                }
+              },
+              "states": []
+            },
+            "el_pk_076T": {
+              "id": "el_pk_076T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "left",
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Terms",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                }
+              },
+              "states": [],
+              "caption": "Terms",
+              "interactions": [
+                {
+                  "id": "int_pk_076T",
+                  "trigger": "tap",
+                  "actions": [
+                    {
+                      "id": "act_terms",
+                      "type": "openUrl",
+                      "payload": {
+                        "url": "https://yumyummy.ai/terms.html",
+                        "external": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "el_pk_077T": {
+              "id": "el_pk_077T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "left",
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": " · ",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                }
+              },
+              "states": []
+            },
+            "el_pk_078T": {
+              "id": "el_pk_078T",
+              "type": "text",
+              "props": {
+                "font": {
+                  "preset": "in_caption"
+                },
+                "align": "left",
+                "width": {
+                  "type": "hug"
+                },
+                "height": {
+                  "type": "hug"
+                },
+                "layout": "auto-height",
+                "content": {
+                  "values": {
+                    "en": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "text": "Privacy",
+                            "type": "text",
+                            "attrs": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strikethrough": false
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "_localizable": true
+                },
+                "position": {
+                  "type": "relative"
+                },
+                "decoration": "none",
+                "color": {
+                  "type": "color-style",
+                  "colorId": "ink_faint"
+                }
+              },
+              "states": [],
+              "caption": "Privacy",
+              "interactions": [
+                {
+                  "id": "int_pk_078T",
+                  "trigger": "tap",
+                  "actions": [
+                    {
+                      "id": "act_privacy",
+                      "type": "openUrl",
+                      "payload": {
+                        "url": "https://yumyummy.ai/privacy.html",
+                        "external": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "hierarchy": {
+            "id": "root",
+            "children": [
+              {
+                "id": "el_pk_002S",
+                "children": [
+                  {
+                    "id": "el_pk_001T"
+                  }
+                ]
+              },
+              {
+                "id": "el_pk_003T"
+              },
+              {
+                "id": "el_pk_006S",
+                "children": [
+                  {
+                    "id": "el_pk_005S",
+                    "children": [
+                      {
+                        "id": "el_pk_004T"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "el_pk_063S",
+                "children": [
+                  {
+                    "id": "el_pk_034S",
+                    "children": [
+                      {
+                        "id": "el_pk_013S",
+                        "children": [
+                          {
+                            "id": "el_pk_008S",
+                            "children": [
+                              {
+                                "id": "el_pk_007I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_009S"
+                          },
+                          {
+                            "id": "el_pk_012S",
+                            "children": [
+                              {
+                                "id": "el_pk_010T"
+                              },
+                              {
+                                "id": "el_pk_011T"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "el_pk_020S",
+                        "children": [
+                          {
+                            "id": "el_pk_015S",
+                            "children": [
+                              {
+                                "id": "el_pk_014I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_016S"
+                          },
+                          {
+                            "id": "el_pk_019S",
+                            "children": [
+                              {
+                                "id": "el_pk_017T"
+                              },
+                              {
+                                "id": "el_pk_018T"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "el_pk_027S",
+                        "children": [
+                          {
+                            "id": "el_pk_022S",
+                            "children": [
+                              {
+                                "id": "el_pk_021I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_023S"
+                          },
+                          {
+                            "id": "el_pk_026S",
+                            "children": [
+                              {
+                                "id": "el_pk_024T"
+                              },
+                              {
+                                "id": "el_pk_025T"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "el_pk_033S",
+                        "children": [
+                          {
+                            "id": "el_pk_029S",
+                            "children": [
+                              {
+                                "id": "el_pk_028I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_032S",
+                            "children": [
+                              {
+                                "id": "el_pk_030T"
+                              },
+                              {
+                                "id": "el_pk_031T"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "el_pk_062S",
+                    "children": [
+                      {
+                        "id": "el_pk_041S",
+                        "children": [
+                          {
+                            "id": "el_pk_036S",
+                            "children": [
+                              {
+                                "id": "el_pk_035I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_037S"
+                          },
+                          {
+                            "id": "el_pk_040S",
+                            "children": [
+                              {
+                                "id": "el_pk_038T"
+                              },
+                              {
+                                "id": "el_pk_039T"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "el_pk_048S",
+                        "children": [
+                          {
+                            "id": "el_pk_043S",
+                            "children": [
+                              {
+                                "id": "el_pk_042I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_044S"
+                          },
+                          {
+                            "id": "el_pk_047S",
+                            "children": [
+                              {
+                                "id": "el_pk_045T"
+                              },
+                              {
+                                "id": "el_pk_046T"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "el_pk_055S",
+                        "children": [
+                          {
+                            "id": "el_pk_050S",
+                            "children": [
+                              {
+                                "id": "el_pk_049I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_051S"
+                          },
+                          {
+                            "id": "el_pk_054S",
+                            "children": [
+                              {
+                                "id": "el_pk_052T"
+                              },
+                              {
+                                "id": "el_pk_053T"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "el_pk_061S",
+                        "children": [
+                          {
+                            "id": "el_pk_057S",
+                            "children": [
+                              {
+                                "id": "el_pk_056I"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "el_pk_060S",
+                            "children": [
+                              {
+                                "id": "el_pk_058T"
+                              },
+                              {
+                                "id": "el_pk_059T"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "el_pk_064S"
+              },
+              {
+                "id": "el_pk_080S",
+                "children": [
+                  {
+                    "id": "el_pk_070S",
+                    "children": [
+                      {
+                        "id": "el_pk_068T"
+                      },
+                      {
+                        "id": "el_pk_069T"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "el_pk_073S",
+                    "children": [
+                      {
+                        "id": "el_pk_071T"
+                      },
+                      {
+                        "id": "el_pk_072T"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "el_pk_067S",
+                    "children": [
+                      {
+                        "id": "el_pk_065T"
+                      },
+                      {
+                        "id": "el_pk_066T"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "el_pk_079S",
+                    "children": [
+                      {
+                        "id": "el_pk_074T"
+                      },
+                      {
+                        "id": "el_pk_075T"
+                      },
+                      {
+                        "id": "el_pk_076T"
+                      },
+                      {
+                        "id": "el_pk_077T"
+                      },
+                      {
+                        "id": "el_pk_078T"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "selectableGroups": [
+          {
+            "id": "plan",
+            "type": "product"
+          }
+        ],
+        "products": [
+          {
+            "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149"
+          }
+        ],
+        "caption": "PW_S_weekly"
+      }
+    ],
+    "locales": [
+      {
+        "id": "en",
+        "code": "en",
+        "name": "English"
+      }
+    ],
+    "defaultLocale": "en",
+    "variables": [],
+    "theme": {
+      "colors": [
+        {
+          "id": "bg",
+          "dark": {
+            "hex": "#F7F1E6"
+          },
+          "name": "Background (paper)",
+          "light": {
+            "hex": "#F7F1E6"
+          }
+        },
+        {
+          "id": "surface",
+          "dark": {
+            "hex": "#FFFDF9"
+          },
+          "name": "Surface (cards)",
+          "light": {
+            "hex": "#FFFDF9"
+          }
+        },
+        {
+          "id": "surface_alt",
+          "dark": {
+            "hex": "#FBF6EE"
+          },
+          "name": "Surface alt",
+          "light": {
+            "hex": "#FBF6EE"
+          }
+        },
+        {
+          "id": "ink",
+          "dark": {
+            "hex": "#19150F"
+          },
+          "name": "Ink",
+          "light": {
+            "hex": "#19150F"
+          }
+        },
+        {
+          "id": "ink_muted",
+          "dark": {
+            "hex": "#6B6258"
+          },
+          "name": "Ink muted",
+          "light": {
+            "hex": "#6B6258"
+          }
+        },
+        {
+          "id": "ink_faint",
+          "dark": {
+            "hex": "#938A7C"
+          },
+          "name": "Ink faint",
+          "light": {
+            "hex": "#938A7C"
+          }
+        },
+        {
+          "id": "hairline",
+          "dark": {
+            "hex": "#E7DFD1"
+          },
+          "name": "Hairline",
+          "light": {
+            "hex": "#E7DFD1"
+          }
+        },
+        {
+          "id": "hairline_strong",
+          "dark": {
+            "hex": "#D8CCB9"
+          },
+          "name": "Hairline strong",
+          "light": {
+            "hex": "#D8CCB9"
+          }
+        },
+        {
+          "id": "terracotta",
+          "dark": {
+            "hex": "#B85A3A"
+          },
+          "name": "Terracotta",
+          "light": {
+            "hex": "#B85A3A"
+          }
+        },
+        {
+          "id": "terracotta_text",
+          "dark": {
+            "hex": "#9A4628"
+          },
+          "name": "Terracotta text",
+          "light": {
+            "hex": "#9A4628"
+          }
+        },
+        {
+          "id": "terracotta_soft",
+          "dark": {
+            "hex": "#EFDFD1"
+          },
+          "name": "Terracotta soft",
+          "light": {
+            "hex": "#EFDFD1"
+          }
+        },
+        {
+          "id": "success",
+          "dark": {
+            "hex": "#2E6B4E"
+          },
+          "name": "Success",
+          "light": {
+            "hex": "#2E6B4E"
+          }
+        },
+        {
+          "id": "error",
+          "dark": {
+            "hex": "#9A2A1F"
+          },
+          "name": "Error",
+          "light": {
+            "hex": "#9A2A1F"
+          }
+        },
+        {
+          "id": "info_blue",
+          "dark": {
+            "hex": "#1F5C99"
+          },
+          "name": "Info blue",
+          "light": {
+            "hex": "#1F5C99"
+          }
+        },
+        {
+          "id": "info_blue_soft",
+          "dark": {
+            "hex": "#E7EFF8"
+          },
+          "name": "Info blue soft",
+          "light": {
+            "hex": "#E7EFF8"
+          }
+        },
+        {
+          "id": "olive_soft",
+          "dark": {
+            "hex": "#E3E6CE"
+          },
+          "name": "Olive soft",
+          "light": {
+            "hex": "#E3E6CE"
+          }
+        },
+        {
+          "id": "warning_soft",
+          "dark": {
+            "hex": "#FBEFD6"
+          },
+          "name": "Warning soft",
+          "light": {
+            "hex": "#FBEFD6"
+          }
+        },
+        {
+          "id": "protein",
+          "dark": {
+            "hex": "#5A6A3A"
+          },
+          "name": "Protein",
+          "light": {
+            "hex": "#5A6A3A"
+          }
+        },
+        {
+          "id": "fat",
+          "dark": {
+            "hex": "#8A5A14"
+          },
+          "name": "Fat",
+          "light": {
+            "hex": "#8A5A14"
+          }
+        },
+        {
+          "id": "carbs",
+          "dark": {
+            "hex": "#2C6CA8"
+          },
+          "name": "Carbs",
+          "light": {
+            "hex": "#2C6CA8"
+          }
+        },
+        {
+          "id": "done_green",
+          "dark": {
+            "hex": "#16A34A"
+          },
+          "name": "Paywall done green",
+          "light": {
+            "hex": "#16A34A"
+          }
+        },
+        {
+          "id": "surplus_strip",
+          "dark": {
+            "hex": "#C97A6A"
+          },
+          "name": "CICO surplus strip",
+          "light": {
+            "hex": "#C97A6A"
+          }
+        },
+        {
+          "id": "stage_bg",
+          "dark": {
+            "hex": "#F2EADB"
+          },
+          "name": "Welcome demo stage",
+          "light": {
+            "hex": "#F2EADB"
+          }
+        },
+        {
+          "id": "white",
+          "dark": {
+            "hex": "#FFFFFF"
+          },
+          "name": "White",
+          "light": {
+            "hex": "#FFFFFF"
+          }
+        }
+      ],
+      "typography": [
+        {
+          "id": "fr_hero",
+          "name": "Fraunces 600 · Hero 56/58",
+          "settings": {
+            "size": 56,
+            "family": {
+              "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+              "type": "user"
+            },
+            "weight": "semibold",
+            "lineHeight": 58
+          }
+        },
+        {
+          "id": "fr_stat",
+          "name": "Fraunces 700 · Stat 60/66",
+          "settings": {
+            "size": 60,
+            "family": {
+              "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+              "type": "user"
+            },
+            "weight": "bold",
+            "lineHeight": 66
+          }
+        },
+        {
+          "id": "fr_h1",
+          "name": "Fraunces 600 · H1 28/32",
+          "settings": {
+            "size": 28,
+            "weight": "semibold",
+            "lineHeight": 32,
+            "family": {
+              "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "fr_h2",
+          "name": "Fraunces 600 · H2 22/28",
+          "settings": {
+            "size": 22,
+            "weight": "semibold",
+            "lineHeight": 28,
+            "family": {
+              "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "fr_num34",
+          "name": "Fraunces 700 · kcal 34/40",
+          "settings": {
+            "size": 34,
+            "weight": "bold",
+            "lineHeight": 40,
+            "family": {
+              "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "fr_label28",
+          "name": "Fraunces 700 · Mascot label 28/32",
+          "settings": {
+            "size": 28,
+            "weight": "bold",
+            "lineHeight": 32,
+            "family": {
+              "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "in_title",
+          "name": "Inter 600 · Title 18/24",
+          "settings": {
+            "size": 18,
+            "family": {
+              "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+              "type": "user"
+            },
+            "weight": "semibold",
+            "lineHeight": 24
+          }
+        },
+        {
+          "id": "in_title_26",
+          "name": "Inter 600 · Title 18/26",
+          "settings": {
+            "size": 18,
+            "weight": "semibold",
+            "lineHeight": 26,
+            "family": {
+              "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "in_body",
+          "name": "Inter 400 · Body 16/26",
+          "settings": {
+            "size": 16,
+            "family": {
+              "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+              "type": "user"
+            },
+            "weight": "regular",
+            "lineHeight": 26
+          }
+        },
+        {
+          "id": "in_body_strong",
+          "name": "Inter 600 · Body strong 16/26",
+          "settings": {
+            "size": 16,
+            "weight": "semibold",
+            "lineHeight": 26,
+            "family": {
+              "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "in_small",
+          "name": "Inter 400 · Small 14/21",
+          "settings": {
+            "size": 14,
+            "weight": "regular",
+            "lineHeight": 21,
+            "family": {
+              "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "in_caption",
+          "name": "Inter 500 · Caption 12/16",
+          "settings": {
+            "size": 12,
+            "family": {
+              "id": "27ffaa16-858b-4664-931c-99488d6f8a8c",
+              "type": "user"
+            },
+            "weight": "medium",
+            "lineHeight": 16
+          }
+        },
+        {
+          "id": "in_caption_strong",
+          "name": "Inter 600 · Chip 12/16",
+          "settings": {
+            "size": 12,
+            "weight": "semibold",
+            "lineHeight": 16,
+            "family": {
+              "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "in_button",
+          "name": "Inter 600 · Button 16/20",
+          "settings": {
+            "size": 16,
+            "weight": "semibold",
+            "lineHeight": 20,
+            "family": {
+              "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "in_badge",
+          "name": "Inter 600 · Number badge 14/18",
+          "settings": {
+            "size": 14,
+            "weight": "semibold",
+            "lineHeight": 18,
+            "family": {
+              "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "jb_overline",
+          "name": "JetBrains Mono 500 · Overline 11/14 +1.6",
+          "settings": {
+            "size": 11,
+            "family": {
+              "id": "89e4be49-420c-4239-abad-e06dcef47828",
+              "type": "user"
+            },
+            "weight": "medium",
+            "lineHeight": 14,
+            "letterSpacing": 1.6
+          }
+        },
+        {
+          "id": "jb_badge",
+          "name": "JetBrains Mono 500 · Source badge 11/14 +1",
+          "settings": {
+            "size": 11,
+            "weight": "medium",
+            "lineHeight": 14,
+            "letterSpacing": 1,
+            "family": {
+              "id": "89e4be49-420c-4239-abad-e06dcef47828",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "emoji_42",
+          "name": "Emoji 42",
+          "settings": {
+            "size": 42,
+            "weight": "regular",
+            "lineHeight": 48
+          }
+        },
+        {
+          "id": "emoji_40",
+          "name": "Emoji 40",
+          "settings": {
+            "size": 40,
+            "weight": "regular",
+            "lineHeight": 48
+          }
+        },
+        {
+          "id": "emoji_26",
+          "name": "Emoji 26",
+          "settings": {
+            "size": 26,
+            "weight": "regular",
+            "lineHeight": 32
+          }
+        },
+        {
+          "id": "emoji_22",
+          "name": "Emoji 22",
+          "settings": {
+            "size": 22,
+            "weight": "regular",
+            "lineHeight": 28
+          }
+        },
+        {
+          "id": "emoji_20",
+          "name": "Emoji 20",
+          "settings": {
+            "size": 20,
+            "weight": "regular",
+            "lineHeight": 26
+          }
+        },
+        {
+          "id": "in_small_20",
+          "name": "Inter 400 · Small 14/20",
+          "settings": {
+            "size": 14,
+            "weight": "regular",
+            "lineHeight": 20,
+            "family": {
+              "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+              "type": "user"
+            }
+          }
+        },
+        {
+          "id": "in_caption_15",
+          "name": "Inter 500 · Terms 12/15",
+          "settings": {
+            "size": 12,
+            "weight": "medium",
+            "lineHeight": 15,
+            "family": {
+              "id": "27ffaa16-858b-4664-931c-99488d6f8a8c",
+              "type": "user"
+            }
+          }
+        }
+      ]
+    },
+    "components": {},
+    "_meta": {
+      "icons": [
+        {
+          "name": "Check",
+          "weight": "bold",
+          "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z\"></path></svg>"
+        },
+        {
+          "name": "LockOpen",
+          "weight": "regular",
+          "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M208,80H96V56a32,32,0,0,1,32-32c15.37,0,29.2,11,32.16,25.59a8,8,0,0,0,15.68-3.18C171.32,24.15,151.2,8,128,8A48.05,48.05,0,0,0,80,56V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80Zm0,128H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z\"></path></svg>"
+        },
+        {
+          "name": "Bell",
+          "weight": "regular",
+          "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z\"></path></svg>"
+        },
+        {
+          "name": "Star",
+          "weight": "regular",
+          "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z\"></path></svg>"
+        }
+      ],
+      "fonts": [
+        {
+          "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+          "name": "Fraunces SemiBold",
+          "url": "https://public-media.adapty.io/public/e4/5d/e45df2e0-bc7f-45a7-b507-b6d0d5ed25ec/fraunces_semibold",
+          "iosName": "Fraunces-SemiBold",
+          "androidName": "fraunces_semibold"
+        },
+        {
+          "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+          "name": "Fraunces Bold",
+          "url": "https://public-media.adapty.io/public/12/1f/121f7545-781d-4dfe-aedb-2c2548be41c7/fraunces_bold",
+          "iosName": "Fraunces-Bold",
+          "androidName": "fraunces_bold"
+        },
+        {
+          "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+          "name": "Inter SemiBold",
+          "url": "https://public-media.adapty.io/public/a0/79/a0792add-d439-43a1-b6be-bb3dea8e757f/inter_semibold",
+          "iosName": "Inter-SemiBold",
+          "androidName": "inter_semibold"
+        },
+        {
+          "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+          "name": "Inter Regular",
+          "url": "https://public-media.adapty.io/public/d9/58/d95869c8-3416-4b04-8342-6b1ef2b1c8d6/inter_regular",
+          "iosName": "Inter-Regular",
+          "androidName": "inter_regular"
+        },
+        {
+          "id": "27ffaa16-858b-4664-931c-99488d6f8a8c",
+          "name": "Inter Medium",
+          "url": "https://public-media.adapty.io/public/33/84/33842964-4a15-4295-81f5-118916d9c573/inter_medium",
+          "iosName": "Inter-Medium",
+          "androidName": "inter_medium"
+        },
+        {
+          "id": "89e4be49-420c-4239-abad-e06dcef47828",
+          "name": "JetBrains Mono Medium",
+          "url": "https://public-media.adapty.io/public/fd/17/fd1715c1-d5f7-4bcd-99e6-ac602f1ffe8e/jetbrains_mono_medium",
+          "iosName": "JetBrainsMono-Medium",
+          "androidName": "jetbrainsmono_medium"
+        }
+      ],
+      "screens": {
+        "PW_S_weekly": {
+          "products": [
+            {
+              "id": "b14a44af-2a10-4f2a-9889-7e587cb6d149",
+              "flowProductId": "6f4eb9d5-5b49-5cb3-af12-012c821393cd"
+            }
+          ]
+        }
+      }
+    },
+    "schemaVersion": 12
+  },
+  "remote_configs": [],
+  "updated_at": 1790852570636,
+  "status": "draft",
+  "publication_status": null,
+  "transform_error": null,
+  "publication_error": null
+}

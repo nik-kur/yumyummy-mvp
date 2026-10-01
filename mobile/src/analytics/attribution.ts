@@ -26,8 +26,14 @@ import {
   requestTrackingPermissionsAsync,
 } from 'expo-tracking-transparency';
 
-import { register, setPersonProperties, setPersonPropertiesOnce } from '@/analytics/posthog';
-import { setAdaptyIntegrationIdentifier, updateAdaptyAttribution } from '@/billing/adapty';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { register, setPersonProperties, setPersonPropertiesOnce, track } from '@/analytics/posthog';
+import {
+  setAdaptyCustomAttributes,
+  setAdaptyIntegrationIdentifier,
+  updateAdaptyAttribution,
+} from '@/billing/adapty';
 
 // AppsFlyer credentials. dev key comes from the AppsFlyer dashboard; appId is
 // the numeric Apple App Store id (iOS only). Both injected at build time.
@@ -35,6 +41,23 @@ const AF_DEV_KEY = process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? '';
 const AF_APP_ID = process.env.EXPO_PUBLIC_APPSFLYER_APP_ID ?? '';
 
 let started = false;
+
+/**
+ * Where the ATT prompt is shown.
+ *
+ * `false` (current): the prompt is raised from the onboarding — the flow's
+ * welcome step, or the native welcome screen's "Get Started" — once the user
+ * has seen what the app is. A prompt over the splash screen is the lowest-
+ * consent placement there is, and consent is the only thing that gives us
+ * user-level Meta attribution on iOS. AppsFlyer holds the install postback for
+ * `ATT_WAIT_SECONDS` so a consent given on the welcome step still ships the
+ * IDFA with it. Flip to `true` to restore the launch-time prompt.
+ */
+export const ATT_PROMPT_AT_LAUNCH = false;
+const ATT_WAIT_SECONDS = 60;
+
+/** AsyncStorage key for the last deep-link signal (deferred or direct). */
+const AD_SIGNAL_KEY = '@yy_ad_signal';
 
 /** True when an AppsFlyer dev key is configured for this build. */
 export function isAppsFlyerConfigured(): boolean {
@@ -120,6 +143,20 @@ async function handleConversionData(event: ConversionDataEvent): Promise<void> {
     // stitching only — never block launch
   }
 
+  // 1b) The same campaign / ad set / ad as plain custom attributes. Adapty's
+  //     own attribution parser decides what it keeps from the AppsFlyer
+  //     payload; these are the fields we target audiences on (a flow per ad
+  //     angle), so they go on the profile verbatim. Meta reports the ad name
+  //     under `adgroup`, hence the fallbacks.
+  if (isNonOrganic) {
+    void setAdaptyCustomAttributes({
+      af_media_source: mediaSource,
+      af_campaign: str('campaign'),
+      af_adset: str('af_adset') || str('adset'),
+      af_ad: str('af_ad') || str('ad_name') || str('adgroup'),
+    });
+  }
+
   // 2) PostHog: super properties on every event from this device + person
   //    properties. `acquisition_source` is set-once so the Apple Ads value
   //    (written by the Adapty path) is never clobbered by "Organic".
@@ -145,27 +182,98 @@ async function handleConversionData(event: ConversionDataEvent): Promise<void> {
   }
 }
 
+/** Shape of AppsFlyer's Unified Deep Linking callback payload. */
+interface UnifiedDeepLinkEvent {
+  status?: string;
+  deepLinkStatus?: 'FOUND' | 'NOT_FOUND' | 'ERROR';
+  isDeferred?: boolean;
+  data?: Record<string, unknown>;
+}
+
+/** What a tracking link told us about this install. */
+export interface AdSignal {
+  deep_link_value: string;
+  deep_link_sub1?: string;
+  deferred: boolean;
+  received_at: string;
+}
+
 /**
- * Ask for ATT, then start AppsFlyer. Idempotent — the first call wins.
- * Called once at launch from the root layout.
+ * Deferred deep link → the one user-level "which ad" signal that survives an
+ * ATT denial. A OneLink click before install resolves here on first launch
+ * with whatever `deep_link_value` the link carried (an angle, a campaign
+ * code). It is stored for the onboarding, pushed to the Adapty profile so a
+ * placement audience can key on it, and registered on every PostHog event.
+ */
+async function handleDeepLink(event: UnifiedDeepLinkEvent): Promise<void> {
+  if (event?.deepLinkStatus !== 'FOUND' || !event.data) return;
+  const str = (key: string): string => {
+    const v = event.data?.[key];
+    return typeof v === 'string' ? v : v == null ? '' : String(v);
+  };
+  const value = str('deep_link_value');
+  if (!value) return;
+  const signal: AdSignal = {
+    deep_link_value: value,
+    deep_link_sub1: str('deep_link_sub1') || undefined,
+    deferred: Boolean(event.isDeferred),
+    received_at: new Date().toISOString(),
+  };
+  try {
+    await AsyncStorage.setItem(AD_SIGNAL_KEY, JSON.stringify(signal));
+  } catch {
+    // storage is a convenience; the profile attribute below is the record
+  }
+  const props = {
+    deep_link_value: signal.deep_link_value,
+    deep_link_sub1: signal.deep_link_sub1,
+    deep_link_deferred: signal.deferred,
+  };
+  register(props);
+  setPersonProperties(props);
+  track('deep_link_received', props);
+  void setAdaptyCustomAttributes({
+    dl_value: signal.deep_link_value,
+    dl_sub1: signal.deep_link_sub1,
+  });
+}
+
+/** The stored deep-link signal, if a tracking link ever reached this install. */
+export async function loadAdSignal(): Promise<AdSignal | null> {
+  try {
+    const raw = await AsyncStorage.getItem(AD_SIGNAL_KEY);
+    return raw ? (JSON.parse(raw) as AdSignal) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Start AppsFlyer (and, when `ATT_PROMPT_AT_LAUNCH`, ask for ATT first).
+ * Idempotent — the first call wins. Called once at launch from the root layout.
  */
 export async function initAttribution(): Promise<void> {
   if (started) return;
   started = true;
 
-  // Prompt for ATT first so the IDFA (if granted) is available to AppsFlyer
-  // and SKAdNetwork when the SDK starts.
-  await requestTrackingConsent();
+  if (ATT_PROMPT_AT_LAUNCH) {
+    // Prompt for ATT first so the IDFA (if granted) is available to AppsFlyer
+    // and SKAdNetwork when the SDK starts.
+    await requestTrackingConsent();
+  }
 
   if (!isAppsFlyerConfigured()) return;
   const appsFlyer = loadAppsFlyer();
   if (!appsFlyer) return;
 
   try {
-    // Must be registered BEFORE initSdk, or the first (and only uncached)
-    // delivery of conversion data is lost.
+    // Both listeners must be registered BEFORE initSdk, or the first (and
+    // only uncached) delivery of conversion data / the deferred link is lost.
     appsFlyer.onInstallConversionData((event: ConversionDataEvent) => {
       void handleConversionData(event);
+    });
+    appsFlyer.onDeepLink((event: UnifiedDeepLinkEvent) => {
+      void handleDeepLink(event);
     });
     appsFlyer.initSdk(
       {
@@ -173,9 +281,11 @@ export async function initAttribution(): Promise<void> {
         appId: AF_APP_ID,
         isDebug: __DEV__,
         onInstallConversionDataListener: true,
-        // Give the user up to 15s to answer ATT before AppsFlyer sends the
-        // install postback, so the IDFA is included when granted.
-        timeToWaitForATTUserAuthorization: 15,
+        onDeepLinkListener: true,
+        // Hold the install postback until ATT is answered (or this many
+        // seconds pass) so the IDFA is included when granted. The prompt is
+        // raised on the welcome step, seconds after launch.
+        timeToWaitForATTUserAuthorization: ATT_WAIT_SECONDS,
       },
       () => {},
       () => {},
