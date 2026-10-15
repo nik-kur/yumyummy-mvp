@@ -1,0 +1,9 @@
+# Knowledge base
+
+Накопленные знания проекта (не код и не инструкции): исследования, выводы, решения. Один файл на тему, в начале каждого — где лежат первоисточники. Обновлять файл темы, а не плодить новые; дата в имени = дата исследования.
+
+| Файл | О чём | Когда читать |
+|---|---|---|
+| [onboarding-paywall-research-2026-10.md](onboarding-paywall-research-2026-10.md) | Воронка install→trial, разбор онбордингов и пейволов 12 конкурентов, best practices из 55 видео, публичные бенчмарки, 15 гипотез и план тестов в Adapty, принятые решения | Любая работа над онбордингом, пейволом, ценами, триалом, Adapty-флоу, alignment рекламы и приложения |
+| [onboarding-v3-implementation-2026-10.md](onboarding-v3-implementation-2026-10.md) | Как внедряем онбординг и пейвол V3 (решения 15 октября): всё в коде, Adapty как пульт (remote config `onb_main` / `onb_content` / `pw_*`), слоты Adapty, конфиг, экраны → код, хаптика, ATT 180 с, аналитика, открытые вопросы | Любая реализация онбординга, пейвола, офферов, preview mode и экранов после покупки по дизайну V3 |
+| [meta-aem-trial-optimization-2026-10.md](meta-aem-trial-optimization-2026-10.md) | Почему StartTrial/Subscribe неэлигибельны для Meta AEM (ATE/IDFA, Install ID = anon_id), как флаг ATE идёт AppsFlyer → Meta, что можно без билда, Meta SDK рядом с AppsFlyer, план оптимизации (installs → StartTrial, SKAN нет), Adapty Attribution; наши цифры за сентябрь–октябрь | Любая работа с оптимизацией Meta-кампаний на события, eligibility в Events Manager, настройками AppsFlyer → Meta, ATT-промптом, выбором атрибуции (AEM/SKAN/Adapty) |
