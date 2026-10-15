@@ -88,6 +88,21 @@ const PAYWALL_LOAD_TIMEOUT_MS = 5000;
 /** How long to keep waiting for Apple Ads attribution before giving up on it. */
 const APPLE_ADS_ATTRIBUTION_TIMEOUT_MS = 20000;
 
+/**
+ * What Sentry needs to tell a declined card from a store outage: Adapty wraps every
+ * StoreKit failure as "#1006 productPurchaseFailed", and the original error only lives
+ * in `detail` (seen live 2026-10-06: one event, no cause). Spread into the event context.
+ */
+function adaptyErrorContext(error: unknown, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  const e = error as { adaptyCode?: unknown; detail?: unknown; localizedDescription?: unknown; message?: unknown } | null;
+  return {
+    ...extra,
+    adapty_code: e?.adaptyCode ?? null,
+    adapty_detail: typeof e?.detail === 'string' ? e.detail.slice(0, 2000) : e?.detail ?? null,
+    message: e?.localizedDescription ?? e?.message ?? String(error),
+  };
+}
+
 /** The after-cancel offer is prefetched in the background; never wait longer than this for it. */
 const OFFER_LOAD_TIMEOUT_MS = 8000;
 
@@ -568,8 +583,12 @@ export default function PaywallScreen() {
         await afterPurchaseSuccess(product, 'code');
       } else if (result.type === 'user_cancelled') {
         // User backed out of the StoreKit sheet — expected, not an error.
-        track('paywall_purchase_cancelled', { product: product.vendorProductId });
+        track('paywall_purchase_cancelled', { product: product.vendorProductId, renderer: 'code' });
         addBreadcrumb('purchase', 'Purchase cancelled by user');
+        // `purchasingRef` mirrors the `purchasing` state through an effect, so at this
+        // point it still reads true and `maybeShowOffer` would bail out: the after-cancel
+        // offer never showed on the code paywall (seen live 2026-10-06). Clear it first.
+        purchasingRef.current = false;
         void maybeShowOffer(product.vendorProductId, 'code');
       } else if (result.type === 'pending') {
         // Ask-to-Buy / deferred: purchase may complete later out of band.
@@ -582,9 +601,11 @@ export default function PaywallScreen() {
     } catch (e) {
       track('paywall_purchase_failed', {
         product: product.vendorProductId,
+        renderer: 'code',
         error: e instanceof Error ? e.message : String(e),
+        adapty_detail: adaptyErrorContext(e).adapty_detail,
       });
-      captureException(e);
+      captureException(e, adaptyErrorContext(e, { product: product.vendorProductId, renderer: 'code' }));
       Alert.alert('Purchase failed', 'Something went wrong. Please try again.');
     } finally {
       setPurchasing(false);
@@ -723,8 +744,8 @@ export default function PaywallScreen() {
           }}
           onPurchaseFailed={(error, product) => {
             purchasingRef.current = false;
-            track('paywall_purchase_failed', { product: product?.vendorProductId, renderer: 'adapty_flow_offer', error: error?.message });
-            captureException(error);
+            track('paywall_purchase_failed', { product: product?.vendorProductId, renderer: 'adapty_flow_offer', error: error?.message, adapty_detail: adaptyErrorContext(error).adapty_detail });
+            captureException(error, adaptyErrorContext(error, { product: product?.vendorProductId, renderer: 'adapty_flow_offer' }));
             return false;
           }}
           onRestoreStarted={() => {
@@ -819,8 +840,9 @@ export default function PaywallScreen() {
               product: product?.vendorProductId,
               renderer: 'adapty_flow',
               error: error?.message ?? String(error),
+              adapty_detail: adaptyErrorContext(error).adapty_detail,
             });
-            captureException(error);
+            captureException(error, adaptyErrorContext(error, { product: product?.vendorProductId, renderer: 'adapty_flow' }));
             return false;
           }}
           onRestoreStarted={() => {
