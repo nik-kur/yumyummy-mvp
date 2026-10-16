@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { CloudOff } from 'lucide-react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { SplashIntro, StaticSplash } from '@/components/splash/SplashIntro';
 import { requestTrackingConsent } from '@/analytics/attribution';
+import {
+  getOnboardingConfig,
+  resolveOnboardingAssignment,
+  type OnboardingAssignment,
+} from '@/config/onboardingConfig';
 import { useAuth } from '@/state/auth';
 import { loadDraft } from '@/state/introDraft';
 import { loadPendingPurchase } from '@/state/pendingPurchase';
@@ -17,7 +23,9 @@ import { colors, space } from '@/theme/tokens';
  *
  * Routes:
  *   - Signed out, purchase made but not signed in yet → /save-plan (sign-in gate)
- *   - Signed out otherwise → (intro) flow (resumes from the local draft)
+ *   - Signed out otherwise → screen 0 (animated splash) while the onboarding
+ *     config arrives from Adapty, then the arm's onboarding: V3, or the pre-V3
+ *     (intro) flow as the T0 control (both resume from the local draft)
  *   - Signed in, onboarding incomplete → (onboarding) legacy flow
  *   - Signed in, no active subscription → /paywall (hard gate)
  *   - Signed in, active → (tabs)
@@ -29,6 +37,9 @@ export default function Index() {
   const [introChecked, setIntroChecked] = useState(false);
   const [hasIntroDraft, setHasIntroDraft] = useState(false);
   const [hasPendingPurchase, setHasPendingPurchase] = useState(false);
+  const [assignment, setAssignment] = useState<OnboardingAssignment | null>(null);
+  const [splashDone, setSplashDone] = useState(false);
+  const onSplashDone = useCallback(() => setSplashDone(true), []);
 
   // The ATT prompt lives in the onboarding; a returning user who signs in
   // straight from the welcome screen skips it, so ask once here. No-op when
@@ -43,16 +54,17 @@ export default function Index() {
         setHasIntroDraft(d.goal_type !== null);
         setHasPendingPurchase(pending !== null);
         setIntroChecked(true);
+        // Started here, not at launch: only the onboarding needs the arm. A
+        // signed-in launch, or a buyer on the way back to the sign-in gate,
+        // must not wait for it or be counted in an onb_main test.
+        if (pending === null) void resolveOnboardingAssignment().then(setAssignment);
       });
     }
   }, [status]);
 
+  // Same look as the native launch screen, so restoring a session is seamless.
   if (status === 'loading') {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.terracotta} />
-      </View>
-    );
+    return <StaticSplash />;
   }
 
   // Signed in, but the backend couldn't be reached at boot. Keep the session
@@ -90,21 +102,19 @@ export default function Index() {
   }
 
   if (status === 'signedOut') {
-    if (!introChecked) {
-      return (
-        <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.terracotta} />
-        </View>
-      );
-    }
     // Paid on the paywall, then the app was closed before signing in: the
     // purchase sits on an anonymous Adapty profile with no account behind it.
     // Go straight back to the gate — restarting the intro would look like the
     // purchase was lost.
-    if (hasPendingPurchase) {
+    if (introChecked && hasPendingPurchase) {
       return <Redirect href="/save-plan" />;
     }
-    return <Redirect href="/(intro)" />;
+    // Screen 0 plays while the arm resolves (bounded by ONB_CONFIG_TIMEOUT_MS).
+    if (!splashDone || !assignment) {
+      return <SplashIntro ready={introChecked && assignment !== null} onDone={onSplashDone} />;
+    }
+    // Effective config, so a QA override of `onboarding` routes too.
+    return <Redirect href={getOnboardingConfig().onboarding === 'v1' ? '/(intro)' : '/(intro)/v3'} />;
   }
 
   if (profile && !profile.onboarding_completed) {

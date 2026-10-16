@@ -29,6 +29,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { register, setPersonProperties, setPersonPropertiesOnce, track } from '@/analytics/posthog';
+import { IS_QA_BUILD } from '@/config/buildFlags';
 import {
   setAdaptyCustomAttributes,
   setAdaptyIntegrationIdentifier,
@@ -45,23 +46,32 @@ let started = false;
 /**
  * Where the ATT prompt is shown.
  *
- * `false` (current): the prompt is raised from the onboarding — the flow's
- * welcome step, or the native welcome screen's "Get Started" — once the user
- * has seen what the app is. A prompt over the splash screen is the lowest-
- * consent placement there is, and consent is the only thing that gives us
- * user-level Meta attribution on iOS. AppsFlyer holds the install postback for
- * `ATT_WAIT_SECONDS` so a consent given on the welcome step still ships the
- * IDFA with it. Flip to `true` to restore the launch-time prompt.
+ * `false` (current): the prompt is raised from the onboarding once the user has
+ * seen what the app is — over the V3 plan loader (~2 minutes in) by default, or
+ * on the welcome screen when the onboarding config says `att: "welcome"`. A
+ * prompt over the splash screen is the lowest-consent placement there is, and
+ * consent is the only thing that gives us user-level Meta attribution on iOS.
+ * Flip to `true` to restore the launch-time prompt.
  */
 export const ATT_PROMPT_AT_LAUNCH = false;
-const ATT_WAIT_SECONDS = 60;
+/**
+ * AppsFlyer holds the install postback (and keeps launch and events in memory)
+ * until ATT is answered or this many seconds pass, so the IDFA ships with the
+ * install when granted. The loader prompt comes ~2 minutes after launch, past
+ * the old 60 s; AppsFlyer's own guidance for a prompt after a ~2-minute
+ * tutorial is 120 s, and 180 s leaves room for slow readers.
+ */
+const ATT_WAIT_SECONDS = 180;
 
 /** AsyncStorage key for the last deep-link signal (deferred or direct). */
 const AD_SIGNAL_KEY = '@yy_ad_signal';
 
-/** True when an AppsFlyer dev key is configured for this build. */
+/**
+ * True when an AppsFlyer dev key is configured for this build. Always false in
+ * a QA build: test installs and sandbox purchases must never reach Meta.
+ */
 export function isAppsFlyerConfigured(): boolean {
-  return AF_DEV_KEY.length > 0;
+  return AF_DEV_KEY.length > 0 && !IS_QA_BUILD;
 }
 
 /**
@@ -283,8 +293,7 @@ export async function initAttribution(): Promise<void> {
         onInstallConversionDataListener: true,
         onDeepLinkListener: true,
         // Hold the install postback until ATT is answered (or this many
-        // seconds pass) so the IDFA is included when granted. The prompt is
-        // raised on the welcome step, seconds after launch.
+        // seconds pass) so the IDFA is included when granted.
         timeToWaitForATTUserAuthorization: ATT_WAIT_SECONDS,
       },
       () => {},

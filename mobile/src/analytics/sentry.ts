@@ -5,6 +5,8 @@
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 
+import { IS_QA_BUILD } from '@/config/buildFlags';
+
 const DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
 
 // Human-readable release tag (e.g. "yumyummy@1.0.0"). Sourcemaps are matched by
@@ -20,6 +22,8 @@ export function initSentry(): void {
   Sentry.init({
     dsn: DSN,
     release: RELEASE,
+    // Local test builds report separately from what customers run.
+    environment: IS_QA_BUILD ? 'qa' : 'production',
     tracesSampleRate: __DEV__ ? 1.0 : 0.2,
     enableNativeFramesTracking: !__DEV__,
     debug: __DEV__,

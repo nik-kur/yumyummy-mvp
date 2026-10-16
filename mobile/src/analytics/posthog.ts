@@ -7,6 +7,8 @@
  */
 import PostHog from 'posthog-react-native';
 
+import { IS_QA_BUILD } from '@/config/buildFlags';
+
 const API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? '';
 const HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST ?? 'https://eu.i.posthog.com';
 
@@ -15,6 +17,10 @@ let client: PostHog | null = null;
 export function initPostHog(): void {
   if (client || !API_KEY) return;
   client = new PostHog(API_KEY, { host: HOST });
+  // Local test builds share the production project: tag every event so
+  // funnels can drop them (`qa_build != true`). Registered either way, so a
+  // store install over a QA build on the same phone clears the persisted tag.
+  void client.register({ qa_build: IS_QA_BUILD });
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {

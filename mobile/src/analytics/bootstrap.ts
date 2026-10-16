@@ -13,7 +13,9 @@
 import { initSentry } from '@/analytics/sentry';
 import { initPostHog, getDistinctId } from '@/analytics/posthog';
 import { initAttribution, getAppsFlyerId } from '@/analytics/attribution';
-import { activateAdapty, setAdaptyIntegrationIdentifier } from '@/billing/adapty';
+import { activateAdapty, setAdaptyCustomAttributes, setAdaptyIntegrationIdentifier } from '@/billing/adapty';
+import { IS_QA_BUILD } from '@/config/buildFlags';
+import { loadQaOverrides } from '@/config/qa';
 
 /** How long we let ATT + AppsFlyer settle before activating Adapty anyway. */
 const PRE_ACTIVATION_TIMEOUT_MS = 5000;
@@ -34,6 +36,7 @@ export async function bootstrapSdks(): Promise<void> {
 
   initSentry();
   initPostHog();
+  void loadQaOverrides();
 
   await withTimeout(initAttribution(), PRE_ACTIVATION_TIMEOUT_MS, undefined);
   const appsFlyerId = await getAppsFlyerId(PRE_ACTIVATION_TIMEOUT_MS);
@@ -45,6 +48,9 @@ export async function bootstrapSdks(): Promise<void> {
       ? setAdaptyIntegrationIdentifier('appsflyer_id', appsFlyerId)
       : Promise.resolve(),
     setAdaptyIntegrationIdentifier('posthog_distinct_user_id', getDistinctId() ?? ''),
+    // Lets an Adapty segment keep local test installs out of real audiences.
+    // Written either way so a store build over a QA build resets it.
+    setAdaptyCustomAttributes({ qa_build: IS_QA_BUILD ? 'true' : 'false' }),
   ]);
 
   // `acquisition_source` is set only from AppsFlyer conversion data (see
