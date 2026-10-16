@@ -21,7 +21,21 @@ import { useOnbScreen } from '@/onb/useOnbScreen';
 import { useIntro } from '@/state/introContext';
 import type { IntroDraft } from '@/state/introDraft';
 
+/**
+ * Claims replaced after the canvas (Nikita, 16 Oct): the "80% of users…
+ * maintain their weight loss" line had no source. Harvey et al. 2019 matches
+ * the chart's 6-month span; the wording follows the authors' conclusion
+ * (logging frequency was significantly related to weight loss).
+ */
+const CLAIM_OVERRIDES: Record<string, { claim: string; source: string }> = {
+  Features_no: {
+    claim: 'In a 6-month study of 142 adults, the people who logged their meals most often lost the most weight.',
+    source: 'Log Often, Lose More · Obesity, 2019',
+  },
+};
+
 const SOURCES: Record<string, string> = {
+  'Log Often, Lose More · Obesity, 2019': 'https://pubmed.ncbi.nlm.nih.gov/30801989/',
   'National Weight Control Registry · Am J Clin Nutr, 2005': 'https://pubmed.ncbi.nlm.nih.gov/16002825/',
   'Meta-analysis of 49 trials · Br J Sports Med, 2018': 'https://pubmed.ncbi.nlm.nih.gov/28698222/',
 };
@@ -66,7 +80,7 @@ export default function FeaturesScreen() {
   const key = variantFor(intro);
   const { content, next, progress } = useOnbScreen('S12_features', key.replace('Features_', ''));
   const { width } = useWindowDimensions();
-  const a = FEATURES[key];
+  const a = { ...FEATURES[key], ...(CLAIM_OVERRIDES[key] ?? {}) };
   const claimKey = `features.${key.replace('Features_', '')}.claim`;
 
   return (

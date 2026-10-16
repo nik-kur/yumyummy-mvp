@@ -85,6 +85,6 @@ QA-меню: заготовки ответов + прыжок на любой э
 
 ## Открытые вопросы
 
-- Источник фразы «80% of users doing calorie tracking maintain their weight loss even 6 months after» (Features «нет, вес вниз») не найден: текст из канваса оставлен, правится без релиза ключом `onb_content.texts["features.no.claim"]`. Нужен источник или замена.
+- 16 окт (Никита): фраза «80% of users… maintain their weight loss» без источника заменена на «In a 6-month study of 142 adults, the people who logged their meals most often lost the most weight.» — Harvey et al., Log Often, Lose More, Obesity 2019 (PMID 30801989); `features.tsx` CLAIM_OVERRIDES.
 - 412 kcal Joe & The Juice — этап 3 (пейвол).
 - AppsFlyer: что с установкой, если приложение закрыли до ATT — тест на телефоне с `isDebug`.
