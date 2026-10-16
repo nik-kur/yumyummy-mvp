@@ -32,8 +32,8 @@ import { parseOnboardingConfig, parseOnboardingContent, remoteConfigData } from 
 import { hasQaOverrides, loadQaOverrides, qaOverrides, subscribeQa } from './qa';
 import type { AssignmentMeta, OnboardingConfig, OnboardingContent } from './types';
 
-/** Longest the first launch waits for `onb_main` (agreed 2–3 s). */
-export const ONB_CONFIG_TIMEOUT_MS = 2500;
+/** Longest the first launch waits for `onb_main` (agreed 2–3 s; Adapty activation alone takes ~2 s on a fresh install). */
+export const ONB_CONFIG_TIMEOUT_MS = 3000;
 /** How long the launch lets AppsFlyer go first before activating Adapty itself. */
 const ACTIVATION_GRACE_MS = 1200;
 const CONTENT_TIMEOUT_MS = 8000;
@@ -47,6 +47,11 @@ export interface OnboardingAssignment {
 }
 
 let assignment: OnboardingAssignment | null = null;
+/** When `onb_main` answered after the splash gave up: for the QA menu and PostHog. */
+let lateFetch: { ms: number; outcome: string } | null = null;
+export function getLateFetch(): { ms: number; outcome: string } | null {
+  return lateFetch;
+}
 let resolving: Promise<OnboardingAssignment> | null = null;
 /** Bumped by `clearOnboardingAssignment`; a resolve started before it must not write back. */
 let generation = 0;
@@ -112,6 +117,17 @@ async function fetchAssignment(): Promise<OnboardingAssignment> {
   })();
 
   const result = await withTimeout(attempt, ONB_CONFIG_TIMEOUT_MS);
+  if (result === 'timeout') {
+    // How late Adapty really was tells whether the budget fits real networks.
+    void attempt.then((late) => {
+      lateFetch = {
+        ms: Date.now() - started,
+        outcome: typeof late === 'string' ? late : 'flow',
+      };
+      track('onboarding_config_late', { late_ms: lateFetch.ms, outcome: lateFetch.outcome });
+      emit();
+    });
+  }
   if (typeof result === 'string') return fallback(result);
   return {
     config: parseOnboardingConfig(remoteConfigData(result)),

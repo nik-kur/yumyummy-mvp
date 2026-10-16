@@ -42,6 +42,11 @@ const OUT = Easing.out(Easing.ease);
 
 const LETTERS = 'YumYummy'.split('');
 const MASCOT = require('../../../assets/v3/splash/mascot_heart.png');
+/**
+ * The native launch screen's own image: text metrics differ between iOS and
+ * the canvas, so the "Y" is drawn from the same bitmap to land on it exactly.
+ */
+const SPLASH_Y = require('../../../assets/v3/splash/splash_y.png');
 
 /**
  * Drive `sv` through absolute-time keyframes: `[[ms, value], …]`, starting from
@@ -203,9 +208,7 @@ export function SplashIntro({ ready, onDone }: Props) {
       <View style={[s.stage, stage]} pointerEvents="none">
         <Animated.View style={[s.ring, ring1Style]} />
         <Animated.View style={[s.ring, ring2Style]} />
-        <Animated.View style={[s.icon, iconStyle]}>
-          <Animated.Text style={s.iconText}>Y</Animated.Text>
-        </Animated.View>
+        <Animated.Image source={SPLASH_Y} style={[s.icon, iconStyle]} />
         <Animated.View style={[s.disc, discStyle]} />
         <Animated.Image source={MASCOT} style={[s.peach, peachStyle]} />
         <Animated.View style={[s.name, nameStyle]}>
@@ -227,9 +230,7 @@ function Letter({ ch, y, o }: { ch: string; y: SharedValue<number>; o: SharedVal
 export function StaticSplash() {
   return (
     <View style={[s.fill, s.center]} accessibilityLabel="YumYummy">
-      <View style={s.staticIcon}>
-        <Animated.Text style={s.iconText}>Y</Animated.Text>
-      </View>
+      <Animated.Image source={SPLASH_Y} style={s.staticIcon} />
     </View>
   );
 }
@@ -248,23 +249,8 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: CREAM,
   },
-  icon: {
-    position: 'absolute',
-    left: 147,
-    top: 374,
-    width: 96,
-    height: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  staticIcon: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center' },
-  iconText: {
-    fontFamily: fonts.serifSemibold,
-    fontSize: 76,
-    lineHeight: 76,
-    color: CREAM,
-    marginTop: 6,
-  },
+  icon: { position: 'absolute', left: 147, top: 374, width: 96, height: 96 },
+  staticIcon: { width: 96, height: 96 },
   disc: {
     position: 'absolute',
     left: 89,

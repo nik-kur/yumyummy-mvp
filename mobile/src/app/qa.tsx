@@ -18,6 +18,7 @@ import { IS_QA_BUILD } from '@/config/buildFlags';
 import { OFFER_VARIANTS, PAYWALL_VARIANTS } from '@/config/defaults';
 import {
   clearOnboardingAssignment,
+  getLateFetch,
   resolveOnboardingAssignment,
   useOnboardingConfig,
 } from '@/config/onboardingConfig';
@@ -123,6 +124,11 @@ export default function QaScreen() {
           <AppText variant="small">
             variation: {meta?.variation_name ?? meta?.variation_id ?? '—'} · test: {meta?.ab_test ?? '—'}
           </AppText>
+          {getLateFetch() ? (
+            <AppText variant="small">
+              Adapty answered late: {getLateFetch()?.outcome} after {getLateFetch()?.ms} ms
+            </AppText>
+          ) : null}
           <AppText variant="small">tester mark: {tester ? 'on' : 'off'}</AppText>
           <AppText variant="caption" style={s.mono}>{JSON.stringify(config)}</AppText>
         </View>

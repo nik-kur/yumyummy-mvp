@@ -1,6 +1,6 @@
 # Онбординг и пейвол V3: журнал реализации
 
-Спецификация: [knowledge/onboarding-v3-implementation-2026-10.md](knowledge/onboarding-v3-implementation-2026-10.md) (раздел «Договорённости 15 октября» главнее). Дизайн: канвас https://claude.ai/artifact/LxWpJAaF5xDcZmAynawjNM, страница «V3 · правки 14 окт». Читать живой канвас (Artifact read): локальная копия `design/canvas_backup` от 15 окт устарела — в ней нет экрана 0 (`V3_Splash`, `V3_Splash_story`).
+Спецификация: [knowledge/onboarding-v3-implementation-2026-10.md](knowledge/onboarding-v3-implementation-2026-10.md) (раздел «Договорённости 15 октября» главнее). Дизайн: канвас https://claude.ai/artifact/LxWpJAaF5xDcZmAynawjNM, страница «V3 · правки 14 окт». Локальная копия `design/canvas_backup/project/` (обновлена 15 окт 20:01) побайтно совпадает с живым канвасом на 16 окт: 72 артборда V3, включая экран 0 (`V3_Splash`, `V3_Splash_story`). Картинки канваса (54 blob) скачаны в scratchpad сессии `canvas_live/blobs/` (карта id → файлы `blob_ids.json`); при новом чате скачивать заново через Artifact read с `path` = id.
 
 Ветка: `onboarding-v3` от main. Коммитить в ветку можно без спроса; push, PR, merge, Adapty, Render, EAS — только после ок Никиты.
 
