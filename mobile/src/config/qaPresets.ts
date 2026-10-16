@@ -54,4 +54,6 @@ export const QA_SCREENS: { label: string; route: string }[] = [
   { label: 'Loader', route: '/(intro)/v3/loader' },
   { label: 'Plan', route: '/(intro)/v3/plan' },
   { label: 'Social', route: '/(intro)/v3/social' },
+  { label: 'Paywall', route: '/paywall' },
+  { label: 'Offer', route: '/paywall?qa_offer=1' },
 ];

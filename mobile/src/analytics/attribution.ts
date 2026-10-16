@@ -6,12 +6,13 @@
  * paid campaigns.
  *
  * Event split (keep it this way or Meta/AppsFlyer double count):
- *   - Client (this file, via `logAttributionEvent`): af_complete_registration,
- *     af_start_trial, af_subscribe. These must come from the SDK because the
- *     SKAN conversion value is computed on-device from SDK events.
- *   - Server (Adapty → AppsFlyer S2S): trial_converted, renewals, refunds,
- *     expirations — things the app never observes. `trial_started` and the
- *     initial purchase stay OFF in that integration.
+ *   - Client (this file, via `logAttributionEvent`): af_complete_registration.
+ *   - Server (Adapty → AppsFlyer S2S): trial_started, subscription_started,
+ *     trial_converted, renewals, refunds, expirations. Trials and purchases
+ *     moved there in V3 (Oct 2026): the client logged them for sandbox and
+ *     TestFlight purchases too (AppsFlyer cannot tell them apart), which
+ *     polluted StartTrial in Meta. The integration's Sandbox field stays empty,
+ *     so only production purchases reach AppsFlyer.
  *
  * Install conversion data (media source / campaign / ad) is fanned out from
  * `onInstallConversionData` to Adapty (`updateAttribution`) and PostHog, so all

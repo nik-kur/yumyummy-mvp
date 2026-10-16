@@ -59,12 +59,37 @@ ASSETS = {
 }
 
 
+# Paywall 17–19 and offer 20 (assets/v3/pw). Photos are shown full-bleed
+# (390 × 694 pt); the sources are 941 px wide, kept as they are.
+PAYWALL = {
+    'b3_joe': ('ffc539e5', None, 'jpg'),
+    'b3_home': ('a6350fb7', None, 'jpg'),      # also the offer's close-up
+    'b3_office': ('3db183b1', None, 'jpg'),
+    'b3_wide': ('4da4cd69', None, 'jpg'),
+    'offer_costa': ('2c4f463f', None, 'jpg'),
+    'bell': ('602f3f97', 450, 'png'),          # 150 pt
+    'phone_frame': ('854554d9', None, 'png'),
+    'p1_photo': ('8d600f24', None, 'mp4'),
+    'p1_photo_poster': ('002ebc33', None, 'jpg'),
+    'p1_text': ('f245b2cb', None, 'mp4'),
+    'p1_text_poster': ('e5824d3c', None, 'jpg'),
+    'p1_voice': ('bfb10dd6', None, 'mp4'),
+    'p1_voice_poster': ('b660976e', None, 'jpg'),
+}
+PW_OUT = os.path.join(os.path.dirname(__file__), '..', 'assets', 'v3', 'pw')
+
+
 def main(blobs: str) -> None:
-    os.makedirs(OUT, exist_ok=True)
     files = os.listdir(blobs)
-    for name, (prefix, size, kind) in ASSETS.items():
+    for out, table in ((OUT, ASSETS), (PW_OUT, PAYWALL)):
+        os.makedirs(out, exist_ok=True)
+        copy(blobs, files, out, table)
+
+
+def copy(blobs: str, files: list, out: str, table: dict) -> None:
+    for name, (prefix, size, kind) in table.items():
         src = next(os.path.join(blobs, f) for f in files if f.startswith(prefix))
-        dst = os.path.join(OUT, f'{name}.{kind}')
+        dst = os.path.join(out, f'{name}.{kind}')
         if kind == 'mp4':
             with open(src, 'rb') as a, open(dst, 'wb') as b:
                 b.write(a.read())

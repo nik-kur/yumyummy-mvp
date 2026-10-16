@@ -1,15 +1,22 @@
 /**
  * Paywall screen.
  *
- * Two renderers, one contract:
- *   1. Builder flow (placement `pw_main`, Adapty Flow & Paywall Builder): the
- *      whole screen is designed in the dashboard and drawn natively by the
- *      SDK via `AdaptyFlowView`; purchases, restore and the StoreKit sheet
- *      are the SDK's. This is where paywall tests live from now on.
- *   2. Code-rendered (placement `main`, legacy remote config): our own
- *      `PaywallRenderer`/`Variant*` components, kept as the fallback for when
- *      the flow placement has nothing published or fails to load, and as the
- *      offline paywall (bundled `FALLBACK_CONFIG`, purchases disabled).
+ * Adapty is the switchboard: each A/B arm on placement `pw_main` is a flow
+ * whose remote config picks the renderer (`config/paywallArms.ts`):
+ *   1. `native` — the V3 paywall in code (`components/pw`, screens 17–19):
+ *      B1 → B2 → B3 photo plans, or the P1 demo clip → B2 → light plans. It
+ *      buys the arm flow's own products (`getPaywallProducts(flow)`) and logs
+ *      the show on that flow (`logShowFlow`), so code and builder arms compare
+ *      inside one Adapty A/B test.
+ *   2. `flow` — the arm's Flow & Paywall Builder screens, drawn by the SDK via
+ *      `AdaptyFlowView`; purchases, restore and the StoreKit sheet are the SDK's.
+ *   3. `legacy` — the pre-V3 code paywall from the `main` placement's remote
+ *      config (`PaywallRenderer`/`Variant*`), kept as a switchable fallback.
+ * With no answer from Adapty the code default (V3 `b3_joe`) shows, and its
+ * plans step offers a retry instead of cards.
+ *
+ * After the customer cancels the App Store sheet, the `pw_after_cancel` arm
+ * answers the same way: our offer screen (20) or the arm's builder flow.
  *
  * Two audiences reach this screen:
  *   - Acquisition (signed OUT): intro quiz → plan reveal → here. The purchase
@@ -18,14 +25,14 @@
  *     the freshly created account. Nothing here may call an authenticated API.
  *   - Existing account (signed IN): the launch router's hard gate for a lapsed
  *     subscription, or Profile ("Manage plan" / "See plans") with
- *     `?dismissable=1`. Purchase → /postbuy as before.
+ *     `?dismissable=1`. Both go straight to the plans. Purchase → /postbuy.
  *
  * Hard paywall by default: no close button, gesture-dismiss disabled — exits
  * only via successful purchase or restore. Only the Profile entry gets a close
  * button: an existing member must always be able to leave.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { View, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
@@ -38,12 +45,14 @@ import type {
   CreateFlowViewParamsInput,
 } from 'react-native-adapty';
 
-import { Screen } from '@/components/Screen';
 import { PaywallRenderer } from '@/components/paywall/PaywallRenderer';
 import { VariantB } from '@/components/paywall/VariantB';
 import { VariantB2 } from '@/components/paywall/VariantB2';
 import { VariantC } from '@/components/paywall/VariantC';
 import { VariantSHero } from '@/components/paywall/VariantSHero';
+import { OfferScreen } from '@/components/pw/OfferScreen';
+import { V3Paywall } from '@/components/pw/V3Paywall';
+import { PwLoading } from '@/components/pw/V3Screens';
 import { useAuth } from '@/state/auth';
 import { loadDraft, type IntroDraft } from '@/state/introDraft';
 import { startJourney } from '@/state/journey';
@@ -55,7 +64,6 @@ import {
   isAdaptyConfigured,
   waitForAdaptyIdentify,
   waitForAppleAdsAttribution,
-  fetchAdaptyFlow,
   ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW,
   ADAPTY_PLACEMENT_MAIN,
   ADAPTY_PLACEMENT_PAYWALL_FLOW,
@@ -69,18 +77,28 @@ import {
   FALLBACK_CONFIG,
   type PlaceholderValues,
 } from '@/billing/paywallConfig';
+import { sortPlans, trialDays } from '@/billing/v3Pricing';
+import { IS_QA_BUILD } from '@/config/buildFlags';
+import { getOnboardingConfig, getOnboardingContent } from '@/config/onboardingConfig';
+import { resolvePaywallArm, type ResolvedArm } from '@/config/paywallArms';
+import { qaOverrides } from '@/config/qa';
+import type { ConfigSource, PaywallArmConfig } from '@/config/types';
+import { fmtKg, fmtStLb } from '@/onb/plan';
 import { scheduleTrialEndingReminder } from '@/notifications/scheduler';
 import { track } from '@/analytics/posthog';
-import { logAttributionEvent } from '@/analytics/attribution';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 import { colors, radius, space } from '@/theme/tokens';
 import * as api from '@/api/endpoints';
 
 /**
- * `loading` → spinner; `flow` → builder flow; `ready` → code-rendered paywall
- * from remote config; `fallback` → bundled config, purchases disabled.
+ * `loading` → spinner; `v3` → our V3 paywall; `flow` → builder flow; `ready` →
+ * legacy code paywall from remote config; `fallback` → legacy bundled config,
+ * purchases disabled.
  */
-type Phase = 'loading' | 'flow' | 'ready' | 'fallback';
+type Phase = 'loading' | 'v3' | 'flow' | 'ready' | 'fallback';
+
+/** Who drew the screen a purchase came from — PostHog `renderer`. */
+type Renderer = 'code' | 'v3' | 'v3_offer' | 'adapty_flow' | 'adapty_flow_offer';
 
 /** Cap each fetch so a slow network shows the fallback instead of a blank screen. */
 const PAYWALL_LOAD_TIMEOUT_MS = 5000;
@@ -106,15 +124,43 @@ function adaptyErrorContext(error: unknown, extra: Record<string, unknown> = {})
 /** The after-cancel offer is prefetched in the background; never wait longer than this for it. */
 const OFFER_LOAD_TIMEOUT_MS = 8000;
 
+/** The after-cancel offer, as its `pw_after_cancel` arm decided. */
+type OfferState =
+  | { kind: 'flow'; flow: AdaptyFlow }
+  | {
+      kind: 'native';
+      flow: AdaptyFlow;
+      config: PaywallArmConfig;
+      product: AdaptyPaywallProduct;
+      source: ConfigSource;
+    };
+
+function offerVariant(o: OfferState): string {
+  return o.kind === 'native' ? o.config.variant : o.flow.variationName ?? o.flow.variationId;
+}
+
 /**
- * Remote kill switch, same convention as the onboarding flow: a flow on
- * `pw_main` whose remote config carries `{"use_native": true}` sends the app to
- * the code-rendered paywall on the legacy `main` placement, where today's
- * remote-config A/B test keeps running untouched. Flip it in the dashboard
- * when the builder paywalls should take over; no release needed either way.
+ * Resolve the offer arm and everything it needs, so a cancellation is answered
+ * at once. Our screen (20) says "free", so it needs a product this customer can
+ * still get a trial on; without one there is no honest offer to show.
  */
-function flowDisabledByRemoteConfig(flow: AdaptyFlow): boolean {
-  return flow.remoteConfigs?.some((rc) => rc.data?.use_native === true) ?? false;
+async function prefetchOffer(): Promise<OfferState | null> {
+  const arm = await resolvePaywallArm(ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW, 'offer', OFFER_LOAD_TIMEOUT_MS);
+  if (!arm.flow) return null;
+  const builder = arm.config.render !== 'native';
+  if (builder && !arm.flow.hasViewConfiguration) return null;
+  // Every offer we run is a free trial ("Try it FREE", "after 3 days free"),
+  // builder ones included: someone who already used their trial gets none.
+  const products = await adapty.getPaywallProducts(arm.flow);
+  const product = products.find((p) => trialDays(p) > 0);
+  if (!product) {
+    addBreadcrumb('paywall', 'Offer skipped: no trial-eligible product', {
+      variant: builder ? arm.flow.variationName ?? arm.flow.variationId : arm.config.variant,
+    });
+    return null;
+  }
+  if (builder) return { kind: 'flow', flow: arm.flow };
+  return { kind: 'native', flow: arm.flow, config: arm.config, product, source: arm.source };
 }
 
 /** First remote config of a legacy paywall placement (one per language; we ship one). */
@@ -125,7 +171,7 @@ function legacyRemoteConfig(flow: AdaptyFlow): Record<string, unknown> | undefin
 export default function PaywallScreen() {
   const router = useRouter();
   const { status, profile, refreshProfile } = useAuth();
-  const params = useLocalSearchParams<{ dismissable?: string }>();
+  const params = useLocalSearchParams<{ dismissable?: string; qa_offer?: string }>();
   const insets = useSafeAreaInsets();
   // Only Profile passes this — the acquisition/gate flows stay hard.
   const dismissable = params.dismissable === '1';
@@ -158,6 +204,12 @@ export default function PaywallScreen() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [purchasing, setPurchasing] = useState(false);
+  // V3 path: the `pw_main` arm and its flow's products. `loadKey` remounts the
+  // step machine on a retry so it starts from the first step again.
+  const [v3, setV3] = useState<{ arm: ResolvedArm; products: AdaptyPaywallProduct[] } | null>(null);
+  const v3Ref = useRef(v3);
+  v3Ref.current = v3;
+  const [loadKey, setLoadKey] = useState(0);
   // Legacy (code-rendered) path: the paywall placement's flow object.
   const paywallRef = useRef<AdaptyFlow | null>(null);
   const [products, setProducts] = useState<AdaptyPaywallProduct[]>([]);
@@ -166,18 +218,29 @@ export default function PaywallScreen() {
   const [builderFlow, setBuilderFlow] = useState<AdaptyFlow | null>(null);
   // After-cancel offer: prefetched once the paywall is up, shown at most once
   // per visit, only when the App Store sheet was dismissed by the customer.
-  const offerFlowRef = useRef<Promise<AdaptyFlow | null> | null>(null);
+  const offerRef = useRef<Promise<OfferState | null> | null>(null);
   const offerShownRef = useRef(false);
-  const [offerFlow, setOfferFlow] = useState<AdaptyFlow | null>(null);
+  const [offer, setOffer] = useState<OfferState | null>(null);
+  // Set once a purchase or restore succeeded or the screen unmounted: a late
+  // offer must not be shown (or counted as a view) after that.
+  const leavingRef = useRef(false);
+  useEffect(() => {
+    leavingRef.current = false;
+    return () => { leavingRef.current = true; };
+  }, []);
   // Guards for the Apple Ads paywall swap: do it at most once, and never while
   // a purchase is in flight.
   const upgradedRef = useRef(false);
   const purchasingRef = useRef(false);
   // Pre-auth users have no profile — plan numbers live in the intro draft.
   const [draft, setDraft] = useState<IntroDraft | null>(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   useEffect(() => {
-    loadDraft().then(setDraft).catch(() => {});
+    loadDraft()
+      .then(setDraft)
+      .catch(() => {})
+      .finally(() => setDraftLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -188,16 +251,21 @@ export default function PaywallScreen() {
   const targetWeeks = draft?.target_weeks ?? null;
   const dailyKcal = draft?.target_calories ?? profile?.target_calories ?? null;
   const goal = draft?.goal_type ?? profile?.goal_type ?? null;
+  const imperial = draft?.units === 'imperial';
+  const targetText = targetWeightKg ? (imperial ? fmtStLb(targetWeightKg) : `${fmtKg(targetWeightKg)} kg`) : undefined;
 
   const targetDate = (() => {
-    if (!targetWeeks) return undefined;
-    const d = new Date();
-    d.setDate(d.getDate() + targetWeeks * 7);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    let d: Date | null = null;
+    if (draft?.target_date) d = new Date(`${draft.target_date}T12:00:00`);
+    else if (targetWeeks) {
+      d = new Date();
+      d.setDate(d.getDate() + targetWeeks * 7);
+    }
+    return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : undefined;
   })();
 
   const placeholders: PlaceholderValues = {
-    TARGET_WEIGHT: targetWeightKg ? `${targetWeightKg} kg` : undefined,
+    TARGET_WEIGHT: targetText,
     TARGET_DATE: targetDate,
     DAILY_KCAL: dailyKcal ? String(dailyKcal) : undefined,
     PRICE_M: products.find((p) => p.vendorProductId?.includes('monthly'))
@@ -210,7 +278,7 @@ export default function PaywallScreen() {
   // so the native view is not rebuilt on every render. Prices are never
   // passed: the builder reads them from the store itself.
   const flowParams = useMemo<CreateFlowViewParamsInput>(() => {
-    const target = targetWeightKg ? `${targetWeightKg} kg` : '';
+    const target = targetText ?? '';
     const kcal = dailyKcal ? String(dailyKcal) : '';
     // The flow cannot branch on the goal, so the hero line is resolved here:
     // a target for lose/gain, the maintenance zone for everyone else.
@@ -226,53 +294,45 @@ export default function PaywallScreen() {
         TARGET_DATE: targetDate ?? '',
         DAILY_KCAL: kcal,
         GOAL: goal ?? '',
-        RATING: '4.9',
+        // Same number the code screens show (`onb_content.rating`), not a hard-coded one.
+        RATING: getOnboardingContent().rating,
         USERS: '12,000',
       },
     };
-  }, [targetWeightKg, targetDate, dailyKcal, goal]);
+  }, [targetText, targetDate, dailyKcal, goal]);
 
-  const variantLabel = useCallback(
-    () => (phase === 'flow'
-      ? builderFlow?.variationName ?? builderFlow?.variationId ?? 'flow'
-      : configRef.current.variant),
-    [phase, builderFlow],
-  );
+  const variantLabel = useCallback((renderer: Renderer): string => {
+    if (renderer === 'v3') return v3Ref.current?.arm.config.variant ?? 'v3';
+    if (renderer === 'adapty_flow') return builderFlow?.variationName ?? builderFlow?.variationId ?? 'flow';
+    if (renderer === 'v3_offer' || renderer === 'adapty_flow_offer') return offer ? offerVariant(offer) : 'offer';
+    return configRef.current.variant;
+  }, [builderFlow, offer]);
 
-  /** Everything that happens after StoreKit confirmed a purchase, either renderer. */
+  /** Everything that happens after StoreKit confirmed a purchase, any renderer. */
   const afterPurchaseSuccess = useCallback(async (
     product: AdaptyPaywallProduct,
-    renderer: 'adapty_flow' | 'code',
+    renderer: Renderer,
+    extra: Record<string, unknown> = {},
   ) => {
     const hasTrial = freeTrialPhase(product) !== undefined;
     track('paywall_purchase_success', {
       product: product.vendorProductId,
-      variant: variantLabel(),
+      variant: variantLabel(renderer),
       renderer,
       price: product.price?.amount,
       currency: product.price?.currencyCode,
       has_trial: hasTrial,
+      ...extra,
     });
-    // AppsFlyer standard events, logged client-side: the SDK feeds them into
-    // the SKAdNetwork conversion value on-device and forwards them to ad
-    // networks (Meta maps af_start_trial → StartTrial, af_subscribe →
-    // Subscribe). A trial carries no revenue yet — af_price is the price it
-    // converts to; a direct subscription reports the charge as af_revenue.
-    logAttributionEvent(hasTrial ? 'af_start_trial' : 'af_subscribe', {
-      af_content_id: product.vendorProductId,
-      ...(product.price?.currencyCode ? { af_currency: product.price.currencyCode } : {}),
-      ...(product.price?.amount !== undefined
-        ? hasTrial
-          ? { af_price: product.price.amount }
-          : { af_revenue: product.price.amount, af_price: product.price.amount }
-        : {}),
-    });
+    // No AppsFlyer event from here: trials and purchases reach AppsFlyer from
+    // Adapty's server integration, which can tell sandbox from production.
+    leavingRef.current = true;
     addBreadcrumb('purchase', 'Purchase succeeded', { signed_in: signedInRef.current, renderer });
     await startJourney(); // journey Day 1 = purchase moment
     // A reminder is only honest when a trial is actually running: customers
     // who already used their one intro offer are charged immediately.
     if (hasTrial) {
-      await scheduleTrialEndingReminder(new Date());
+      await scheduleTrialEndingReminder(new Date(), trialDays(product));
     }
     if (!signedInRef.current) {
       // Acquisition flow: the receipt is on an anonymous Adapty profile.
@@ -284,8 +344,9 @@ export default function PaywallScreen() {
     router.replace('/postbuy');
   }, [handOffToSignIn, refreshProfile, router, variantLabel]);
 
-  /** After a restore that found an active `premium` access level, either renderer. */
+  /** After a restore that found an active `premium` access level, any renderer. */
   const afterRestoreSuccess = useCallback(async () => {
+    leavingRef.current = true;
     track('paywall_restore_success', { signed_in: signedInRef.current });
     // Idempotent — a reinstall gets the first-week ladder, an existing
     // journey is left where it is.
@@ -331,61 +392,91 @@ export default function PaywallScreen() {
     const alive = () => mountedRef?.current !== false;
     setPhase('loading');
     const ok = await activateAdapty();
-    if (!ok) {
-      if (alive()) {
-        setPhase('fallback');
-        // The fallback paywall renders display prices with purchases disabled —
-        // without its own event these sessions are invisible in the funnel
-        // (paywall_shown only fires on a live Adapty paywall).
-        track('paywall_fallback_shown', {
-          placement: ADAPTY_PLACEMENT_MAIN,
-          reason: 'adapty_unavailable',
-        });
+
+    // The arm decides the renderer. With Adapty down it is the code default.
+    const arm = await resolvePaywallArm(ADAPTY_PLACEMENT_PAYWALL_FLOW, 'paywall', PAYWALL_LOAD_TIMEOUT_MS);
+    if (!alive()) return;
+    const armMeta = {
+      placement: ADAPTY_PLACEMENT_PAYWALL_FLOW,
+      config_source: arm.source,
+      variation_id: arm.flow?.variationId,
+      variation_name: arm.flow?.variationName,
+      ab_test: arm.flow?.placement?.abTestName,
+      audience: arm.flow?.placement?.audienceName,
+    };
+
+    if (arm.config.render === 'flow' && arm.flow?.hasViewConfiguration) {
+      setBuilderFlow(arm.flow);
+      setPhase('flow');
+      addBreadcrumb('paywall', 'Builder flow loaded', { variation: arm.flow.variationName ?? arm.flow.variationId });
+      return;
+    }
+
+    if (arm.config.render === 'legacy') {
+      addBreadcrumb('paywall', 'Arm asks for the legacy code paywall', armMeta);
+      try {
+        await loadCodePaywall(alive);
+      } catch (e) {
+        captureException(e);
+        if (alive()) {
+          setPhase('fallback');
+          track('paywall_fallback_shown', {
+            placement: ADAPTY_PLACEMENT_MAIN,
+            reason: 'load_failed',
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
       }
       return;
     }
 
-    // 1) The builder flow. Anything short of a renderable flow — nothing
-    //    published on the placement, a timeout, an SDK error — drops to the
-    //    code paywall, which is exactly what shipped before.
-    try {
-      const flow = await adapty.getFlow(ADAPTY_PLACEMENT_PAYWALL_FLOW, {
-        loadTimeoutMs: PAYWALL_LOAD_TIMEOUT_MS,
-      });
-      if (!alive()) return;
-      if (flowDisabledByRemoteConfig(flow)) {
-        addBreadcrumb('paywall', 'Flow placement disabled by remote config → code paywall');
-      } else if (flow.hasViewConfiguration) {
-        setBuilderFlow(flow);
-        setPhase('flow');
-        addBreadcrumb('paywall', 'Builder flow loaded', {
-          variation: flow.variationName ?? flow.variationId,
-        });
+    // V3 in code, with the arm flow's own products.
+    let prods: AdaptyPaywallProduct[] = [];
+    if (ok && arm.flow) {
+      try {
+        prods = sortPlans(await adapty.getPaywallProducts(arm.flow));
+      } catch (e) {
+        captureException(e, adaptyErrorContext(e, { placement: ADAPTY_PLACEMENT_PAYWALL_FLOW, renderer: 'v3' }));
+      }
+    }
+    if (!alive()) return;
+    if (ok && arm.flow && prods.length === 0) {
+      // A code arm whose flow carries no products (a dashboard mistake, or
+      // StoreKit answered empty) would be a wall without a way through: show
+      // the legacy paywall and its products instead.
+      captureException(new Error('V3 paywall arm has no products'), { ...armMeta, variant: arm.config.variant });
+      try {
+        await loadCodePaywall(alive);
         return;
-      } else {
-        addBreadcrumb('paywall', 'Flow placement has no view configuration → code paywall');
+      } catch (e) {
+        captureException(e);
       }
-    } catch (e) {
-      addBreadcrumb('paywall', 'Flow placement unavailable → code paywall', {
-        error: e instanceof Error ? e.message : String(e),
+      if (!alive()) return;
+    }
+    setV3({ arm, products: prods });
+    setLoadKey((k) => k + 1);
+    setPhase('v3');
+    if (arm.flow && prods.length > 0) {
+      adapty.logShowFlow(arm.flow).catch((e) => captureException(e));
+    }
+    track('paywall_shown', {
+      ...armMeta,
+      variant: arm.config.variant,
+      renderer: 'v3',
+      price_emphasis: arm.config.price_emphasis,
+      products_available: prods.length > 0,
+      products: prods.map((p) => p.vendorProductId).join(','),
+      plans_only: dismissable || signedInRef.current,
+    });
+    addBreadcrumb('paywall', 'Paywall shown', { variant: arm.config.variant, renderer: 'v3' });
+    if (prods.length === 0) {
+      track('paywall_fallback_shown', {
+        placement: ADAPTY_PLACEMENT_PAYWALL_FLOW,
+        renderer: 'v3',
+        reason: !ok ? 'adapty_unavailable' : arm.flow ? 'no_products' : 'no_flow',
       });
     }
-
-    // 2) Code-rendered paywall from the legacy placement.
-    try {
-      await loadCodePaywall(alive);
-    } catch (e) {
-      captureException(e);
-      if (alive()) {
-        setPhase('fallback');
-        track('paywall_fallback_shown', {
-          placement: ADAPTY_PLACEMENT_MAIN,
-          reason: 'load_failed',
-          error: e instanceof Error ? e.message : String(e),
-        });
-      }
-    }
-  }, [loadCodePaywall]);
+  }, [dismissable, loadCodePaywall]);
 
   useEffect(() => {
     const mountedRef = { current: true };
@@ -467,9 +558,9 @@ export default function PaywallScreen() {
   // the paywall out once attribution arrives. No-op for everyone else, and from
   // the second launch on the first fetch is already targeted.
   //
-  // Code-rendered path only: the builder flow is a live native view and is not
-  // swapped under the user; an Apple-Ads audience on `pw_main` takes effect
-  // from the second launch.
+  // Legacy code path only: the V3 steps and the builder flow are not swapped
+  // under the user; an Apple-Ads audience on `pw_main` takes effect from the
+  // second launch.
   useEffect(() => {
     if (phase !== 'ready' || upgradedRef.current) return;
     const mountedRef = { current: true };
@@ -513,46 +604,89 @@ export default function PaywallScreen() {
   }, [phase]);
 
   // Prefetch the offer as soon as the paywall is on screen, so a cancellation
-  // can be answered instantly instead of with a spinner.
+  // can be answered instantly instead of with a spinner. Test C5 can switch
+  // the offer off (`after_cancel_offer: false` on `onb_main`).
   useEffect(() => {
-    if ((phase !== 'flow' && phase !== 'ready') || offerFlowRef.current || dismissable) return;
-    offerFlowRef.current = fetchAdaptyFlow(ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW, OFFER_LOAD_TIMEOUT_MS)
-      .then((flow) => (flow && flow.hasViewConfiguration && !flowDisabledByRemoteConfig(flow) ? flow : null))
-      .catch(() => null);
+    if (phase !== 'flow' && phase !== 'ready' && phase !== 'v3') return;
+    if (offerRef.current || dismissable || !getOnboardingConfig().after_cancel_offer) return;
+    offerRef.current = prefetchOffer().catch((e) => {
+      addBreadcrumb('paywall', 'Offer prefetch failed', { error: e instanceof Error ? e.message : String(e) });
+      return null;
+    });
   }, [phase, dismissable]);
 
   /**
    * The customer dismissed the App Store sheet. Show the after-cancel offer if
-   * the dashboard has one, once per visit. Returns whether it was shown.
+   * the arm has one, once per visit. Returns whether it was shown.
    */
-  const maybeShowOffer = useCallback(async (product: string | undefined, renderer: string) => {
+  const maybeShowOffer = useCallback(async (product: string | undefined, renderer: Renderer) => {
     if (offerShownRef.current || dismissable) return false;
-    const flow = await (offerFlowRef.current ?? Promise.resolve(null));
-    if (!flow || purchasingRef.current) return false;
+    const next = await (offerRef.current ?? Promise.resolve(null));
+    if (!next || purchasingRef.current || offerShownRef.current || leavingRef.current) return false;
     offerShownRef.current = true;
-    setOfferFlow(flow);
+    setOffer(next);
+    if (next.kind === 'native') {
+      adapty.logShowFlow(next.flow).catch((e) => captureException(e));
+    }
     track('paywall_offer_shown', {
       placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW,
-      variant: flow.variationName ?? flow.variationId,
+      variant: offerVariant(next),
+      renderer: next.kind === 'native' ? 'v3' : 'adapty_flow',
+      config_source: next.kind === 'native' ? next.source : 'adapty',
+      variation_id: next.flow.variationId,
+      ab_test: next.flow.placement?.abTestName,
+      offer_product: next.kind === 'native' ? next.product.vendorProductId : undefined,
       after_product: product,
       after_renderer: renderer,
     });
-    addBreadcrumb('paywall', 'After-cancel offer shown', { after_product: product });
+    addBreadcrumb('paywall', 'After-cancel offer shown', { after_product: product, kind: next.kind });
     return true;
   }, [dismissable]);
 
+  // QA builds: `/paywall?qa_offer=1` opens the after-cancel offer straight
+  // away, so it can be checked in the simulator without a StoreKit cancel.
+  const qaOfferRef = useRef(false);
+  useEffect(() => {
+    if (!IS_QA_BUILD || params.qa_offer !== '1' || qaOfferRef.current) return;
+    if (phase !== 'v3' && phase !== 'flow' && phase !== 'ready') return;
+    qaOfferRef.current = true;
+    void maybeShowOffer('qa_preview', 'v3');
+  }, [phase, params.qa_offer, maybeShowOffer]);
+
   const handleRetry = useCallback(() => {
     track('paywall_retry_pressed');
+    // A prefetch made while Adapty was unreachable resolved to "no offer";
+    // fetch it again with the paywall.
+    if (!offerShownRef.current) offerRef.current = null;
     void loadPaywall();
   }, [loadPaywall]);
 
-  const handlePurchase = useCallback(async (product: AdaptyPaywallProduct) => {
+  const handlePurchase = useCallback(async (product: AdaptyPaywallProduct, renderer: Renderer = 'code') => {
+    if (purchasingRef.current) return;
+    purchasingRef.current = true;
     setPurchasing(true);
-    const variant = configRef.current.variant;
-    addBreadcrumb('purchase', 'Purchase started', { product: product.vendorProductId });
-    track('paywall_plan_selected', { product: product.vendorProductId, variant, renderer: 'code' });
+    const variant = variantLabel(renderer);
+    addBreadcrumb('purchase', 'Purchase started', { product: product.vendorProductId, renderer });
+    if (renderer === 'code') {
+      track('paywall_plan_selected', { product: product.vendorProductId, variant, renderer });
+    } else {
+      track('paywall_purchase_started', {
+        product: product.vendorProductId,
+        variant,
+        renderer,
+        has_trial: trialDays(product) > 0,
+      });
+    }
 
     try {
+      // QA builds only: skip StoreKit so the post-purchase screens can be
+      // walked in the simulator.
+      if (IS_QA_BUILD && qaOverrides().mock_purchase) {
+        addBreadcrumb('purchase', 'QA mock purchase', { product: product.vendorProductId });
+        await afterPurchaseSuccess(product, renderer, { mode: 'qa_mock' });
+        return;
+      }
+
       if (!isAdaptyConfigured()) {
         track('paywall_purchase_success', {
           product: product.vendorProductId,
@@ -580,19 +714,19 @@ export default function PaywallScreen() {
 
       const result = await adapty.makePurchase(product);
       if (result.type === 'success') {
-        await afterPurchaseSuccess(product, 'code');
+        await afterPurchaseSuccess(product, renderer);
       } else if (result.type === 'user_cancelled') {
         // User backed out of the StoreKit sheet — expected, not an error.
-        track('paywall_purchase_cancelled', { product: product.vendorProductId, renderer: 'code' });
+        track('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer });
         addBreadcrumb('purchase', 'Purchase cancelled by user');
         // `purchasingRef` mirrors the `purchasing` state through an effect, so at this
         // point it still reads true and `maybeShowOffer` would bail out: the after-cancel
         // offer never showed on the code paywall (seen live 2026-10-06). Clear it first.
         purchasingRef.current = false;
-        void maybeShowOffer(product.vendorProductId, 'code');
+        if (renderer !== 'v3_offer') void maybeShowOffer(product.vendorProductId, renderer);
       } else if (result.type === 'pending') {
         // Ask-to-Buy / deferred: purchase may complete later out of band.
-        track('paywall_purchase_pending', { product: product.vendorProductId });
+        track('paywall_purchase_pending', { product: product.vendorProductId, variant, renderer });
         Alert.alert(
           'Purchase pending',
           "Your purchase needs approval and will activate once it's confirmed.",
@@ -601,18 +735,22 @@ export default function PaywallScreen() {
     } catch (e) {
       track('paywall_purchase_failed', {
         product: product.vendorProductId,
-        renderer: 'code',
+        variant,
+        renderer,
         error: e instanceof Error ? e.message : String(e),
         adapty_detail: adaptyErrorContext(e).adapty_detail,
       });
-      captureException(e, adaptyErrorContext(e, { product: product.vendorProductId, renderer: 'code' }));
+      captureException(e, adaptyErrorContext(e, { product: product.vendorProductId, renderer }));
       Alert.alert('Purchase failed', 'Something went wrong. Please try again.');
     } finally {
+      purchasingRef.current = false;
       setPurchasing(false);
     }
-  }, [afterPurchaseSuccess, maybeShowOffer, refreshProfile, router, signedIn, handOffToSignIn]);
+  }, [afterPurchaseSuccess, maybeShowOffer, refreshProfile, router, signedIn, handOffToSignIn, variantLabel]);
 
   const handleRestore = useCallback(async () => {
+    if (purchasingRef.current) return;
+    purchasingRef.current = true;
     setPurchasing(true);
     addBreadcrumb('purchase', 'Restore started');
     track('paywall_restore_started');
@@ -638,6 +776,7 @@ export default function PaywallScreen() {
       captureException(e);
       track('paywall_restore_failed');
     } finally {
+      purchasingRef.current = false;
       setPurchasing(false);
     }
   }, [afterRestoreSuccess, router, signedIn, handOffToSignIn]);
@@ -665,7 +804,11 @@ export default function PaywallScreen() {
       if (result.type === 'success') {
         void afterPurchaseSuccess(product, 'adapty_flow').catch(captureException);
       } else if (result.type === 'user_cancelled') {
-        track('paywall_purchase_cancelled', { product: product.vendorProductId, renderer: 'adapty_flow' });
+        track('paywall_purchase_cancelled', {
+          product: product.vendorProductId,
+          variant: variantLabel('adapty_flow'),
+          renderer: 'adapty_flow',
+        });
         addBreadcrumb('purchase', 'Purchase cancelled by user');
         void maybeShowOffer(product.vendorProductId, 'adapty_flow');
       } else if (result.type === 'pending') {
@@ -677,7 +820,7 @@ export default function PaywallScreen() {
       }
       return false;
     },
-    [afterPurchaseSuccess, maybeShowOffer],
+    [afterPurchaseSuccess, maybeShowOffer, variantLabel],
   );
 
   const onFlowRestoreCompleted = useCallback((adaptyProfile: AdaptyProfile) => {
@@ -701,6 +844,8 @@ export default function PaywallScreen() {
           onPress={handleClose}
           style={[s.closeBtn, { top: insets.top + space.xs }]}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         >
           <X size={20} color={colors.inkMuted} strokeWidth={2} />
         </Pressable>
@@ -708,22 +853,43 @@ export default function PaywallScreen() {
     );
   };
 
-  // The after-cancel offer replaces whatever paywall is up; its close button
-  // brings the paywall back (the gate itself stays hard).
-  if (offerFlow) {
-    const offerVariant = offerFlow.variationName ?? offerFlow.variationId;
+  // The after-cancel offer is drawn over the paywall, which stays mounted
+  // underneath: closing it brings the customer back to the same step (the
+  // plans), not to the start. The gate itself stays hard. From stage 6 the
+  // close leads to preview mode instead.
+  let offerNode: ReactNode = null;
+  if (offer) {
+    const variant = offerVariant(offer);
     const closeOffer = (reason: string) => {
-      track('paywall_offer_closed', { placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW, variant: offerVariant, reason });
-      setOfferFlow(null);
+      track('paywall_offer_closed', {
+        placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW,
+        variant,
+        renderer: offer.kind === 'native' ? 'v3' : 'adapty_flow',
+        reason,
+      });
+      setOffer(null);
     };
-    return (
-      <View style={s.fill}>
+
+    if (offer.kind === 'native') {
+      offerNode = (
+        <OfferScreen
+          config={offer.config}
+          product={offer.product}
+          purchasing={purchasing}
+          onBuy={() => void handlePurchase(offer.product, 'v3_offer')}
+          onClose={() => closeOffer('close')}
+          onRestore={() => void handleRestore()}
+        />
+      );
+    } else {
+      const offerFlow = offer.flow;
+      offerNode = (
         <AdaptyFlowView
           flow={offerFlow}
           params={flowParams}
           style={s.fill}
           onProductSelected={(productId) => {
-            track('paywall_plan_selected', { product: productId, variant: offerVariant, renderer: 'adapty_flow_offer' });
+            track('paywall_plan_selected', { product: productId, variant, renderer: 'adapty_flow_offer' });
             return false;
           }}
           onPurchaseStarted={(product) => {
@@ -734,9 +900,9 @@ export default function PaywallScreen() {
           onPurchaseCompleted={(result, product) => {
             purchasingRef.current = false;
             if (result.type === 'success') {
-              void afterPurchaseSuccess(product, 'adapty_flow').catch(captureException);
+              void afterPurchaseSuccess(product, 'adapty_flow_offer').catch(captureException);
             } else if (result.type === 'user_cancelled') {
-              track('paywall_purchase_cancelled', { product: product.vendorProductId, renderer: 'adapty_flow_offer' });
+              track('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
             } else if (result.type === 'pending') {
               track('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow_offer' });
             }
@@ -782,22 +948,41 @@ export default function PaywallScreen() {
           }}
           onRequestPermission={handleFlowPermissionRequest}
         />
+      );
+    }
+  }
+  const withOffer = (node: ReactNode) =>
+    offerNode ? (
+      <View style={s.fill}>
+        {node}
+        <View style={StyleSheet.absoluteFill}>{offerNode}</View>
       </View>
+    ) : (
+      node
     );
+
+  if (phase === 'loading' || (phase === 'v3' && !draftLoaded)) {
+    return withClose(<PwLoading />);
   }
 
-  if (phase === 'loading') {
-    return withClose(
-      <Screen edges={['top', 'bottom', 'left', 'right']}>
-        <View style={s.loading}>
-          <ActivityIndicator color={colors.terracotta} />
-        </View>
-      </Screen>,
-    );
+  if (phase === 'v3' && v3) {
+    return withOffer(withClose(
+      <V3Paywall
+        key={loadKey}
+        config={v3.arm.config}
+        products={v3.products}
+        draft={signedIn ? null : draft}
+        plansOnly={dismissable || signedIn}
+        purchasing={purchasing}
+        onPurchase={(p) => void handlePurchase(p, 'v3')}
+        onRestore={() => void handleRestore()}
+        onRetry={handleRetry}
+      />,
+    ));
   }
 
   if (phase === 'flow' && builderFlow) {
-    return withClose(
+    return withOffer(withClose(
       <View style={s.fill}>
         <AdaptyFlowView
           flow={builderFlow}
@@ -896,7 +1081,7 @@ export default function PaywallScreen() {
           onRequestPermission={handleFlowPermissionRequest}
         />
       </View>,
-    );
+    ));
   }
 
   const variant = resolveVariant(configRef.current.variant);
@@ -905,7 +1090,7 @@ export default function PaywallScreen() {
     products,
     placeholders,
     goal,
-    onPurchase: handlePurchase,
+    onPurchase: (p: AdaptyPaywallProduct) => handlePurchase(p, 'code'),
     onRestore: handleRestore,
     onRetry: handleRetry,
     purchasing,
@@ -913,21 +1098,20 @@ export default function PaywallScreen() {
 
   switch (variant) {
     case 'B':
-      return withClose(<VariantB {...rendererProps} />);
+      return withOffer(withClose(<VariantB {...rendererProps} />));
     case 'B2':
-      return withClose(<VariantB2 {...rendererProps} />);
+      return withOffer(withClose(<VariantB2 {...rendererProps} />));
     case 'C':
-      return withClose(<VariantC {...rendererProps} />);
+      return withOffer(withClose(<VariantC {...rendererProps} />));
     case 'S':
-      return withClose(<VariantSHero {...rendererProps} />);
+      return withOffer(withClose(<VariantSHero {...rendererProps} />));
     default:
-      return withClose(<PaywallRenderer {...rendererProps} />);
+      return withOffer(withClose(<PaywallRenderer {...rendererProps} />));
   }
 }
 
 const s = StyleSheet.create({
   fill: { flex: 1, backgroundColor: colors.bg },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   closeBtn: {
     position: 'absolute',
     left: space.lg,

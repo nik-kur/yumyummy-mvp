@@ -39,3 +39,23 @@ export const IMG = {
 export const VIDEO = {
   welcome_d: require('../../assets/v3/onb/welcome_d.mp4'),
 } as const;
+
+/** Paywall 17–19 and offer 20. */
+export const PW = {
+  b3_joe: require('../../assets/v3/pw/b3_joe.jpg'),
+  b3_home: require('../../assets/v3/pw/b3_home.jpg'),
+  b3_office: require('../../assets/v3/pw/b3_office.jpg'),
+  b3_wide: require('../../assets/v3/pw/b3_wide.jpg'),
+  offer_costa: require('../../assets/v3/pw/offer_costa.jpg'),
+  bell: require('../../assets/v3/pw/bell.png'),
+  phone_frame: require('../../assets/v3/pw/phone_frame.png'),
+  p1_photo_poster: require('../../assets/v3/pw/p1_photo_poster.jpg'),
+  p1_text_poster: require('../../assets/v3/pw/p1_text_poster.jpg'),
+  p1_voice_poster: require('../../assets/v3/pw/p1_voice_poster.jpg'),
+} as const;
+
+export const PW_VIDEO = {
+  p1_photo: require('../../assets/v3/pw/p1_photo.mp4'),
+  p1_text: require('../../assets/v3/pw/p1_text.mp4'),
+  p1_voice: require('../../assets/v3/pw/p1_voice.mp4'),
+} as const;

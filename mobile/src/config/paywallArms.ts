@@ -12,7 +12,7 @@ import { adapty } from 'react-native-adapty';
 import type { AdaptyFlow } from 'react-native-adapty';
 
 import { addBreadcrumb } from '@/analytics/sentry';
-import { whenAdaptyActivated } from '@/billing/adapty';
+import { waitForAdaptyIdentify, whenAdaptyActivated } from '@/billing/adapty';
 
 import { DEFAULT_OFFER_ARM, DEFAULT_PAYWALL_ARM } from './defaults';
 import { parsePaywallArm } from './parse';
@@ -37,6 +37,9 @@ export async function resolvePaywallArm(
   const override = kind === 'offer' ? qa.offer : qa.paywall;
   let flow: AdaptyFlow | null = null;
   if (!qa.simulate_timeout && (await whenAdaptyActivated(ACTIVATION_GRACE_MS))) {
+    // A signed-in customer's arm belongs to their identified profile; resolves
+    // at once in the acquisition flow, where no identify() is in flight.
+    await waitForAdaptyIdentify();
     try {
       flow = await adapty.getFlow(placement, { loadTimeoutMs: timeoutMs });
     } catch (e) {
