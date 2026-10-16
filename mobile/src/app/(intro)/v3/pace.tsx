@@ -138,6 +138,7 @@ const s = StyleSheet.create({
   zoneOn: { fontFamily: F.sansSemibold, color: C.ink },
   slider: { marginTop: 18 },
   card: {
+    marginBottom: 16,
     backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: C.hair,

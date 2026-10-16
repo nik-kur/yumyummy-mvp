@@ -5,6 +5,8 @@
  *   below BMI 18.5 → never praised: "Let's aim for <healthy floor>", with
  *   "Change my goal" back to the ruler (agreed 15 Oct).
  */
+import { useState } from 'react';
+
 import { MascotMessage } from '@/components/onb/MascotMessage';
 import { IMG } from '@/onb/assets';
 import { fmtKg, fmtStLb, goalCheck, healthyFloorKg } from '@/onb/plan';
@@ -13,13 +15,17 @@ import { useIntro } from '@/state/introContext';
 
 export default function GoalCheckScreen() {
   const intro = useIntro();
-  const target = intro.target_weight_kg ?? intro.weight_kg;
-  const check = goalCheck(intro.weight_kg, target, intro.height_cm);
+  // Frozen on mount: accepting the healthy floor saves a new target, and the
+  // screen must not flip to "realistic" during the push animation.
+  const [{ target, check, current }] = useState(() => {
+    const t = intro.target_weight_kg ?? intro.weight_kg;
+    return { target: t, current: intro.weight_kg, check: goalCheck(intro.weight_kg, t, intro.height_cm) };
+  });
   const { next, progress, router } = useOnbScreen('S7_goal_check', check);
   const show = (kg: number) => (intro.units === 'imperial' ? fmtStLb(kg) : `${fmtKg(kg)} kg`);
-  const losing = target < intro.weight_kg;
+  const losing = target < current;
   const verb = losing ? 'Losing ' : 'Gaining ';
-  const amount = show(Math.abs(target - intro.weight_kg));
+  const amount = show(Math.abs(target - current));
 
   if (check === 'healthy') {
     const floor = healthyFloorKg(intro.height_cm);

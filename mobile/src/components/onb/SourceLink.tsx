@@ -35,5 +35,5 @@ export function SourceLink({ label, url, style }: { label: string; url: string; 
 
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  text: { fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.faint },
+  text: { flexShrink: 1, fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.faint },
 });

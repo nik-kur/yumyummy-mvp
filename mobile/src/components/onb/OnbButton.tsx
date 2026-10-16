@@ -33,6 +33,7 @@ export function OnbButton({ label, onPress, variant = 'ink', disabled, style }: 
         style,
       ]}
       accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
     >
       <Text
         style={[

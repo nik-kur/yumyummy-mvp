@@ -242,15 +242,21 @@ export async function clearOnboardingAssignment(): Promise<void> {
   emit();
 }
 
+let mergedCache: { base: OnboardingConfig; o: unknown; out: OnboardingConfig } | null = null;
+
+/** Arm + QA overrides; the same object while neither changes (stable for React deps). */
 function mergeOverrides(config: OnboardingConfig): OnboardingConfig {
   const o = qaOverrides().onboarding;
   if (!o) return config;
-  return {
+  if (mergedCache && mergedCache.base === config && mergedCache.o === o) return mergedCache.out;
+  const out = {
     ...config,
     ...o,
     welcome: { ...config.welcome, ...(o.welcome ?? {}) },
     social_proof: { ...config.social_proof, ...(o.social_proof ?? {}) },
   } as OnboardingConfig;
+  mergedCache = { base: config, o, out };
+  return out;
 }
 
 /** The onboarding config in effect: the arm plus any QA overrides. */

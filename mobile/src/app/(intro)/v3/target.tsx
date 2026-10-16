@@ -127,6 +127,7 @@ export default function TargetScreen() {
             next(
               { target_weight_kg: target },
               { bmi_band: card.tone, direction: Math.abs(diff) <= 1 ? 'same' : diff < 0 ? 'down' : 'up' },
+              { onb_direction: Math.abs(diff) <= 1 ? 'same' : diff < 0 ? 'down' : 'up', onb_target_bmi_band: card.tone },
             )
           }
         />
@@ -179,6 +180,7 @@ const s = StyleSheet.create({
   diff: { marginTop: 4, textAlign: 'center', fontFamily: F.sans, fontSize: 16, lineHeight: 22, color: C.muted },
   ruler: { marginTop: 26 },
   card: {
+    marginBottom: 16,
     flexDirection: 'row',
     gap: 12,
     alignItems: 'flex-start',

@@ -11,6 +11,8 @@ import { memo, useCallback, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   runOnJS,
+  scrollTo,
+  useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -38,6 +40,9 @@ interface Props {
   width: number;
 }
 
+/** Ticks per SVG chunk: one huge SVG can exceed the 16k px texture limit at @3x. */
+const CHUNK = 60;
+
 const Ticks = memo(function Ticks({
   count,
   perMajor,
@@ -49,28 +54,39 @@ const Ticks = memo(function Ticks({
   majorLabel: (i: number) => string;
   pad: number;
 }) {
-  const minor: string[] = [];
-  const major: string[] = [];
-  const labels: { x: number; t: string }[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const x = pad + i * STEP_PX;
-    if (i % perMajor === 0) {
-      major.push(`M${x} 28 V56`);
-      labels.push({ x, t: majorLabel(i) });
-    } else {
-      minor.push(`M${x} 40 V56`);
+  const chunks: { left: number; width: number; minor: string; major: string; labels: { x: number; t: string }[] }[] = [];
+  for (let start = 0; start < count; start += CHUNK) {
+    const end = Math.min(count, start + CHUNK);
+    // Each chunk is its own coordinate space starting half a step left of its first tick.
+    const left = pad + start * STEP_PX - STEP_PX / 2;
+    const minor: string[] = [];
+    const major: string[] = [];
+    const labels: { x: number; t: string }[] = [];
+    for (let i = start; i < end; i += 1) {
+      const x = pad + i * STEP_PX - left;
+      if (i % perMajor === 0) {
+        major.push(`M${x} 28 V56`);
+        labels.push({ x, t: majorLabel(i) });
+      } else {
+        minor.push(`M${x} 40 V56`);
+      }
     }
+    chunks.push({ left, width: (end - start) * STEP_PX, minor: minor.join(' '), major: major.join(' '), labels });
   }
   return (
-    <Svg width={pad * 2 + (count - 1) * STEP_PX} height={H}>
-      <Path d={minor.join(' ')} stroke={C.hair2} strokeWidth={1.5} strokeLinecap="round" />
-      <Path d={major.join(' ')} stroke={C.faint} strokeWidth={2} strokeLinecap="round" />
-      {labels.map((l) => (
-        <SvgText key={l.x} x={l.x} y={78} textAnchor="middle" fontFamily={F.sans} fontSize={13} fill={C.muted}>
-          {l.t}
-        </SvgText>
+    <View style={{ width: pad * 2 + (count - 1) * STEP_PX, height: H }}>
+      {chunks.map((c) => (
+        <Svg key={c.left} width={c.width + 24} height={H} style={{ position: 'absolute', left: c.left }}>
+          {c.minor ? <Path d={c.minor} stroke={C.hair2} strokeWidth={1.5} strokeLinecap="round" /> : null}
+          {c.major ? <Path d={c.major} stroke={C.faint} strokeWidth={2} strokeLinecap="round" /> : null}
+          {c.labels.map((l) => (
+            <SvgText key={l.x} x={l.x} y={78} textAnchor="middle" fontFamily={F.sans} fontSize={13} fill={C.muted}>
+              {l.t}
+            </SvgText>
+          ))}
+        </Svg>
       ))}
-    </Svg>
+    </View>
   );
 });
 
@@ -79,6 +95,7 @@ export function Ruler({ count, index, currentIndex, perMajor, majorLabel, onChan
   const x = useSharedValue(index * STEP_PX);
   const last = useSharedValue(index);
   const reported = useRef(index);
+  const ref = useAnimatedRef<Animated.ScrollView>();
 
   const onStep = useCallback(
     (i: number) => {
@@ -101,6 +118,15 @@ export function Ruler({ count, index, currentIndex, perMajor, majorLabel, onChan
         runOnJS(onStep)(i);
       }
     },
+    onEndDrag: (e) => {
+      if (Math.abs(e.velocity?.x ?? 0) < 0.3) {
+        scrollTo(ref, Math.round(e.contentOffset.x / STEP_PX) * STEP_PX, 0, true);
+      }
+    },
+    onMomentumEnd: (e) => {
+      const i = Math.round(e.contentOffset.x / STEP_PX);
+      if (Math.abs(e.contentOffset.x - i * STEP_PX) > 0.5) scrollTo(ref, i * STEP_PX, 0, true);
+    },
   });
 
   const curX = pad + currentIndex * STEP_PX;
@@ -117,6 +143,7 @@ export function Ruler({ count, index, currentIndex, perMajor, majorLabel, onChan
   return (
     <View style={{ width, height: H }}>
       <Animated.ScrollView
+        ref={ref}
         horizontal
         onScroll={onScroll}
         scrollEventThrottle={16}

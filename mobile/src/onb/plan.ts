@@ -27,10 +27,10 @@ export function bmi(weightKg: number, heightCm: number): number {
   return weightKg / (m * m);
 }
 
-/** Lowest weight inside the healthy BMI range, rounded up to 0.2 kg. */
+/** Lowest weight inside the healthy BMI range, rounded up to a whole kilo (as on the canvas). */
 export function healthyFloorKg(heightCm: number): number {
   const m = heightCm / 100;
-  return Math.ceil(HEALTHY_BMI * m * m * 5) / 5;
+  return Math.ceil(HEALTHY_BMI * m * m);
 }
 
 export function direction(currentKg: number, targetKg: number): Direction {
@@ -53,10 +53,13 @@ export function planMode(goal: GoalType, dir: Direction): PlanMode {
   return 'zone';
 }
 
-/** Pace options in kg per week. Losing tops out at 1 kg/week (CAP 13.10). */
+/**
+ * Pace options in kg per week; the recommended pace sits mid-track as drawn.
+ * Losing stays under 1 kg/week (CAP 13.10).
+ */
 export const PACE = {
-  down: { min: 0.1, max: 1.0, step: 0.1, recommended: 0.5, gentleMax: 0.3, fastMin: 0.8 },
-  up: { min: 0.1, max: 0.5, step: 0.05, recommended: 0.25, gentleMax: 0.15, fastMin: 0.4 },
+  down: { min: 0.1, max: 0.9, step: 0.1, recommended: 0.5, gentleMax: 0.3, fastMin: 0.7 },
+  up: { min: 0.1, max: 0.4, step: 0.05, recommended: 0.25, gentleMax: 0.15, fastMin: 0.35 },
 } as const;
 
 export type PaceZone = 'gentle' | 'recommended' | 'fast';
@@ -119,11 +122,21 @@ export function dailyPlan(
   let weeks: number | null = null;
   if ((mode === 'lose' || mode === 'cut' || mode === 'gain') && kgPerWeek && kgPerWeek > 0) {
     const daily = (kgPerWeek * KCAL_PER_KG) / 7;
-    calories = mode === 'gain' ? tdee + daily : Math.max(minKcal(body), tdee - daily);
-    // The real pace when the floor caps the deficit.
-    const realDaily = Math.abs(tdee - calories);
-    const realPace = realDaily > 0 ? (realDaily * 7) / KCAL_PER_KG : kgPerWeek;
-    weeks = Math.max(1, Math.ceil(Math.abs(body.weight_kg - targetKg) / realPace));
+    if (mode === 'gain') {
+      calories = tdee + daily;
+      weeks = Math.max(1, Math.ceil(Math.abs(targetKg - body.weight_kg) / kgPerWeek));
+    } else {
+      calories = Math.max(minKcal(body), tdee - daily);
+      // The floor can cap — or erase — the deficit for small, older bodies.
+      const realDaily = tdee - calories;
+      if (realDaily <= 0) {
+        calories = tdee;
+        weeks = null;
+      } else {
+        const realPace = (realDaily * 7) / KCAL_PER_KG;
+        weeks = Math.max(1, Math.ceil(Math.abs(body.weight_kg - targetKg) / realPace));
+      }
+    }
   }
   calories = round10(calories);
   const proteinPerKg = mode === 'gain' || mode === 'recomp' || mode === 'cut' ? 2.0 : mode === 'lose' ? 1.6 : 1.4;
@@ -134,16 +147,19 @@ export function dailyPlan(
   if (weeks !== null) {
     const d = new Date(now);
     d.setDate(d.getDate() + weeks * 7);
-    target_date = d.toISOString().slice(0, 10);
+    // Local calendar date (toISOString would shift a day around midnight BST).
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    target_date = `${d.getFullYear()}-${mm}-${dd}`;
   }
   return { calories, protein, fat, carbs, weeks, target_date };
 }
 
-/** "31 December" (UK order, no year unless it is not this year's). */
+/** "31 December" (UK order; the year only when the date is ~a year or more away). */
 export function formatLongDate(iso: string, now: Date = new Date()): string {
   const d = new Date(`${iso}T12:00:00`);
   const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' };
-  if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+  if (d.getTime() - now.getTime() > 300 * 24 * 3600 * 1000) opts.year = 'numeric';
   return d.toLocaleDateString('en-GB', opts);
 }
 

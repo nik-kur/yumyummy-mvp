@@ -13,7 +13,8 @@
  * (custom actions `request_review` / `next`). No reviews for the goal → skip.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import * as StoreReview from 'expo-store-review';
 import { AdaptyFlowView } from 'react-native-adapty';
@@ -54,7 +55,13 @@ function Stars({ size }: { size: number }) {
 function Photo({ uri, local, label }: { uri: string; local?: number; label: string }) {
   return (
     <View style={s.photo}>
-      <Image source={local ?? { uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <ExpoImage
+        source={local ?? { uri }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        contentPosition={{ left: '50%', top: '22%' }}
+        transition={150}
+      />
       <View style={s.tag}>
         <Text style={s.tagText}>{label}</Text>
       </View>
@@ -195,17 +202,33 @@ export default function SocialScreen() {
     };
   }, [config.social_proof.render]);
 
-  const finish = async (source: string) => {
+  const asked = useRef(false);
+  /**
+   * The rating prompt (SKStoreReviewController) comes up over this screen a
+   * moment after it opens, as drawn (16 · Rating prompt) and as Cal AI does.
+   * Apple decides whether it really shows (3 times a year at most).
+   */
+  const askForRating = async (source: string) => {
+    if (asked.current) return;
+    asked.current = true;
     try {
-      if (await StoreReview.hasAction()) {
-        track('rating_prompt_requested', { source });
-        await StoreReview.requestReview();
-      }
+      if (!(await StoreReview.hasAction())) return;
+      track('rating_prompt_requested', { source });
+      await StoreReview.requestReview();
     } catch (e) {
       captureException(e, { where: 'v3_social_rating' });
     }
+  };
+  const finish = () => {
     next({}, { reviews: reviews.length, hero: ba ? config.social_proof.hero : 'rating' }, undefined, { replace: true });
   };
+
+  useEffect(() => {
+    if (!slotDone || slotFlow || reviews.length === 0) return;
+    const t = setTimeout(() => void askForRating('native'), 2000);
+    return () => clearTimeout(t);
+     
+  }, [slotDone, slotFlow, reviews.length]);
 
   // Nothing real to show for this goal: skip the screen rather than show an empty one.
   useEffect(() => {
@@ -229,7 +252,7 @@ export default function SocialScreen() {
           return false;
         }}
         onCustomAction={(actionId) => {
-          if (actionId === 'request_review') void finish('slot');
+          if (actionId === 'request_review') void askForRating('slot');
           else if (actionId === 'next') next({}, {}, undefined, { replace: true });
           return false;
         }}
@@ -253,7 +276,7 @@ export default function SocialScreen() {
       progress={null}
       backOnly
       title="People like you are already doing it"
-      footer={<OnbButton label="Continue" onPress={() => void finish('native')} />}
+      footer={<OnbButton label="Continue" onPress={finish} />}
       contentStyle={{ marginTop: 22 }}
     >
       {photoHero && ba ? (

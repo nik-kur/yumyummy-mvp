@@ -52,11 +52,11 @@ export function useOnbScreen(id: ScreenId, variant?: string) {
       track('onboarding_screen_completed', { screen: id, variant: variant ?? null, ...answer });
       if (person) setPersonProperties(person);
       const draft = { ...introRef.current, ...patch } as IntroDraft;
-      const to = nextScreen(id, draft, config) as never;
+      const to = nextScreen(id, draft, config, content) as never;
       if (opts.replace) router.replace(to);
       else router.push(to);
     },
-    [config, id, router, variant],
+    [config, content, id, router, variant],
   );
 
   return { intro, config, content, next, progress: PROGRESS[id] ?? null, router };

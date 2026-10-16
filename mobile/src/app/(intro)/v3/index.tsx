@@ -12,6 +12,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
+import { getTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { AdaptyFlowView } from 'react-native-adapty';
 import type { AdaptyFlow } from 'react-native-adapty';
@@ -120,8 +121,12 @@ export default function WelcomeScreen() {
     if (busy.current) return;
     busy.current = true;
     if (config.att === 'welcome') {
-      const granted = await requestTrackingConsent();
-      track('att_prompt_answered', { granted, source: 'v3_welcome' });
+      const current = await getTrackingPermissionsAsync().catch(() => null);
+      if (current?.status === 'undetermined' && current.canAskAgain) {
+        track('att_prompt_shown', { source: 'v3_welcome' });
+        const granted = await requestTrackingConsent();
+        track('att_prompt_answered', { granted, source: 'v3_welcome' });
+      }
     }
     busy.current = false;
     next({}, { action: 'start' });

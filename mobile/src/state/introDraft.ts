@@ -85,6 +85,18 @@ export async function saveDraft(draft: IntroDraft): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(draft)).catch(() => {});
 }
 
+const reloadListeners = new Set<() => void>();
+
+/** Ask mounted intro providers to re-read the stored draft (QA jumps). */
+export function notifyDraftReplaced(): void {
+  reloadListeners.forEach((l) => l());
+}
+
+export function onDraftReplaced(listener: () => void): () => void {
+  reloadListeners.add(listener);
+  return () => reloadListeners.delete(listener);
+}
+
 export async function clearDraft(): Promise<void> {
   await AsyncStorage.removeItem(KEY).catch(() => {});
 }

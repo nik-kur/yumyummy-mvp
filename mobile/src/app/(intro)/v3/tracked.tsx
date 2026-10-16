@@ -30,7 +30,9 @@ export default function TrackedScreen() {
       onContinue={() =>
         answer &&
         next(
-          { tracked_before: answer === 'yes', barrier: answer === 'yes' ? intro.barrier : null },
+          answer === 'yes'
+            ? { tracked_before: true }
+            : { tracked_before: false, barrier: null, pain_points: [] },
           { tracked_before: answer === 'yes' },
           { onb_tracked_before: answer === 'yes' },
         )

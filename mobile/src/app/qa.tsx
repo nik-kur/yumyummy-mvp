@@ -23,8 +23,10 @@ import {
   useOnboardingConfig,
 } from '@/config/onboardingConfig';
 import { loadQaOverrides, qaOverrides, saveQaOverrides, type QaOverrides } from '@/config/qa';
+import { QA_PRESETS, QA_SCENARIOS, QA_SCREENS } from '@/config/qaPresets';
 import { isTesterMarked } from '@/config/testerMark';
-import { clearDraft } from '@/state/introDraft';
+import { buildPlan } from '@/onb/buildPlan';
+import { clearDraft, loadDraft, notifyDraftReplaced, saveDraft } from '@/state/introDraft';
 import { clearPendingPurchase } from '@/state/pendingPurchase';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -63,11 +65,19 @@ export default function QaScreen() {
   const [o, setO] = useState<QaOverrides>(qaOverrides());
   const [tester, setTester] = useState(false);
 
+  const [draftLine, setDraftLine] = useState('');
   useEffect(() => {
+    void loadDraft().then((d) =>
+      setDraftLine(
+        `draft: ${d.goal_type ?? '—'} · ${d.weight_kg} → ${d.target_weight_kg ?? '—'} kg · ${d.height_cm} cm · tracked ${String(d.tracked_before)} · ${d.target_calories ?? '—'} kcal`,
+      ),
+    );
     void isTesterMarked().then(setTester);
     // A cold start straight into /qa has not loaded the stored overrides yet.
     void loadQaOverrides().then(setO);
   }, []);
+
+  const [preset, setPreset] = useState(QA_PRESETS[0].key);
 
   if (!IS_QA_BUILD) return <Redirect href="/" />;
 
@@ -97,6 +107,20 @@ export default function QaScreen() {
     setOnb({ social_proof: { ...(onb.social_proof ?? {}), ...patch } });
   const pw = o.paywall ?? {};
   const offer = o.offer ?? {};
+
+  const jump = async (route: string, extra?: QaOverrides) => {
+    const p = QA_PRESETS.find((x) => x.key === preset) ?? QA_PRESETS[0];
+    // A scenario replaces the overrides wholesale, so earlier taps cannot leak in.
+    if (extra) update(extra);
+    // Plan numbers as the loader would have saved them.
+    await saveDraft({ ...p.draft, ...buildPlan(p.draft).patch });
+    notifyDraftReplaced();
+    // Let mounted providers re-read it before screens that freeze on mount open.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    if (router.canDismiss()) router.dismissAll();
+    // Replacing the intro group remounts its provider, which re-reads the draft.
+    router.replace(route as never);
+  };
 
   const restart = async () => {
     await clearDraft();
@@ -130,7 +154,26 @@ export default function QaScreen() {
             </AppText>
           ) : null}
           <AppText variant="small">tester mark: {tester ? 'on' : 'off'}</AppText>
+          <AppText variant="small">{draftLine}</AppText>
           <AppText variant="caption" style={s.mono}>{JSON.stringify(config)}</AppText>
+        </View>
+
+        <AppText variant="eyebrow">Jump to a V3 screen</AppText>
+        <View style={s.chips}>
+          {QA_PRESETS.map((p) => (
+            <Chip key={p.key} label={p.label} selected={preset === p.key} onPress={() => setPreset(p.key)} />
+          ))}
+        </View>
+        <View style={s.chips}>
+          {QA_SCREENS.map((x) => (
+            <Chip key={x.route} label={`→ ${x.label}`} onPress={() => void jump(x.route)} />
+          ))}
+        </View>
+        <View style={s.chips}>
+          {QA_SCENARIOS.map((x) => (
+            <Chip key={x.label} label={`★ ${x.label}`} onPress={() => void jump(x.route, x.overrides)} />
+          ))}
+          <Chip label="✕ clear overrides" onPress={() => update({})} />
         </View>
 
         <AppText variant="eyebrow">onb_main</AppText>

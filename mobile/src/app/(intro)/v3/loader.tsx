@@ -89,9 +89,18 @@ export default function LoaderScreen() {
   const [pct, setPct] = useState(0);
   const [started, setStarted] = useState(false);
   const finished = useRef(false);
+  // The ticking effect must not restart when the draft / config / navigation
+  // helpers change identity (each save or QA override would reset t0).
+  const t0 = useRef<number | null>(null);
 
   // Plan from the answers (also for paths without a Pace screen).
   const { patch, mode } = useMemo(() => buildPlan(intro), [intro]);
+  const latest = useRef({ next, patch, mode });
+  latest.current = { next, patch, mode };
+  // Frozen at the moment the loader starts: what the rows show must not
+  // change when the plan is saved on the way out.
+  const shown = useRef<{ patch: typeof patch; mode: typeof mode } | null>(null);
+  if (shown.current === null) shown.current = { patch, mode };
 
   // ATT first, progress after.
   useEffect(() => {
@@ -114,10 +123,10 @@ export default function LoaderScreen() {
 
   useEffect(() => {
     if (!started) return;
-    const t0 = Date.now();
+    if (t0.current === null) t0.current = Date.now();
     let lastRow = -1;
     const id = setInterval(() => {
-      const p = Math.min(100, Math.round(((Date.now() - t0) / DURATION_MS) * 100));
+      const p = Math.min(100, Math.round(((Date.now() - (t0.current ?? Date.now())) / DURATION_MS) * 100));
       setPct(p);
       const row = ROW_DONE_AT.filter((x) => p >= x).length - 1;
       if (row > lastRow) {
@@ -128,22 +137,26 @@ export default function LoaderScreen() {
         finished.current = true;
         clearInterval(id);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        setTimeout(() => next(patch, { plan_mode: mode }, { onb_plan_mode: mode }, { replace: true }), 450);
+        setTimeout(() => {
+          const l = latest.current;
+          l.next(l.patch, { plan_mode: l.mode }, { onb_plan_mode: l.mode }, { replace: true });
+        }, 450);
       }
     }, 50);
     return () => clearInterval(id);
-  }, [started, next, patch, mode]);
+  }, [started]);
 
   const imperial = intro.units === 'imperial';
   const ft = cmToFtIn(intro.height_cm);
   const bodyText = imperial
     ? `${ft.ft} ft ${ft.inch} in · ${fmtStLb(intro.weight_kg)}`
     : `${Math.round(intro.height_cm)} cm · ${fmtKg(intro.weight_kg)} kg`;
-  const dateText = patch.target_date ? formatShortDate(patch.target_date) : 'Your zone';
+  const view = shown.current;
+  const dateText = view.patch.target_date ? formatShortDate(view.patch.target_date) : 'Your zone';
   const rows = [
     { label: 'Your body', value: bodyText },
     { label: 'Activity', value: ACTIVITY_LABELS_V3[intro.activity_level ?? 'light'] },
-    { label: 'Daily calories', value: `${(patch.target_calories ?? 0).toLocaleString('en-GB')} kcal` },
+    { label: 'Daily calories', value: `${(view.patch.target_calories ?? 0).toLocaleString('en-GB')} kcal` },
     { label: 'Your goal date', value: dateText },
   ];
   const line = [...LINES].reverse().find(([at]) => pct >= at)?.[1] ?? LINES[0][1];
@@ -185,7 +198,10 @@ export default function LoaderScreen() {
             {review.city ? `, ${review.city}` : ''}
           </Text>
         </View>
-      ) : null}
+      ) : (
+        // Same height as the review card, so the loader sits where it is drawn.
+        <View style={{ height: 118 }} />
+      )}
     </OnbLayout>
   );
 }

@@ -11,6 +11,8 @@ import { memo, useCallback, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
+  scrollTo,
+  useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -98,6 +100,7 @@ export function Wheel({ values, value, onChange, half, label, bigSize = 34, band
   const height = half * 2 * ROW + CENTER;
   const pad = half * ROW + GAP;
   const committed = useRef(value);
+  const ref = useAnimatedRef<Animated.ScrollView>();
 
   const tick = useCallback(() => {
     void Haptics.selectionAsync().catch(() => {});
@@ -121,14 +124,24 @@ export function Wheel({ values, value, onChange, half, label, bigSize = 34, band
       if (idx !== lastIdx.value && idx >= 0 && idx < values.length) {
         lastIdx.value = idx;
         runOnJS(tick)();
+        // Commit as the value passes the centre: a tap on Continue mid-fling
+        // must submit what the wheel shows.
+        runOnJS(commit)(idx);
       }
     },
     onMomentumEnd: (e) => {
-      runOnJS(commit)(Math.round(e.contentOffset.y / ROW));
+      const idx = Math.round(e.contentOffset.y / ROW);
+      // snapToInterval can leave a slow fling between rows; finish the snap.
+      if (Math.abs(e.contentOffset.y - idx * ROW) > 0.5) scrollTo(ref, 0, idx * ROW, true);
+      runOnJS(commit)(idx);
     },
     onEndDrag: (e) => {
       // A slow release without momentum never fires onMomentumEnd.
-      if (Math.abs(e.velocity?.y ?? 0) < 0.05) runOnJS(commit)(Math.round(e.contentOffset.y / ROW));
+      if (Math.abs(e.velocity?.y ?? 0) < 0.3) {
+        const idx = Math.round(e.contentOffset.y / ROW);
+        scrollTo(ref, 0, idx * ROW, true);
+        runOnJS(commit)(idx);
+      }
     },
   });
 
@@ -138,6 +151,7 @@ export function Wheel({ values, value, onChange, half, label, bigSize = 34, band
     <View style={{ height, width }}>
       {band ? <View pointerEvents="none" style={[s.band, { top: half * ROW }]} /> : null}
       <Animated.ScrollView
+        ref={ref}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -179,9 +193,8 @@ const s = StyleSheet.create({
     top: -8,
     bottom: -8,
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 8,
   },
   big: { fontFamily: F.serif, lineHeight: 40, color: C.ink, fontVariant: ['tabular-nums'] },
   unit: { fontFamily: F.sans, fontSize: 15, color: C.muted, marginLeft: 6 },

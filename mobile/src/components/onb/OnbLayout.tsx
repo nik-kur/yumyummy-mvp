@@ -6,8 +6,8 @@
  * The artboards are 390 × 844 with the status bar inside the 52 pt top
  * padding; on a device the safe-area inset replaces the status bar part.
  */
-import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -65,6 +65,12 @@ interface Props {
 
 export function OnbLayout({ progress, title, sub, children, footer, canGoBack, onBack, center, contentStyle, backOnly }: Props) {
   const insets = useSafeAreaInsets();
+  // Scroll only when the content does not fit (small iPhones, App Review's
+  // iPad compatibility mode); otherwise the flex spacers lay it out as drawn,
+  // and wheels / rulers inside never fight an outer scroll.
+  const [boxH, setBoxH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const overflow = boxH > 0 && contentH > boxH + 1;
   return (
     <View
       style={[
@@ -83,7 +89,18 @@ export function OnbLayout({ progress, title, sub, children, footer, canGoBack, o
         )
       ) : null}
       {sub ? <Text style={[s.sub, center && s.center]}>{sub}</Text> : null}
-      <View style={[s.content, contentStyle]}>{children}</View>
+      <ScrollView
+        // Clip only while scrolling is needed, so card shadows are not cut.
+        style={[s.content, !overflow && s.visible]}
+        contentContainerStyle={[s.scrollContent, contentStyle]}
+        scrollEnabled={overflow}
+        showsVerticalScrollIndicator={overflow}
+        bounces={overflow}
+        onLayout={(e) => setBoxH(e.nativeEvent.layout.height)}
+        onContentSizeChange={(_, h) => setContentH(h)}
+      >
+        {children}
+      </ScrollView>
       {footer}
     </View>
   );
@@ -107,4 +124,6 @@ const s = StyleSheet.create({
   sub: { marginTop: 10, fontFamily: F.sans, fontSize: 17, lineHeight: 25, color: C.muted },
   center: { textAlign: 'center' },
   content: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  visible: { overflow: 'visible' },
 });

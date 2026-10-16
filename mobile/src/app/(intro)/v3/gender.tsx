@@ -23,7 +23,7 @@ export default function GenderScreen() {
       value={gender}
       onChange={setGender}
       pad={{ v: 0, h: 20, minHeight: 64 }}
-      onContinue={() => gender && next({ gender }, { gender })}
+      onContinue={() => gender && next({ gender }, { gender }, { onb_gender: gender })}
     />
   );
 }

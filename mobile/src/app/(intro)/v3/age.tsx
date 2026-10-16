@@ -18,7 +18,7 @@ export default function AgeScreen() {
       progress={progress}
       title="How old are you?"
       sub="Calorie needs change with age."
-      footer={<OnbButton label="Continue" onPress={() => next({ age }, { age_bucket: Math.floor(age / 10) * 10 })} />}
+      footer={<OnbButton label="Continue" onPress={() => next({ age }, { age_bucket: Math.floor(age / 10) * 10 }, { onb_age_bucket: Math.floor(age / 10) * 10 })} />}
     >
       <View style={{ flex: 1 }} />
       <Wheel values={AGES} value={age} onChange={setAge} half={3} label={label} bigSize={34} />

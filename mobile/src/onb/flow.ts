@@ -11,10 +11,10 @@
  * Every screen asks `nextScreen` where to go, so a branch rule lives in one
  * place. Screen ids double as PostHog `screen` values.
  */
-import type { OnboardingConfig } from '@/config/types';
+import type { ContentGoal, OnboardingConfig, OnboardingContent } from '@/config/types';
 import type { IntroDraft } from '@/state/introDraft';
 
-import { direction } from './plan';
+import { direction, goalCheck } from './plan';
 
 export type ScreenId =
   | 'S1_welcome'
@@ -85,8 +85,21 @@ function weightMoves(d: IntroDraft): boolean {
   return d.target_weight_kg !== null && direction(d.weight_kg, d.target_weight_kg) !== 'same';
 }
 
+function belowHealthy(d: IntroDraft): boolean {
+  return d.target_weight_kg !== null && goalCheck(d.weight_kg, d.target_weight_kg, d.height_cm) === 'healthy';
+}
+
 /** Where to go after `current`, given the answers so far and the arm's config. */
-export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig): string {
+const CONTENT_GOAL: Record<string, ContentGoal> = { lose: 'lose', gain: 'gain', maintain: 'maintain', just_track: 'track' };
+
+/** Screen 16 needs reviews for this goal unless a Flow Builder slot draws it. */
+function hasSocialContent(d: IntroDraft, c: OnboardingConfig, content?: OnboardingContent): boolean {
+  if (c.social_proof.render === 'flow') return true;
+  if (!content) return true;
+  return (content.reviews[CONTENT_GOAL[d.goal_type ?? 'lose']] ?? []).length > 0;
+}
+
+export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig, content?: OnboardingContent): string {
   const order: ScreenId[] = [
     'S1_welcome',
     'S2_goal',
@@ -110,6 +123,8 @@ export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig
   const skip = (id: ScreenId): boolean => {
     switch (id) {
       case 'S7_goal_check':
+        // Below a healthy BMI is always caught, even when the weight barely moves.
+        return !weightMoves(d) && !belowHealthy(d);
       case 'S7_pace':
         return !weightMoves(d);
       case 'S10_barriers':
@@ -117,7 +132,7 @@ export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig
       case 'S12_features':
         return c.features === 'off';
       case 'S16_social':
-        return !c.social_proof.show;
+        return !c.social_proof.show || !hasSocialContent(d, c, content);
       default:
         return false;
     }
