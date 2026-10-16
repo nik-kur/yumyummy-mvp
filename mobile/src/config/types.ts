@@ -57,6 +57,9 @@ export interface Review {
 export interface BeforeAfter {
   before_url: string;
   after_url: string;
+  /** Bundled photos — QA demo content only (`demoContent.ts`). */
+  before_local?: number;
+  after_local?: number;
   /** e.g. "Emma, −7 kg in 4 months" */
   caption: string;
   quote?: string;

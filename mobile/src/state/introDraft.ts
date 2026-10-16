@@ -28,6 +28,19 @@ export interface IntroDraft {
   target_weight_kg: number | null;
   deficit_pct: number | null;
   target_weeks: number | null;
+  // V3 onboarding answers
+  /** Screen 4: where they heard about us (`instagram`, `tiktok`, …). */
+  source: string | null;
+  /** Screen 9: tracked calories before. */
+  tracked_before: boolean | null;
+  /** Screen 10: what made tracking hard (one answer). */
+  barrier: string | null;
+  /** Screen 5: units chosen on the height & weight wheels. */
+  units: 'metric' | 'imperial';
+  /** Screen 7: pace in kg per week (null when the weight holds). */
+  pace_kg_week: number | null;
+  /** ISO date the target weight is reached (null when the weight holds). */
+  target_date: string | null;
   // Computed
   target_calories: number | null;
   target_protein_g: number | null;
@@ -46,6 +59,12 @@ export const DEFAULT_DRAFT: IntroDraft = {
   target_weight_kg: null,
   deficit_pct: null,
   target_weeks: null,
+  source: null,
+  tracked_before: null,
+  barrier: null,
+  units: 'metric',
+  pace_kg_week: null,
+  target_date: null,
   target_calories: null,
   target_protein_g: null,
   target_fat_g: null,

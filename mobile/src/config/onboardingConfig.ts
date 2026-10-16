@@ -270,7 +270,7 @@ export function getOnboardingAssignmentMeta(): AssignmentMeta | null {
  */
 const DEMO_CONTENT: OnboardingContent | null =
   __DEV__ || process.env.EXPO_PUBLIC_QA_BUILD === '1'
-    ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+    ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- QA-only module, see note above
       (require('./demoContent') as { DEMO_CONTENT: OnboardingContent }).DEMO_CONTENT
     : null;
 
