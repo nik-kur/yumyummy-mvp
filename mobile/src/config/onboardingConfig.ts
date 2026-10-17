@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import { adapty } from 'react-native-adapty';
 import type { AdaptyFlow } from 'react-native-adapty';
 
-import { register, setPersonProperties, track } from '@/analytics/posthog';
+import { registerDevice, setPersonProperties, track } from '@/analytics/posthog';
 import { addBreadcrumb } from '@/analytics/sentry';
 import {
   ADAPTY_PLACEMENT_ONBOARDING_CONTENT,
@@ -170,7 +170,7 @@ export function resolveOnboardingAssignment(): Promise<OnboardingAssignment> {
     if (gen !== generation) return resolveOnboardingAssignment();
     if (stored) {
       assignment = stored;
-      register(analyticsProps(stored));
+      registerDevice(analyticsProps(stored));
       addBreadcrumb('config', 'Onboarding arm reused', { source: stored.meta.source });
       emit();
       return stored;
@@ -194,7 +194,7 @@ export function resolveOnboardingAssignment(): Promise<OnboardingAssignment> {
     assignment = fresh;
     await AsyncStorage.setItem(ASSIGNMENT_KEY, JSON.stringify(fresh)).catch(() => {});
     const props = analyticsProps(fresh);
-    register(props);
+    registerDevice(props);
     setPersonProperties(props);
     track('onboarding_config_assigned', {
       ...props,

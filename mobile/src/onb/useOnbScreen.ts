@@ -27,7 +27,7 @@ export function useOnbScreen(id: ScreenId, variant?: string) {
   const leaving = useRef(false);
 
   useEffect(() => {
-    track('onboarding_screen_viewed', { screen: id, variant: variant ?? null, onboarding_version: 'v3' });
+    track('onboarding_screen_viewed', { screen: id, variant: variant ?? null });
     // Only once per mount: a variant that depends on async content is logged as first rendered.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);

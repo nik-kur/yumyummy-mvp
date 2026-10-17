@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
   useCallback,
@@ -24,6 +25,25 @@ import { track } from '@/analytics/posthog';
  * replaced by the real entry. Failures surface as a tappable error row rather
  * than a silent 0-kcal meal.
  */
+
+
+/**
+ * `is_first_meal` on the first meal ever logged on this device: the funnel's
+ * activation step. Read once at start-up, then kept in memory.
+ */
+const FIRST_MEAL_KEY = '@yy_first_meal_logged';
+let firstMealLogged: boolean | null = null;
+void AsyncStorage.getItem(FIRST_MEAL_KEY)
+  .then((v) => {
+    if (firstMealLogged === null) firstMealLogged = v !== null;
+  })
+  .catch(() => {});
+function markFirstMeal(): boolean {
+  if (firstMealLogged) return false;
+  firstMealLogged = true;
+  void AsyncStorage.setItem(FIRST_MEAL_KEY, new Date().toISOString()).catch(() => {});
+  return true;
+}
 
 export type PendingStatus = 'processing' | 'error';
 
@@ -188,6 +208,7 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
         // success path and the timeout-reconciliation path.
         const totals = res ? sumItems(res.items ?? []) : null;
         track('meal_logged', {
+          is_first_meal: markFirstMeal(),
           source: kindOf(input),
           origin: res ? originOf(res) : undefined,
           calories: res?.totals?.calories_kcal ?? totals?.calories,

@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sentrySetUser(String(me.account_id));
     if (method) {
       lastSignInCreated = Boolean(created);
-      track('signin_success', { method });
+      track('signin_success', { method, created: Boolean(created) });
     }
     // Registration is the first post-install signal Meta can optimise on before
     // any trial starts; fire it once per account, on the sign-in that created it.

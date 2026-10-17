@@ -76,15 +76,18 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
   const next = useCallback(() => setIndex((i) => Math.min(i + 1, steps.length - 1)), [steps.length]);
   const back = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
 
+  // Once per step shown (products loading later must not log it again).
+  const productCount = useRef(products.length);
+  productCount.current = products.length;
   useEffect(() => {
     track('paywall_step_viewed', {
       step,
       variant: config.variant,
       step_index: index,
       steps: steps.join('>'),
-      products: products.length,
+      products: productCount.current,
     });
-  }, [step, index, steps, config.variant, products.length]);
+  }, [step, index, steps, config.variant]);
 
   // B2: ask for push on arrival, once per visit — the reminder it promises
   // only fires with permission. Declined before = iOS answers without a prompt.

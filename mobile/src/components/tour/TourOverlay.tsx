@@ -202,6 +202,34 @@ function Spotlight({ hole, width, height, dim, radius }: { hole: Box; width: num
 }
 
 /** Step 2: the white arrow floating above "+" (canvas `yy-float`). */
+/**
+ * Curved arrow from the card to the element, bobbing towards it. `down` =
+ * the element is below the card; `flip` mirrors it left-right.
+ */
+function CurvedArrow({ x, y, down, flip }: { x: number; y: number; down: boolean; flip: boolean }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    const e = Easing.inOut(Easing.ease);
+    t.value = withRepeat(withSequence(withTiming(1, { duration: 900, easing: e }), withTiming(0, { duration: 900, easing: e })), -1);
+    return () => cancelAnimation(t);
+  }, [t]);
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: (down ? 5 : -5) * t.value },
+      { scaleY: down ? -1 : 1 },
+      { scaleX: flip ? -1 : 1 },
+    ],
+  }));
+  return (
+    <Animated.View style={[{ position: 'absolute', left: x - 28, top: y - 6, width: 56, height: 52 }, style]} pointerEvents="none">
+      <Svg width={56} height={52} viewBox="0 0 44 40" fill="none">
+        <Path d="M8 37C8 22 18 11 34 7" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" />
+        <Path d="M26 3l8 4-5 7" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
 function FloatingArrow({ x, y }: { x: number; y: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
@@ -301,16 +329,23 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
     router.push('/capture');
   };
 
-  // Card below the hole when it fits above the bottom, otherwise above it
-  // (leaving room for the arrow on step 2).
+  // Card below the hole when it fits above the bottom, otherwise above it,
+  // with room for the arrow between them (step 3 has no arrow: the example
+  // chips sit there).
   let cardTop = 0;
+  let cardBelow = false;
+  const curved = def.target !== 'plus' && def.target !== 'capture_bar';
   if (hole) {
-    const below = hole.y + hole.h + 20;
+    const gap = curved ? 46 : 18;
+    const below = hole.y + hole.h + gap;
     const roof = ceiling !== null && ceiling < hole.y ? ceiling : hole.y;
-    const above = roof - (def.circle ? 58 : 18) - cardH;
-    // Below the element only if the card clears the tab bar there.
-    const floor = height - (scope === 'tabs' ? 100 : 40);
-    cardTop = !def.above && below + cardH <= floor ? below : Math.max(56, above);
+    const above = roof - (def.circle ? 58 : gap) - cardH;
+    // Below the element if the card clears the tab bar there (squeezing the
+    // arrow gap a little rather than covering the element from above).
+    const floor = height - (scope === 'tabs' ? 92 : 40);
+    const squeezed = Math.min(below, floor - cardH);
+    cardBelow = !def.above && squeezed >= hole.y + hole.h + (curved ? 34 : 12);
+    cardTop = cardBelow ? squeezed : Math.max(56, above);
   }
 
   // The app is blocked only while a step is actually on screen: a step still
@@ -332,6 +367,18 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
           accessibilityViewIsModal={scope === 'tabs'}
         >
           <Spotlight hole={hole} width={width} height={height} dim={def.dim} radius={def.circle ? hole.w / 2 : def.radius} />
+          {curved && cardH > 0 ? (
+            cardBelow ? (
+              <CurvedArrow
+                x={hole.x + hole.w * 0.62}
+                y={hole.y + hole.h + Math.max(0, (cardTop - hole.y - hole.h - 40) / 2)}
+                down={false}
+                flip={tour.step % 2 === 0}
+              />
+            ) : (
+              <CurvedArrow x={hole.x + hole.w * 0.62} y={hole.y - 46} down flip={tour.step % 2 === 0} />
+            )
+          ) : null}
           {def.target === 'plus' ? (
             <>
               <FloatingArrow x={hole.x + hole.w / 2} y={hole.y} />
@@ -370,21 +417,24 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
 }
 
 const s = StyleSheet.create({
-  // Dark, so a tip never reads as one of the app's own (light) cards.
+  // Soft olive (the protein colour family), so a tip never reads as one of
+  // the app's own cream cards, without the weight of a dark card.
   card: {
     position: 'absolute',
     left: 20,
     right: 20,
     paddingVertical: 16,
     paddingHorizontal: 18,
-    backgroundColor: C.ink,
+    backgroundColor: '#E8EBD3',
+    borderWidth: 1.5,
+    borderColor: '#B9C197',
     borderRadius: 16,
   },
-  title: { fontFamily: F.sansSemibold, fontSize: 17, lineHeight: 22, color: C.paper },
-  body: { marginTop: 4, fontFamily: F.sans, fontSize: 15, lineHeight: 21, color: 'rgba(247,241,230,0.75)' },
+  title: { fontFamily: F.sansSemibold, fontSize: 17, lineHeight: 22, color: '#2F3A1C' },
+  body: { marginTop: 4, fontFamily: F.sans, fontSize: 15, lineHeight: 21, color: '#4E5934' },
   footer: { marginTop: 14, height: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  count: { fontFamily: F.sans, fontSize: 13, color: 'rgba(247,241,230,0.55)' },
+  count: { fontFamily: F.sans, fontSize: 13, color: '#7A8459' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  next: { height: 36, paddingHorizontal: 16, borderRadius: 10, backgroundColor: C.terra, alignItems: 'center', justifyContent: 'center' },
+  next: { height: 36, paddingHorizontal: 16, borderRadius: 10, backgroundColor: C.protein, alignItems: 'center', justifyContent: 'center' },
   nextText: { fontFamily: F.sansSemibold, fontSize: 14, color: C.white },
 });

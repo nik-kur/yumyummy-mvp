@@ -13,7 +13,7 @@
 | 2 | Онбординг 1–16 (43 артборда), хаптика, карусель, ATT поверх лоадера | готово 16 окт |
 | 3 | Пейвол 17–19 (B1–B3, P1 с видео), оффер 20, покупка, restore; убрать клиентские af_start_trial / af_subscribe | готово 16 окт |
 | 4 | После покупки 22–25: Success, Save plan, туториал 6 шагов, Payoff | готово 17 окт |
-| 5 | Аналитика: события экранов, пробелы, метка sandbox | — |
+| 5 | Аналитика: события экранов, пробелы, метка sandbox | готово 17 окт |
 | 6 | Preview mode: анонимный аккаунт, merge, один бесплатный AI-лог, защита от переустановки | — |
 | Финал | Полный прогон, /code-review, чеклист теста на телефоне, черновик настроек Adapty | — |
 
@@ -121,7 +121,23 @@ QA-меню: заготовки ответов + прыжок на любой э
 
 Прогон (17 окт, iPhone 17e, тестовая сборка с внутренним API): пейвол → mock-покупка → Success → Save plan → вход → тур 1–6 → Payoff — всё совпадает с артбордами, листы `docs/onboarding-v3-screens/stage4/`. Не проверено: настоящий Sign in with Apple и покупка (телефон), VoiceOver вживую, экран 667 pt.
 
+## Этап 5
+
+Аудит событий PostHog (субагент) → исправлено:
+- Арм пейвола — super properties устройства (`pw_render`, `pw_variant`, `pw_variation_id`, `pw_variation_name`, `pw_ab_test`, `pw_config_source`, `pw_price_emphasis`) и на каждом событии `paywall_*` (включая отмену, ошибку, оффер). Вход, тур, первая еда теперь делятся и по арму пейвола, и по арму онбординга.
+- `reset()` при выходе из аккаунта больше не стирает `qa_build` и армы (они регистрируются заново).
+- Покупка: `is_sandbox` из профиля Adapty (подписка) на `paywall_purchase_success` и как super property — тестовые покупки (TestFlight, ревью, sandbox) отфильтровываются в PostHog.
+- `paywall_purchase_started` у всех рендеров (раньше у флоу Adapty и старого пейвола не было); `paywall_shown` флоу Adapty — один раз (не повторяется после закрытия оффера); `paywall_step_viewed` — один раз на шаг.
+- `meal_logged` → `is_first_meal: true` на первой еде с устройства (шаг активации); `signin_success` → `created`.
+- `onboarding_screen_viewed` больше не пишет жёстко `onboarding_version: v3` (версия идёт super property).
+
+Воронка в PostHog (фильтр `qa_build = false`, `is_sandbox != true`): `onboarding_config_assigned` → `onboarding_screen_viewed` (S1…S16) → `paywall_shown` → `paywall_step_viewed` → `paywall_purchase_started` → `paywall_purchase_success` | `paywall_purchase_cancelled` → `paywall_offer_shown` → `signin_gate_success` → `tour_step_viewed` → `meal_logged is_first_meal`. Разбивка: `onb_variation_name`, `pw_variant`, `pw_variation_name`.
+
+Тур (17 окт, Никита): подсказки оливковые (`#E8EBD3`, рамка, кнопка цвета белка), без Skip; изогнутые прыгающие стрелки к элементу на шагах 1, 4, 5, 6, прямая — к «+».
+
 ## Открытые вопросы
+
+- Проверить на TestFlight с настоящим аккаунтом (17 окт, Никита): шаг 3 тура → настоящий поиск еды (текст, голос, фото) → еда с источником появляется на Today → шаг 4 и Payoff. В симуляторе работает только заглушка API: запись добавляется с придуманными калориями, голос не распознаётся.
 
 - 16 окт (Никита): фраза «80% of users… maintain their weight loss» без источника заменена на «In a 6-month study of 142 adults, the people who logged their meals most often lost the most weight.» — Harvey et al., Log Often, Lose More, Obesity 2019 (PMID 30801989); `features.tsx` CLAIM_OVERRIDES.
 - Реестр всего, что меняется через Adapty: [knowledge/adapty-control-registry.md](knowledge/adapty-control-registry.md) (обновлять при каждом новом ключе).

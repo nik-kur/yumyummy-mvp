@@ -86,7 +86,7 @@ import { qaOverrides } from '@/config/qa';
 import type { ConfigSource, PaywallArmConfig } from '@/config/types';
 import { fmtKg, fmtStLb } from '@/onb/plan';
 import { enableRemindersAfterPurchase, scheduleTrialEndingReminder } from '@/notifications/scheduler';
-import { track } from '@/analytics/posthog';
+import { registerDevice, track } from '@/analytics/posthog';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 import { colors, radius, space } from '@/theme/tokens';
 import * as api from '@/api/endpoints';
@@ -223,6 +223,12 @@ export default function PaywallScreen() {
   const offerRef = useRef<Promise<OfferState | null> | null>(null);
   const offerShownRef = useRef(false);
   const [offer, setOffer] = useState<OfferState | null>(null);
+  // The `pw_main` arm on every paywall event, and as device super properties
+  // so later events (sign-in, tour, first meal) can be split by paywall arm.
+  const pwArmRef = useRef<Record<string, unknown>>({});
+  const shownFlowRef = useRef<string | null>(null);
+  const ptrack = (event: string, props: Record<string, unknown> = {}) =>
+    track(event, { ...pwArmRef.current, ...props });
   // Set once a purchase or restore succeeded or the screen unmounted: a late
   // offer must not be shown (or counted as a view) after that.
   const leavingRef = useRef(false);
@@ -315,9 +321,15 @@ export default function PaywallScreen() {
     product: AdaptyPaywallProduct,
     renderer: Renderer,
     extra: Record<string, unknown> = {},
+    profile?: AdaptyProfile | null,
   ) => {
     const hasTrial = freeTrialPhase(product) !== undefined;
-    track('paywall_purchase_success', {
+    // Sandbox = TestFlight, App Review or a sandbox Apple ID: filter these out
+    // of conversion numbers in PostHog (`is_sandbox`), as Adapty does.
+    const isSandbox = profile?.subscriptions?.[product.vendorProductId]?.isSandbox ?? null;
+    if (isSandbox !== null) registerDevice({ is_sandbox: isSandbox });
+    ptrack('paywall_purchase_success', {
+      is_sandbox: isSandbox,
       product: product.vendorProductId,
       variant: variantLabel(renderer),
       renderer,
@@ -350,7 +362,7 @@ export default function PaywallScreen() {
   /** After a restore that found an active `premium` access level, any renderer. */
   const afterRestoreSuccess = useCallback(async () => {
     leavingRef.current = true;
-    track('paywall_restore_success', { signed_in: signedInRef.current });
+    ptrack('paywall_restore_success', { signed_in: signedInRef.current });
     // Idempotent — a reinstall gets the first-week ladder, an existing
     // journey is left where it is.
     await startJourney();
@@ -380,7 +392,7 @@ export default function PaywallScreen() {
     setProducts(prods);
 
     await adapty.logShowFlow(pw);
-    track('paywall_shown', {
+    ptrack('paywall_shown', {
       placement: ADAPTY_PLACEMENT_MAIN,
       variant: config.variant,
       renderer: 'code',
@@ -407,6 +419,16 @@ export default function PaywallScreen() {
       ab_test: arm.flow?.placement?.abTestName,
       audience: arm.flow?.placement?.audienceName,
     };
+    pwArmRef.current = {
+      pw_render: arm.config.render,
+      pw_variant: arm.config.render === 'native' ? arm.config.variant : arm.flow?.variationName ?? null,
+      pw_variation_id: arm.flow?.variationId ?? null,
+      pw_variation_name: arm.flow?.variationName ?? null,
+      pw_ab_test: arm.flow?.placement?.abTestName ?? null,
+      pw_config_source: arm.source,
+      pw_price_emphasis: arm.config.price_emphasis,
+    };
+    registerDevice(pwArmRef.current);
 
     if (arm.config.render === 'flow' && arm.flow?.hasViewConfiguration) {
       setBuilderFlow(arm.flow);
@@ -423,7 +445,7 @@ export default function PaywallScreen() {
         captureException(e);
         if (alive()) {
           setPhase('fallback');
-          track('paywall_fallback_shown', {
+          ptrack('paywall_fallback_shown', {
             placement: ADAPTY_PLACEMENT_MAIN,
             reason: 'load_failed',
             error: e instanceof Error ? e.message : String(e),
@@ -462,7 +484,7 @@ export default function PaywallScreen() {
     if (arm.flow && prods.length > 0) {
       adapty.logShowFlow(arm.flow).catch((e) => captureException(e));
     }
-    track('paywall_shown', {
+    ptrack('paywall_shown', {
       ...armMeta,
       variant: arm.config.variant,
       renderer: 'v3',
@@ -473,7 +495,7 @@ export default function PaywallScreen() {
     });
     addBreadcrumb('paywall', 'Paywall shown', { variant: arm.config.variant, renderer: 'v3' });
     if (prods.length === 0) {
-      track('paywall_fallback_shown', {
+      ptrack('paywall_fallback_shown', {
         placement: ADAPTY_PLACEMENT_PAYWALL_FLOW,
         renderer: 'v3',
         reason: !ok ? 'adapty_unavailable' : arm.flow ? 'no_products' : 'no_flow',
@@ -507,7 +529,7 @@ export default function PaywallScreen() {
         // Never yank the screen while a StoreKit sheet may be up.
         if (cancelled || purchasingRef.current) return;
 
-        track('paywall_skipped_already_premium', {
+        ptrack('paywall_skipped_already_premium', {
           placement: ADAPTY_PLACEMENT_MAIN,
           source: 'paywall_mount',
           signed_in: signedInRef.current,
@@ -591,7 +613,7 @@ export default function PaywallScreen() {
         setProducts(targetedProducts);
 
         await adapty.logShowFlow(targeted);
-        track('paywall_variant_swapped', {
+        ptrack('paywall_variant_swapped', {
           placement: ADAPTY_PLACEMENT_MAIN,
           from_variant: previousVariant,
           to_variant: configRef.current.variant,
@@ -631,7 +653,7 @@ export default function PaywallScreen() {
     if (next.kind === 'native') {
       adapty.logShowFlow(next.flow).catch((e) => captureException(e));
     }
-    track('paywall_offer_shown', {
+    ptrack('paywall_offer_shown', {
       placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW,
       variant: offerVariant(next),
       renderer: next.kind === 'native' ? 'v3' : 'adapty_flow',
@@ -657,7 +679,7 @@ export default function PaywallScreen() {
   }, [phase, params.qa_offer, maybeShowOffer]);
 
   const handleRetry = useCallback(() => {
-    track('paywall_retry_pressed');
+    ptrack('paywall_retry_pressed');
     // A prefetch made while Adapty was unreachable resolved to "no offer";
     // fetch it again with the paywall.
     if (!offerShownRef.current) offerRef.current = null;
@@ -670,16 +692,14 @@ export default function PaywallScreen() {
     setPurchasing(true);
     const variant = variantLabel(renderer);
     addBreadcrumb('purchase', 'Purchase started', { product: product.vendorProductId, renderer });
-    if (renderer === 'code') {
-      track('paywall_plan_selected', { product: product.vendorProductId, variant, renderer });
-    } else {
-      track('paywall_purchase_started', {
-        product: product.vendorProductId,
-        variant,
-        renderer,
-        has_trial: trialDays(product) > 0,
-      });
-    }
+    // The legacy paywall never sent plan selection separately: keep its event.
+    if (renderer === 'code') ptrack('paywall_plan_selected', { product: product.vendorProductId, variant, renderer });
+    ptrack('paywall_purchase_started', {
+      product: product.vendorProductId,
+      variant,
+      renderer,
+      has_trial: trialDays(product) > 0,
+    });
 
     try {
       // QA builds only: skip StoreKit so the post-purchase screens can be
@@ -691,7 +711,7 @@ export default function PaywallScreen() {
       }
 
       if (!isAdaptyConfigured()) {
-        track('paywall_purchase_success', {
+        ptrack('paywall_purchase_success', {
           product: product.vendorProductId,
           variant,
           mode: 'dev_trial',
@@ -717,10 +737,10 @@ export default function PaywallScreen() {
 
       const result = await adapty.makePurchase(product);
       if (result.type === 'success') {
-        await afterPurchaseSuccess(product, renderer);
+        await afterPurchaseSuccess(product, renderer, {}, result.profile);
       } else if (result.type === 'user_cancelled') {
         // User backed out of the StoreKit sheet — expected, not an error.
-        track('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer });
+        ptrack('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer });
         addBreadcrumb('purchase', 'Purchase cancelled by user');
         // `purchasingRef` mirrors the `purchasing` state through an effect, so at this
         // point it still reads true and `maybeShowOffer` would bail out: the after-cancel
@@ -729,14 +749,14 @@ export default function PaywallScreen() {
         if (renderer !== 'v3_offer') void maybeShowOffer(product.vendorProductId, renderer);
       } else if (result.type === 'pending') {
         // Ask-to-Buy / deferred: purchase may complete later out of band.
-        track('paywall_purchase_pending', { product: product.vendorProductId, variant, renderer });
+        ptrack('paywall_purchase_pending', { product: product.vendorProductId, variant, renderer });
         Alert.alert(
           'Purchase pending',
           "Your purchase needs approval and will activate once it's confirmed.",
         );
       }
     } catch (e) {
-      track('paywall_purchase_failed', {
+      ptrack('paywall_purchase_failed', {
         product: product.vendorProductId,
         variant,
         renderer,
@@ -756,7 +776,7 @@ export default function PaywallScreen() {
     purchasingRef.current = true;
     setPurchasing(true);
     addBreadcrumb('purchase', 'Restore started');
-    track('paywall_restore_started');
+    ptrack('paywall_restore_started');
 
     try {
       if (!isAdaptyConfigured()) {
@@ -772,12 +792,12 @@ export default function PaywallScreen() {
         await afterRestoreSuccess();
       } else {
         Alert.alert('No subscription found', 'We couldn\'t find an active subscription for this Apple ID.');
-        track('paywall_restore_empty');
+        ptrack('paywall_restore_empty');
       }
     } catch (e) {
       Alert.alert('Restore failed', 'Please try again.');
       captureException(e);
-      track('paywall_restore_failed');
+      ptrack('paywall_restore_failed');
     } finally {
       purchasingRef.current = false;
       setPurchasing(false);
@@ -785,7 +805,7 @@ export default function PaywallScreen() {
   }, [afterRestoreSuccess, router, signedIn, handOffToSignIn]);
 
   const handleClose = useCallback(() => {
-    track('paywall_closed', { dismissable: true });
+    ptrack('paywall_closed', { dismissable: true });
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)');
   }, [router]);
@@ -805,9 +825,9 @@ export default function PaywallScreen() {
     (result: AdaptyPurchaseResult, product: AdaptyPaywallProduct) => {
       purchasingRef.current = false;
       if (result.type === 'success') {
-        void afterPurchaseSuccess(product, 'adapty_flow').catch(captureException);
+        void afterPurchaseSuccess(product, 'adapty_flow', {}, result.profile).catch(captureException);
       } else if (result.type === 'user_cancelled') {
-        track('paywall_purchase_cancelled', {
+        ptrack('paywall_purchase_cancelled', {
           product: product.vendorProductId,
           variant: variantLabel('adapty_flow'),
           renderer: 'adapty_flow',
@@ -815,7 +835,7 @@ export default function PaywallScreen() {
         addBreadcrumb('purchase', 'Purchase cancelled by user');
         void maybeShowOffer(product.vendorProductId, 'adapty_flow');
       } else if (result.type === 'pending') {
-        track('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow' });
+        ptrack('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow' });
         Alert.alert(
           'Purchase pending',
           "Your purchase needs approval and will activate once it's confirmed.",
@@ -831,7 +851,7 @@ export default function PaywallScreen() {
     if (adaptyProfile.accessLevels?.[PREMIUM_ACCESS_LEVEL]?.isActive) {
       void afterRestoreSuccess().catch(captureException);
     } else {
-      track('paywall_restore_empty', { renderer: 'adapty_flow' });
+      ptrack('paywall_restore_empty', { renderer: 'adapty_flow' });
       Alert.alert('No subscription found', 'We couldn\'t find an active subscription for this Apple ID.');
     }
     return false;
@@ -864,7 +884,7 @@ export default function PaywallScreen() {
   if (offer) {
     const variant = offerVariant(offer);
     const closeOffer = (reason: string) => {
-      track('paywall_offer_closed', {
+      ptrack('paywall_offer_closed', {
         placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW,
         variant,
         renderer: offer.kind === 'native' ? 'v3' : 'adapty_flow',
@@ -892,28 +912,29 @@ export default function PaywallScreen() {
           params={flowParams}
           style={s.fill}
           onProductSelected={(productId) => {
-            track('paywall_plan_selected', { product: productId, variant, renderer: 'adapty_flow_offer' });
+            ptrack('paywall_plan_selected', { product: productId, variant, renderer: 'adapty_flow_offer' });
             return false;
           }}
           onPurchaseStarted={(product) => {
             purchasingRef.current = true;
+            ptrack('paywall_purchase_started', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
             addBreadcrumb('purchase', 'Offer purchase started', { product: product.vendorProductId });
             return false;
           }}
           onPurchaseCompleted={(result, product) => {
             purchasingRef.current = false;
             if (result.type === 'success') {
-              void afterPurchaseSuccess(product, 'adapty_flow_offer').catch(captureException);
+              void afterPurchaseSuccess(product, 'adapty_flow_offer', {}, result.profile).catch(captureException);
             } else if (result.type === 'user_cancelled') {
-              track('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
+              ptrack('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
             } else if (result.type === 'pending') {
-              track('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow_offer' });
+              ptrack('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow_offer' });
             }
             return false;
           }}
           onPurchaseFailed={(error, product) => {
             purchasingRef.current = false;
-            track('paywall_purchase_failed', { product: product?.vendorProductId, renderer: 'adapty_flow_offer', error: error?.message, adapty_detail: adaptyErrorContext(error).adapty_detail });
+            ptrack('paywall_purchase_failed', { product: product?.vendorProductId, renderer: 'adapty_flow_offer', error: error?.message, adapty_detail: adaptyErrorContext(error).adapty_detail });
             captureException(error, adaptyErrorContext(error, { product: product?.vendorProductId, renderer: 'adapty_flow_offer' }));
             return false;
           }}
@@ -992,7 +1013,10 @@ export default function PaywallScreen() {
           params={flowParams}
           style={s.fill}
           onAppeared={() => {
-            track('paywall_shown', {
+            // Once per flow: it appears again when the after-cancel offer closes.
+            if (shownFlowRef.current === builderFlow.variationId) return false;
+            shownFlowRef.current = builderFlow.variationId;
+            ptrack('paywall_shown', {
               placement: ADAPTY_PLACEMENT_PAYWALL_FLOW,
               variant: builderFlow.variationName ?? builderFlow.variationId,
               renderer: 'adapty_flow',
@@ -1006,7 +1030,7 @@ export default function PaywallScreen() {
             return false;
           }}
           onProductSelected={(productId) => {
-            track('paywall_plan_selected', {
+            ptrack('paywall_plan_selected', {
               product: productId,
               variant: builderFlow.variationName ?? builderFlow.variationId,
               renderer: 'adapty_flow',
@@ -1015,6 +1039,11 @@ export default function PaywallScreen() {
           }}
           onPurchaseStarted={(product) => {
             purchasingRef.current = true;
+            ptrack('paywall_purchase_started', {
+              product: product.vendorProductId,
+              variant: builderFlow.variationName ?? builderFlow.variationId,
+              renderer: 'adapty_flow',
+            });
             addBreadcrumb('purchase', 'Purchase started', {
               product: product.vendorProductId,
               renderer: 'adapty_flow',
@@ -1024,7 +1053,7 @@ export default function PaywallScreen() {
           onPurchaseCompleted={onFlowPurchaseCompleted}
           onPurchaseFailed={(error, product) => {
             purchasingRef.current = false;
-            track('paywall_purchase_failed', {
+            ptrack('paywall_purchase_failed', {
               product: product?.vendorProductId,
               renderer: 'adapty_flow',
               error: error?.message ?? String(error),
@@ -1036,13 +1065,13 @@ export default function PaywallScreen() {
           onRestoreStarted={() => {
             purchasingRef.current = true;
             addBreadcrumb('purchase', 'Restore started', { renderer: 'adapty_flow' });
-            track('paywall_restore_started', { renderer: 'adapty_flow' });
+            ptrack('paywall_restore_started', { renderer: 'adapty_flow' });
             return false;
           }}
           onRestoreCompleted={onFlowRestoreCompleted}
           onRestoreFailed={(error) => {
             purchasingRef.current = false;
-            track('paywall_restore_failed', { renderer: 'adapty_flow' });
+            ptrack('paywall_restore_failed', { renderer: 'adapty_flow' });
             captureException(error);
             return false;
           }}
@@ -1053,19 +1082,19 @@ export default function PaywallScreen() {
             return false;
           }}
           onLoadingProductsFailed={(error) => {
-            track('paywall_products_failed', { renderer: 'adapty_flow', error: error?.message });
+            ptrack('paywall_products_failed', { renderer: 'adapty_flow', error: error?.message });
             captureException(error);
             return false;
           }}
           onError={(error) => {
             // A flow that cannot render is not a wall: drop to the code paywall.
             captureException(error, { placement: ADAPTY_PLACEMENT_PAYWALL_FLOW });
-            track('paywall_flow_render_failed', { error: error?.message });
+            ptrack('paywall_flow_render_failed', { error: error?.message });
             setBuilderFlow(null);
             void loadCodePaywall(() => true).catch((e) => {
               captureException(e);
               setPhase('fallback');
-              track('paywall_fallback_shown', {
+              ptrack('paywall_fallback_shown', {
                 placement: ADAPTY_PLACEMENT_MAIN,
                 reason: 'load_failed',
                 error: e instanceof Error ? e.message : String(e),

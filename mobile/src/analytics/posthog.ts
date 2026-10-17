@@ -31,8 +31,21 @@ export function identify(distinctId: string, properties?: Record<string, unknown
   client?.identify(distinctId, properties as Record<string, string | number | boolean | null>);
 }
 
+/**
+ * Super properties that describe the device, not the person: the QA flag and
+ * the A/B arms (onboarding, paywall). `reset()` on sign-out would wipe them,
+ * so they are kept here and registered again afterwards.
+ */
+const deviceProps: Record<string, unknown> = {};
+
+export function registerDevice(properties: Record<string, unknown>): void {
+  Object.assign(deviceProps, properties);
+  register(properties);
+}
+
 export function reset(): void {
   client?.reset();
+  register({ qa_build: IS_QA_BUILD, ...deviceProps });
 }
 
 export function getAnonymousId(): string | undefined {
