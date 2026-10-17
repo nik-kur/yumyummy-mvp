@@ -969,72 +969,86 @@ export default function PaywallScreen() {
       );
     } else {
       const offerFlow = offer.flow;
+      // Builder offers carry no close action of their own (the live
+      // pw_offer_* screens have none), and closing is the way into preview
+      // mode and back out of Last offer: the app draws the close button.
       offerNode = (
-        <AdaptyFlowView
-          flow={offerFlow}
-          params={flowParams}
-          style={s.fill}
-          onProductSelected={(productId) => {
-            ptrack('paywall_plan_selected', { product: productId, variant, renderer: 'adapty_flow_offer' });
-            return false;
-          }}
-          onPurchaseStarted={(product) => {
-            purchasingRef.current = true;
-            ptrack('paywall_purchase_started', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
-            addBreadcrumb('purchase', 'Offer purchase started', { product: product.vendorProductId });
-            return false;
-          }}
-          onPurchaseCompleted={(result, product) => {
-            purchasingRef.current = false;
-            if (result.type === 'success') {
-              void afterPurchaseSuccess(product, 'adapty_flow_offer', {}, result.profile).catch(captureException);
-            } else if (result.type === 'user_cancelled') {
-              ptrack('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
-            } else if (result.type === 'pending') {
-              ptrack('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow_offer' });
-            }
-            return false;
-          }}
-          onPurchaseFailed={(error, product) => {
-            purchasingRef.current = false;
-            ptrack('paywall_purchase_failed', { product: product?.vendorProductId, renderer: 'adapty_flow_offer', error: error?.message, adapty_detail: adaptyErrorContext(error).adapty_detail });
-            captureException(error, adaptyErrorContext(error, { product: product?.vendorProductId, renderer: 'adapty_flow_offer' }));
-            return false;
-          }}
-          onRestoreStarted={() => {
-            purchasingRef.current = true;
-            return false;
-          }}
-          onRestoreCompleted={onFlowRestoreCompleted}
-          onRestoreFailed={(error) => {
-            purchasingRef.current = false;
-            captureException(error);
-            return false;
-          }}
-          onCloseButtonPress={() => {
-            closeOffer('close');
-            return false;
-          }}
-          onCustomAction={(actionId) => {
-            // Any custom action on the offer ("no thanks") returns to the paywall.
-            closeOffer(actionId);
-            return false;
-          }}
-          onError={(error) => {
-            captureException(error, { placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW });
-            closeOffer('render_error');
-            return false;
-          }}
-          onAnalytics={(name, eventParams) => {
-            trackFlowAnalytics(
-              { placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW, variation: offerFlow.variationId, variationName: offerFlow.variationName },
-              name,
-              eventParams,
-            );
-            return false;
-          }}
-          onRequestPermission={handleFlowPermissionRequest}
-        />
+        <View style={s.fill}>
+          <AdaptyFlowView
+            flow={offerFlow}
+            params={flowParams}
+            style={s.fill}
+            onProductSelected={(productId) => {
+              ptrack('paywall_plan_selected', { product: productId, variant, renderer: 'adapty_flow_offer' });
+              return false;
+            }}
+            onPurchaseStarted={(product) => {
+              purchasingRef.current = true;
+              ptrack('paywall_purchase_started', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
+              addBreadcrumb('purchase', 'Offer purchase started', { product: product.vendorProductId });
+              return false;
+            }}
+            onPurchaseCompleted={(result, product) => {
+              purchasingRef.current = false;
+              if (result.type === 'success') {
+                void afterPurchaseSuccess(product, 'adapty_flow_offer', {}, result.profile).catch(captureException);
+              } else if (result.type === 'user_cancelled') {
+                ptrack('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
+              } else if (result.type === 'pending') {
+                ptrack('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow_offer' });
+              }
+              return false;
+            }}
+            onPurchaseFailed={(error, product) => {
+              purchasingRef.current = false;
+              ptrack('paywall_purchase_failed', { product: product?.vendorProductId, renderer: 'adapty_flow_offer', error: error?.message, adapty_detail: adaptyErrorContext(error).adapty_detail });
+              captureException(error, adaptyErrorContext(error, { product: product?.vendorProductId, renderer: 'adapty_flow_offer' }));
+              return false;
+            }}
+            onRestoreStarted={() => {
+              purchasingRef.current = true;
+              return false;
+            }}
+            onRestoreCompleted={onFlowRestoreCompleted}
+            onRestoreFailed={(error) => {
+              purchasingRef.current = false;
+              captureException(error);
+              return false;
+            }}
+            onCloseButtonPress={() => {
+              closeOffer('close');
+              return false;
+            }}
+            onCustomAction={(actionId) => {
+              // Any custom action on the offer ("no thanks") returns to the paywall.
+              closeOffer(actionId);
+              return false;
+            }}
+            onError={(error) => {
+              captureException(error, { placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW });
+              closeOffer('render_error');
+              return false;
+            }}
+            onAnalytics={(name, eventParams) => {
+              trackFlowAnalytics(
+                { placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW, variation: offerFlow.variationId, variationName: offerFlow.variationName },
+                name,
+                eventParams,
+              );
+              return false;
+            }}
+            onRequestPermission={handleFlowPermissionRequest}
+          />
+          <Pressable
+            onPress={() => closeOffer('close')}
+            style={[s.offerClose, { top: insets.top + 3 }]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <X size={20} color={colors.white} strokeWidth={2} />
+          </Pressable>
+        </View>
       );
     }
   }
@@ -1217,6 +1231,17 @@ export default function PaywallScreen() {
 
 const s = StyleSheet.create({
   previewStarting: { backgroundColor: 'rgba(20,16,12,0.45)', alignItems: 'center', justifyContent: 'center' },
+  // Same as the code offer's close (OfferScreen): readable over any photo.
+  offerClose: {
+    position: 'absolute',
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(25,21,15,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fill: { flex: 1, backgroundColor: colors.bg },
   closeBtn: {
     position: 'absolute',
