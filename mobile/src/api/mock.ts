@@ -7,6 +7,7 @@ import { IS_QA_BUILD } from '@/config/buildFlags';
 import type {
   AccountProfile,
   AccountProfileUpdate,
+  AuthTokenResponse,
   BillingSnapshot,
   DaySummary,
   DayTotals,
@@ -114,8 +115,27 @@ const state: MockState = {
 
 let nextMealId = 1000;
 
+// ---- Preview mode (anonymous account per install) ------------------------
+let previewActive = false;
+let previewFreeLogUsed = false;
+
+export function mockStartPreview(): AuthTokenResponse {
+  const created = !previewActive;
+  previewActive = true;
+  return { access_token: MOCK_TOKEN, token_type: 'bearer', account_id: 2, created, install_id: 'mock-install-0000000000' };
+}
+
+/** A real sign-in ends preview (the backend merges the anonymous account). */
+export function mockSignIn(created: boolean): AuthTokenResponse {
+  previewActive = false;
+  return { access_token: MOCK_TOKEN, token_type: 'bearer', account_id: 1, created };
+}
+
 export function getMockProfile(): AccountProfile {
-  return { ...state.profile, billing: { ...state.profile.billing } };
+  const preview = previewActive
+    ? { is_preview: true, preview_free_log_available: !previewFreeLogUsed, linked_providers: [] }
+    : { is_preview: false, preview_free_log_available: false };
+  return { ...state.profile, billing: { ...state.profile.billing }, ...preview };
 }
 
 export function patchMockProfile(update: AccountProfileUpdate): AccountProfile {
@@ -554,6 +574,19 @@ export function markMockTelegramLinked(): void {
 }
 
 export function mockAgentRun(text: string, hasPhoto: boolean): WorkflowRunResponse {
+  if (previewActive) {
+    if (previewFreeLogUsed) {
+      return {
+        intent: 'paywall',
+        message_text: 'That was your free log. Start your free trial to keep logging.',
+        confidence: null,
+        totals: { calories_kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0 },
+        items: [],
+        source_url: null,
+      };
+    }
+    previewFreeLogUsed = true;
+  }
   const parts = text
     .split(/,| and | with |\+/i)
     .map((s) => s.trim())

@@ -50,9 +50,10 @@
 | `plan` | `chart`, `ahead` | `chart` | Экран плана: график веса или «See what's ahead» с вехами | O7 |
 | `att` | `loader`, `welcome` | `loader` | Где спрашиваем разрешение на отслеживание (ATT) | O6 |
 | `after_cancel_offer` | `true`, `false` | `true` | Показывать оффер после отмены покупки | C5 |
-| `tutorial` | `true`, `false` | `true` | Тур по Today после покупки (заработает в этапе 4) | |
+| `tutorial` | `true`, `false` | `true` | Тур по Today после покупки (только новым аккаунтам) | |
 | `ai_consent` | `save_plan`, `sheet` | `save_plan` | Где покупатель соглашается на обработку AI (правило Apple 5.1.2(i)): строка на экране Save plan (согласие вместе с Sign in with Apple, тур без окна) или отдельное окно «AI does the math» перед первым логом. Если Apple придерётся — переключить на `sheet` | |
-| `free_first_log` | `true`, `false` | `true` | Первый AI-лог бесплатно в preview mode (заработает в этапе 6) | PM2 |
+| `preview_mode` | `true`, `false` | `true` | Закрыл оффер 20 без покупки → настоящий Today на анонимном аккаунте (preview mode). `false` = пейвол остаётся жёстким, как до V3 | PM |
+| `free_first_log` | `true`, `false` | `true` | В preview mode первый AI-лог бесплатный; `false` = «+» сразу ведёт на Last offer | PM2 |
 | `use_native` | `true` | — | Только для старых сборок (≤ 1.0.10). Не убирать там, где стоит | |
 
 Пример (контроль + Welcome C + без Features):

@@ -34,6 +34,21 @@ class Settings(BaseSettings):
     billing_yearly_price_xtr: int = 9599
     billing_paywall_enabled: bool = True
 
+    # Preview mode (V3 screen 21): an anonymous account per app install, with
+    # one free AI meal log per install. Off = /auth/install answers 503 and the
+    # app keeps the paywall hard.
+    preview_mode_enabled: bool = True
+    # New installs one IP may register per day, and free logs one IP may use
+    # per day (a whole office or café shares an IP; a farm hits the cap).
+    # Mobile carriers put many people behind one IPv4, so these are generous;
+    # the global cap and the per-install AI call cap do the real limiting.
+    preview_installs_per_ip_day: int = 30
+    preview_free_logs_per_ip_day: int = 20
+    preview_installs_per_day: int = 3000
+    # AI calls one install may make in preview (the free meal log included:
+    # a question or a non-food photo does not spend the free log, but counts).
+    preview_ai_calls_per_install: int = 3
+
     # Billing / Gumroad
     gumroad_enabled: bool = False
     gumroad_access_token: Optional[str] = None

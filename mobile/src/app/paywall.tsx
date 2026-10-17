@@ -33,7 +33,7 @@
  * button: an existing member must always be able to leave.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { View, Pressable, StyleSheet, Alert } from 'react-native';
+import { ActivityIndicator, View, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
@@ -171,11 +171,15 @@ function legacyRemoteConfig(flow: AdaptyFlow): Record<string, unknown> | undefin
 
 export default function PaywallScreen() {
   const router = useRouter();
-  const { status, profile, refreshProfile } = useAuth();
-  const params = useLocalSearchParams<{ dismissable?: string; qa_offer?: string }>();
+  const { status, profile, refreshProfile, startPreview } = useAuth();
+  const params = useLocalSearchParams<{ dismissable?: string; qa_offer?: string; last_offer?: string }>();
   const insets = useSafeAreaInsets();
   // Only Profile passes this — the acquisition/gate flows stay hard.
   const dismissable = params.dismissable === '1';
+  // Last offer (21): preview mode's gated actions open this. The offer shows
+  // straight away; closing it (or the plans under it) returns to the app.
+  const lastOffer = params.last_offer === '1';
+  const closable = dismissable || lastOffer;
   // Acquisition flow: no account yet. Read through a ref inside the mount-time
   // effects below, which must not re-run when auth state changes.
   const signedIn = status === 'signedIn';
@@ -660,23 +664,48 @@ export default function PaywallScreen() {
       config_source: next.kind === 'native' ? next.source : 'adapty',
       variation_id: next.flow.variationId,
       ab_test: next.flow.placement?.abTestName,
+      offer_context: lastOffer ? 'last_offer' : 'after_cancel',
       offer_product: next.kind === 'native' ? next.product.vendorProductId : undefined,
       after_product: product,
       after_renderer: renderer,
     });
     addBreadcrumb('paywall', 'After-cancel offer shown', { after_product: product, kind: next.kind });
     return true;
-  }, [dismissable]);
+  }, [dismissable, lastOffer]);
 
-  // QA builds: `/paywall?qa_offer=1` opens the after-cancel offer straight
-  // away, so it can be checked in the simulator without a StoreKit cancel.
-  const qaOfferRef = useRef(false);
+  // Last offer (21), and in QA builds `/paywall?qa_offer=1`: open the
+  // after-cancel offer straight away (QA: checked without a StoreKit cancel).
+  const directOfferRef = useRef(false);
   useEffect(() => {
-    if (!IS_QA_BUILD || params.qa_offer !== '1' || qaOfferRef.current) return;
+    const qa = IS_QA_BUILD && params.qa_offer === '1';
+    if ((!qa && !lastOffer) || directOfferRef.current) return;
     if (phase !== 'v3' && phase !== 'flow' && phase !== 'ready') return;
-    qaOfferRef.current = true;
-    void maybeShowOffer('qa_preview', 'v3');
-  }, [phase, params.qa_offer, maybeShowOffer]);
+    directOfferRef.current = true;
+    void maybeShowOffer(lastOffer ? 'last_offer' : 'qa_preview', 'v3');
+  }, [phase, params.qa_offer, lastOffer, maybeShowOffer]);
+
+  /** Leave the paywall from Last offer: back to the preview app. */
+  const leaveToApp = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  }, [router]);
+
+  // Closing the after-cancel offer (20) without buying opens preview mode:
+  // the real Today on an anonymous account with one free AI log. If preview
+  // cannot start (backend off, offline) the paywall stays, as before.
+  const [startingPreview, setStartingPreview] = useState(false);
+  const openPreview = useCallback(async (): Promise<boolean> => {
+    if (signedInRef.current || dismissable || !getOnboardingConfig().preview_mode) return false;
+    setStartingPreview(true);
+    const ok = await startPreview();
+    setStartingPreview(false);
+    if (ok) {
+      leavingRef.current = true;
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(tabs)');
+    }
+    return ok;
+  }, [dismissable, router, startPreview]);
 
   const handleRetry = useCallback(() => {
     ptrack('paywall_retry_pressed');
@@ -859,7 +888,7 @@ export default function PaywallScreen() {
 
   // Overlays a close button (Profile entry only) on any paywall content.
   const withClose = (node: ReactNode) => {
-    if (!dismissable) return <>{node}</>;
+    if (!closable) return <>{node}</>;
     return (
       <View style={s.fill}>
         {node}
@@ -888,9 +917,16 @@ export default function PaywallScreen() {
         placement: ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW,
         variant,
         renderer: offer.kind === 'native' ? 'v3' : 'adapty_flow',
+        offer_context: lastOffer ? 'last_offer' : 'after_cancel',
         reason,
       });
-      setOffer(null);
+      if (lastOffer) {
+        leaveToApp();
+        return;
+      }
+      void openPreview().then((opened) => {
+        if (!opened) setOffer(null);
+      });
     };
 
     if (offer.kind === 'native') {
@@ -980,6 +1016,11 @@ export default function PaywallScreen() {
       <View style={s.fill}>
         {node}
         <View style={StyleSheet.absoluteFill}>{offerNode}</View>
+        {startingPreview ? (
+          <View style={[StyleSheet.absoluteFill, s.previewStarting]}>
+            <ActivityIndicator color={colors.white} />
+          </View>
+        ) : null}
       </View>
     ) : (
       node
@@ -996,7 +1037,7 @@ export default function PaywallScreen() {
         config={v3.arm.config}
         products={v3.products}
         draft={signedIn ? null : draft}
-        plansOnly={dismissable || signedIn}
+        plansOnly={dismissable || signedIn || lastOffer}
         purchasing={purchasing}
         onPurchase={(p) => void handlePurchase(p, 'v3')}
         onRestore={() => void handleRestore()}
@@ -1077,8 +1118,8 @@ export default function PaywallScreen() {
           }}
           onCloseButtonPress={() => {
             // Hard paywall: a close action in the flow only works for the
-            // Profile entry, where the overlay button already exists.
-            if (dismissable) handleClose();
+            // Profile entry and Last offer, where the overlay button exists.
+            if (closable) handleClose();
             return false;
           }}
           onLoadingProductsFailed={(error) => {
@@ -1143,6 +1184,7 @@ export default function PaywallScreen() {
 }
 
 const s = StyleSheet.create({
+  previewStarting: { backgroundColor: 'rgba(20,16,12,0.45)', alignItems: 'center', justifyContent: 'center' },
   fill: { flex: 1, backgroundColor: colors.bg },
   closeBtn: {
     position: 'absolute',

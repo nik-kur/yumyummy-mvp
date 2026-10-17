@@ -30,14 +30,22 @@ import {
   syncTrackingStatusToAdapty,
 } from '@/analytics/attribution';
 import { clearPendingPurchase } from '@/state/pendingPurchase';
+import { readInstallId, saveInstallId } from '@/state/installId';
+import { loadDraft } from '@/state/introDraft';
 import { resetTour } from '@/state/tour';
 
 /**
  * `unreachable` = a session token exists but the backend couldn't be reached
  * (offline, timeout, 5xx). The user stays signed in; the launch router shows
  * a connection screen with a retry instead of dumping them into onboarding.
+ *
+ * `preview` = preview mode (V3 screen 21): the anonymous account of this
+ * install, after the paywall offer was closed without buying. The app shows
+ * Today with one free AI log; everything that needs a person (purchase hand-
+ * off, Adapty identify, attribution) still treats them as signed out, and the
+ * next real sign-in merges the anonymous account into the real one.
  */
-type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'unreachable';
+type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'unreachable' | 'preview';
 
 type Provider = 'apple' | 'google';
 
@@ -56,6 +64,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Re-attempt session restore after the backend was unreachable at boot. */
   retryBoot: () => Promise<void>;
+  /** Preview mode: sign this install into its anonymous account. False when unavailable. */
+  startPreview: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -76,6 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadProfile = useCallback(async (method?: string, created?: boolean) => {
     const me = await api.getMe();
     setProfile(me);
+    if (me.is_preview) {
+      // An anonymous preview account is not a person yet: no identify, no
+      // attribution customer id, no Adapty profile switch.
+      setStatus('preview');
+      return;
+    }
     setStatus('signedIn');
     setAttributionCustomerId(me.account_id);
     // identify() links the anonymous onboarding distinct_id to account_id, so
@@ -180,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const sub = AppState.addEventListener('change', (next) => {
       const resumed = (previous === 'background' || previous === 'inactive') && next === 'active';
       previous = next;
-      if (!resumed || statusRef.current !== 'signedIn') return;
+      if (!resumed || (statusRef.current !== 'signedIn' && statusRef.current !== 'preview')) return;
       // A 401 lands in endExpiredSession via the hook above. Everything else
       // (offline, timeout, 5xx) must leave the session untouched.
       void api
@@ -196,6 +212,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await restoreSession();
   }, [restoreSession]);
 
+  /** The preview account's token, sent with a sign-in so the backend merges it. */
+  const previewToken = useCallback(
+    async () => (statusRef.current === 'preview' ? getToken() : null),
+    [],
+  );
+
+  const startPreview = useCallback(async (): Promise<boolean> => {
+    try {
+      // A Keychain that can't be read (e.g. before first unlock) must not
+      // look like a new install: no preview this time rather than a new id.
+      const stored = await readInstallId();
+      const res = await api.signInInstall(stored);
+      if (res.install_id && res.install_id !== stored) await saveInstallId(res.install_id);
+      await setToken(res.access_token);
+      // The plan from the onboarding, so Today shows the person's targets.
+      const intro = await loadDraft();
+      if (intro.goal_type) {
+        await api
+          .updateMe({
+            goal_type: intro.goal_type,
+            gender: intro.gender,
+            age: intro.age,
+            height_cm: intro.height_cm,
+            weight_kg: intro.weight_kg,
+            activity_level: intro.activity_level,
+            target_calories: intro.target_calories,
+            target_protein_g: intro.target_protein_g,
+            target_fat_g: intro.target_fat_g,
+            target_carbs_g: intro.target_carbs_g,
+            onboarding_completed: true,
+          })
+          .catch(() => {});
+      }
+      await loadProfile();
+      track('preview_started', { created: res.created });
+      return true;
+    } catch (e) {
+      track('preview_unavailable', {
+        status: e instanceof ApiError ? e.status : null,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      // Leave no half-made session behind: the paywall stays.
+      if (statusRef.current !== 'preview') await setToken(null);
+      return false;
+    }
+  }, [loadProfile]);
+
   const requestEmailCode = useCallback(async (email: string) => {
     const res = await api.requestEmailCode(email);
     return res.debug_code ?? null;
@@ -203,11 +266,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithEmail = useCallback(
     async (email: string, code: string) => {
-      const res = await api.verifyEmailCode(email, code);
+      const res = await api.verifyEmailCode(email, code, await previewToken());
       await setToken(res.access_token);
       await loadProfile('email', res.created);
     },
-    [loadProfile],
+    [loadProfile, previewToken],
   );
 
   // One-tap entry into the live app using a stable demo email. The backend
@@ -262,17 +325,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw e;
     }
     if (!identityToken) throw new Error('Apple did not return an identity token. Please try again.');
-    const res = await api.signInApple(identityToken, fullName);
+    const res = await api.signInApple(identityToken, fullName, await previewToken());
     await setToken(res.access_token);
     await loadProfile('apple', res.created);
     return true;
-  }, [loadProfile]);
+  }, [loadProfile, previewToken]);
 
   const signInWithProvider = useCallback(
     async (provider: Provider): Promise<boolean> => {
       if (provider === 'apple') {
         if (USE_MOCKS) {
-          const res = await api.signInApple('apple-placeholder-identity-token');
+          const res = await api.signInApple('apple-placeholder-identity-token', null, await previewToken());
           await setToken(res.access_token);
           await loadProfile('apple', res.created);
           return true;
@@ -283,14 +346,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Google: native sign-in (@react-native-google-signin) lands in a later
       // build. Against the real API, steer the user to email for now.
       if (USE_MOCKS) {
-        const res = await api.signInGoogle('google-placeholder-identity-token');
+        const res = await api.signInGoogle('google-placeholder-identity-token', await previewToken());
         await setToken(res.access_token);
         await loadProfile('google', res.created);
         return true;
       }
       throw new Error('Google sign-in arrives in the next build — use Apple or email for now.');
     },
-    [loadProfile, signInWithApple],
+    [loadProfile, signInWithApple, previewToken],
   );
 
   const signInFromTelegram = useCallback(
@@ -364,8 +427,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       applyProfile,
       signOut,
       retryBoot,
+      startPreview,
     }),
-    [status, profile, requestEmailCode, signInWithEmail, signInWithDemoEmail, signInWithProvider, signInFromTelegram, linkTelegram, refreshProfile, applyProfile, signOut, retryBoot],
+    [status, profile, requestEmailCode, signInWithEmail, signInWithDemoEmail, signInWithProvider, signInFromTelegram, linkTelegram, refreshProfile, applyProfile, signOut, retryBoot, startPreview],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

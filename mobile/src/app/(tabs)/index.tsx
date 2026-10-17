@@ -33,6 +33,7 @@ import { SourcesIntroPopup } from '@/components/SourcesIntroPopup';
 import { PayoffSheet } from '@/components/tour/PayoffSheet';
 import { measureTourTarget, useTourTarget, type TourTargetId } from '@/components/tour/TourOverlay';
 import { markPayoffShown, setTourStep, useTour } from '@/state/tour';
+import { getOnboardingConfig } from '@/config/onboardingConfig';
 import { loadDraft, type IntroDraft } from '@/state/introDraft';
 import { personalUnlock } from '@/onb/firstWeek';
 import { WidgetInstructionSheet } from '@/components/WidgetInstructionSheet';
@@ -197,8 +198,19 @@ function PendingRow({ item, onPress }: { item: PendingMeal; onPress: () => void 
 
 export default function TodayScreen() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, status, refreshProfile } = useAuth();
   const { pending, lastSettledAt, retry, dismiss } = usePendingMeals();
+  // Preview mode (21): one free log, then Last offer for anything that costs.
+  const preview = status === 'preview';
+  const freeLogLeft =
+    Boolean(profile?.preview_free_log_available) && getOnboardingConfig().free_first_log && pending.length === 0;
+  const openLastOffer = useCallback(
+    (from: string) => {
+      track('preview_gate', { from });
+      router.push('/paywall?last_offer=1');
+    },
+    [router],
+  );
   const [day, setDay] = useState<DaySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -317,7 +329,9 @@ export default function TodayScreen() {
   // Refetch whenever a background meal finishes so the new entry appears.
   useEffect(() => {
     if (lastSettledAt) load();
-  }, [lastSettledAt, load]);
+    // The free preview log just landed: the "+" now leads to Last offer.
+    if (lastSettledAt && preview) void refreshProfile().catch(() => {});
+  }, [lastSettledAt, load, preview, refreshProfile]);
 
   // Keep the home/lock-screen widgets in sync with today's numbers.
   useEffect(() => {
@@ -445,7 +459,8 @@ export default function TodayScreen() {
   // A beat between the payoff closing and the next sheet: iOS can drop a
   // modal presented while another is still dismissing.
   const [afterPayoff, setAfterPayoff] = useState(false);
-  const sheetsHeld = tourActive || payoffVisible || afterPayoff;
+  // Preview mode holds them too: they belong to a member's first visit.
+  const sheetsHeld = tourActive || payoffVisible || afterPayoff || preview;
 
   // Step 4 waits for the meal to land. If it never will (analysis failed and
   // was removed), go back to "tap +" instead of waiting forever.
@@ -574,7 +589,7 @@ export default function TodayScreen() {
             </View>
           )}
 
-          <Pressable onPress={() => router.push('/advisor')}>
+          <Pressable onPress={() => (preview ? openLastOffer('advisor') : router.push('/advisor'))}>
             <Card style={styles.advisorCard} flat>
               <View style={styles.advisorIcon}>
                 <Sparkles size={20} color={colors.infoBlue} strokeWidth={1.5} />
@@ -615,7 +630,7 @@ export default function TodayScreen() {
                 title="Nothing logged yet"
                 subtitle="Tap the + below and tell me what you ate — a sentence is enough."
                 ctaLabel="Log something"
-                onCta={() => router.push('/capture')}
+                onCta={() => (preview && !freeLogLeft ? openLastOffer('empty_state') : router.push('/capture'))}
               />
             )
           ) : (

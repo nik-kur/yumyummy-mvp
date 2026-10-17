@@ -30,6 +30,10 @@ export interface BillingSnapshot {
 export interface AccountProfile {
   account_id: number;
   user_id: number;
+  /** Preview mode: an anonymous account (no sign-in yet). */
+  is_preview?: boolean;
+  /** Preview mode: the install's one free AI log is still available. */
+  preview_free_log_available?: boolean;
   telegram_id?: string | null;
   linked_providers: string[];
   /** From the sign-in provider; an Apple relay alias when the user hid theirs. */
@@ -290,6 +294,8 @@ export interface AuthTokenResponse {
   token_type: string;
   account_id: number;
   created: boolean;
+  /** /auth/install only: the id to keep in the Keychain. */
+  install_id?: string | null;
 }
 
 export interface EmailCodeRequestResponse {

@@ -29,6 +29,8 @@ import { colors, space } from '@/theme/tokens';
  *   - Signed in, onboarding incomplete → (onboarding) legacy flow
  *   - Signed in, no active subscription → /paywall (hard gate)
  *   - Signed in, active → (tabs)
+ *   - Preview mode (closed the offer without buying) → (tabs) in preview,
+ *     or the sign-in gate if a purchase is waiting for an account
  */
 const ACTIVE_STATUSES = new Set(['trial', 'active']);
 
@@ -49,6 +51,13 @@ export default function Index() {
   }, [status]);
 
   useEffect(() => {
+    if (status === 'preview') {
+      void loadPendingPurchase().then((pending) => {
+        setHasPendingPurchase(pending !== null);
+        setIntroChecked(true);
+      });
+      return;
+    }
     if (status === 'signedOut') {
       Promise.all([loadDraft(), loadPendingPurchase()]).then(([d, pending]) => {
         setHasIntroDraft(d.goal_type !== null);
@@ -99,6 +108,11 @@ export default function Index() {
         />
       </View>
     );
+  }
+
+  if (status === 'preview') {
+    if (!introChecked) return <StaticSplash />;
+    return <Redirect href={hasPendingPurchase ? '/save-plan' : '/(tabs)'} />;
   }
 
   if (status === 'signedOut') {

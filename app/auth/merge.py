@@ -104,7 +104,13 @@ def merge_users(db: Session, source: User, target: User) -> None:
         else:
             sd.user_id = target.id
 
-    # 2) Re-point any remaining child rows that key on user_id.
+    # 2) Re-point any remaining child rows that key on user_id. Weekly recaps
+    #    are only a cache of an LLM summary (unique per user and week): drop the
+    #    source's, the target regenerates its own. Left in place they would
+    #    block deleting the source user (foreign key) on Postgres.
+    from app.models.weekly_recap import WeeklyRecap
+
+    db.query(WeeklyRecap).filter(WeeklyRecap.user_id == source.id).delete(synchronize_session=False)
     for model in (MealEntry, SavedMeal, PaymentEvent, UsageRecord, ChurnSurvey):
         db.query(model).filter(model.user_id == source.id).update(
             {model.user_id: target.id}, synchronize_session=False

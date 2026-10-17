@@ -45,6 +45,11 @@ class AccountProfile(BaseModel):
 
     billing: BillingSnapshot
 
+    # Preview mode: an anonymous account (no sign-in yet) and whether its one
+    # free AI log is still available. Additive: older apps ignore both.
+    is_preview: bool = False
+    preview_free_log_available: bool = False
+
 
 class AccountProfileUpdate(BaseModel):
     goal_type: Optional[str] = None

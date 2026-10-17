@@ -254,6 +254,9 @@ export default function SavePlanScreen() {
       await clearOnboardingAssignment();
 
       track('onboarding_screen_completed', { screen: 'N2b_save_plan' });
+      // From preview mode the stack holds the old tabs and the paywall: clear
+      // it, so Today is the only screen and back cannot reach the old one.
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
     } catch (e) {
       captureException(e);

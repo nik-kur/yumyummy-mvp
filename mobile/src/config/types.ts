@@ -38,6 +38,11 @@ export interface OnboardingConfig {
   plan: 'chart' | 'ahead';
   /** O6: ATT prompt over the loader (default) or on the welcome screen. */
   att: 'loader' | 'welcome';
+  /**
+   * PM: closing the after-cancel offer opens preview mode (the real Today on
+   * an anonymous account). Off = the paywall stays hard, as before V3.
+   */
+  preview_mode: boolean;
   /** PM2: preview mode lets the first AI log through for free. */
   free_first_log: boolean;
   /** C5: offer after the customer cancels the App Store sheet. */

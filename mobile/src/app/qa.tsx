@@ -188,6 +188,7 @@ export default function QaScreen() {
         <Choice label="loader_review" value={onb.loader_review} options={ON_OFF} onChange={(v) => setOnb({ loader_review: v })} />
         <Choice label="plan" value={onb.plan} options={['chart', 'ahead'] as const} onChange={(v) => setOnb({ plan: v })} />
         <Choice label="att" value={onb.att} options={['loader', 'welcome'] as const} onChange={(v) => setOnb({ att: v })} />
+        <Choice label="preview_mode" value={onb.preview_mode} options={ON_OFF} onChange={(v) => setOnb({ preview_mode: v })} />
         <Choice label="free_first_log" value={onb.free_first_log} options={ON_OFF} onChange={(v) => setOnb({ free_first_log: v })} />
         <Choice label="after_cancel_offer" value={onb.after_cancel_offer} options={ON_OFF} onChange={(v) => setOnb({ after_cancel_offer: v })} />
         <Choice label="tutorial" value={onb.tutorial} options={ON_OFF} onChange={(v) => setOnb({ tutorial: v })} />

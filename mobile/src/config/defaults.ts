@@ -25,6 +25,7 @@ export const DEFAULT_ONBOARDING_CONFIG: OnboardingConfig = {
   loader_review: false,
   plan: 'chart',
   att: 'loader',
+  preview_mode: true,
   free_first_log: true,
   after_cancel_offer: true,
   tutorial: true,

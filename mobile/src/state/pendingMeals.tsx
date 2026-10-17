@@ -14,6 +14,7 @@ import { uploadMealPhoto, transcribeAudio } from '@/api/upload';
 import type { WorkflowItem, WorkflowRunResponse } from '@/api/types';
 import { reportJourneyEvent, type LogOrigin, type LogSource } from '@/state/journey';
 import { track } from '@/analytics/posthog';
+import { openPreviewGate } from '@/state/previewGate';
 
 /**
  * Background meal logging.
@@ -278,6 +279,8 @@ export function PendingMealsProvider({ children }: { children: ReactNode }) {
             status: 'error',
             error: res.message_text || 'Your trial has ended. Subscribe to keep logging meals.',
           });
+          // Preview mode: the free log is used up → Last offer (no-op otherwise).
+          openPreviewGate('meal_log');
           return;
         }
 

@@ -31,11 +31,19 @@ class EmailVerifyRequest(BaseModel):
     code: str = Field(..., min_length=4, max_length=12)
 
 
+class InstallSignInRequest(BaseModel):
+    # The id this backend issued to the install earlier, kept in the Keychain
+    # (survives a reinstall). Empty on the first call: the backend issues one.
+    install_id: Optional[str] = Field(None, min_length=16, max_length=128)
+
+
 class AuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     account_id: int
     created: bool = False
+    # /auth/install only: the install id to keep (issued here, unguessable).
+    install_id: Optional[str] = None
 
 
 class TelegramLinkIssueRequest(BaseModel):

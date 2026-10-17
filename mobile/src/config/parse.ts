@@ -86,6 +86,7 @@ export function parseOnboardingConfig(data: Json | undefined): OnboardingConfig 
     loader_review: bool(data.loader_review, d.loader_review),
     plan: oneOf(data.plan, ['chart', 'ahead'] as const, d.plan),
     att: oneOf(data.att, ['loader', 'welcome'] as const, d.att),
+    preview_mode: bool(data.preview_mode, d.preview_mode),
     free_first_log: bool(data.free_first_log, d.free_first_log),
     after_cancel_offer: bool(data.after_cancel_offer, d.after_cancel_offer),
     tutorial: bool(data.tutorial, d.tutorial),
