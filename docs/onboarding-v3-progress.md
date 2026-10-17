@@ -143,7 +143,7 @@ QA-меню: заготовки ответов + прыжок на любой э
 
 Бэкенд (ветка, **не задеплоен**: деплой на Render и миграция — только с ок Никиты):
 - Таблица `installs` (миграция `add_installs`, после `add_weekly_recaps`): `install_id` (случайный id из Keychain, переживает переустановку), `account_id`, `free_log_used_at`, `ip`.
-- `POST /auth/install` → токен анонимного аккаунта (аккаунт без способов входа). Лимиты в настройках: `preview_installs_per_ip_day=10`, `preview_free_logs_per_ip_day=5`, выключатель `preview_mode_enabled`.
+- `POST /auth/install` → токен анонимного аккаунта (аккаунт без способов входа). Лимиты в настройках: `preview_installs_per_ip_day=30`, `preview_free_logs_per_ip_day=20` (одна сеть Wi-Fi или мобильный оператор — много людей), `preview_installs_per_day=3000` на всех, `preview_ai_calls_per_install=3`, выключатель `preview_mode_enabled`.
 - `/app/agent/run`: анонимному — один лог еды (не советник), потом `intent: paywall`. Ручное добавление еды, повтор, сохранённые блюда, старт триала — 402; голос и загрузка фото — только пока бесплатный лог не потрачен.
 - `/auth/apple|google|email/verify` с токеном превью в заголовке → слияние анонимного аккаунта в настоящий (только если он анонимный). Запись установки остаётся (бесплатный лог не выдаётся снова).
 - `/app/me`: `is_preview`, `preview_free_log_available`.
