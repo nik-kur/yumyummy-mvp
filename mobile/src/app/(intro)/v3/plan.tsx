@@ -9,7 +9,7 @@
  * Charts are the canvas SVGs with the person's numbers swapped in.
  */
 import { useMemo } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { OnbButton } from '@/components/onb/OnbButton';
@@ -18,6 +18,7 @@ import { OnbLayout } from '@/components/onb/OnbLayout';
 import { SvgSpec, type SvgSpecData } from '@/components/onb/SvgSpec';
 import { PLAN_CHARTS } from '@/onb/generated/planCharts';
 import { direction, fmtKg, fmtStLb, formatLongDate, formatShortDate, planMode, type PlanMode } from '@/onb/plan';
+import { IMG } from '@/onb/assets';
 import { C, F, PAD } from '@/onb/theme';
 import { useOnbScreen } from '@/onb/useOnbScreen';
 import { useIntro } from '@/state/introContext';
@@ -201,13 +202,11 @@ export default function PlanScreen() {
 
       {/* The first-week ladder (state/journey.ts) is what turns the plan into a habit. */}
       <View style={s.guide}>
-        <View style={s.guideBadge}>
-          <Text style={s.guideNum}>7</Text>
-        </View>
+        <Image source={IMG.mascot_great} style={s.guideIcon} accessibilityIgnoresInvertColors />
         <View style={s.guideText}>
-          <Text style={s.guideTitle}>{content.texts['plan.guide_title'] ?? 'We’ll guide your first 7 days'}</Text>
+          <Text style={s.guideTitle}>{content.texts['plan.guide_title'] ?? 'We designed your first 7 days'}</Text>
           <Text style={s.guideSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.9}>
-            {content.texts['plan.guide_sub'] ?? 'One small step a day builds the habit.'}
+            {content.texts['plan.guide_sub'] ?? 'A personal start to make your plan stick.'}
           </Text>
         </View>
       </View>
@@ -255,15 +254,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
-  guideBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: C.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guideNum: { fontFamily: F.serif, fontSize: 20, lineHeight: 24, color: C.terra },
+  guideIcon: { width: 40, height: 40 },
   guideText: { flex: 1, gap: 1 },
   guideTitle: { fontFamily: F.sansSemibold, fontSize: 15, lineHeight: 20, color: C.ink },
   guideSub: { fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: C.muted },

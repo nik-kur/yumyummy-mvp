@@ -25,7 +25,7 @@
 - 15 окт: имя события экрана остаётся `onboarding_screen_viewed` (а не `onb_screen_viewed`), версия онбординга — в свойстве `onboarding_version`, чтобы v1 и V3 считались в одной воронке.
 - 15 окт: тестовая сборка = `__DEV__` или `EXPO_PUBLIC_QA_BUILD=1`: AppsFlyer выключен, у событий PostHog super property `qa_build: true`, в Sentry environment `qa`, доступно QA-меню.
 - 17 окт (Никита): плашки Joe & The Juice — розовый смузи «Beets & Berries smoothie 368 kcal» (b3_joe), сэндвич на `b3_wide` «Joe & The Juice Tunacado 506 kcal» (оба по UK-меню на Deliveroo; 412 убрано). Рейтинг «5.0 ★» оставляем.
-- 17 окт (Никита): экран 2× — блок по центру между заголовком и кнопкой; на плане плашка «We’ll guide your first 7 days / One small step a day builds the habit.» (ключи `plan.guide_title`, `plan.guide_sub` в `onb_content.texts`); колокольчик B2 качается сразу; у армов пейвола `show_rating` (лавры и звезда вкл/выкл) и `price_emphasis: weekly` (цена за неделю крупно).
+- 17 окт (Никита): экран 2× — блок по центру между заголовком и кнопкой; на плане плашка с маскотом «We designed your first 7 days / A personal start to make your plan stick.» (выбор Никиты; этап 4: первые шаги недели должны зависеть от цели, чтобы «personal» было правдой) (ключи `plan.guide_title`, `plan.guide_sub` в `onb_content.texts`); колокольчик B2 качается сразу; у армов пейвола `show_rating` (лавры и звезда вкл/выкл) и `price_emphasis: weekly` (цена за неделю крупно).
 - 17 окт (Никита): по умолчанию (и для ревью Apple) `price_emphasis: billed` — крупно сумма списания и строка «3 days free, then …» на пейволе и оффере. Вариант как на канвасе (`design`) включается в A/B тесте через Adapty без билда.
 
 ## Состояние Adapty (чтение, 15 окт)
