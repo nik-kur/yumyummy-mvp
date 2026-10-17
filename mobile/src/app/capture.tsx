@@ -28,6 +28,8 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { AIConsentSheet } from '@/components/AIConsentSheet';
+import { TourOverlay, useTourTarget } from '@/components/tour/TourOverlay';
+import { getTour, setTourStep } from '@/state/tour';
 import { useAIConsent } from '@/state/aiConsent';
 import { usePendingMeals } from '@/state/pendingMeals';
 import { useKeyboardHeight } from '@/utils/keyboard';
@@ -122,8 +124,22 @@ export default function CaptureScreen() {
 
   const accept = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // Tour step 3 → 4: the meal lands on Today, where step 4 points at it.
+    const tour = getTour();
+    if (tour.status === 'active' && tour.step === 3) void setTourStep(4);
     setMode('accepted');
   };
+
+  // Tour: closing without logging sends the person back to step 2 ("tap +").
+  useEffect(
+    () => () => {
+      const tour = getTour();
+      if (tour.status === 'active' && tour.step === 3) void setTourStep(2);
+    },
+    [],
+  );
+  const tourBarRef = useTourTarget('capture_bar');
+  const tourExtrasRef = useTourTarget('capture_extras');
 
   const canSubmit = (text.trim().length > 0 || photos.length > 0) && !recording;
 
@@ -373,14 +389,14 @@ export default function CaptureScreen() {
               ) : null}
 
               {!text.trim() && photos.length === 0 ? (
-                <View style={styles.examples}>
+                <View style={styles.examples} ref={tourExtrasRef} collapsable={false}>
                   {EXAMPLES.map((ex) => (
                     <Chip key={ex} label={ex} onPress={() => setText(ex)} />
                   ))}
                 </View>
               ) : null}
 
-              <View style={styles.actions}>
+              <View style={styles.actions} ref={tourBarRef} collapsable={false}>
                 <Pressable style={styles.iconButton} onPress={() => void startRecording()}>
                   <Mic size={22} color={colors.ink} strokeWidth={1.5} />
                 </Pressable>
@@ -401,6 +417,7 @@ export default function CaptureScreen() {
         onAgree={() => void grantAIConsent()}
         onDismiss={() => router.back()}
       />
+      <TourOverlay scope="capture" />
     </Screen>
   );
 }

@@ -25,7 +25,8 @@
  *     the freshly created account. Nothing here may call an authenticated API.
  *   - Existing account (signed IN): the launch router's hard gate for a lapsed
  *     subscription, or Profile ("Manage plan" / "See plans") with
- *     `?dismissable=1`. Both go straight to the plans. Purchase → /postbuy.
+ *     `?dismissable=1`. Both go straight to the plans. Purchase → /success
+ *     (22) → Today; a signed-out purchase → /success → /save-plan (23).
  *
  * Hard paywall by default: no close button, gesture-dismiss disabled — exits
  * only via successful purchase or restore. Only the Profile entry gets a close
@@ -84,7 +85,7 @@ import { resolvePaywallArm, type ResolvedArm } from '@/config/paywallArms';
 import { qaOverrides } from '@/config/qa';
 import type { ConfigSource, PaywallArmConfig } from '@/config/types';
 import { fmtKg, fmtStLb } from '@/onb/plan';
-import { scheduleTrialEndingReminder } from '@/notifications/scheduler';
+import { enableRemindersAfterPurchase, scheduleTrialEndingReminder } from '@/notifications/scheduler';
 import { track } from '@/analytics/posthog';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 import { colors, radius, space } from '@/theme/tokens';
@@ -199,7 +200,8 @@ export default function PaywallScreen() {
       source,
     });
     addBreadcrumb('purchase', 'Signed-out purchase → sign-in gate', { source });
-    router.replace('/save-plan');
+    // A new purchase celebrates first (22), then the gate (23).
+    router.replace(source === 'purchase' ? '/success' : '/save-plan');
   }, [router]);
 
   const [phase, setPhase] = useState<Phase>('loading');
@@ -340,8 +342,9 @@ export default function PaywallScreen() {
       await handOffToSignIn('purchase', product.vendorProductId);
       return;
     }
+    await enableRemindersAfterPurchase().catch(() => false);
     await refreshProfile();
-    router.replace('/postbuy');
+    router.replace('/success?next=tabs');
   }, [handOffToSignIn, refreshProfile, router, variantLabel]);
 
   /** After a restore that found an active `premium` access level, any renderer. */
@@ -358,7 +361,7 @@ export default function PaywallScreen() {
       return;
     }
     await refreshProfile();
-    router.replace('/postbuy');
+    router.replace('/(tabs)');
   }, [handOffToSignIn, refreshProfile, router]);
 
   /** Legacy path: remote config + our own renderer. */
@@ -701,7 +704,7 @@ export default function PaywallScreen() {
         }
         await api.startTrial(3);
         await refreshProfile();
-        router.replace('/postbuy');
+        router.replace('/success?next=tabs');
         return;
       }
 
@@ -761,7 +764,7 @@ export default function PaywallScreen() {
           await handOffToSignIn('restore', null);
           return;
         }
-        router.replace('/postbuy');
+        router.replace('/(tabs)');
         return;
       }
       const adaptyProfile = await adapty.restorePurchases();

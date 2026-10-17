@@ -70,8 +70,9 @@ export default function RootLayout() {
                   gestureEnabled: false,
                 }}
               />
+              {/* Success (22): right after a purchase, before the gate or Today. */}
               <Stack.Screen
-                name="postbuy"
+                name="success"
                 options={{
                   presentation: 'fullScreenModal',
                   gestureEnabled: false,

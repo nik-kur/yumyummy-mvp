@@ -24,6 +24,10 @@ for k in ('EXPO_PUBLIC_API_BASE_URL', 'EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY', 'EXPO_PU
 EOF
 )"
 export EXPO_PUBLIC_QA_BUILD=1
+# MOCKS=1: the app talks to the in-app mock API (sign-in without an Apple ID,
+# a fresh diary), so the after-purchase screens and the tour can be walked in
+# the simulator. Never for a build that leaves this Mac.
+if [ "${MOCKS:-0}" = "1" ]; then export EXPO_PUBLIC_USE_MOCKS=1; else unset EXPO_PUBLIC_USE_MOCKS; fi
 # Metro caches transforms across builds and does not key them on env vars:
 # start from a clean cache, and wipe it again afterwards so a later production
 # bundle on this Mac (`eas update`, `expo export`) cannot reuse QA transforms.

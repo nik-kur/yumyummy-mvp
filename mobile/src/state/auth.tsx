@@ -30,6 +30,7 @@ import {
   syncTrackingStatusToAdapty,
 } from '@/analytics/attribution';
 import { clearPendingPurchase } from '@/state/pendingPurchase';
+import { resetTour } from '@/state/tour';
 
 /**
  * `unreachable` = a session token exists but the backend couldn't be reached
@@ -59,6 +60,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Whether the latest genuine sign-in created the account (the tour is for new ones). */
+let lastSignInCreated = false;
+export function lastSignInCreatedAccount(): boolean {
+  return lastSignInCreated;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [profile, setProfile] = useState<AccountProfile | null>(null);
@@ -75,7 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // pre-login funnel events (paywall_shown, onboarding_*) stitch to the user.
     phIdentify(String(me.account_id), { goal: me.goal_type });
     sentrySetUser(String(me.account_id));
-    if (method) track('signin_success', { method });
+    if (method) {
+      lastSignInCreated = Boolean(created);
+      track('signin_success', { method });
+    }
     // Registration is the first post-install signal Meta can optimise on before
     // any trial starts; fire it once per account, on the sign-in that created it.
     if (method && created) {
@@ -333,6 +343,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // sign-in gate instead of the intro. Any purchase it referred to has been
     // reconciled by the sign-in we are now ending.
     void clearPendingPurchase();
+    // The tour and the payoff belong to the account that bought, not the next one.
+    void resetTour(false);
     void logoutAdapty();
     phReset();
     sentryClearUser();

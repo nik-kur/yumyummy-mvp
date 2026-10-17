@@ -24,6 +24,7 @@ import {
 } from '@/config/onboardingConfig';
 import { loadQaOverrides, qaOverrides, saveQaOverrides, type QaOverrides } from '@/config/qa';
 import { QA_PRESETS, QA_SCENARIOS, QA_SCREENS } from '@/config/qaPresets';
+import { resetTour } from '@/state/tour';
 import { isTesterMarked } from '@/config/testerMark';
 import { buildPlan } from '@/onb/buildPlan';
 import { clearDraft, loadDraft, notifyDraftReplaced, saveDraft } from '@/state/introDraft';
@@ -216,6 +217,16 @@ export default function QaScreen() {
 
         <View style={s.actions}>
           <Button label="Restart onboarding" variant="brand" onPress={() => void restart()} />
+          <Button
+            label="Start the after-purchase tour (signed in)"
+            variant="secondary"
+            onPress={() =>
+              void resetTour(true).then(() => {
+                if (router.canDismiss()) router.dismissAll();
+                router.replace('/(tabs)');
+              })
+            }
+          />
           <Button
             label="Re-fetch arm from Adapty"
             variant="secondary"

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
-import { loadPrefs, type NotificationPrefs, type ReminderPref } from './prefs';
+import { loadPrefs, savePrefs, type NotificationPrefs, type ReminderPref } from './prefs';
 import { loadJourney, rawDay } from '@/state/journey';
 
 /**
@@ -187,6 +187,23 @@ async function scheduleStoredTrialReminder(): Promise<void> {
   } catch {
     // non-fatal
   }
+}
+
+/**
+ * After a purchase: the reminder promised on paywall B2 needs the master switch
+ * on. Permission was asked there; when it was granted, turn the default
+ * reminders on (what the old post-purchase push screen did). Never for
+ * returning customers, whose own settings stand.
+ */
+export async function enableRemindersAfterPurchase(): Promise<boolean> {
+  if (!(await getPermissionGranted())) return false;
+  const prefs = await loadPrefs();
+  if (!prefs.enabled) {
+    prefs.enabled = true;
+    await savePrefs(prefs);
+  }
+  await syncFromPrefs(prefs);
+  return true;
 }
 
 /**

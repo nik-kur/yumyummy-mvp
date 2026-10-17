@@ -7,6 +7,7 @@ import {
   Alert,
   Animated,
   Easing,
+  type ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Sparkles, ChevronRight, CircleAlert } from 'lucide-react-native';
@@ -29,6 +30,11 @@ import { JourneyPathSheet } from '@/components/JourneyPathSheet';
 import { QuestInfoSheet } from '@/components/QuestInfoSheet';
 import { InsightCard } from '@/components/InsightCard';
 import { SourcesIntroPopup } from '@/components/SourcesIntroPopup';
+import { PayoffSheet } from '@/components/tour/PayoffSheet';
+import { measureTourTarget, useTourTarget, type TourTargetId } from '@/components/tour/TourOverlay';
+import { markPayoffShown, setTourStep, useTour } from '@/state/tour';
+import { loadDraft, type IntroDraft } from '@/state/introDraft';
+import { personalUnlock } from '@/onb/firstWeek';
 import { WidgetInstructionSheet } from '@/components/WidgetInstructionSheet';
 import { loadJourney, reconcileJourney, rawDay, activeDay, takeNextPopup, subscribeJourney, reportJourneyEvent, type JourneyState, type QuestDef, type QuestId } from '@/state/journey';
 import { insightSeenToday } from '@/state/insightSeen';
@@ -203,6 +209,22 @@ export default function TodayScreen() {
   const [pathSheetVisible, setPathSheetVisible] = useState(false);
   const [infoQuest, setInfoQuest] = useState<QuestDef | null>(null);
   const [sourcesIntroVisible, setSourcesIntroVisible] = useState(false);
+
+  // Post-purchase tour (24) and payoff (25): other sheets wait until they're done.
+  const tour = useTour();
+  const tourActive = tour.status === 'active';
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const dashboardRef = useTourTarget('dashboard');
+  const journeyRef = useTourTarget('journey');
+  const firstMealRef = useTourTarget('first_meal');
+
+  // Intro answers stay on the device after sign-in: they make the first-week
+  // card's day lines personal (`onb/firstWeek.ts`).
+  const [introDraft, setIntroDraft] = useState<IntroDraft | null>(null);
+  useEffect(() => {
+    loadDraft().then(setIntroDraft).catch(() => {});
+  }, []);
 
   // One-time "backed by science" popup on the very first visit to Today
   // (Guideline 1.4.1 — tells the user where the citations live). Quest popups
@@ -419,8 +441,60 @@ export default function TodayScreen() {
     return (b.id ?? 0) - (a.id ?? 0);
   });
 
+  const payoffVisible = !tourActive && tour.payoff === 'pending' && meals.length > 0;
+  // A beat between the payoff closing and the next sheet: iOS can drop a
+  // modal presented while another is still dismissing.
+  const [afterPayoff, setAfterPayoff] = useState(false);
+  const sheetsHeld = tourActive || payoffVisible || afterPayoff;
+
+  // Step 4 waits for the meal to land. If it never will (analysis failed and
+  // was removed), go back to "tap +" instead of waiting forever.
+  useEffect(() => {
+    if (tourActive && tour.step === 4 && !loading && meals.length === 0 && pending.length === 0) {
+      void setTourStep(2);
+    }
+  }, [tourActive, tour.step, loading, meals.length, pending.length]);
+
+  // Bring the step's element into view: the top for 1, 2 and 5; the first meal
+  // and the first-week card where the canvas shows them.
+  useEffect(() => {
+    if (!tourActive) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const step = tour.step;
+    if (step === 1 || step === 2 || step === 5) {
+      scroller.scrollTo({ y: 0, animated: true });
+      return;
+    }
+    const plan: Partial<Record<number, { id: TourTargetId; top: number }>> = {
+      4: { id: 'first_meal', top: 360 },
+      6: { id: 'journey', top: 172 },
+    };
+    const want = plan[step];
+    if (!want) return;
+    const t = setTimeout(() => {
+      void measureTourTarget(want.id).then((rect) => {
+        if (rect) scroller.scrollTo({ y: Math.max(0, scrollY.current + rect.y - want.top), animated: true });
+      });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [tourActive, tour.step, meals.length]);
+
+  const onPayoffDone = useCallback(() => {
+    track('onboarding_screen_completed', { screen: 'S25_payoff' });
+    setAfterPayoff(true);
+    setTimeout(() => setAfterPayoff(false), 600);
+    void markPayoffShown();
+  }, []);
+
   return (
-    <Screen scroll>
+    <Screen
+      scroll
+      scrollRef={scrollRef}
+      onScroll={(e) => {
+        scrollY.current = e.nativeEvent.contentOffset.y;
+      }}
+    >
       <View style={styles.header}>
         <AppText variant="overline" color={colors.inkMuted}>
           {dateLabel}
@@ -436,6 +510,7 @@ export default function TodayScreen() {
         </View>
       ) : (
         <>
+          <View ref={dashboardRef} collapsable={false}>
           <Card style={styles.hero}>
             <Ring progress={progress} color={over ? colors.terracottaText : colors.terracotta} size={200}>
               <View style={styles.ringCenter}>
@@ -472,12 +547,14 @@ export default function TodayScreen() {
               <MacroBar label="Carbs" macro="carbs" value={day?.total_carbs_g ?? 0} target={profile?.target_carbs_g} />
             </View>
           </Card>
+          </View>
 
           {journey && journey.started_at && !journey.dismissed && rawDay(journey.started_at) <= 7 && (
-            <View style={styles.journeyWrap}>
+            <View style={styles.journeyWrap} ref={journeyRef} collapsable={false}>
               <JourneyCard
                 state={journey}
                 day={activeDay(journey)}
+                unlockLine={personalUnlock(activeDay(journey), introDraft)}
                 onHeaderPress={() => {
                   track('journey_path_opened');
                   setPathSheetVisible(true);
@@ -555,7 +632,7 @@ export default function TodayScreen() {
               {meals.length > 0 ? (
                 <Card padded={false} style={[styles.mealsCard, pending.length > 0 ? styles.mealsCardStacked : null]}>
                   {meals.map((m, i) => (
-                    <View key={m.id}>
+                    <View key={m.id} ref={i === 0 ? firstMealRef : undefined} collapsable={false}>
                       {i > 0 ? <View style={styles.sep} /> : null}
                       <MealRow
                         meal={m}
@@ -585,11 +662,12 @@ export default function TodayScreen() {
         </>
       )}
 
-      <SourcesIntroPopup visible={sourcesIntroVisible} onDismiss={dismissSourcesIntro} />
+      <SourcesIntroPopup visible={sourcesIntroVisible && !sheetsHeld} onDismiss={dismissSourcesIntro} />
+      <PayoffSheet visible={payoffVisible} onDone={onPayoffDone} />
 
       {/* Mount at most one bottom sheet at a time — the sources intro takes
           priority; a pending quest popup appears right after it's dismissed. */}
-      {popupQuestId && !sourcesIntroVisible && (
+      {popupQuestId && !sourcesIntroVisible && !sheetsHeld && (
         <JourneyPopup
           questId={popupQuestId}
           visible={!!popupQuestId}

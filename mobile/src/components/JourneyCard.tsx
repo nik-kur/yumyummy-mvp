@@ -28,6 +28,8 @@ interface JourneyCardProps {
   day: number;
   onHeaderPress: () => void;
   onQuestPress: (quest: QuestDef) => void;
+  /** The day's line written for this person's goal (`onb/firstWeek.ts`). */
+  unlockLine?: string | null;
 }
 
 function QuestRow({
@@ -62,7 +64,7 @@ function QuestRow({
   );
 }
 
-export function JourneyCard({ state, day, onHeaderPress, onQuestPress }: JourneyCardProps) {
+export function JourneyCard({ state, day, onHeaderPress, onQuestPress, unlockLine }: JourneyCardProps) {
   const done = completedCount(state);
   const total = ALL_QUESTS.length;
   const dayDef = LADDER.find((d) => d.day === day);
@@ -124,7 +126,7 @@ export function JourneyCard({ state, day, onHeaderPress, onQuestPress }: Journey
             ? `You're behind — finish ${overdue.length} earlier ${
                 overdue.length === 1 ? 'quest' : 'quests'
               } to get back on track.`
-            : `✨ ${dayDef.unlock}`}
+            : `✨ ${unlockLine ?? dayDef.unlock}`}
         </AppText>
       </View>
     </Card>

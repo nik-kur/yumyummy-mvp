@@ -21,6 +21,7 @@ export const IMG = {
   goal_track: require('../../assets/v3/onb/goal_track.png'),
   laurel_left: require('../../assets/v3/onb/laurel_left.png'),
   laurel_right: require('../../assets/v3/onb/laurel_right.png'),
+  save_cloud: require('../../assets/v3/onb/save_cloud.png'),
   mascot_great: require('../../assets/v3/onb/mascot_great.png'),
   mascot_heart: require('../../assets/v3/onb/mascot_heart.png'),
   mascot_stellar: require('../../assets/v3/onb/mascot_stellar.png'),

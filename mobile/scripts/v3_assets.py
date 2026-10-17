@@ -52,6 +52,8 @@ ASSETS = {
     'mascot_stellar': ('8278c1b3', None, 'png'),
     'laurel_left': ('1251bc6e', None, 'png'),
     'laurel_right': ('5de406de', None, 'png'),
+    # after purchase (22–25)
+    'save_cloud': ('fd361467', 450, 'png'),  # Save plan, 150 pt
     # photos and video
     'bg_costa': ('b5edbe00', None, 'jpg'),  # 1080 px wide, shown 390 pt full-bleed
     'welcome_d_poster': ('7180eb62', None, 'png'),

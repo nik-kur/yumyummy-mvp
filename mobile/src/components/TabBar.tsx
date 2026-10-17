@@ -5,6 +5,7 @@ import { House, Bookmark, BarChart3, User, Plus, type LucideIcon } from 'lucide-
 import * as Haptics from 'expo-haptics';
 
 import { AppText } from './AppText';
+import { useTourTarget } from './tour/TourOverlay';
 import { colors, radius, shadow, space } from '@/theme/tokens';
 
 type TabName = 'index' | 'menu' | 'week' | 'profile';
@@ -32,6 +33,8 @@ interface TabBarProps {
 export function TabBar({ routes, activeIndex, onNavigate }: TabBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tourBarRef = useTourTarget('tabbar');
+  const tourPlusRef = useTourTarget('plus');
 
   const activeName = routes[activeIndex]?.name;
 
@@ -59,11 +62,11 @@ export function TabBar({ routes, activeIndex, onNavigate }: TabBarProps) {
   };
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, space.sm) }]}>
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, space.sm) }]} ref={tourBarRef} collapsable={false}>
       <Tab name="index" />
       <Tab name="menu" />
       <View style={styles.fabSlot}>
-        <Pressable style={styles.fab} onPress={openCapture} hitSlop={8}>
+        <Pressable style={styles.fab} onPress={openCapture} hitSlop={8} ref={tourPlusRef}>
           <Plus size={28} color={colors.bg} strokeWidth={2} />
         </Pressable>
       </View>
