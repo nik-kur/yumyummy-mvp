@@ -174,6 +174,7 @@ export function parsePaywallArm(
     render,
     variant: oneOf(data.variant, variants, d.variant),
     copy: stringMap(data.copy),
-    price_emphasis: oneOf(data.price_emphasis, ['design', 'billed'] as const, d.price_emphasis),
+    price_emphasis: oneOf(data.price_emphasis, ['design', 'billed', 'weekly'] as const, d.price_emphasis),
+    show_rating: bool(data.show_rating, d.show_rating),
   };
 }

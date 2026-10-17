@@ -71,6 +71,15 @@ export function perMonth(p: AdaptyPaywallProduct): string | null {
   return likeStorePrice(p, per);
 }
 
+/** Price per week, e.g. yearly £49.99 → "£0.96", monthly £9.99 → "£2.31". */
+export function perWeek(p: AdaptyPaywallProduct): string | null {
+  const amount = p.price?.amount;
+  if (amount === undefined) return null;
+  const per = periodOf(p);
+  const weekly = per === 'year' ? amount / 52 : per === 'month' ? (amount * 12) / 52 : per === 'week' ? amount : null;
+  return weekly === null ? null : likeStorePrice(p, weekly);
+}
+
 /** "SAVE 58%" for the yearly plan against the monthly one, honest arithmetic, rounded down. */
 export function savePercent(products: AdaptyPaywallProduct[]): number | null {
   const y = products.find((p) => periodOf(p) === 'year')?.price?.amount;

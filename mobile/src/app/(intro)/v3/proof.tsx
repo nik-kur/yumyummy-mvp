@@ -40,10 +40,13 @@ export default function ProofScreen() {
       }
       footer={<OnbButton label="Continue" onPress={() => next()} />}
     >
+      {/* As drawn the block hugs the title and leaves the gap under it: centre it
+          between the title and the button instead (Nikita, 17 Oct). */}
+      <View style={{ flex: 1, minHeight: 24 }} />
       <View style={s.card}>
         <View style={s.cols}>
-          <Bar label={'Without a\nfood diary'} height={64} value="1×" />
-          <Bar label={'With a daily\nfood diary'} height={158} value="2×" strong />
+          <Bar label={'Without a\nfood diary'} height={72} value="1×" />
+          <Bar label={'With a daily\nfood diary'} height={178} value="2×" strong />
         </View>
       </View>
       <Text style={s.body}>
@@ -53,7 +56,7 @@ export default function ProofScreen() {
         )}
       </Text>
       <SourceLink label="Kaiser Permanente study of 1,685 adults · Am J Prev Med, 2008" url={STUDY_URL} style={s.link} />
-      <View style={{ flex: 1 }} />
+      <View style={{ flex: 1.3 }} />
     </OnbLayout>
   );
 }
@@ -61,7 +64,6 @@ export default function ProofScreen() {
 const s = StyleSheet.create({
   title: { marginTop: 24, fontFamily: F.serif, fontSize: 32, lineHeight: 38, letterSpacing: -0.32, color: C.ink },
   card: {
-    marginTop: 24,
     backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: C.hair,
@@ -72,7 +74,7 @@ const s = StyleSheet.create({
   col: { flex: 1, gap: 10 },
   colLabelBox: { height: 36, justifyContent: 'flex-end' },
   colLabel: { textAlign: 'center', fontFamily: F.sansSemibold, fontSize: 14, lineHeight: 18, color: C.ink },
-  well: { height: 190, borderRadius: 12, backgroundColor: C.paper, padding: 8, justifyContent: 'flex-end' },
+  well: { height: 210, borderRadius: 12, backgroundColor: C.paper, padding: 8, justifyContent: 'flex-end' },
   bar: { borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   barValue: { fontFamily: F.serif },
   barWeak: { fontSize: 22, color: C.muted },

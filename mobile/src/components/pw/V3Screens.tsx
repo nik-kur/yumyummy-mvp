@@ -119,21 +119,22 @@ export function TrialIntro({
 
 // ---- 18 · B2 ----------------------------------------------------------------
 
-/** 2.8 s loop: still until 55 %, then a ring 14° → −12° → 8° → −5° → 0 (canvas `yy-ring`). */
+/** A ring 14° → −12° → 8° → −5° → 0, then still for 1.5 s, on a loop (canvas `yy-ring`). */
 function RingingBell() {
   const rot = useSharedValue(0);
   useEffect(() => {
     const e = Easing.inOut(Easing.ease);
-    rot.value = withRepeat(
+    const ring = () =>
       withSequence(
-        withDelay(1540, withTiming(14, { duration: 196, easing: e })),
+        withTiming(14, { duration: 196, easing: e }),
         withTiming(-12, { duration: 224, easing: e }),
         withTiming(8, { duration: 224, easing: e }),
         withTiming(-5, { duration: 224, easing: e }),
         withTiming(0, { duration: 392, easing: e }),
-      ),
-      -1,
-    );
+      );
+    // First ring right away (the canvas loop starts still for 1.5 s, and
+    // people tap on before it moves), then the canvas rhythm.
+    rot.value = withSequence(withDelay(250, ring()), withRepeat(withDelay(1540, ring()), -1));
     return () => cancelAnimation(rot);
   }, [rot]);
   const ring = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
@@ -235,7 +236,8 @@ interface PlansProps {
   products: AdaptyPaywallProduct[];
   selectedId: string | null;
   onSelect: (p: AdaptyPaywallProduct) => void;
-  emphasis: 'design' | 'billed';
+  emphasis: 'design' | 'billed' | 'weekly';
+  showRating: boolean;
   hasTrial: boolean;
   trialDays: number;
   /** "3 days free, then £49.99 per year" — shown only with `price_emphasis: billed`. */
@@ -292,7 +294,7 @@ export function LightPlans({
       }
     >
       <View style={s.chips}>
-        {[`★ ${rating}`, `${users} trackers`, '✓ Verified data'].map((c) => (
+        {[...(p.showRating ? [`★ ${rating}`] : []), `${users} trackers`, '✓ Verified data'].map((c) => (
           <Text key={c} style={s.chip}>
             {c}
           </Text>
@@ -364,8 +366,8 @@ export function PhotoPlans({
           />
         </>
       )}
-      <LaurelRating rating={rating} />
-      <LegalRow onRestore={p.onRestore} color="rgba(255,255,255,0.6)" />
+      {p.showRating ? <LaurelRating rating={rating} /> : null}
+      <LegalRow onRestore={p.onRestore} color="rgba(255,255,255,0.6)" style={p.showRating ? undefined : { marginTop: 14 }} />
     </PhotoStage>
   );
 }

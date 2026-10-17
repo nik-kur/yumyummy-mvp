@@ -8,13 +8,14 @@
  *   billed — the billed amount is always the big number (default, App Review
  *            3.1.2(c));
  *   design — yearly shows the per-month figure big and the billed amount below
- *            on B3 (as drawn); P1 already leads with the billed amount.
+ *            on B3 (as drawn); P1 already leads with the billed amount;
+ *   weekly — every plan shows its per-week figure big, the billed amount below.
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AdaptyPaywallProduct } from 'react-native-adapty';
 import * as Haptics from 'expo-haptics';
 
-import { billed, perMonth, periodOf, planName, savePercent, unitWord } from '@/billing/v3Pricing';
+import { billed, perMonth, perWeek, periodOf, planName, savePercent, unitWord } from '@/billing/v3Pricing';
 import { C, F } from '@/onb/theme';
 
 import { Check } from './PwParts';
@@ -24,12 +25,17 @@ interface Props {
   selectedId: string | null;
   onSelect: (p: AdaptyPaywallProduct) => void;
   tone: 'dark' | 'light';
-  emphasis: 'design' | 'billed';
+  emphasis: 'design' | 'billed' | 'weekly';
 }
 
-function lines(p: AdaptyPaywallProduct, tone: 'dark' | 'light', emphasis: 'design' | 'billed') {
+function lines(p: AdaptyPaywallProduct, tone: 'dark' | 'light', emphasis: 'design' | 'billed' | 'weekly') {
   const per = periodOf(p);
   const pm = perMonth(p);
+  const pw = perWeek(p);
+  if (emphasis === 'weekly' && pw && per !== 'other') {
+    if (per === 'week') return { big: `${billed(p)} /wk`, small: 'billed weekly' };
+    return { big: `${pw} /wk`, small: `${billed(p)} per ${unitWord(p)}` };
+  }
   if (tone === 'light') {
     if (per === 'year') return { big: billed(p), small: pm ? `${pm} / month` : 'per year' };
     if (per === 'month') return { big: billed(p), small: 'per month' };

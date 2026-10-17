@@ -44,6 +44,7 @@ export const DEFAULT_PAYWALL_ARM: PaywallArmConfig = {
   variant: 'b3_joe',
   copy: {},
   price_emphasis: 'billed',
+  show_rating: true,
 };
 
 export const DEFAULT_OFFER_ARM: PaywallArmConfig = {
@@ -51,6 +52,7 @@ export const DEFAULT_OFFER_ARM: PaywallArmConfig = {
   variant: 'costa',
   copy: {},
   price_emphasis: 'billed',
+  show_rating: true,
 };
 
 export const PAYWALL_VARIANTS = [

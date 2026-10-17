@@ -197,7 +197,8 @@ export default function QaScreen() {
         <AppText variant="eyebrow">pw_main</AppText>
         <Choice label="render" value={pw.render} options={['native', 'flow', 'legacy'] as const} onChange={(v) => update({ ...o, paywall: { ...pw, render: v } })} />
         <Choice label="variant" value={pw.variant} options={PAYWALL_VARIANTS} onChange={(v) => update({ ...o, paywall: { ...pw, variant: v } })} />
-        <Choice label="price_emphasis" value={pw.price_emphasis} options={['design', 'billed'] as const} onChange={(v) => update({ ...o, paywall: { ...pw, price_emphasis: v } })} />
+        <Choice label="price_emphasis" value={pw.price_emphasis} options={['billed', 'design', 'weekly'] as const} onChange={(v) => update({ ...o, paywall: { ...pw, price_emphasis: v } })} />
+        <Choice label="show_rating" value={pw.show_rating} options={ON_OFF} onChange={(v) => update({ ...o, paywall: { ...pw, show_rating: v } })} />
 
         <AppText variant="eyebrow">pw_after_cancel</AppText>
         <Choice label="render" value={offer.render} options={['native', 'flow'] as const} onChange={(v) => update({ ...o, offer: { ...offer, render: v } })} />

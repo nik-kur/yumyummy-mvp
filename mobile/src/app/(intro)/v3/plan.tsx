@@ -71,7 +71,7 @@ export default function PlanScreen() {
   const intro = useIntro();
   const target = intro.target_weight_kg ?? intro.weight_kg;
   const mode: PlanMode = planMode(intro.goal_type ?? 'just_track', direction(intro.weight_kg, target));
-  const { config, next } = useOnbScreen('S15_plan', `${mode}_${getOnboardingConfig().plan}`);
+  const { config, content, next } = useOnbScreen('S15_plan', `${mode}_${getOnboardingConfig().plan}`);
   const { width } = useWindowDimensions();
   const chartW = width - PAD.side * 2 - 34;
   const imperial = intro.units === 'imperial';
@@ -198,6 +198,19 @@ export default function PlanScreen() {
           </>
         )}
       </View>
+
+      {/* The first-week ladder (state/journey.ts) is what turns the plan into a habit. */}
+      <View style={s.guide}>
+        <View style={s.guideBadge}>
+          <Text style={s.guideNum}>7</Text>
+        </View>
+        <View style={s.guideText}>
+          <Text style={s.guideTitle}>{content.texts['plan.guide_title'] ?? 'We’ll guide your first 7 days'}</Text>
+          <Text style={s.guideSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.9}>
+            {content.texts['plan.guide_sub'] ?? 'One small step a day builds the habit.'}
+          </Text>
+        </View>
+      </View>
       <View style={{ flex: 1 }} />
     </OnbLayout>
   );
@@ -215,9 +228,9 @@ const s = StyleSheet.create({
   },
   h1: { marginTop: 10, textAlign: 'center', fontFamily: F.serif, fontSize: 30, lineHeight: 36, letterSpacing: -0.3, color: C.ink },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.hair, borderRadius: 16 },
-  kcalCard: { marginTop: 20, padding: 18 },
-  goalCard: { marginTop: 12, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14 },
-  aheadCard: { marginTop: 12, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 6 },
+  kcalCard: { marginTop: 16, padding: 18 },
+  goalCard: { marginTop: 10, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14 },
+  aheadCard: { marginTop: 10, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 6 },
   baseline: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', columnGap: 8 },
   wrap: { flexWrap: 'wrap' },
   kcal: { fontFamily: F.serif, fontSize: 52, lineHeight: 56, color: C.ink, fontVariant: ['tabular-nums'] },
@@ -231,6 +244,29 @@ const s = StyleSheet.create({
   chart: { marginTop: 10 },
   axis: { marginTop: 4, height: 18, flexDirection: 'row', justifyContent: 'space-between' },
   axisText: { fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.muted },
+  guide: {
+    marginTop: 10,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: C.paper2,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  guideBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guideNum: { fontFamily: F.serif, fontSize: 20, lineHeight: 24, color: C.terra },
+  guideText: { flex: 1, gap: 1 },
+  guideTitle: { fontFamily: F.sansSemibold, fontSize: 15, lineHeight: 20, color: C.ink },
+  guideSub: { fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: C.muted },
   aheadTitle: { marginTop: 14, fontFamily: F.serif, fontSize: 18, lineHeight: 24, color: C.ink },
   rail: { position: 'absolute', left: 6, top: 32, bottom: 32, width: 2, backgroundColor: C.terraSoft },
   mile: { height: 64, flexDirection: 'row', alignItems: 'center', gap: 14 },

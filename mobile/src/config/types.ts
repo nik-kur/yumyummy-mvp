@@ -96,9 +96,12 @@ export interface PaywallArmConfig {
   /**
    * Which price is the big one on the plans screen and the offer. `billed`
    * (default) = the amount actually charged leads and the trial terms are
-   * spelled out (App Review 3.1.2(c)); `design` = as drawn on the canvas.
+   * spelled out (App Review 3.1.2(c)); `design` = as drawn on the canvas
+   * (per-month figure first); `weekly` = per-week figure first.
    */
-  price_emphasis: 'design' | 'billed';
+  price_emphasis: 'design' | 'billed' | 'weekly';
+  /** "5.0 ★ avg App Store rating" on B3 and the rating chip on P1 plans. */
+  show_rating: boolean;
 }
 
 /** How a config reached the app — goes to PostHog as `config_source`. */

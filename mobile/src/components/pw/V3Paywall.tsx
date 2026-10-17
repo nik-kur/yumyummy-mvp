@@ -135,6 +135,7 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     selectedId: selected?.vendorProductId ?? null,
     onSelect,
     emphasis: config.price_emphasis,
+    showRating: config.show_rating,
     hasTrial,
     trialDays: days,
     terms,
