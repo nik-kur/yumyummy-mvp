@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
   createContext,
   useCallback,
@@ -31,7 +32,7 @@ import {
 } from '@/analytics/attribution';
 import { clearPendingPurchase } from '@/state/pendingPurchase';
 import { readInstallId, saveInstallId } from '@/state/installId';
-import { loadDraft } from '@/state/introDraft';
+import { draftProfilePatch, loadDraft } from '@/state/introDraft';
 import { resetTour } from '@/state/tour';
 
 /**
@@ -70,6 +71,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Set when this install entered preview; gone after a reinstall (see `loadProfile`). */
+const PREVIEW_DEVICE_KEY = '@yy_preview_device';
+
 /** Whether the latest genuine sign-in created the account (the tour is for new ones). */
 let lastSignInCreated = false;
 export function lastSignInCreatedAccount(): boolean {
@@ -85,13 +89,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // `created` is the backend's "this sign-in made a new account" flag.
   const loadProfile = useCallback(async (method?: string, created?: boolean) => {
     const me = await api.getMe();
-    setProfile(me);
     if (me.is_preview) {
+      // A reinstall keeps the Keychain (this token) but not the app's storage:
+      // start from the onboarding again rather than in preview. Closing the
+      // offer there brings back the same anonymous account through the
+      // install id, with its free log still spent.
+      if (!(await AsyncStorage.getItem(PREVIEW_DEVICE_KEY).catch(() => null))) {
+        await setToken(null);
+        setProfile(null);
+        setStatus('signedOut');
+        return;
+      }
       // An anonymous preview account is not a person yet: no identify, no
       // attribution customer id, no Adapty profile switch.
+      setProfile(me);
       setStatus('preview');
       return;
     }
+    setProfile(me);
     setStatus('signedIn');
     setAttributionCustomerId(me.account_id);
     // identify() links the anonymous onboarding distinct_id to account_id, so
@@ -225,26 +240,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const stored = await readInstallId();
       const res = await api.signInInstall(stored);
       if (res.install_id && res.install_id !== stored) await saveInstallId(res.install_id);
+      await AsyncStorage.setItem(PREVIEW_DEVICE_KEY, new Date().toISOString()).catch(() => {});
       await setToken(res.access_token);
       // The plan from the onboarding, so Today shows the person's targets.
       const intro = await loadDraft();
-      if (intro.goal_type) {
-        await api
-          .updateMe({
-            goal_type: intro.goal_type,
-            gender: intro.gender,
-            age: intro.age,
-            height_cm: intro.height_cm,
-            weight_kg: intro.weight_kg,
-            activity_level: intro.activity_level,
-            target_calories: intro.target_calories,
-            target_protein_g: intro.target_protein_g,
-            target_fat_g: intro.target_fat_g,
-            target_carbs_g: intro.target_carbs_g,
-            onboarding_completed: true,
-          })
-          .catch(() => {});
-      }
+      if (intro.goal_type) await api.updateMe(draftProfilePatch(intro)).catch(() => {});
       await loadProfile();
       track('preview_started', { created: res.created });
       return true;

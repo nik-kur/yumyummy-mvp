@@ -6,10 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import { AppText } from './AppText';
 import { useTourTarget } from './tour/TourOverlay';
-import { track } from '@/analytics/posthog';
-import { getOnboardingConfig } from '@/config/onboardingConfig';
-import { useAuth } from '@/state/auth';
-import { usePendingMeals } from '@/state/pendingMeals';
+import { usePreview } from '@/state/usePreview';
 import { colors, radius, shadow, space } from '@/theme/tokens';
 
 type TabName = 'index' | 'menu' | 'week' | 'profile';
@@ -44,16 +41,7 @@ export function TabBar({ routes, activeIndex, onNavigate }: TabBarProps) {
 
   // Preview mode (21): the free log opens capture; anything past it opens
   // Last offer, as does Profile (there is no account to manage yet).
-  const { status, profile } = useAuth();
-  const { pending } = usePendingMeals();
-  const preview = status === 'preview';
-  // A log still in flight already holds the free log.
-  const freeLogLeft =
-    Boolean(profile?.preview_free_log_available) && getOnboardingConfig().free_first_log && pending.length === 0;
-  const openLastOffer = (from: string) => {
-    track('preview_gate', { from });
-    router.push('/paywall?last_offer=1');
-  };
+  const { preview, freeLogLeft, openLastOffer } = usePreview();
 
   const go = (name: TabName) => {
     if (preview && name === 'profile') {

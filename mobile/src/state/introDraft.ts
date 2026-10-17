@@ -5,6 +5,7 @@
  * is synced to the backend via PATCH /app/me and then cleared.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { AccountProfileUpdate } from '@/api/types';
 import type { ActivityLevel, Gender, GoalType } from '@/utils/calories';
 
 const KEY = '@yy_intro_draft';
@@ -79,6 +80,23 @@ export async function loadDraft(): Promise<IntroDraft> {
   } catch {
     return DEFAULT_DRAFT;
   }
+}
+
+/** The plan from the intro answers, as the account profile takes it (Save plan, preview). */
+export function draftProfilePatch(d: IntroDraft): AccountProfileUpdate {
+  return {
+    goal_type: d.goal_type,
+    gender: d.gender,
+    age: d.age,
+    height_cm: d.height_cm,
+    weight_kg: d.weight_kg,
+    activity_level: d.activity_level,
+    target_calories: d.target_calories,
+    target_protein_g: d.target_protein_g,
+    target_fat_g: d.target_fat_g,
+    target_carbs_g: d.target_carbs_g,
+    onboarding_completed: true,
+  };
 }
 
 export async function saveDraft(draft: IntroDraft): Promise<void> {

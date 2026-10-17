@@ -34,6 +34,7 @@ from app.models.usage_record import UsageRecord
 from app.models.churn_survey import ChurnSurvey
 from app.models.payment_event import PaymentEvent
 from app.models.notification_event import NotificationEvent
+from app.models.weekly_recap import WeeklyRecap
 from app.models.acquisition_event import AcquisitionEvent
 from app.models.auth_code import AuthOneTimeCode
 from app.auth import preview
@@ -179,7 +180,9 @@ def delete_me(
     subscriptions are managed by Apple and cancelled by the user in Settings;
     we only remove our own copy of the account and its data.
     """
-    members = account_member_users(db, account.id)
+    # Read before the commit: the deleted account cannot be refreshed after it.
+    account_id = account.id
+    members = account_member_users(db, account_id)
     user_ids = [u.id for u in members]
     telegram_ids = [u.telegram_id for u in members if u.telegram_id]
 
@@ -210,6 +213,8 @@ def delete_me(
         db.query(UsageRecord).filter(UsageRecord.user_id.in_(user_ids)).delete(synchronize_session=False)
         db.query(ChurnSurvey).filter(ChurnSurvey.user_id.in_(user_ids)).delete(synchronize_session=False)
         db.query(PaymentEvent).filter(PaymentEvent.user_id.in_(user_ids)).delete(synchronize_session=False)
+        # Cached weekly recaps key on the user with no ON DELETE CASCADE either.
+        db.query(WeeklyRecap).filter(WeeklyRecap.user_id.in_(user_ids)).delete(synchronize_session=False)
 
     if telegram_ids:
         db.query(NotificationEvent).filter(
@@ -230,7 +235,7 @@ def delete_me(
     db.query(Account).filter(Account.id == account.id).delete(synchronize_session=False)
 
     db.commit()
-    logger.info("account_deleted account_id=%s users=%s", account.id, user_ids)
+    logger.info("account_deleted account_id=%s users=%s", account_id, user_ids)
     return {"status": "deleted"}
 
 

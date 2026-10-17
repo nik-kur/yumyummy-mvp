@@ -117,10 +117,12 @@
 | `render` | `native`, `flow` | без ключа: флоу с экраном → `flow` | Наш оффер или экран флоу Adapty (сейчас идёт тест флоу Adapty) |
 | `variant` | `costa`, `closeup` | `costa` | Фото: Costa или курица с рисом + плашка |
 | `price_emphasis` | `billed`, `design` | `billed` | `billed` — крупно «£4.99 / week»; иначе «Try it FREE» |
-| `copy.headline` | текст | «Try it FREE» | Крупный заголовок (например «50% OFF»; работает при `design`) |
+| `copy.headline` | текст | «Try it FREE» | Крупный заголовок (например «50% OFF»). Только при `design`: при `billed` (по умолчанию) крупно цена, а заголовок молча не показывается, так что тест заголовков требует `price_emphasis: design` в каждом арме |
 | `copy.badge`, `copy.cta`, `copy.footnote` | текст | «Last offer», «Continue», «No commitment · Cancel anytime» | Плашка, кнопка, подпись |
 
 Продукт — первый продукт с триалом на флоу арма. Если триала у человека нет (уже был), оффер не показывается. Это касается и экранов флоу Adapty.
+
+Этот же плейсмент открывается как Last offer (21) из пробного режима: «+» после бесплатного лога, Profile, советник. Показы из пробного режима попадают в тот же A/B тест, что и показы после отмены покупки; в PostHog их отличает `offer_context` (`after_cancel` / `last_offer`) у `paywall_offer_shown`. Если нужно мерить их отдельно в Adapty — отдельный плейсмент под Last offer (потребует сборки).
 
 ## Слоты: экран из Adapty вместо нашего
 

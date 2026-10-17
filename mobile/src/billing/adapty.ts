@@ -12,6 +12,7 @@
  */
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { IS_QA_BUILD } from '@/config/buildFlags';
 import { adapty, AppTrackingTransparencyStatus, LogLevel } from 'react-native-adapty';
 import type {
   AdaptyExternalAttributionProvider,
@@ -123,16 +124,19 @@ export async function whenAdaptyActivated(graceMs: number): Promise<boolean> {
 }
 
 /**
- * The tester mark (`config/testerMark.ts`) lives on one Adapty profile. Sign-in
- * to another account and sign-out both move the device to a different profile,
- * so the stored code is written again after each switch.
+ * Device attributes live on one Adapty profile: the tester mark
+ * (`config/testerMark.ts`) and `qa_build`. Sign-in to another account and
+ * sign-out both move the device to a different profile, so they are written
+ * again after each switch.
  */
-async function reapplyTesterMark(): Promise<void> {
+async function reapplyDeviceAttributes(): Promise<void> {
   try {
     const code = await AsyncStorage.getItem('@yy_qa_tester');
-    if (code) await adapty.updateProfile({ codableCustomAttributes: { qa_tester: code } });
+    await adapty.updateProfile({
+      codableCustomAttributes: { qa_build: IS_QA_BUILD ? 'true' : 'false', ...(code ? { qa_tester: code } : {}) },
+    });
   } catch {
-    // tester convenience only
+    // segmentation convenience only
   }
 }
 
@@ -150,7 +154,7 @@ export async function identifyAdapty(accountId: number | string): Promise<boolea
     if (!(await activateAdapty())) return false;
     try {
       await adapty.identify(String(accountId));
-      void reapplyTesterMark();
+      void reapplyDeviceAttributes();
       return true;
     } catch (e) {
       // Non-fatal: the purchase still exists on the anonymous profile, and
@@ -381,7 +385,7 @@ export async function logoutAdapty(): Promise<void> {
   if (!isAdaptyConfigured()) return;
   try {
     await adapty.logout();
-    void reapplyTesterMark();
+    void reapplyDeviceAttributes();
   } catch {
     // ignore
   }

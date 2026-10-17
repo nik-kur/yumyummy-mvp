@@ -270,3 +270,54 @@ def test_per_ip_install_cap(monkeypatch):
 def test_preview_off(monkeypatch):
     monkeypatch.setattr(settings, "preview_mode_enabled", False, raising=False)
     assert client.post("/auth/install", json={}).status_code == 503
+
+
+def test_preview_off_ends_free_logs_of_started_sessions(monkeypatch):
+    token = _start()["access_token"]
+    monkeypatch.setattr(settings, "preview_mode_enabled", False, raising=False)
+    monkeypatch.setattr(app_api_module, "run_yumyummy_workflow", _meal_workflow())
+    r = client.post("/app/agent/run", headers=_auth(token), json={"text": "salad"})
+    assert r.json()["intent"] == "paywall"
+    me = client.get("/app/me", headers=_auth(token)).json()
+    assert me["preview_free_log_available"] is False
+
+
+def test_voice_out_of_calls_with_free_log_left_is_not_the_paywall(monkeypatch):
+    monkeypatch.setattr(settings, "preview_ai_calls_per_install", 1, raising=False)
+    token = _start()["access_token"]
+    r = client.post(
+        "/app/voice/transcribe",
+        headers=_auth(token),
+        files={"audio": ("a.m4a", b"x", "audio/m4a")},
+    )
+    # One call in total, kept for the log itself: voice is refused, typing is not.
+    assert r.status_code == 429
+    me = client.get("/app/me", headers=_auth(token)).json()
+    assert me["preview_free_log_available"] is True
+
+
+def test_delete_account_with_a_cached_weekly_recap(monkeypatch):
+    from datetime import date
+
+    from app.models.weekly_recap import WeeklyRecap
+
+    monkeypatch.setattr(
+        auth_providers,
+        "verify_apple_identity_token",
+        lambda tok: auth_providers.ProviderIdentity("apple", "apple-del", "del@example.com"),
+    )
+    real = client.post("/auth/apple", json={"identity_token": "x"}).json()
+    db = TestingSessionLocal()
+    try:
+        user = account_member_users(db, real["account_id"])[0]
+        db.add(WeeklyRecap(user_id=user.id, week_start=date(2026, 10, 12), llm_summary="x"))
+        db.commit()
+    finally:
+        db.close()
+    r = client.delete("/app/me", headers=_auth(real["access_token"]))
+    assert r.status_code == 200, r.text
+    db = TestingSessionLocal()
+    try:
+        assert db.get(Account, real["account_id"]) is None
+    finally:
+        db.close()

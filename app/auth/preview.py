@@ -60,21 +60,34 @@ def require_preview_ai_call(
     account: Account = Depends(get_current_account),
 ) -> None:
     """Route dependency for an AI call before the log (voice transcription):
-    a preview account spends one of its AI calls, leaving room for the log."""
+    a preview account spends one of its AI calls, leaving room for the log.
+    Out of those calls with the free log still unused, typing is still free:
+    429, not the paywall."""
     if not is_anonymous_account(db, account):
         return
-    if not free_log_available(db, account) or not _spend_ai_call(db, account, keep_for_log=True):
+    if not free_log_available(db, account):
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="preview")
+    if not _spend_ai_call(db, account, keep_for_log=True):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Type your meal instead")
 
 
 def client_ip(request: Request) -> Optional[str]:
-    """The client IP for the preview caps. The leftmost X-Forwarded-For entry
-    is whatever the client sent; the proxy appends the real address on the
-    right, so take the rightmost (or Cloudflare's header when present)."""
+    """The client IP for the preview caps. Cloudflare's header when present
+    (Cloudflare overwrites whatever the client sent). Otherwise the rightmost
+    X-Forwarded-For entry: the leftmost is whatever the client sent, the proxy
+    appends the address it saw on the right."""
     cf = request.headers.get("cf-connecting-ip")
+    xff = request.headers.get("x-forwarded-for")
+    # Which source the caps run on (never the address itself): with more than
+    # one proxy in front, the rightmost entry is a proxy and every install
+    # would share one bucket.
+    logger.info(
+        "[PREVIEW] ip source=%s xff_entries=%s",
+        "cf" if cf else "xff" if xff else "peer",
+        len(xff.split(",")) if xff else 0,
+    )
     if cf:
         return cf.strip()
-    xff = request.headers.get("x-forwarded-for")
     if xff:
         last = xff.split(",")[-1].strip()
         if last:
@@ -160,7 +173,10 @@ def _start_preview(db: Session, *, install_id: Optional[str], ip: Optional[str])
 
 
 def free_log_available(db: Session, account: Account) -> bool:
-    """True while this anonymous account's install has not used its free log."""
+    """True while this anonymous account's install has not used its free log.
+    Preview switched off ends it for sessions already started, too."""
+    if not settings.preview_mode_enabled:
+        return False
     install = install_for_account(db, account)
     if install is None or install.free_log_used_at is not None:
         return False
@@ -179,7 +195,9 @@ def free_log_available(db: Session, account: Account) -> bool:
 
 def claim_free_log(db: Session, account: Account) -> bool:
     """Atomically take the free log for one AI call. False if another request
-    holds it, it is spent, or the install is out of AI calls."""
+    holds it, it is spent, the install is out of AI calls or preview is off."""
+    if not settings.preview_mode_enabled:
+        return False
     result = db.execute(
         update(Install)
         .where(

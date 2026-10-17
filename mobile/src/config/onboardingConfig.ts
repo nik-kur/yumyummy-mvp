@@ -232,6 +232,21 @@ export function resolveOnboardingAssignment(): Promise<OnboardingAssignment> {
   return resolving;
 }
 
+/**
+ * The arm this install was given, from the device only — no Adapty request.
+ * For what comes after the onboarding (preview Today, Save plan after a cold
+ * start): it must follow the person's arm, but must not join an onb_main test.
+ */
+export async function restoreOnboardingAssignment(): Promise<void> {
+  if (assignment) return;
+  await loadQaOverrides();
+  const stored = await loadStoredAssignment();
+  if (stored && !assignment) {
+    assignment = stored;
+    emit();
+  }
+}
+
 /** Drop the stored arm; the next resolve asks Adapty again (QA reset, tester mark). */
 export async function clearOnboardingAssignment(): Promise<void> {
   generation += 1;

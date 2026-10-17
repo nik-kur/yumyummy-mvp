@@ -17,6 +17,7 @@ import {
 } from '@/components/mealEdit';
 import { useAuth } from '@/state/auth';
 import * as api from '@/api/endpoints';
+import { isPreviewGate } from '@/api/client';
 import { reportJourneyEvent } from '@/state/journey';
 import type { AccuracyLevel, MealItem, MealRead } from '@/api/types';
 import { formatInt, formatTime } from '@/utils/format';
@@ -278,8 +279,8 @@ export default function MealDetailScreen() {
       void reportJourneyEvent({ type: 'log_created', source: 'saved' }).catch(() => {});
       Alert.alert('Logged again', 'Added to today exactly as before — no new search.');
       router.back();
-    } catch {
-      Alert.alert('Could not repeat', 'Please try again.');
+    } catch (e) {
+      if (!isPreviewGate(e)) Alert.alert('Could not repeat', 'Please try again.');
     } finally {
       setRepeating(false);
     }
@@ -300,8 +301,8 @@ export default function MealDetailScreen() {
       });
       void reportJourneyEvent({ type: 'menu_item_created' }).catch(() => {});
       Alert.alert('Saved to My Menu', 'Log it again anytime in one tap.');
-    } catch {
-      Alert.alert('Could not save', 'Please try again.');
+    } catch (e) {
+      if (!isPreviewGate(e)) Alert.alert('Could not save', 'Please try again.');
     } finally {
       setBusy(false);
     }

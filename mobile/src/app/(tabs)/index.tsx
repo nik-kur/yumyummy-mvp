@@ -33,7 +33,7 @@ import { SourcesIntroPopup } from '@/components/SourcesIntroPopup';
 import { PayoffSheet } from '@/components/tour/PayoffSheet';
 import { measureTourTarget, useTourTarget, type TourTargetId } from '@/components/tour/TourOverlay';
 import { markPayoffShown, setTourStep, useTour } from '@/state/tour';
-import { getOnboardingConfig } from '@/config/onboardingConfig';
+import { usePreview } from '@/state/usePreview';
 import { loadDraft, type IntroDraft } from '@/state/introDraft';
 import { personalUnlock } from '@/onb/firstWeek';
 import { WidgetInstructionSheet } from '@/components/WidgetInstructionSheet';
@@ -198,19 +198,10 @@ function PendingRow({ item, onPress }: { item: PendingMeal; onPress: () => void 
 
 export default function TodayScreen() {
   const router = useRouter();
-  const { profile, status, refreshProfile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const { pending, lastSettledAt, retry, dismiss } = usePendingMeals();
   // Preview mode (21): one free log, then Last offer for anything that costs.
-  const preview = status === 'preview';
-  const freeLogLeft =
-    Boolean(profile?.preview_free_log_available) && getOnboardingConfig().free_first_log && pending.length === 0;
-  const openLastOffer = useCallback(
-    (from: string) => {
-      track('preview_gate', { from });
-      router.push('/paywall?last_offer=1');
-    },
-    [router],
-  );
+  const { preview, freeLogLeft, openLastOffer } = usePreview();
   const [day, setDay] = useState<DaySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);

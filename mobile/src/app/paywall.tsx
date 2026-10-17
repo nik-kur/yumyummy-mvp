@@ -94,9 +94,9 @@ import * as api from '@/api/endpoints';
 /**
  * `loading` → spinner; `v3` → our V3 paywall; `flow` → builder flow; `ready` →
  * legacy code paywall from remote config; `fallback` → legacy bundled config,
- * purchases disabled.
+ * purchases disabled; `offer` → Last offer on its own, no paywall under it.
  */
-type Phase = 'loading' | 'v3' | 'flow' | 'ready' | 'fallback';
+type Phase = 'loading' | 'v3' | 'flow' | 'ready' | 'fallback' | 'offer';
 
 /** Who drew the screen a purchase came from — PostHog `renderer`. */
 type Renderer = 'code' | 'v3' | 'v3_offer' | 'adapty_flow' | 'adapty_flow_offer';
@@ -180,6 +180,11 @@ export default function PaywallScreen() {
   // straight away; closing it (or the plans under it) returns to the app.
   const lastOffer = params.last_offer === '1';
   const closable = dismissable || lastOffer;
+  // Where this paywall view comes from, on `paywall_shown`: Last offer and
+  // Profile opens must not read as acquisition views in the funnel.
+  const contextRef = useRef<'last_offer' | 'profile' | 'gate' | 'acquisition'>(
+    lastOffer ? 'last_offer' : dismissable ? 'profile' : status === 'signedIn' ? 'gate' : 'acquisition',
+  );
   // Acquisition flow: no account yet. Read through a ref inside the mount-time
   // effects below, which must not re-run when auth state changes.
   const signedIn = status === 'signedIn';
@@ -401,6 +406,7 @@ export default function PaywallScreen() {
       variant: config.variant,
       renderer: 'code',
       products_available: prods.length > 0,
+      context: contextRef.current,
     });
     addBreadcrumb('paywall', 'Paywall shown', { variant: config.variant, renderer: 'code' });
 
@@ -495,7 +501,8 @@ export default function PaywallScreen() {
       price_emphasis: arm.config.price_emphasis,
       products_available: prods.length > 0,
       products: prods.map((p) => p.vendorProductId).join(','),
-      plans_only: dismissable || signedInRef.current,
+      plans_only: dismissable || signedInRef.current || lastOffer,
+      context: contextRef.current,
     });
     addBreadcrumb('paywall', 'Paywall shown', { variant: arm.config.variant, renderer: 'v3' });
     if (prods.length === 0) {
@@ -505,12 +512,32 @@ export default function PaywallScreen() {
         reason: !ok ? 'adapty_unavailable' : arm.flow ? 'no_products' : 'no_flow',
       });
     }
-  }, [dismissable, loadCodePaywall]);
+  }, [dismissable, lastOffer, loadCodePaywall]);
 
   useEffect(() => {
     const mountedRef = { current: true };
-    void loadPaywall(mountedRef);
+    void (async () => {
+      // Last offer (21): the offer is the whole screen. The paywall under it is
+      // loaded — and counted as shown, in PostHog and in the pw_main test —
+      // only when there is no offer to show.
+      if (lastOffer && getOnboardingConfig().after_cancel_offer) {
+        if (!offerRef.current) {
+          offerRef.current = prefetchOffer().catch((e) => {
+            addBreadcrumb('paywall', 'Offer prefetch failed', { error: e instanceof Error ? e.message : String(e) });
+            return null;
+          });
+        }
+        const lastOfferState = await offerRef.current;
+        if (!mountedRef.current) return;
+        if (lastOfferState) {
+          setPhase('offer');
+          return;
+        }
+      }
+      await loadPaywall(mountedRef);
+    })();
     return () => { mountedRef.current = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount; `lastOffer` is a route param
   }, [loadPaywall]);
 
   // Web purchases (Adapty Mail → FunnelFox → Paddle) grant `premium` on the
@@ -679,7 +706,7 @@ export default function PaywallScreen() {
   useEffect(() => {
     const qa = IS_QA_BUILD && params.qa_offer === '1';
     if ((!qa && !lastOffer) || directOfferRef.current) return;
-    if (phase !== 'v3' && phase !== 'flow' && phase !== 'ready') return;
+    if (phase !== 'v3' && phase !== 'flow' && phase !== 'ready' && phase !== 'offer') return;
     directOfferRef.current = true;
     void maybeShowOffer(lastOffer ? 'last_offer' : 'qa_preview', 'v3');
   }, [phase, params.qa_offer, lastOffer, maybeShowOffer]);
@@ -1030,6 +1057,10 @@ export default function PaywallScreen() {
     return withClose(<PwLoading />);
   }
 
+  if (phase === 'offer') {
+    return withOffer(withClose(<PwLoading />));
+  }
+
   if (phase === 'v3' && v3) {
     return withOffer(withClose(
       <V3Paywall
@@ -1063,6 +1094,7 @@ export default function PaywallScreen() {
               renderer: 'adapty_flow',
               ab_test: builderFlow.placement?.abTestName,
               audience: builderFlow.placement?.audienceName,
+              context: contextRef.current,
             });
             addBreadcrumb('paywall', 'Paywall shown', {
               variant: builderFlow.variationName ?? builderFlow.variationId,

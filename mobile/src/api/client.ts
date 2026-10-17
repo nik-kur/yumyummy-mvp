@@ -79,6 +79,15 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Preview mode: the backend refused because this needs a subscription. Last
+ * offer is already on its way (see `openPreviewGate`), so callers show no
+ * error of their own.
+ */
+export function isPreviewGate(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 402 && e.message === 'preview';
+}
+
 type Query = Record<string, string | number | boolean | undefined>;
 
 export interface RequestOptions {

@@ -10,6 +10,7 @@ import { requestTrackingConsent } from '@/analytics/attribution';
 import {
   getOnboardingConfig,
   resolveOnboardingAssignment,
+  restoreOnboardingAssignment,
   type OnboardingAssignment,
 } from '@/config/onboardingConfig';
 import { useAuth } from '@/state/auth';
@@ -52,20 +53,23 @@ export default function Index() {
 
   useEffect(() => {
     if (status === 'preview') {
-      void loadPendingPurchase().then((pending) => {
+      // Preview Today follows the arm (free_first_log): the stored one only.
+      void Promise.all([loadPendingPurchase(), restoreOnboardingAssignment()]).then(([pending]) => {
         setHasPendingPurchase(pending !== null);
         setIntroChecked(true);
       });
       return;
     }
     if (status === 'signedOut') {
-      Promise.all([loadDraft(), loadPendingPurchase()]).then(([d, pending]) => {
+      Promise.all([loadDraft(), loadPendingPurchase()]).then(async ([d, pending]) => {
+        // Started here, not at launch: only the onboarding needs the arm. A
+        // signed-in launch, or a buyer on the way back to the sign-in gate,
+        // must not wait for it or be counted in an onb_main test (the gate
+        // reads the stored arm only).
+        if (pending !== null) await restoreOnboardingAssignment();
         setHasIntroDraft(d.goal_type !== null);
         setHasPendingPurchase(pending !== null);
         setIntroChecked(true);
-        // Started here, not at launch: only the onboarding needs the arm. A
-        // signed-in launch, or a buyer on the way back to the sign-in gate,
-        // must not wait for it or be counted in an onb_main test.
         if (pending === null) void resolveOnboardingAssignment().then(setAssignment);
       });
     }

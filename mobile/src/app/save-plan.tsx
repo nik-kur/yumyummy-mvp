@@ -38,7 +38,12 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Button } from '@/components/Button';
-import { clearOnboardingAssignment, getOnboardingConfig, resolveOnboardingAssignment } from '@/config/onboardingConfig';
+import {
+  clearOnboardingAssignment,
+  getOnboardingConfig,
+  resolveOnboardingAssignment,
+  restoreOnboardingAssignment,
+} from '@/config/onboardingConfig';
 import { enableRemindersAfterPurchase } from '@/notifications/scheduler';
 import { IMG } from '@/onb/assets';
 import { C, F, PAD } from '@/onb/theme';
@@ -47,7 +52,7 @@ import { startPostPurchase } from '@/state/tour';
 import { lastSignInCreatedAccount, useAuth } from '@/state/auth';
 import { AI_PROVIDERS_LABEL, grantAIConsent, hasAIConsent } from '@/state/aiConsent';
 import { PRIVACY_URL } from '@/components/pw/PwParts';
-import { loadDraft } from '@/state/introDraft';
+import { draftProfilePatch, loadDraft } from '@/state/introDraft';
 import {
   clearPendingPurchase,
   loadPendingPurchase,
@@ -95,8 +100,11 @@ export default function SavePlanScreen() {
   // AI consent on this screen (`ai_consent: save_plan`), unless already given.
   const [showAiLine, setShowAiLine] = useState(false);
   useEffect(() => {
-    if (getOnboardingConfig().ai_consent !== 'save_plan') return;
-    void hasAIConsent().then((has) => setShowAiLine(!has));
+    // After a cold start straight to this gate the arm is read from the device.
+    void restoreOnboardingAssignment().then(async () => {
+      if (getOnboardingConfig().ai_consent !== 'save_plan') return;
+      setShowAiLine(!(await hasAIConsent()));
+    });
   }, []);
 
   useEffect(() => {
@@ -121,19 +129,7 @@ export default function SavePlanScreen() {
   const syncDraft = useCallback(async () => {
     const intro = await loadDraft();
     if (!intro.goal_type) return;
-    const payload = {
-      goal_type: intro.goal_type,
-      gender: intro.gender,
-      age: intro.age,
-      height_cm: intro.height_cm,
-      weight_kg: intro.weight_kg,
-      activity_level: intro.activity_level,
-      target_calories: intro.target_calories,
-      target_protein_g: intro.target_protein_g,
-      target_fat_g: intro.target_fat_g,
-      target_carbs_g: intro.target_carbs_g,
-      onboarding_completed: true,
-    };
+    const payload = draftProfilePatch(intro);
 
     for (let attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt += 1) {
       try {
