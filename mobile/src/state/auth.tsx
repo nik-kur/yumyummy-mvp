@@ -23,7 +23,12 @@ import {
 } from '@/billing/adapty';
 import { identify as phIdentify, reset as phReset, track } from '@/analytics/posthog';
 import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
-import { getAppsFlyerId, setAttributionCustomerId, logAttributionEvent } from '@/analytics/attribution';
+import {
+  getAppsFlyerId,
+  logAttributionEvent,
+  setAttributionCustomerId,
+  syncTrackingStatusToAdapty,
+} from '@/analytics/attribution';
 import { clearPendingPurchase } from '@/state/pendingPurchase';
 
 /**
@@ -93,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // identify() may drop the one set at launch: set it again right away.
       const appsFlyerId = await getAppsFlyerId();
       if (appsFlyerId) await setAdaptyIntegrationIdentifier('appsflyer_id', appsFlyerId);
+      await syncTrackingStatusToAdapty();
       await setAdaptyEmail(me.email);
       try {
         const billing = await api.syncBilling(adaptyProfileId);

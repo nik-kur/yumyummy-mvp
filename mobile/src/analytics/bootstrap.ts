@@ -12,7 +12,7 @@
  */
 import { initSentry } from '@/analytics/sentry';
 import { initPostHog, getDistinctId } from '@/analytics/posthog';
-import { initAttribution, getAppsFlyerId } from '@/analytics/attribution';
+import { initAttribution, getAppsFlyerId, syncTrackingStatusToAdapty } from '@/analytics/attribution';
 import { activateAdapty, setAdaptyCustomAttributes, setAdaptyIntegrationIdentifier } from '@/billing/adapty';
 import { IS_QA_BUILD } from '@/config/buildFlags';
 import { loadQaOverrides } from '@/config/qa';
@@ -48,6 +48,8 @@ export async function bootstrapSdks(): Promise<void> {
       ? setAdaptyIntegrationIdentifier('appsflyer_id', appsFlyerId)
       : Promise.resolve(),
     setAdaptyIntegrationIdentifier('posthog_distinct_user_id', getDistinctId() ?? ''),
+    // The ATT answer can also change in Settings between launches.
+    syncTrackingStatusToAdapty(),
     // Lets an Adapty segment keep local test installs out of real audiences.
     // Written either way so a store build over a QA build resets it.
     setAdaptyCustomAttributes({ qa_build: IS_QA_BUILD ? 'true' : 'false' }),

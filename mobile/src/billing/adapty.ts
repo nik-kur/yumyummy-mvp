@@ -12,7 +12,7 @@
  */
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { adapty, LogLevel } from 'react-native-adapty';
+import { adapty, AppTrackingTransparencyStatus, LogLevel } from 'react-native-adapty';
 import type {
   AdaptyExternalAttributionProvider,
   AdaptyFlow,
@@ -232,6 +232,29 @@ export async function setAdaptyIntegrationIdentifier(
     await adapty.setIntegrationIdentifier(key, value);
   } catch {
     // analytics stitching only — never block the app on it
+  }
+}
+
+/**
+ * Tell Adapty the customer's ATT answer. Adapty's server-side events to
+ * AppsFlyer (trials, purchases, renewals) carry it as `att`; without it every
+ * one of them reaches Meta as "tracking not allowed", even for people who said
+ * yes. Adapty does not read it by itself, so it is sent after the prompt, at
+ * every launch and after sign-in (a new profile).
+ */
+export async function setAdaptyTrackingStatus(status: 'granted' | 'denied' | 'undetermined'): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  if (!(await activateAdapty())) return;
+  const value =
+    status === 'granted'
+      ? AppTrackingTransparencyStatus.Authorized
+      : status === 'denied'
+        ? AppTrackingTransparencyStatus.Denied
+        : AppTrackingTransparencyStatus.NotDetermined;
+  try {
+    await adapty.updateProfile({ appTrackingTransparencyStatus: value });
+  } catch {
+    // attribution quality only — never block the app on it
   }
 }
 

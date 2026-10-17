@@ -34,6 +34,7 @@ import { IS_QA_BUILD } from '@/config/buildFlags';
 import {
   setAdaptyCustomAttributes,
   setAdaptyIntegrationIdentifier,
+  setAdaptyTrackingStatus,
   updateAdaptyAttribution,
 } from '@/billing/adapty';
 
@@ -84,11 +85,22 @@ export async function requestTrackingConsent(): Promise<boolean> {
     const current = await getTrackingPermissionsAsync();
     if (current.status === 'undetermined' && current.canAskAgain) {
       const res = await requestTrackingPermissionsAsync();
+      void setAdaptyTrackingStatus(res.status);
       return res.status === 'granted';
     }
     return current.status === 'granted';
   } catch {
     return false;
+  }
+}
+
+/** Current ATT answer → Adapty (see `setAdaptyTrackingStatus`). */
+export async function syncTrackingStatusToAdapty(): Promise<void> {
+  try {
+    const { status } = await getTrackingPermissionsAsync();
+    await setAdaptyTrackingStatus(status);
+  } catch {
+    // attribution quality only
   }
 }
 
