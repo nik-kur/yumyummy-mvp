@@ -7,7 +7,9 @@
  * - overdue  — a past day with open quests (amber "catch up");
  * - preview  — a future day, quests visible but grayed with "opens Day N".
  */
-import { View, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
+import { View, Pressable, StyleSheet, ScrollView } from 'react-native';
+
+import { SheetModal } from './SheetModal';
 import { X, Check, Lock, AlertCircle } from 'lucide-react-native';
 
 import { AppText } from './AppText';
@@ -27,8 +29,7 @@ interface JourneyPathSheetProps {
 
 export function JourneyPathSheet({ visible, state, onDismiss }: JourneyPathSheetProps) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <View style={s.overlay}>
+    <SheetModal visible={visible} onRequestClose={onDismiss}>
         <View style={s.sheet}>
           <View style={s.topRow}>
             <View style={s.flex}>
@@ -131,8 +132,7 @@ export function JourneyPathSheet({ visible, state, onDismiss }: JourneyPathSheet
             })}
           </ScrollView>
         </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

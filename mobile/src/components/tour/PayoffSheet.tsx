@@ -5,7 +5,7 @@
  * sign-in); without a dated weight goal the line speaks about the habit.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Image, Modal, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   cancelAnimation,
@@ -19,6 +19,7 @@ import Animated, {
 
 import { track } from '@/analytics/posthog';
 import { OnbButton } from '@/components/onb/OnbButton';
+import { SheetModal } from '@/components/SheetModal';
 import { IMG } from '@/onb/assets';
 import { direction, fmtKg, fmtStLb, planMode } from '@/onb/plan';
 import { C, F } from '@/onb/theme';
@@ -70,8 +71,7 @@ export function PayoffSheet({ visible, onDone }: { visible: boolean; onDone: () 
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
-      <View style={s.dim}>
+    <SheetModal visible={visible} onRequestClose={onDone} backdrop="rgba(20,16,12,0.45)">
         <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <BobbingMascot />
           <Text style={s.h1} accessibilityRole="header">
@@ -80,13 +80,11 @@ export function PayoffSheet({ visible, onDone }: { visible: boolean; onDone: () 
           <Text style={s.body}>{goalLine(draft)}</Text>
           <OnbButton label="Got it" onPress={onDone} style={{ marginTop: 24 }} />
         </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 
 const s = StyleSheet.create({
-  dim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20,16,12,0.45)' },
   sheet: {
     backgroundColor: C.surface,
     borderTopLeftRadius: 20,

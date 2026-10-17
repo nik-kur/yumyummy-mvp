@@ -4,7 +4,9 @@
  * App Review Guideline 1.4.1) without linking out, so the first-session flow
  * isn't interrupted. Styled after JourneyPopup.
  */
-import { View, StyleSheet, Modal } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+
+import { SheetModal } from './SheetModal';
 import { BookOpen } from 'lucide-react-native';
 
 import { AppText } from './AppText';
@@ -18,8 +20,7 @@ interface SourcesIntroPopupProps {
 
 export function SourcesIntroPopup({ visible, onDismiss }: SourcesIntroPopupProps) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <View style={s.overlay}>
+    <SheetModal visible={visible} onRequestClose={onDismiss}>
         <View style={s.sheet}>
           <View style={s.handle} />
           <View style={s.iconWrap}>
@@ -43,8 +44,7 @@ export function SourcesIntroPopup({ visible, onDismiss }: SourcesIntroPopupProps
 
           <Button label="OK" variant="brand" onPress={onDismiss} />
         </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

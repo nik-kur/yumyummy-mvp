@@ -3,6 +3,7 @@
  * backend. Onboarding starts incomplete, and `updateMe`/`agentRun`/`createMeal`
  * mutate this state so the flows feel real in Expo Go.
  */
+import { IS_QA_BUILD } from '@/config/buildFlags';
 import type {
   AccountProfile,
   AccountProfileUpdate,
@@ -86,6 +87,8 @@ function seedProfile(): AccountProfile {
 }
 
 function seedMeals(): MealRead[] {
+  // QA builds walk the after-purchase tour as a brand-new account: empty diary.
+  if (IS_QA_BUILD) return [];
   return [
     { id: 101, eaten_at: isoMinusHours(6), description_user: 'Greek yogurt, berries & honey', calories: 320, protein_g: 22, fat_g: 9, carbs_g: 41, accuracy_level: 'EXACT', source: 'USDA' },
     { id: 102, eaten_at: isoMinusHours(3), description_user: 'Chicken & avocado bowl, Sweetgreen', calories: 640, protein_g: 43, fat_g: 28, carbs_g: 52, accuracy_level: 'ESTIMATE', source: 'Restaurant' },
@@ -575,6 +578,16 @@ export function mockAgentRun(text: string, hasPhoto: boolean): WorkflowRunRespon
     fat_g: items.reduce((a, b) => a + b.fat_g, 0),
     carbs_g: items.reduce((a, b) => a + b.carbs_g, 0),
   };
+  // Like the real backend, a log run saves the meal, so it lands on Today.
+  addMockMeal({
+    description_user: text.trim() || names.join(', '),
+    calories: totals.calories_kcal,
+    protein_g: totals.protein_g,
+    fat_g: totals.fat_g,
+    carbs_g: totals.carbs_g,
+    accuracy_level: 'ESTIMATE',
+    source: 'USDA',
+  });
   return {
     intent: 'log_meal',
     message_text: hasPhoto

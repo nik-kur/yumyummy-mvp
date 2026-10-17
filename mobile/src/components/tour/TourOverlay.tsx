@@ -28,7 +28,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 
 import { track } from '@/analytics/posthog';
 import { C, F, SHADOW } from '@/onb/theme';
-import { nextTourStep, setTourStep, skipTour, useTour, type TourStep } from '@/state/tour';
+import { nextTourStep, setTourStep, useTour, type TourStep } from '@/state/tour';
 
 export type TourTargetId =
   | 'dashboard'
@@ -295,7 +295,6 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
     void Haptics.selectionAsync().catch(() => {});
     void nextTourStep();
   };
-  const onSkip = () => void skipTour();
   const onPlus = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     void setTourStep(3);
@@ -356,9 +355,6 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
             <View style={s.footer}>
               <Text style={s.count}>{tour.step} of 6</Text>
               <View style={s.actions}>
-                <Pressable onPress={onSkip} hitSlop={10} accessibilityRole="button">
-                  <Text style={s.skip}>Skip</Text>
-                </Pressable>
                 {def.cta ? (
                   <Pressable onPress={onNext} style={({ pressed }) => [s.next, pressed && { opacity: 0.85 }]} accessibilityRole="button">
                     <Text style={s.nextText}>{def.cta}</Text>
@@ -374,21 +370,21 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
 }
 
 const s = StyleSheet.create({
+  // Dark, so a tip never reads as one of the app's own (light) cards.
   card: {
     position: 'absolute',
     left: 20,
     right: 20,
     paddingVertical: 16,
     paddingHorizontal: 18,
-    backgroundColor: C.surface,
+    backgroundColor: C.ink,
     borderRadius: 16,
   },
-  title: { fontFamily: F.sansSemibold, fontSize: 17, lineHeight: 22, color: C.ink },
-  body: { marginTop: 4, fontFamily: F.sans, fontSize: 15, lineHeight: 21, color: C.muted },
+  title: { fontFamily: F.sansSemibold, fontSize: 17, lineHeight: 22, color: C.paper },
+  body: { marginTop: 4, fontFamily: F.sans, fontSize: 15, lineHeight: 21, color: 'rgba(247,241,230,0.75)' },
   footer: { marginTop: 14, height: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  count: { fontFamily: F.sans, fontSize: 13, color: C.faint },
+  count: { fontFamily: F.sans, fontSize: 13, color: 'rgba(247,241,230,0.55)' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  skip: { fontFamily: F.sans, fontSize: 14, color: C.ink },
-  next: { height: 36, paddingHorizontal: 16, borderRadius: 10, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
-  nextText: { fontFamily: F.sansSemibold, fontSize: 14, color: C.paper },
+  next: { height: 36, paddingHorizontal: 16, borderRadius: 10, backgroundColor: C.terra, alignItems: 'center', justifyContent: 'center' },
+  nextText: { fontFamily: F.sansSemibold, fontSize: 14, color: C.white },
 });

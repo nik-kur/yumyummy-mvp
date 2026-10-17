@@ -449,10 +449,12 @@ export default function TodayScreen() {
 
   // Step 4 waits for the meal to land. If it never will (analysis failed and
   // was removed), go back to "tap +" instead of waiting forever.
+  // Only after it has stayed that way a while: between the analysis finishing
+  // and Today refetching there is a moment with neither a pending nor a meal.
   useEffect(() => {
-    if (tourActive && tour.step === 4 && !loading && meals.length === 0 && pending.length === 0) {
-      void setTourStep(2);
-    }
+    if (!(tourActive && tour.step === 4 && !loading && meals.length === 0 && pending.length === 0)) return;
+    const t = setTimeout(() => void setTourStep(2), 5000);
+    return () => clearTimeout(t);
   }, [tourActive, tour.step, loading, meals.length, pending.length]);
 
   // Bring the step's element into view: the top for 1, 2 and 5; the first meal

@@ -101,6 +101,25 @@ export default function CaptureScreen() {
 
   const [mode, setMode] = useState<Mode>('input');
   const [text, setText] = useState(typeof params.prefill === 'string' ? params.prefill : '');
+
+  // `autoFocus` fires while the modal is still sliding in and iOS ignores it,
+  // so the keyboard never came up. Focus once the screen has settled (and the
+  // AI consent sheet, if any, is out of the way).
+  const inputRef = useRef<TextInput>(null);
+  useEffect(() => {
+    if (aiConsent !== true || params.mode === 'photo' || params.mode === 'voice') return;
+    // iOS refuses focus while the presentation is still running: try after it,
+    // and once more if the first attempt didn't take.
+    const focus = () => {
+      if (inputRef.current && !inputRef.current.isFocused()) inputRef.current.focus();
+    };
+    const a = setTimeout(focus, 700);
+    const b = setTimeout(focus, 1300);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+  }, [aiConsent, params.mode]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -337,6 +356,7 @@ export default function CaptureScreen() {
               showsVerticalScrollIndicator={false}
             >
               <TextInput
+                ref={inputRef}
                 style={styles.input}
                 placeholder={
                   photos.length > 0
