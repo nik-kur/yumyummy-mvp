@@ -5,6 +5,7 @@
  * is synced to the backend via PATCH /app/me and then cleared.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { AccountProfileUpdate } from '@/api/types';
 import type { ActivityLevel, Gender, GoalType } from '@/utils/calories';
 
 const KEY = '@yy_intro_draft';
@@ -28,6 +29,19 @@ export interface IntroDraft {
   target_weight_kg: number | null;
   deficit_pct: number | null;
   target_weeks: number | null;
+  // V3 onboarding answers
+  /** Screen 4: where they heard about us (`instagram`, `tiktok`, …). */
+  source: string | null;
+  /** Screen 9: tracked calories before. */
+  tracked_before: boolean | null;
+  /** Screen 10: what made tracking hard (one answer). */
+  barrier: string | null;
+  /** Screen 5: units chosen on the height & weight wheels. */
+  units: 'metric' | 'imperial';
+  /** Screen 7: pace in kg per week (null when the weight holds). */
+  pace_kg_week: number | null;
+  /** ISO date the target weight is reached (null when the weight holds). */
+  target_date: string | null;
   // Computed
   target_calories: number | null;
   target_protein_g: number | null;
@@ -46,6 +60,12 @@ export const DEFAULT_DRAFT: IntroDraft = {
   target_weight_kg: null,
   deficit_pct: null,
   target_weeks: null,
+  source: null,
+  tracked_before: null,
+  barrier: null,
+  units: 'metric',
+  pace_kg_week: null,
+  target_date: null,
   target_calories: null,
   target_protein_g: null,
   target_fat_g: null,
@@ -62,8 +82,37 @@ export async function loadDraft(): Promise<IntroDraft> {
   }
 }
 
+/** The plan from the intro answers, as the account profile takes it (Save plan, preview). */
+export function draftProfilePatch(d: IntroDraft): AccountProfileUpdate {
+  return {
+    goal_type: d.goal_type,
+    gender: d.gender,
+    age: d.age,
+    height_cm: d.height_cm,
+    weight_kg: d.weight_kg,
+    activity_level: d.activity_level,
+    target_calories: d.target_calories,
+    target_protein_g: d.target_protein_g,
+    target_fat_g: d.target_fat_g,
+    target_carbs_g: d.target_carbs_g,
+    onboarding_completed: true,
+  };
+}
+
 export async function saveDraft(draft: IntroDraft): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(draft)).catch(() => {});
+}
+
+const reloadListeners = new Set<() => void>();
+
+/** Ask mounted intro providers to re-read the stored draft (QA jumps). */
+export function notifyDraftReplaced(): void {
+  reloadListeners.forEach((l) => l());
+}
+
+export function onDraftReplaced(listener: () => void): () => void {
+  reloadListeners.add(listener);
+  return () => reloadListeners.delete(listener);
 }
 
 export async function clearDraft(): Promise<void> {

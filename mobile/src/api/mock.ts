@@ -3,9 +3,11 @@
  * backend. Onboarding starts incomplete, and `updateMe`/`agentRun`/`createMeal`
  * mutate this state so the flows feel real in Expo Go.
  */
+import { IS_QA_BUILD } from '@/config/buildFlags';
 import type {
   AccountProfile,
   AccountProfileUpdate,
+  AuthTokenResponse,
   BillingSnapshot,
   DaySummary,
   DayTotals,
@@ -86,6 +88,8 @@ function seedProfile(): AccountProfile {
 }
 
 function seedMeals(): MealRead[] {
+  // QA builds walk the after-purchase tour as a brand-new account: empty diary.
+  if (IS_QA_BUILD) return [];
   return [
     { id: 101, eaten_at: isoMinusHours(6), description_user: 'Greek yogurt, berries & honey', calories: 320, protein_g: 22, fat_g: 9, carbs_g: 41, accuracy_level: 'EXACT', source: 'USDA' },
     { id: 102, eaten_at: isoMinusHours(3), description_user: 'Chicken & avocado bowl, Sweetgreen', calories: 640, protein_g: 43, fat_g: 28, carbs_g: 52, accuracy_level: 'ESTIMATE', source: 'Restaurant' },
@@ -111,8 +115,27 @@ const state: MockState = {
 
 let nextMealId = 1000;
 
+// ---- Preview mode (anonymous account per install) ------------------------
+let previewActive = false;
+let previewFreeLogUsed = false;
+
+export function mockStartPreview(): AuthTokenResponse {
+  const created = !previewActive;
+  previewActive = true;
+  return { access_token: MOCK_TOKEN, token_type: 'bearer', account_id: 2, created, install_id: 'mock-install-0000000000' };
+}
+
+/** A real sign-in ends preview (the backend merges the anonymous account). */
+export function mockSignIn(created: boolean): AuthTokenResponse {
+  previewActive = false;
+  return { access_token: MOCK_TOKEN, token_type: 'bearer', account_id: 1, created };
+}
+
 export function getMockProfile(): AccountProfile {
-  return { ...state.profile, billing: { ...state.profile.billing } };
+  const preview = previewActive
+    ? { is_preview: true, preview_free_log_available: !previewFreeLogUsed, linked_providers: [] }
+    : { is_preview: false, preview_free_log_available: false };
+  return { ...state.profile, billing: { ...state.profile.billing }, ...preview };
 }
 
 export function patchMockProfile(update: AccountProfileUpdate): AccountProfile {
@@ -551,6 +574,19 @@ export function markMockTelegramLinked(): void {
 }
 
 export function mockAgentRun(text: string, hasPhoto: boolean): WorkflowRunResponse {
+  if (previewActive) {
+    if (previewFreeLogUsed) {
+      return {
+        intent: 'paywall',
+        message_text: 'That was your free log. Start your free trial to keep logging.',
+        confidence: null,
+        totals: { calories_kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0 },
+        items: [],
+        source_url: null,
+      };
+    }
+    previewFreeLogUsed = true;
+  }
   const parts = text
     .split(/,| and | with |\+/i)
     .map((s) => s.trim())
@@ -575,6 +611,16 @@ export function mockAgentRun(text: string, hasPhoto: boolean): WorkflowRunRespon
     fat_g: items.reduce((a, b) => a + b.fat_g, 0),
     carbs_g: items.reduce((a, b) => a + b.carbs_g, 0),
   };
+  // Like the real backend, a log run saves the meal, so it lands on Today.
+  addMockMeal({
+    description_user: text.trim() || names.join(', '),
+    calories: totals.calories_kcal,
+    protein_g: totals.protein_g,
+    fat_g: totals.fat_g,
+    carbs_g: totals.carbs_g,
+    accuracy_level: 'ESTIMATE',
+    source: 'USDA',
+  });
   return {
     intent: 'log_meal',
     message_text: hasPhoto

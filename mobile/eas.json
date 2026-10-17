@@ -19,6 +19,7 @@
         "EXPO_PUBLIC_SENTRY_DSN": "https://0169e00e2ce77d6122ac134c2f81cff9@o4511348872380416.ingest.de.sentry.io/4511704535924816",
         "EXPO_PUBLIC_APPSFLYER_DEV_KEY": "4iBz9oYMMfmKMowNuvE8CQ",
         "EXPO_PUBLIC_APPSFLYER_APP_ID": "6785363037",
+        "EXPO_PUBLIC_QA_BUILD": "0",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -36,6 +37,7 @@
         "EXPO_PUBLIC_SENTRY_DSN": "https://0169e00e2ce77d6122ac134c2f81cff9@o4511348872380416.ingest.de.sentry.io/4511704535924816",
         "EXPO_PUBLIC_APPSFLYER_DEV_KEY": "4iBz9oYMMfmKMowNuvE8CQ",
         "EXPO_PUBLIC_APPSFLYER_APP_ID": "6785363037",
+        "EXPO_PUBLIC_QA_BUILD": "0",
         "SENTRY_URL": "https://de.sentry.io/",
         "SENTRY_ALLOW_FAILURE": "true"
       }
@@ -51,6 +53,7 @@
         "EXPO_PUBLIC_SENTRY_DSN": "https://0169e00e2ce77d6122ac134c2f81cff9@o4511348872380416.ingest.de.sentry.io/4511704535924816",
         "EXPO_PUBLIC_APPSFLYER_DEV_KEY": "4iBz9oYMMfmKMowNuvE8CQ",
         "EXPO_PUBLIC_APPSFLYER_APP_ID": "6785363037",
+        "EXPO_PUBLIC_QA_BUILD": "0",
         "SENTRY_URL": "https://de.sentry.io/",
         "SENTRY_ALLOW_FAILURE": "true"
       }

@@ -11,7 +11,9 @@
  * falls back to its static UI so the rest of the app stays usable.
  */
 import { Platform } from 'react-native';
-import { adapty, LogLevel } from 'react-native-adapty';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { IS_QA_BUILD } from '@/config/buildFlags';
+import { adapty, AppTrackingTransparencyStatus, LogLevel } from 'react-native-adapty';
 import type {
   AdaptyExternalAttributionProvider,
   AdaptyFlow,
@@ -48,6 +50,17 @@ export const ADAPTY_PLACEMENT_ONBOARDING_FLOW =
  */
 export const ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW =
   process.env.EXPO_PUBLIC_ADAPTY_PLACEMENT_AFTER_CANCEL_FLOW ?? 'pw_after_cancel';
+
+/**
+ * V3 switchboard and slot placements. `onb_content` carries copy, numbers and
+ * reviews for every arm. `onb_welcome` / `onb_social` are slots: when the
+ * onboarding config says `render: "flow"`, the flow published there replaces
+ * our welcome (1) or social-proof (16) screen. A placement that does not exist
+ * yet simply resolves to "no flow" and the app shows its own screen.
+ */
+export const ADAPTY_PLACEMENT_ONBOARDING_CONTENT = 'onb_content';
+export const ADAPTY_PLACEMENT_WELCOME_SLOT = 'onb_welcome';
+export const ADAPTY_PLACEMENT_SOCIAL_SLOT = 'onb_social';
 
 function sdkKey(): string {
   const ios = process.env.EXPO_PUBLIC_ADAPTY_IOS_SDK_KEY ?? '';
@@ -93,6 +106,40 @@ export function activateAdapty(): Promise<boolean> {
   return activationPromise;
 }
 
+/**
+ * Activation as started by the launch bootstrap, which first gives AppsFlyer a
+ * moment to report its device id (Adapty's required order). Something that
+ * needs Adapty early — the onboarding config under the splash — waits for that
+ * here, but only for `graceMs`: past it, activating out of order beats making
+ * the first screen wait.
+ */
+export async function whenAdaptyActivated(graceMs: number): Promise<boolean> {
+  if (!activationPromise) {
+    const start = Date.now();
+    while (!activationPromise && Date.now() - start < graceMs) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  return activateAdapty();
+}
+
+/**
+ * Device attributes live on one Adapty profile: the tester mark
+ * (`config/testerMark.ts`) and `qa_build`. Sign-in to another account and
+ * sign-out both move the device to a different profile, so they are written
+ * again after each switch.
+ */
+async function reapplyDeviceAttributes(): Promise<void> {
+  try {
+    const code = await AsyncStorage.getItem('@yy_qa_tester');
+    await adapty.updateProfile({
+      codableCustomAttributes: { qa_build: IS_QA_BUILD ? 'true' : 'false', ...(code ? { qa_tester: code } : {}) },
+    });
+  } catch {
+    // segmentation convenience only
+  }
+}
+
 let identifyPromise: Promise<boolean> | null = null;
 
 /**
@@ -107,6 +154,7 @@ export async function identifyAdapty(accountId: number | string): Promise<boolea
     if (!(await activateAdapty())) return false;
     try {
       await adapty.identify(String(accountId));
+      void reapplyDeviceAttributes();
       return true;
     } catch (e) {
       // Non-fatal: the purchase still exists on the anonymous profile, and
@@ -188,6 +236,29 @@ export async function setAdaptyIntegrationIdentifier(
     await adapty.setIntegrationIdentifier(key, value);
   } catch {
     // analytics stitching only — never block the app on it
+  }
+}
+
+/**
+ * Tell Adapty the customer's ATT answer. Adapty's server-side events to
+ * AppsFlyer (trials, purchases, renewals) carry it as `att`; without it every
+ * one of them reaches Meta as "tracking not allowed", even for people who said
+ * yes. Adapty does not read it by itself, so it is sent after the prompt, at
+ * every launch and after sign-in (a new profile).
+ */
+export async function setAdaptyTrackingStatus(status: 'granted' | 'denied' | 'undetermined'): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  if (!(await activateAdapty())) return;
+  const value =
+    status === 'granted'
+      ? AppTrackingTransparencyStatus.Authorized
+      : status === 'denied'
+        ? AppTrackingTransparencyStatus.Denied
+        : AppTrackingTransparencyStatus.NotDetermined;
+  try {
+    await adapty.updateProfile({ appTrackingTransparencyStatus: value });
+  } catch {
+    // attribution quality only — never block the app on it
   }
 }
 
@@ -314,6 +385,7 @@ export async function logoutAdapty(): Promise<void> {
   if (!isAdaptyConfigured()) return;
   try {
     await adapty.logout();
+    void reapplyDeviceAttributes();
   } catch {
     // ignore
   }

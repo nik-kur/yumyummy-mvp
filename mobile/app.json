@@ -24,19 +24,43 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": false,
         "NSAdvertisingAttributionReportEndpoint": "https://appsflyer-skadnetwork.com/",
-        "AdAttributionKit": { "AttributionCopyEndpoint": "https://appsflyer-skadnetwork.com/" },
+        "AdAttributionKit": {
+          "AttributionCopyEndpoint": "https://appsflyer-skadnetwork.com/"
+        },
         "SKAdNetworkItems": [
-          { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
-          { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" },
-          { "SKAdNetworkIdentifier": "238da6jt44.skadnetwork" },
-          { "SKAdNetworkIdentifier": "22mmun2rn5.skadnetwork" },
-          { "SKAdNetworkIdentifier": "4468km3ulz.skadnetwork" },
-          { "SKAdNetworkIdentifier": "2u9pt9hc89.skadnetwork" },
-          { "SKAdNetworkIdentifier": "hs6bdukanm.skadnetwork" },
-          { "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork" },
-          { "SKAdNetworkIdentifier": "424m5254lk.skadnetwork" },
-          { "SKAdNetworkIdentifier": "4dzt52r2t5.skadnetwork" },
-          { "SKAdNetworkIdentifier": "ludvb6z3bs.skadnetwork" }
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "238da6jt44.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "22mmun2rn5.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "4468km3ulz.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "2u9pt9hc89.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "hs6bdukanm.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "424m5254lk.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "4dzt52r2t5.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "ludvb6z3bs.skadnetwork"
+          }
         ]
       },
       "entitlements": {
@@ -77,7 +101,12 @@
           ]
         }
       ],
-      ["expo-secure-store", { "configureAndroidBackup": false }],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false
+        }
+      ],
       "expo-apple-authentication",
       [
         "expo-image-picker",
@@ -89,8 +118,8 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FAF5EC",
-          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#B85A3A",
+          "image": "./assets/v3/splash/splash_y.png",
           "imageWidth": 96
         }
       ],
@@ -102,15 +131,34 @@
           "microphonePermission": "YumYummy uses the microphone so you can log meals by voice."
         }
       ],
-      ["react-native-adapty", { "replaceAndroidBackupConfig": true }],
+      [
+        "react-native-adapty",
+        {
+          "replaceAndroidBackupConfig": true
+        }
+      ],
       [
         "expo-tracking-transparency",
         {
           "userTrackingPermission": "YumYummy uses this to measure ad performance and improve your experience. Your data is never sold."
         }
       ],
-      ["react-native-appsflyer", { "shouldUseStrictMode": false, "shouldUsePurchaseConnector": false }],
-      ["expo-build-properties", { "ios": { "deploymentTarget": "15.1", "useFrameworks": "dynamic" } }],
+      [
+        "react-native-appsflyer",
+        {
+          "shouldUseStrictMode": false,
+          "shouldUsePurchaseConnector": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1",
+            "useFrameworks": "dynamic"
+          }
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {
@@ -118,7 +166,8 @@
           "project": "yumyummy-react-native",
           "url": "https://de.sentry.io/"
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": false,

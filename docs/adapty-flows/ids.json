@@ -7,5 +7,10 @@
   "pw_single_monthly": "be988b5b-af8e-4180-bda3-1cecd65ce99e",
   "pw_single_weekly": "588d6ac7-6e30-4f7b-907a-55aa483a16e5",
   "pw_after_cancel": "95dab450-fa0d-44aa-b7f2-2060074edda7",
-  "placement_pw_after_cancel": "0ca14826-5b9c-45bd-b5d2-2a68c32794f1"
+  "placement_pw_after_cancel": "0ca14826-5b9c-45bd-b5d2-2a68c32794f1",
+  "pw_calai": "1260aba5-1daa-42cc-a34b-e89d17bd2819",
+  "pw_welmi": "a31d5e53-47e5-4f10-82ce-4334941894ca",
+  "pw_a_native": "b42407d7-dab3-4ef4-9107-49ea94211f77",
+  "pw_offer_free": "edf1ccf2-8120-49e7-b220-dd5e001efbbb",
+  "pw_offer_price": "ea93fb12-4c8f-419f-ad94-09ee274cbf1d"
 }

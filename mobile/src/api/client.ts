@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { openPreviewGate } from '@/state/previewGate';
 
 const TOKEN_KEY = 'yumyummy.jwt';
 
@@ -78,12 +79,27 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Preview mode: the backend refused because this needs a subscription. Last
+ * offer is already on its way (see `openPreviewGate`), so callers show no
+ * error of their own.
+ */
+export function isPreviewGate(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 402 && e.message === 'preview';
+}
+
 type Query = Record<string, string | number | boolean | undefined>;
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
   body?: unknown;
   auth?: boolean;
+  /**
+   * Send this token even on an `auth: false` call, without the session-expiry
+   * handling: sign-in passes the preview account's token so the backend can
+   * merge it into the account being signed into.
+   */
+  bearer?: string | null;
   query?: Query;
   /**
    * Abort the request after this many ms. Defaults to 30s. The agent run passes
@@ -105,12 +121,14 @@ function buildQuery(query?: Query): string {
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = true, query, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const { method = 'GET', body, auth = true, query, timeoutMs = DEFAULT_TIMEOUT_MS, bearer } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   let sentToken: string | null = null;
   if (auth) {
     sentToken = await getToken();
     if (sentToken) headers.Authorization = `Bearer ${sentToken}`;
+  } else if (bearer) {
+    headers.Authorization = `Bearer ${bearer}`;
   }
 
   const controller = new AbortController();
@@ -153,6 +171,8 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     } else if (typeof data === 'string' && data) {
       detail = data;
     }
+    // Preview mode: this action needs a subscription → Last offer.
+    if (res.status === 402 && detail === 'preview') openPreviewGate(path);
     throw new ApiError(res.status, detail);
   }
 

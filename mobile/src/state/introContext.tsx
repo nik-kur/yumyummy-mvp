@@ -11,6 +11,7 @@ import {
   loadDraft,
   saveDraft,
   clearDraft,
+  onDraftReplaced,
 } from './introDraft';
 
 interface IntroContextValue extends IntroDraft {
@@ -26,10 +27,13 @@ export function IntroProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    loadDraft().then((d) => {
-      setDraft(d);
-      setReady(true);
-    });
+    const load = () =>
+      loadDraft().then((d) => {
+        setDraft(d);
+        setReady(true);
+      });
+    void load();
+    return onDraftReplaced(() => void load());
   }, []);
 
   const set = useCallback((patch: Partial<IntroDraft>) => {
@@ -50,7 +54,9 @@ export function IntroProvider({ children }: { children: React.ReactNode }) {
     [draft, set, clear, ready],
   );
 
-  return <IntroContext.Provider value={value}>{children}</IntroContext.Provider>;
+  // Screens never see the defaults while the stored answers load (a few ms):
+  // screens that freeze values on mount (goal check, loader) would keep them.
+  return <IntroContext.Provider value={value}>{ready ? children : null}</IntroContext.Provider>;
 }
 
 export function useIntro(): IntroContextValue {

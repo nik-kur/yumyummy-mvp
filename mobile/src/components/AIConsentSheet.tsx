@@ -3,7 +3,9 @@
  * action (meal capture or advisor chat). Satisfies App Review Guidelines
  * 5.1.1(i)/5.1.2(i): disclose what is sent, to whom, and get permission first.
  */
-import { View, Pressable, StyleSheet, Modal, Linking } from 'react-native';
+import { View, Pressable, StyleSheet, Linking } from 'react-native';
+
+import { SheetModal } from './SheetModal';
 import { Sparkles } from 'lucide-react-native';
 
 import { AppText } from './AppText';
@@ -36,8 +38,7 @@ interface AIConsentSheetProps {
 
 export function AIConsentSheet({ visible, onAgree, onDismiss }: AIConsentSheetProps) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <View style={s.overlay}>
+    <SheetModal visible={visible} onRequestClose={onDismiss}>
         <View style={s.sheet}>
           <View style={s.handle} />
 
@@ -81,8 +82,7 @@ export function AIConsentSheet({ visible, onAgree, onDismiss }: AIConsentSheetPr
             </AppText>
           </Pressable>
         </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

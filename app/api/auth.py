@@ -14,7 +14,9 @@ Every successful sign-in returns one of our HS256 access tokens (see
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, get_current_account, verify_internal_token
@@ -25,6 +27,7 @@ from app.auth.service import (
     find_or_create_account_for_identity,
     ensure_account_for_telegram_user,
 )
+from app.auth import preview
 from app.auth.merge import link_telegram_account
 from app.models.account import Account
 from app.models.user import User
@@ -35,6 +38,7 @@ from app.schemas.auth import (
     EmailCodeRequestResponse,
     EmailVerifyRequest,
     AuthTokenResponse,
+    InstallSignInRequest,
     TelegramLinkIssueRequest,
     TelegramLinkIssueResponse,
     TelegramLinkRedeemRequest,
@@ -58,8 +62,44 @@ def _mint_token(account: Account, *, created: bool) -> AuthTokenResponse:
     return AuthTokenResponse(access_token=token, account_id=account.id, created=created)
 
 
+def _merge_preview(db: Session, authorization: Optional[str], account: Account) -> None:
+    """If the app sent its preview (anonymous) account's token along with the
+    sign-in, fold that account — the free log, the plan — into this one.
+    Never fails the sign-in."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return
+    try:
+        source_id = jwt_auth.account_id_from_token(authorization.split(" ", 1)[1].strip())
+        source = db.query(Account).filter(Account.id == source_id).first()
+        if source is not None and preview.merge_preview_into(db, source_account=source, target_account=account):
+            logger.info("[AUTH] preview account %s merged into %s", source_id, account.id)
+    except Exception as exc:  # noqa: BLE001 — a merge problem must not block sign-in
+        db.rollback()
+        logger.warning("[AUTH] preview merge skipped: %s", exc)
+
+
+@router.post("/install", response_model=AuthTokenResponse)
+def sign_in_with_install(
+    payload: InstallSignInRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Preview mode: the anonymous account of this app install."""
+    try:
+        account, created, install_id = preview.start_preview(
+            db, install_id=payload.install_id, ip=preview.client_ip(request)
+        )
+    except preview.PreviewUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    response = _mint_token(account, created=created)
+    response.install_id = install_id
+    return response
+
+
 @router.post("/apple", response_model=AuthTokenResponse)
-def sign_in_with_apple(payload: AppleSignInRequest, db: Session = Depends(get_db)):
+def sign_in_with_apple(
+    payload: AppleSignInRequest,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
     try:
         identity = providers.verify_apple_identity_token(payload.identity_token)
     except providers.ProviderAuthError as exc:
@@ -76,11 +116,16 @@ def sign_in_with_apple(payload: AppleSignInRequest, db: Session = Depends(get_db
         "[AUTH] apple sign-in account_id=%s created=%s named=%s",
         account.id, created, bool(account.display_name),
     )
+    _merge_preview(db, authorization, account)
     return _mint_token(account, created=created)
 
 
 @router.post("/google", response_model=AuthTokenResponse)
-def sign_in_with_google(payload: GoogleSignInRequest, db: Session = Depends(get_db)):
+def sign_in_with_google(
+    payload: GoogleSignInRequest,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
     try:
         identity = providers.verify_google_id_token(payload.id_token)
     except providers.ProviderAuthError as exc:
@@ -90,6 +135,7 @@ def sign_in_with_google(payload: GoogleSignInRequest, db: Session = Depends(get_
         db, provider=identity.provider, provider_id=identity.provider_id, email=identity.email
     )
     logger.info("[AUTH] google sign-in account_id=%s created=%s", account.id, created)
+    _merge_preview(db, authorization, account)
     return _mint_token(account, created=created)
 
 
@@ -111,7 +157,11 @@ def request_email_code(payload: EmailCodeRequest, db: Session = Depends(get_db))
 
 
 @router.post("/email/verify", response_model=AuthTokenResponse)
-def verify_email_code(payload: EmailVerifyRequest, db: Session = Depends(get_db)):
+def verify_email_code(
+    payload: EmailVerifyRequest,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
     email = payload.email.strip().lower()
     if not codes.verify_email_login_code(db, email, payload.code):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired code")
@@ -120,6 +170,7 @@ def verify_email_code(payload: EmailVerifyRequest, db: Session = Depends(get_db)
         db, provider="email", provider_id=email, email=email
     )
     logger.info("[AUTH] email sign-in account_id=%s created=%s", account.id, created)
+    _merge_preview(db, authorization, account)
     return _mint_token(account, created=created)
 
 

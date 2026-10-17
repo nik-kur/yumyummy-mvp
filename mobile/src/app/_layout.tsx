@@ -13,6 +13,8 @@ import { WidgetActionBridge } from '@/widgets/WidgetActionBridge';
 import { useAppFonts } from '@/theme/useAppFonts';
 import { bootstrapSdks } from '@/analytics/bootstrap';
 import { colors } from '@/theme/tokens';
+import { IS_QA_BUILD } from '@/config/buildFlags';
+import { QaButton } from '@/components/QaButton';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -68,8 +70,9 @@ export default function RootLayout() {
                   gestureEnabled: false,
                 }}
               />
+              {/* Success (22): right after a purchase, before the gate or Today. */}
               <Stack.Screen
-                name="postbuy"
+                name="success"
                 options={{
                   presentation: 'fullScreenModal',
                   gestureEnabled: false,
@@ -78,7 +81,12 @@ export default function RootLayout() {
               <Stack.Screen name="recap" options={{ presentation: 'modal' }} />
               <Stack.Screen name="week1-report" options={{ presentation: 'card' }} />
               <Stack.Screen name="sources" options={{ presentation: 'card' }} />
+              {/* Screen 0 hands over to the onboarding with a fade, not a slide. */}
+              <Stack.Screen name="(intro)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="tester" options={{ presentation: 'card' }} />
+              <Stack.Screen name="qa" options={{ presentation: 'modal' }} />
             </Stack>
+            {IS_QA_BUILD ? <QaButton /> : null}
           </PendingMealsProvider>
         </AuthProvider>
       </SafeAreaProvider>

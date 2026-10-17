@@ -1,6 +1,8 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, type Ref } from 'react';
 import {
   ScrollView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   View,
   StyleSheet,
   type StyleProp,
@@ -21,6 +23,9 @@ interface ScreenProps {
   contentStyle?: StyleProp<ViewStyle>;
   /** Make the scroll content fill the viewport so children can distribute / pin a footer. */
   grow?: boolean;
+  /** `scroll` screens only: the ScrollView, e.g. to bring a tour target into view. */
+  scrollRef?: Ref<ScrollView>;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }
 
 export function Screen({
@@ -32,6 +37,8 @@ export function Screen({
   edges = ['top', 'left', 'right'],
   contentStyle,
   grow = false,
+  scrollRef,
+  onScroll,
 }: ScreenProps) {
   const background = bg ?? (dark ? colors.darkBg : colors.bg);
   const inner: StyleProp<ViewStyle> = [padded && styles.padded, contentStyle];
@@ -41,6 +48,9 @@ export function Screen({
       <StatusBar style={dark ? 'light' : 'dark'} />
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
+          onScroll={onScroll}
+          scrollEventThrottle={onScroll ? 32 : undefined}
           contentContainerStyle={[styles.scrollContent, grow && styles.grow, inner]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

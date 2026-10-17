@@ -17,6 +17,7 @@ import {
   type MacroTotals,
 } from '@/components/mealEdit';
 import * as api from '@/api/endpoints';
+import { isPreviewGate } from '@/api/client';
 import { reportJourneyEvent } from '@/state/journey';
 import type { MealItem, SavedMealListItem } from '@/api/types';
 import { formatInt } from '@/utils/format';
@@ -56,8 +57,8 @@ export default function MenuScreen() {
     try {
       // Server-side log keeps the component breakdown and bumps use_count.
       await api.logSavedMeal(item.id);
-    } catch {
-      Alert.alert('Could not log', 'Please check your connection and try again.');
+    } catch (e) {
+      if (!isPreviewGate(e)) Alert.alert('Could not log', 'Please check your connection and try again.');
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});

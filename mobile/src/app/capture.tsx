@@ -28,6 +28,8 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { AIConsentSheet } from '@/components/AIConsentSheet';
+import { TourOverlay, useTourTarget } from '@/components/tour/TourOverlay';
+import { getTour, setTourStep } from '@/state/tour';
 import { useAIConsent } from '@/state/aiConsent';
 import { usePendingMeals } from '@/state/pendingMeals';
 import { useKeyboardHeight } from '@/utils/keyboard';
@@ -99,6 +101,25 @@ export default function CaptureScreen() {
 
   const [mode, setMode] = useState<Mode>('input');
   const [text, setText] = useState(typeof params.prefill === 'string' ? params.prefill : '');
+
+  // `autoFocus` fires while the modal is still sliding in and iOS ignores it,
+  // so the keyboard never came up. Focus once the screen has settled (and the
+  // AI consent sheet, if any, is out of the way).
+  const inputRef = useRef<TextInput>(null);
+  useEffect(() => {
+    if (aiConsent !== true || params.mode === 'photo' || params.mode === 'voice') return;
+    // iOS refuses focus while the presentation is still running: try after it,
+    // and once more if the first attempt didn't take.
+    const focus = () => {
+      if (inputRef.current && !inputRef.current.isFocused()) inputRef.current.focus();
+    };
+    const a = setTimeout(focus, 700);
+    const b = setTimeout(focus, 1300);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+  }, [aiConsent, params.mode]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -122,8 +143,22 @@ export default function CaptureScreen() {
 
   const accept = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // Tour step 3 → 4: the meal lands on Today, where step 4 points at it.
+    const tour = getTour();
+    if (tour.status === 'active' && tour.step === 3) void setTourStep(4);
     setMode('accepted');
   };
+
+  // Tour: closing without logging sends the person back to step 2 ("tap +").
+  useEffect(
+    () => () => {
+      const tour = getTour();
+      if (tour.status === 'active' && tour.step === 3) void setTourStep(2);
+    },
+    [],
+  );
+  const tourBarRef = useTourTarget('capture_bar');
+  const tourExtrasRef = useTourTarget('capture_extras');
 
   const canSubmit = (text.trim().length > 0 || photos.length > 0) && !recording;
 
@@ -321,6 +356,7 @@ export default function CaptureScreen() {
               showsVerticalScrollIndicator={false}
             >
               <TextInput
+                ref={inputRef}
                 style={styles.input}
                 placeholder={
                   photos.length > 0
@@ -373,14 +409,14 @@ export default function CaptureScreen() {
               ) : null}
 
               {!text.trim() && photos.length === 0 ? (
-                <View style={styles.examples}>
+                <View style={styles.examples} ref={tourExtrasRef} collapsable={false}>
                   {EXAMPLES.map((ex) => (
                     <Chip key={ex} label={ex} onPress={() => setText(ex)} />
                   ))}
                 </View>
               ) : null}
 
-              <View style={styles.actions}>
+              <View style={styles.actions} ref={tourBarRef} collapsable={false}>
                 <Pressable style={styles.iconButton} onPress={() => void startRecording()}>
                   <Mic size={22} color={colors.ink} strokeWidth={1.5} />
                 </Pressable>
@@ -401,6 +437,7 @@ export default function CaptureScreen() {
         onAgree={() => void grantAIConsent()}
         onDismiss={() => router.back()}
       />
+      <TourOverlay scope="capture" />
     </Screen>
   );
 }

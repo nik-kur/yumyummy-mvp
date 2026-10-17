@@ -6,12 +6,13 @@
  * paid campaigns.
  *
  * Event split (keep it this way or Meta/AppsFlyer double count):
- *   - Client (this file, via `logAttributionEvent`): af_complete_registration,
- *     af_start_trial, af_subscribe. These must come from the SDK because the
- *     SKAN conversion value is computed on-device from SDK events.
- *   - Server (Adapty → AppsFlyer S2S): trial_converted, renewals, refunds,
- *     expirations — things the app never observes. `trial_started` and the
- *     initial purchase stay OFF in that integration.
+ *   - Client (this file, via `logAttributionEvent`): af_complete_registration.
+ *   - Server (Adapty → AppsFlyer S2S): trial_started, subscription_started,
+ *     trial_converted, renewals, refunds, expirations. Trials and purchases
+ *     moved there in V3 (Oct 2026): the client logged them for sandbox and
+ *     TestFlight purchases too (AppsFlyer cannot tell them apart), which
+ *     polluted StartTrial in Meta. The integration's Sandbox field stays empty,
+ *     so only production purchases reach AppsFlyer.
  *
  * Install conversion data (media source / campaign / ad) is fanned out from
  * `onInstallConversionData` to Adapty (`updateAttribution`) and PostHog, so all
@@ -29,9 +30,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { register, setPersonProperties, setPersonPropertiesOnce, track } from '@/analytics/posthog';
+import { IS_QA_BUILD } from '@/config/buildFlags';
 import {
   setAdaptyCustomAttributes,
   setAdaptyIntegrationIdentifier,
+  setAdaptyTrackingStatus,
   updateAdaptyAttribution,
 } from '@/billing/adapty';
 
@@ -45,23 +48,32 @@ let started = false;
 /**
  * Where the ATT prompt is shown.
  *
- * `false` (current): the prompt is raised from the onboarding — the flow's
- * welcome step, or the native welcome screen's "Get Started" — once the user
- * has seen what the app is. A prompt over the splash screen is the lowest-
- * consent placement there is, and consent is the only thing that gives us
- * user-level Meta attribution on iOS. AppsFlyer holds the install postback for
- * `ATT_WAIT_SECONDS` so a consent given on the welcome step still ships the
- * IDFA with it. Flip to `true` to restore the launch-time prompt.
+ * `false` (current): the prompt is raised from the onboarding once the user has
+ * seen what the app is — over the V3 plan loader (~2 minutes in) by default, or
+ * on the welcome screen when the onboarding config says `att: "welcome"`. A
+ * prompt over the splash screen is the lowest-consent placement there is, and
+ * consent is the only thing that gives us user-level Meta attribution on iOS.
+ * Flip to `true` to restore the launch-time prompt.
  */
 export const ATT_PROMPT_AT_LAUNCH = false;
-const ATT_WAIT_SECONDS = 60;
+/**
+ * AppsFlyer holds the install postback (and keeps launch and events in memory)
+ * until ATT is answered or this many seconds pass, so the IDFA ships with the
+ * install when granted. The loader prompt comes ~2 minutes after launch, past
+ * the old 60 s; AppsFlyer's own guidance for a prompt after a ~2-minute
+ * tutorial is 120 s, and 180 s leaves room for slow readers.
+ */
+const ATT_WAIT_SECONDS = 180;
 
 /** AsyncStorage key for the last deep-link signal (deferred or direct). */
 const AD_SIGNAL_KEY = '@yy_ad_signal';
 
-/** True when an AppsFlyer dev key is configured for this build. */
+/**
+ * True when an AppsFlyer dev key is configured for this build. Always false in
+ * a QA build: test installs and sandbox purchases must never reach Meta.
+ */
 export function isAppsFlyerConfigured(): boolean {
-  return AF_DEV_KEY.length > 0;
+  return AF_DEV_KEY.length > 0 && !IS_QA_BUILD;
 }
 
 /**
@@ -73,11 +85,22 @@ export async function requestTrackingConsent(): Promise<boolean> {
     const current = await getTrackingPermissionsAsync();
     if (current.status === 'undetermined' && current.canAskAgain) {
       const res = await requestTrackingPermissionsAsync();
+      void setAdaptyTrackingStatus(res.status);
       return res.status === 'granted';
     }
     return current.status === 'granted';
   } catch {
     return false;
+  }
+}
+
+/** Current ATT answer → Adapty (see `setAdaptyTrackingStatus`). */
+export async function syncTrackingStatusToAdapty(): Promise<void> {
+  try {
+    const { status } = await getTrackingPermissionsAsync();
+    await setAdaptyTrackingStatus(status);
+  } catch {
+    // attribution quality only
   }
 }
 
@@ -283,8 +306,7 @@ export async function initAttribution(): Promise<void> {
         onInstallConversionDataListener: true,
         onDeepLinkListener: true,
         // Hold the install postback until ATT is answered (or this many
-        // seconds pass) so the IDFA is included when granted. The prompt is
-        // raised on the welcome step, seconds after launch.
+        // seconds pass) so the IDFA is included when granted.
         timeToWaitForATTUserAuthorization: ATT_WAIT_SECONDS,
       },
       () => {},

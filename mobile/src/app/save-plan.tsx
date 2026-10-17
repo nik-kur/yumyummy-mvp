@@ -1,8 +1,8 @@
 /**
  * Post-purchase sign-in gate — Sign in with Apple, no way past it.
  *
- * Order of the acquisition funnel: intro quiz → plan reveal → paywall → THIS
- * screen → postbuy → app. The paywall runs before sign-in so the trial decision
+ * Order of the acquisition funnel (V3): intro quiz → plan reveal → paywall →
+ * Success (22) → THIS screen (23) → Today with the tour (24). The paywall runs before sign-in so the trial decision
  * is never taxed by an account prompt; the account is created right after the
  * purchase, because every other part of the app (diary, plan, sync) needs one.
  *
@@ -13,7 +13,8 @@
  *   2. push the onboarding draft (targets, onboarding_completed);
  *   3. `/app/billing/sync` with the anonymous profile id captured at purchase,
  *      so the entitlement is granted server-side before the user reaches Today;
- *   4. clear the pending-purchase marker and continue to /postbuy.
+ *   4. clear the pending-purchase marker and continue to Today; a new buyer
+ *      (not a restore) gets the tour and the first-log payoff.
  * Every step after sign-in is best-effort: nothing here may strand a paying
  * user — the launch router and the paywall's own Adapty-side check are the
  * safety nets if a network call fails.
@@ -22,15 +23,36 @@
  * and Today's plan if the user relaunches before the profile has synced.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, Image, Linking, Text } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { Screen } from '@/components/Screen';
-import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
-import { useAuth } from '@/state/auth';
-import { loadDraft } from '@/state/introDraft';
+import {
+  clearOnboardingAssignment,
+  getOnboardingConfig,
+  resolveOnboardingAssignment,
+  restoreOnboardingAssignment,
+} from '@/config/onboardingConfig';
+import { enableRemindersAfterPurchase } from '@/notifications/scheduler';
+import { IMG } from '@/onb/assets';
+import { C, F, PAD } from '@/onb/theme';
+import { reportJourneyEvent } from '@/state/journey';
+import { startPostPurchase } from '@/state/tour';
+import { lastSignInCreatedAccount, useAuth } from '@/state/auth';
+import { AI_PROVIDERS_LABEL, grantAIConsent, hasAIConsent } from '@/state/aiConsent';
+import { PRIVACY_URL } from '@/components/pw/PwParts';
+import { draftProfilePatch, loadDraft } from '@/state/introDraft';
 import {
   clearPendingPurchase,
   loadPendingPurchase,
@@ -39,25 +61,35 @@ import {
 import { getAdaptyProfileId, isAdaptyConfigured } from '@/billing/adapty';
 import * as api from '@/api/endpoints';
 import { ApiError, getToken } from '@/api/client';
-import { colors, radius, space } from '@/theme/tokens';
 import { track } from '@/analytics/posthog';
 import { addBreadcrumb, captureException } from '@/analytics/sentry';
 
 const MAX_SYNC_ATTEMPTS = 3;
 const SYNC_RETRY_DELAY_MS = 500;
 
-const REASONS = [
-  { emoji: '🔒', text: 'Your plan, diary and subscription are saved to your account, not just this phone' },
-  { emoji: '📱', text: 'Log from any device and pick up exactly where you left off' },
-  { emoji: '🍎', text: 'Apple hides your email if you want — we never see a password' },
-];
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Canvas `yy-float`, 3.2 s: the cloud drifts up 8 pt and back. */
+function FloatingCloud() {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    const e = Easing.inOut(Easing.ease);
+    t.value = withRepeat(withSequence(withTiming(-8, { duration: 1600, easing: e }), withTiming(0, { duration: 1600, easing: e })), -1);
+    return () => cancelAnimation(t);
+  }, [t]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: t.value }] }));
+  return (
+    <Animated.View style={[s.cloudBox, style]}>
+      <Image source={IMG.save_cloud} style={s.cloud} accessibilityLabel="A cloud with a check mark" />
+    </Animated.View>
+  );
+}
+
 export default function SavePlanScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { signInWithProvider, refreshProfile } = useAuth();
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingPurchase | null>(null);
@@ -65,6 +97,15 @@ export default function SavePlanScreen() {
   // non-compliant fallback never flashes where the official one is available
   // (App Review Guideline 4).
   const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
+  // AI consent on this screen (`ai_consent: save_plan`), unless already given.
+  const [showAiLine, setShowAiLine] = useState(false);
+  useEffect(() => {
+    // After a cold start straight to this gate the arm is read from the device.
+    void restoreOnboardingAssignment().then(async () => {
+      if (getOnboardingConfig().ai_consent !== 'save_plan') return;
+      setShowAiLine(!(await hasAIConsent()));
+    });
+  }, []);
 
   useEffect(() => {
     loadPendingPurchase().then(setPending).catch(() => {});
@@ -88,19 +129,7 @@ export default function SavePlanScreen() {
   const syncDraft = useCallback(async () => {
     const intro = await loadDraft();
     if (!intro.goal_type) return;
-    const payload = {
-      goal_type: intro.goal_type,
-      gender: intro.gender,
-      age: intro.age,
-      height_cm: intro.height_cm,
-      weight_kg: intro.weight_kg,
-      activity_level: intro.activity_level,
-      target_calories: intro.target_calories,
-      target_protein_g: intro.target_protein_g,
-      target_fat_g: intro.target_fat_g,
-      target_carbs_g: intro.target_carbs_g,
-      onboarding_completed: true,
-    };
+    const payload = draftProfilePatch(intro);
 
     for (let attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt += 1) {
       try {
@@ -189,16 +218,42 @@ export default function SavePlanScreen() {
         return;
       }
       track('signin_gate_success', { placement: 'post_paywall' });
+      // The disclosure line above the button was the AI consent (App Review
+      // 5.1.2(i)): record it, so the first log in the tour asks nothing more.
+      if (showAiLine) await grantAIConsent();
 
       await syncDraft();
       await reconcilePurchase();
       // Pull the reconciled billing + synced targets into state so Today and the
       // launch router see the entitlement without waiting for a background sync.
       await refreshProfile().catch(() => {});
+      const marker = pending ?? (await loadPendingPurchase());
       await clearPendingPurchase();
+      // A new buyer on a new account gets reminders (if allowed on B2), the
+      // tour (if this arm has `tutorial` on) and the first-log payoff. A
+      // restore, or an Apple ID that already had an account, goes straight in.
+      // The arm is read after a cold start too (resolve reads the stored one);
+      // then it has done its job: forget it, keep the super properties.
+      if (marker?.source === 'purchase') {
+        try {
+          if (await enableRemindersAfterPurchase()) {
+            await reportJourneyEvent({ type: 'push_permission_granted' }).catch(() => {});
+          }
+        } catch (e) {
+          captureException(e);
+        }
+        if (lastSignInCreatedAccount()) {
+          await resolveOnboardingAssignment().catch(() => null);
+          await startPostPurchase(getOnboardingConfig().tutorial);
+        }
+      }
+      await clearOnboardingAssignment();
 
       track('onboarding_screen_completed', { screen: 'N2b_save_plan' });
-      router.replace('/postbuy');
+      // From preview mode the stack holds the old tabs and the paywall: clear
+      // it, so Today is the only screen and back cannot reach the old one.
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(tabs)');
     } catch (e) {
       captureException(e);
       track('signin_gate_failed', {
@@ -208,90 +263,67 @@ export default function SavePlanScreen() {
     } finally {
       setBusy(false);
     }
-  }, [busy, signInWithProvider, syncDraft, reconcilePurchase, refreshProfile, router]);
+  }, [busy, signInWithProvider, syncDraft, reconcilePurchase, refreshProfile, router, pending, showAiLine]);
 
   return (
-    <Screen grow edges={['top', 'bottom', 'left', 'right']}>
-      <View style={s.center}>
-        <View style={s.successPill}>
-          <AppText variant="caption" color={colors.success}>
-            ✓ Trial started — one last step
-          </AppText>
-        </View>
-        <AppText variant="h1" center style={s.title}>
-          Save your plan
-        </AppText>
-        <AppText variant="body" color={colors.inkMuted} center style={s.sub}>
-          Your plan is built and your trial is active. Sign in to keep them —
-          so they’re still here tomorrow, and on every device you use.
-        </AppText>
+    <View style={[s.screen, { paddingTop: insets.top + PAD.topBelowStatus, paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <View style={{ flex: 1 }} />
+      <FloatingCloud />
+      <Text style={s.h1} accessibilityRole="header">
+        Save your plan
+      </Text>
+      <Text style={s.sub}>Your plan, diary and subscription stay safe in your account, on any device.</Text>
+      <View style={{ flex: 1.3 }} />
+      {showAiLine ? (
+        <Text style={s.ai}>
+          By continuing, you agree that what you log (text, voice and photos) is analysed by our AI partners,{' '}
+          {AI_PROVIDERS_LABEL}.{' '}
+          <Text style={s.aiLink} onPress={() => void Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
+            Privacy Policy
+          </Text>
+        </Text>
+      ) : null}
 
-        <View style={s.reasons}>
-          {REASONS.map((row) => (
-            <View key={row.emoji} style={s.reasonRow}>
-              <AppText style={s.reasonEmoji}>{row.emoji}</AppText>
-              <AppText variant="small" color={colors.ink} style={s.reasonText}>
-                {row.text}
-              </AppText>
-            </View>
-          ))}
+      {/* Official Sign in with Apple button — HIG-required artwork with the
+          Apple logo (App Review Guideline 4). The plain-button fallback only
+          exists for environments without the native module (Expo Go). */}
+      {busy ? (
+        <View style={s.busyBox}>
+          <ActivityIndicator color={C.ink} />
         </View>
-      </View>
-
-      <View style={s.bottom}>
-        {/* Official Sign in with Apple button — HIG-required artwork with the
-            Apple logo (App Review Guideline 4). The plain-button fallback only
-            exists for environments without the native module (Expo Go). */}
-        {busy ? (
-          <View style={s.busyBox}>
-            <ActivityIndicator color={colors.ink} />
-          </View>
-        ) : appleAvailable === null ? (
-          <View style={s.busyBox} />
-        ) : appleAvailable ? (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-            cornerRadius={radius.md}
-            style={s.appleButton}
-            onPress={handleSignIn}
-          />
-        ) : (
-          <Button label="Sign in with Apple" variant="primary" onPress={handleSignIn} />
-        )}
-        <AppText variant="caption" color={colors.inkFaint} center>
-          No password. Nothing shared with anyone.
-        </AppText>
-      </View>
-    </Screen>
+      ) : appleAvailable === null ? (
+        <View style={s.busyBox} />
+      ) : appleAvailable ? (
+        <AppleAuthentication.AppleAuthenticationButton
+          buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+          cornerRadius={12}
+          style={s.appleButton}
+          onPress={handleSignIn}
+        />
+      ) : (
+        <Button label="Sign in with Apple" variant="primary" onPress={handleSignIn} />
+      )}
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: space.sm },
-  successPill: {
-    alignSelf: 'center',
-    backgroundColor: colors.successSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.base,
-    paddingVertical: space.xs,
+  screen: { flex: 1, backgroundColor: C.paper, paddingHorizontal: PAD.side },
+  cloudBox: { alignSelf: 'center', width: 150, height: 150 },
+  cloud: { width: 150, height: 150 },
+  h1: {
+    marginTop: 24,
+    textAlign: 'center',
+    fontFamily: F.serif,
+    fontSize: 34,
+    lineHeight: 40,
+    letterSpacing: -0.34,
+    color: C.ink,
   },
-  title: { marginTop: space.md },
-  sub: { marginTop: space.md },
-  reasons: {
-    alignSelf: 'stretch',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    padding: space.base,
-    gap: space.md,
-    marginTop: space.xl,
-  },
-  reasonRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  reasonEmoji: { fontSize: 20, lineHeight: 26 },
-  reasonText: { flex: 1 },
-  bottom: { paddingBottom: space.lg, gap: space.md },
+  sub: { marginTop: 10, textAlign: 'center', fontFamily: F.sans, fontSize: 18, lineHeight: 27, color: C.muted },
+  ai: { marginBottom: 14, textAlign: 'center', fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.muted },
+  aiLink: { color: C.info },
   appleButton: { alignSelf: 'stretch', height: 54 },
   busyBox: { height: 54, alignItems: 'center', justifyContent: 'center' },
 });

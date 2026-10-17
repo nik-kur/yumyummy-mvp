@@ -1,7 +1,8 @@
 /** Mifflin–St Jeor energy + macro split used for the onboarding plan reveal. */
 
 export type GoalType = 'lose' | 'maintain' | 'gain' | 'just_track';
-export type Gender = 'male' | 'female';
+/** `other` (V3 gender screen) uses the midpoint of the two Mifflin–St Jeor constants. */
+export type Gender = 'male' | 'female' | 'other';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 
 const ACTIVITY: Record<ActivityLevel, number> = {
@@ -42,7 +43,7 @@ export function computePlan(input: PlanInput): Plan {
     10 * input.weight_kg +
     6.25 * input.height_cm -
     5 * input.age +
-    (input.gender === 'male' ? 5 : -161);
+    (input.gender === 'male' ? 5 : input.gender === 'female' ? -161 : -78);
   const tdee = bmr * (ACTIVITY[input.activity_level] ?? 1.2);
   const calories = Math.round((tdee * (1 + (GOAL_DELTA[input.goal_type] ?? 0))) / 10) * 10;
   const protein = Math.round(input.weight_kg * (input.goal_type === 'lose' ? 2.0 : 1.8));

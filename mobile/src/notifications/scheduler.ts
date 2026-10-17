@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
-import { loadPrefs, type NotificationPrefs, type ReminderPref } from './prefs';
+import { loadPrefs, savePrefs, type NotificationPrefs, type ReminderPref } from './prefs';
 import { loadJourney, rawDay } from '@/state/journey';
 
 /**
@@ -190,15 +190,36 @@ async function scheduleStoredTrialReminder(): Promise<void> {
 }
 
 /**
+ * After a purchase: the reminder promised on paywall B2 needs the master switch
+ * on. Permission was asked there; when it was granted, turn the default
+ * reminders on (what the old post-purchase push screen did). Never for
+ * returning customers, whose own settings stand.
+ */
+export async function enableRemindersAfterPurchase(): Promise<boolean> {
+  if (!(await getPermissionGranted())) return false;
+  const prefs = await loadPrefs();
+  if (!prefs.enabled) {
+    prefs.enabled = true;
+    await savePrefs(prefs);
+  }
+  await syncFromPrefs(prefs);
+  return true;
+}
+
+/**
  * Arm the pre-conversion nudge for a trial that started at `trialStartedAt`.
  * Call this only for purchases that actually carry a free-trial phase —
  * customers who already used their one introductory offer are charged straight
  * away and would find the message untrue.
  */
-export async function scheduleTrialEndingReminder(trialStartedAt: Date): Promise<void> {
-  const fireAt = new Date(
-    trialStartedAt.getTime() + TRIAL_ENDING_REMINDER.delayHours * 60 * 60 * 1000,
-  );
+export async function scheduleTrialEndingReminder(
+  trialStartedAt: Date,
+  trialDays = 3,
+): Promise<void> {
+  // A day before the first charge, as the paywall timeline promises
+  // ("In 2 days: reminder" on a 3-day trial → the default 48 h).
+  const delayHours = trialDays === 3 ? TRIAL_ENDING_REMINDER.delayHours : Math.max(12, (trialDays - 1) * 24);
+  const fireAt = new Date(trialStartedAt.getTime() + delayHours * 60 * 60 * 1000);
   try {
     await AsyncStorage.setItem(TRIAL_REMINDER_KEY, fireAt.toISOString());
   } catch {

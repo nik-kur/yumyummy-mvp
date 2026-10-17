@@ -1,0 +1,4493 @@
+{
+ "schemaVersion": 12,
+ "locales": [
+  {
+   "id": "en",
+   "code": "en",
+   "name": "English"
+  }
+ ],
+ "defaultLocale": "en",
+ "variables": [
+  {
+   "id": "var_HERO_LINE",
+   "name": "HERO_LINE",
+   "valueType": "string",
+   "value": "Reach your goal"
+  },
+  {
+   "id": "var_TARGET_WEIGHT",
+   "name": "TARGET_WEIGHT",
+   "valueType": "string",
+   "value": ""
+  },
+  {
+   "id": "var_TARGET_DATE",
+   "name": "TARGET_DATE",
+   "valueType": "string",
+   "value": ""
+  },
+  {
+   "id": "var_DAILY_KCAL",
+   "name": "DAILY_KCAL",
+   "valueType": "string",
+   "value": ""
+  },
+  {
+   "id": "var_GOAL",
+   "name": "GOAL",
+   "valueType": "string",
+   "value": ""
+  },
+  {
+   "id": "var_RATING",
+   "name": "RATING",
+   "valueType": "string",
+   "value": "4.9"
+  },
+  {
+   "id": "var_USERS",
+   "name": "USERS",
+   "valueType": "string",
+   "value": "12,000"
+  }
+ ],
+ "components": {},
+ "theme": {
+  "colors": [
+   {
+    "id": "bg",
+    "dark": {
+     "hex": "#F7F1E6"
+    },
+    "name": "Background (paper)",
+    "light": {
+     "hex": "#F7F1E6"
+    }
+   },
+   {
+    "id": "surface",
+    "dark": {
+     "hex": "#FFFDF9"
+    },
+    "name": "Surface (cards)",
+    "light": {
+     "hex": "#FFFDF9"
+    }
+   },
+   {
+    "id": "surface_alt",
+    "dark": {
+     "hex": "#FBF6EE"
+    },
+    "name": "Surface alt",
+    "light": {
+     "hex": "#FBF6EE"
+    }
+   },
+   {
+    "id": "ink",
+    "dark": {
+     "hex": "#19150F"
+    },
+    "name": "Ink",
+    "light": {
+     "hex": "#19150F"
+    }
+   },
+   {
+    "id": "ink_muted",
+    "dark": {
+     "hex": "#6B6258"
+    },
+    "name": "Ink muted",
+    "light": {
+     "hex": "#6B6258"
+    }
+   },
+   {
+    "id": "ink_faint",
+    "dark": {
+     "hex": "#938A7C"
+    },
+    "name": "Ink faint",
+    "light": {
+     "hex": "#938A7C"
+    }
+   },
+   {
+    "id": "hairline",
+    "dark": {
+     "hex": "#E7DFD1"
+    },
+    "name": "Hairline",
+    "light": {
+     "hex": "#E7DFD1"
+    }
+   },
+   {
+    "id": "hairline_strong",
+    "dark": {
+     "hex": "#D8CCB9"
+    },
+    "name": "Hairline strong",
+    "light": {
+     "hex": "#D8CCB9"
+    }
+   },
+   {
+    "id": "terracotta",
+    "dark": {
+     "hex": "#B85A3A"
+    },
+    "name": "Terracotta",
+    "light": {
+     "hex": "#B85A3A"
+    }
+   },
+   {
+    "id": "terracotta_text",
+    "dark": {
+     "hex": "#9A4628"
+    },
+    "name": "Terracotta text",
+    "light": {
+     "hex": "#9A4628"
+    }
+   },
+   {
+    "id": "terracotta_soft",
+    "dark": {
+     "hex": "#EFDFD1"
+    },
+    "name": "Terracotta soft",
+    "light": {
+     "hex": "#EFDFD1"
+    }
+   },
+   {
+    "id": "success",
+    "dark": {
+     "hex": "#2E6B4E"
+    },
+    "name": "Success",
+    "light": {
+     "hex": "#2E6B4E"
+    }
+   },
+   {
+    "id": "error",
+    "dark": {
+     "hex": "#9A2A1F"
+    },
+    "name": "Error",
+    "light": {
+     "hex": "#9A2A1F"
+    }
+   },
+   {
+    "id": "info_blue",
+    "dark": {
+     "hex": "#1F5C99"
+    },
+    "name": "Info blue",
+    "light": {
+     "hex": "#1F5C99"
+    }
+   },
+   {
+    "id": "info_blue_soft",
+    "dark": {
+     "hex": "#E7EFF8"
+    },
+    "name": "Info blue soft",
+    "light": {
+     "hex": "#E7EFF8"
+    }
+   },
+   {
+    "id": "olive_soft",
+    "dark": {
+     "hex": "#E3E6CE"
+    },
+    "name": "Olive soft",
+    "light": {
+     "hex": "#E3E6CE"
+    }
+   },
+   {
+    "id": "warning_soft",
+    "dark": {
+     "hex": "#FBEFD6"
+    },
+    "name": "Warning soft",
+    "light": {
+     "hex": "#FBEFD6"
+    }
+   },
+   {
+    "id": "protein",
+    "dark": {
+     "hex": "#5A6A3A"
+    },
+    "name": "Protein",
+    "light": {
+     "hex": "#5A6A3A"
+    }
+   },
+   {
+    "id": "fat",
+    "dark": {
+     "hex": "#8A5A14"
+    },
+    "name": "Fat",
+    "light": {
+     "hex": "#8A5A14"
+    }
+   },
+   {
+    "id": "carbs",
+    "dark": {
+     "hex": "#2C6CA8"
+    },
+    "name": "Carbs",
+    "light": {
+     "hex": "#2C6CA8"
+    }
+   },
+   {
+    "id": "done_green",
+    "dark": {
+     "hex": "#16A34A"
+    },
+    "name": "Paywall done green",
+    "light": {
+     "hex": "#16A34A"
+    }
+   },
+   {
+    "id": "surplus_strip",
+    "dark": {
+     "hex": "#C97A6A"
+    },
+    "name": "CICO surplus strip",
+    "light": {
+     "hex": "#C97A6A"
+    }
+   },
+   {
+    "id": "stage_bg",
+    "dark": {
+     "hex": "#F2EADB"
+    },
+    "name": "Welcome demo stage",
+    "light": {
+     "hex": "#F2EADB"
+    }
+   },
+   {
+    "id": "white",
+    "dark": {
+     "hex": "#FFFFFF"
+    },
+    "name": "White",
+    "light": {
+     "hex": "#FFFFFF"
+    }
+   },
+   {
+    "id": "red_badge",
+    "name": "Red badge",
+    "light": {
+     "hex": "#D32F2F"
+    },
+    "dark": {
+     "hex": "#D32F2F"
+    }
+   },
+   {
+    "id": "bell_gray",
+    "name": "Bell gray",
+    "light": {
+     "hex": "#C9D3D8"
+    },
+    "dark": {
+     "hex": "#C9D3D8"
+    }
+   },
+   {
+    "id": "card_sel",
+    "name": "Card selected",
+    "light": {
+     "hex": "#F4E8D6"
+    },
+    "dark": {
+     "hex": "#F4E8D6"
+    }
+   }
+  ],
+  "typography": [
+   {
+    "id": "fr_hero",
+    "name": "Fraunces 600 · Hero 56/58",
+    "settings": {
+     "size": 56,
+     "family": {
+      "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+      "type": "user"
+     },
+     "weight": "semibold",
+     "lineHeight": 58
+    }
+   },
+   {
+    "id": "fr_stat",
+    "name": "Fraunces 700 · Stat 60/66",
+    "settings": {
+     "size": 60,
+     "family": {
+      "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+      "type": "user"
+     },
+     "weight": "bold",
+     "lineHeight": 66
+    }
+   },
+   {
+    "id": "fr_h1",
+    "name": "Fraunces 600 · H1 28/32",
+    "settings": {
+     "size": 28,
+     "weight": "semibold",
+     "lineHeight": 32,
+     "family": {
+      "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "fr_h2",
+    "name": "Fraunces 600 · H2 22/28",
+    "settings": {
+     "size": 22,
+     "weight": "semibold",
+     "lineHeight": 28,
+     "family": {
+      "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "fr_num34",
+    "name": "Fraunces 700 · kcal 34/40",
+    "settings": {
+     "size": 34,
+     "weight": "bold",
+     "lineHeight": 40,
+     "family": {
+      "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "fr_label28",
+    "name": "Fraunces 700 · Mascot label 28/32",
+    "settings": {
+     "size": 28,
+     "weight": "bold",
+     "lineHeight": 32,
+     "family": {
+      "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_title",
+    "name": "Inter 600 · Title 18/24",
+    "settings": {
+     "size": 18,
+     "family": {
+      "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+      "type": "user"
+     },
+     "weight": "semibold",
+     "lineHeight": 24
+    }
+   },
+   {
+    "id": "in_title_26",
+    "name": "Inter 600 · Title 18/26",
+    "settings": {
+     "size": 18,
+     "weight": "semibold",
+     "lineHeight": 26,
+     "family": {
+      "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_body",
+    "name": "Inter 400 · Body 16/26",
+    "settings": {
+     "size": 16,
+     "family": {
+      "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+      "type": "user"
+     },
+     "weight": "regular",
+     "lineHeight": 26
+    }
+   },
+   {
+    "id": "in_body_strong",
+    "name": "Inter 600 · Body strong 16/26",
+    "settings": {
+     "size": 16,
+     "weight": "semibold",
+     "lineHeight": 26,
+     "family": {
+      "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_small",
+    "name": "Inter 400 · Small 14/21",
+    "settings": {
+     "size": 14,
+     "weight": "regular",
+     "lineHeight": 21,
+     "family": {
+      "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_caption",
+    "name": "Inter 500 · Caption 12/16",
+    "settings": {
+     "size": 12,
+     "family": {
+      "id": "27ffaa16-858b-4664-931c-99488d6f8a8c",
+      "type": "user"
+     },
+     "weight": "medium",
+     "lineHeight": 16
+    }
+   },
+   {
+    "id": "in_caption_strong",
+    "name": "Inter 600 · Chip 12/16",
+    "settings": {
+     "size": 12,
+     "weight": "semibold",
+     "lineHeight": 16,
+     "family": {
+      "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_button",
+    "name": "Inter 600 · Button 16/20",
+    "settings": {
+     "size": 16,
+     "weight": "semibold",
+     "lineHeight": 20,
+     "family": {
+      "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_badge",
+    "name": "Inter 600 · Number badge 14/18",
+    "settings": {
+     "size": 14,
+     "weight": "semibold",
+     "lineHeight": 18,
+     "family": {
+      "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "jb_overline",
+    "name": "JetBrains Mono 500 · Overline 11/14 +1.6",
+    "settings": {
+     "size": 11,
+     "family": {
+      "id": "89e4be49-420c-4239-abad-e06dcef47828",
+      "type": "user"
+     },
+     "weight": "medium",
+     "lineHeight": 14,
+     "letterSpacing": 1.6
+    }
+   },
+   {
+    "id": "jb_badge",
+    "name": "JetBrains Mono 500 · Source badge 11/14 +1",
+    "settings": {
+     "size": 11,
+     "weight": "medium",
+     "lineHeight": 14,
+     "letterSpacing": 1,
+     "family": {
+      "id": "89e4be49-420c-4239-abad-e06dcef47828",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "emoji_42",
+    "name": "Emoji 42",
+    "settings": {
+     "size": 42,
+     "weight": "regular",
+     "lineHeight": 48
+    }
+   },
+   {
+    "id": "emoji_40",
+    "name": "Emoji 40",
+    "settings": {
+     "size": 40,
+     "weight": "regular",
+     "lineHeight": 48
+    }
+   },
+   {
+    "id": "emoji_26",
+    "name": "Emoji 26",
+    "settings": {
+     "size": 26,
+     "weight": "regular",
+     "lineHeight": 32
+    }
+   },
+   {
+    "id": "emoji_22",
+    "name": "Emoji 22",
+    "settings": {
+     "size": 22,
+     "weight": "regular",
+     "lineHeight": 28
+    }
+   },
+   {
+    "id": "emoji_20",
+    "name": "Emoji 20",
+    "settings": {
+     "size": 20,
+     "weight": "regular",
+     "lineHeight": 26
+    }
+   },
+   {
+    "id": "in_small_20",
+    "name": "Inter 400 · Small 14/20",
+    "settings": {
+     "size": 14,
+     "weight": "regular",
+     "lineHeight": 20,
+     "family": {
+      "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_caption_15",
+    "name": "Inter 500 · Terms 12/15",
+    "settings": {
+     "size": 12,
+     "weight": "medium",
+     "lineHeight": 15,
+     "family": {
+      "id": "27ffaa16-858b-4664-931c-99488d6f8a8c",
+      "type": "user"
+     }
+    }
+   },
+   {
+    "id": "in_rating",
+    "name": "Inter 700 · Rating 24/28",
+    "settings": {
+     "size": 24,
+     "family": {
+      "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+      "type": "user"
+     },
+     "weight": "bold",
+     "lineHeight": 28
+    }
+   }
+  ]
+ },
+ "_meta": {
+  "icons": [
+   {
+    "name": "CaretLeft",
+    "weight": "regular",
+    "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z\"></path></svg>"
+   },
+   {
+    "name": "LockOpen",
+    "weight": "fill",
+    "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M208,80H96V56a32,32,0,0,1,32-32c15.37,0,29.2,11,32.16,25.59a8,8,0,0,0,15.68-3.18C171.32,24.15,151.2,8,128,8A48.05,48.05,0,0,0,80,56V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80Zm-80,84a12,12,0,1,1,12-12A12,12,0,0,1,128,164Z\"></path></svg>"
+   },
+   {
+    "name": "Bell",
+    "weight": "fill",
+    "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216Z\"></path></svg>"
+   },
+   {
+    "name": "Crown",
+    "weight": "fill",
+    "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 256 256\"><path d=\"M248,80a28,28,0,1,0-51.12,15.77l-26.79,33L146,73.4a28,28,0,1,0-36.06,0L85.91,128.74l-26.79-33a28,28,0,1,0-26.6,12L47,194.63A16,16,0,0,0,62.78,208H193.22A16,16,0,0,0,209,194.63l14.47-86.85A28,28,0,0,0,248,80ZM128,40a12,12,0,1,1-12,12A12,12,0,0,1,128,40ZM24,80A12,12,0,1,1,36,92,12,12,0,0,1,24,80ZM220,92a12,12,0,1,1,12-12A12,12,0,0,1,220,92Z\"></path></svg>"
+   }
+  ],
+  "fonts": [
+   {
+    "id": "0cb04219-2563-4215-8650-d30d0ceb2cd0",
+    "name": "Fraunces SemiBold",
+    "url": "https://public-media.adapty.io/public/e4/5d/e45df2e0-bc7f-45a7-b507-b6d0d5ed25ec/fraunces_semibold",
+    "iosName": "Fraunces-SemiBold",
+    "androidName": "fraunces_semibold"
+   },
+   {
+    "id": "aca68093-5e0e-41be-8ee9-44b782cad6ed",
+    "name": "Fraunces Bold",
+    "url": "https://public-media.adapty.io/public/12/1f/121f7545-781d-4dfe-aedb-2c2548be41c7/fraunces_bold",
+    "iosName": "Fraunces-Bold",
+    "androidName": "fraunces_bold"
+   },
+   {
+    "id": "b1b16750-d91a-4ccb-8898-a42099bb3d35",
+    "name": "Inter SemiBold",
+    "url": "https://public-media.adapty.io/public/a0/79/a0792add-d439-43a1-b6be-bb3dea8e757f/inter_semibold",
+    "iosName": "Inter-SemiBold",
+    "androidName": "inter_semibold"
+   },
+   {
+    "id": "abd66baf-fac9-4ce7-89ab-1fca62981ffc",
+    "name": "Inter Regular",
+    "url": "https://public-media.adapty.io/public/d9/58/d95869c8-3416-4b04-8342-6b1ef2b1c8d6/inter_regular",
+    "iosName": "Inter-Regular",
+    "androidName": "inter_regular"
+   },
+   {
+    "id": "27ffaa16-858b-4664-931c-99488d6f8a8c",
+    "name": "Inter Medium",
+    "url": "https://public-media.adapty.io/public/33/84/33842964-4a15-4295-81f5-118916d9c573/inter_medium",
+    "iosName": "Inter-Medium",
+    "androidName": "inter_medium"
+   },
+   {
+    "id": "89e4be49-420c-4239-abad-e06dcef47828",
+    "name": "JetBrains Mono Medium",
+    "url": "https://public-media.adapty.io/public/fd/17/fd1715c1-d5f7-4bcd-99e6-ac602f1ffe8e/jetbrains_mono_medium",
+    "iosName": "JetBrainsMono-Medium",
+    "androidName": "jetbrainsmono_medium"
+   }
+  ],
+  "screens": {
+   "PW_A3_plans": {
+    "products": [
+     {
+      "id": "cf5874b1-a1c2-46cc-900a-2ee04db8ddde",
+      "flowProductId": "53e783a9-c3ab-5248-8b80-cacebfdeace0"
+     },
+     {
+      "id": "7cbbdae3-6caa-4862-b05a-33960863c2f1",
+      "flowProductId": "c963db3b-b4ba-50e5-b1f3-6e939076da01"
+     }
+    ]
+   }
+  }
+ },
+ "screens": [
+  {
+   "id": "PW_A1_try",
+   "props": {
+    "layout": {
+     "alignH": "start",
+     "alignV": "start",
+     "direction": "vertical",
+     "distribution": {
+      "type": "space-between"
+     }
+    },
+    "safeArea": true,
+    "statusBar": false,
+    "scrollable": false,
+    "progressBar": {
+     "enabled": false
+    },
+    "statusBarTheme": "light",
+    "fill": [
+     {
+      "type": "color",
+      "color": {
+       "type": "color-style",
+       "colorId": "bg"
+      }
+     }
+    ],
+    "padding": {
+     "top": 0,
+     "left": 16,
+     "right": 16,
+     "bottom": 24
+    }
+   },
+   "elements": {
+    "map": {
+     "el_a1_001T": {
+      "id": "el_a1_001T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "fr_h1"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "We want you to\ntry YumYummy for free.",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       },
+       "margin": {
+        "top": 58,
+        "left": 0,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Headline"
+     },
+     "el_a1_006S": {
+      "id": "el_a1_006S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Mockup"
+     },
+     "el_a1_005S": {
+      "id": "el_a1_005S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 216
+       },
+       "height": {
+        "type": "fixed",
+        "value": 444
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Phone mockup"
+     },
+     "el_a1_004I": {
+      "id": "el_a1_004I",
+      "type": "image",
+      "props": {
+       "image": {
+        "values": {
+         "en": {
+          "url": "https://public-media.adapty.io/public/eb/d9/ebd9864e-f4cc-49a3-89a2-3dcf250bf036/demo_poster.png",
+          "id": "544123",
+          "previewValue": "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"
+         }
+        },
+        "_localizable": true
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "fixed",
+        "value": 431
+       },
+       "objectFit": "cover",
+       "position": {
+        "type": "absolute",
+        "top": 7,
+        "left": 7,
+        "right": 7
+       },
+       "borderRadius": {
+        "tl": 29,
+        "tr": 29,
+        "bl": 29,
+        "br": 29
+       }
+      },
+      "states": [],
+      "caption": "Poster (first frame)"
+     },
+     "el_a1_002V": {
+      "id": "el_a1_002V",
+      "type": "video",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "fixed",
+        "value": 431
+       },
+       "objectFit": "cover",
+       "loop": true,
+       "position": {
+        "type": "absolute",
+        "top": 7,
+        "left": 7,
+        "right": 7
+       },
+       "borderRadius": {
+        "tl": 29,
+        "tr": 29,
+        "bl": 29,
+        "br": 29
+       },
+       "video": {
+        "values": {
+         "en": {
+          "videoUrl": "https://public-media.adapty.io/video/f34670a6-b467-4765-b67f-cc54c6ae6bc6/hls/master.m3u8",
+          "previewUrl": "https://public-media.adapty.io/video/f34670a6-b467-4765-b67f-cc54c6ae6bc6/preview.png"
+         }
+        },
+        "_localizable": true
+       }
+      },
+      "states": [],
+      "caption": "Demo video (paywall_demo_scan_loop_v3.mp4)"
+     },
+     "el_a1_003I": {
+      "id": "el_a1_003I",
+      "type": "image",
+      "props": {
+       "image": {
+        "values": {
+         "en": {
+          "url": "https://public-media.adapty.io/public/79/44/79447442-53d5-4e79-9695-6a5206372c70/phone_frame.png",
+          "id": "543256",
+          "previewValue": "UklGRrwFAABXRUJQVlA4WAoAAAAQAAAAkAAAKQEAQUxQSD0EAAABoHztn3qn+XxnBne/weUPcN3XcXdnFYH6CoddLeuil7q7u6y9RXPOxeVisUMOYx80MuWXZRMRE4BGiwFQMrfy60MNzMKGQ19Xzi0BYATNrYFuS94uMluLby/pBujmEYUem0+TjM5al43Wukjy9OYeUNIMGlh9jPTOemapt86Tx1YDukkGfd8hXXAk637Nb6vYUHG/31CxLf9rHUkXHPlOX5gmGIyroguerN49axCyc9Cs3dWkD45V42AaZbCghi56Fp8aAkBMVgqAIU8V6aNjzQKYRhjMJUMg84MBrQVJSssjSdEaGJwnQyDnwtxDYWxdDJ7VKwAjSFKMRssrIwkAEAOsqKYPsW4s1F1E9SowBFZNhhGkqQC079DiAHQSgBhMrmIILPRScofG+3SBJ0pgkKhC+zUfF06dbtlTp354th9UGoBByQkGx/ehAWisoI2+diIMElUY/RvTPDcdKhEYTKz10XIFNET1KITguRTtkKiSEddofWh578iHoBNBOyylD6HQQ4nBFjrPV9EOyeB7Wqbp47keIomgHV6ld9wCI10vRB8v55RKRWMqPVN1LIVJRanc5ejjha6CRfSeT8MgVYNd0aUTP4NOBQZP03suAt6NNl7LiST0FtMJPIx0RXLXoo3vYsAVWu6GRkL5mNIfCUFjNy2vDJjD6DlNkiplOi7ug0lIptFHzqmMjvU5SDqCIdd9TIYPQKcjyNXTxcrvaPkLFBLW2MEbMYl4g59CIWGFX2j53VFaHoRJSZT6mPQuQfLvfpKUwUFaHm2g47a0IIJNRaZ4/eVuEKS1jY4NpGNZYhBBv4XPvdji60cBgsTK6Mg7NqYGaKSpBaltvNeG9CAmRYXUDTb8l+7Pbf5r81+b/9r81+a/Nv+1+a/Nf/+jbWOrYeO9yloNZXc00HFbq2EbHRuO0vJgq+EgLY9+R8tfoFoFCr/Q8rvK6Fifg7QCBLl6ulg5h9FzmuhWgJZp9JFzBlyh5W60CrCbllcG4N1o47WcSOaJ5K5FG98FFtF7Pg2TeQZP03sugnS9EH28nFMq45TKXY4+XugqBlvoPF9Fu4xrh1fpHbfAiOpRCMFzKdplWjsspQ+h0EMJNFbQRl87ESbDDCbW+mi5AhqAxvt0gSdKYDLLoOQEg+P70AAgqleBIbBqMoxkkhhMrmIILPRScgcUxtbF4Fm9AjCSOWKAFdX0IdaNhcLdDeaSIZD5wYDWkiGiNTA4T4ZAzoXBvQ0W1NBFz+JTQwCIyUoBMOSpIn10rFkAg8YajKuiC56s3j1rELJz0Kzd1aQPjlXjYNB4g77vkC44knW/5rdVbKi432+o2Jb/tY6kC458py8MmqqB1cdI76xnlnrrPHlsNaDRdFHosfk0yeisddlorYskT2/uASVoVg10W/J2kdlafHtJN0CjucUAKJlb+fWhhkxoOPR15dwSAEbQaABWUDggWAEAAFAVAJ0BKpEAKgE+0WKrUigqJKKhdAphQBoJaW7hcTEDgBTpWZOhTPbsuuRwV2b97z77CBFqiD5M3nLCKZsgtfZzQbF0yhlVVRNWn6VVVIvdkSzMy/WMck7u7GM3p3ZmY4eBUydVTMKYC5VVTAT3qckQ8+bY7szMcPAqZOqpl+OfN3d0O4xryIh+iKUMqqqJq0/SqqpFvZs4vrLFWSdd3Wkp3rCSvwJW2evHSmha8aSwABAAAP79W07VLwmAEBcsYVjI06Lm26UZZ+XbguPjn/q8CLy/sBlBUh3H/HB7fAcXA+4nJxbeRi+z7/Xtd04rsT8BCPPi6LBZTPvhxUeLu2moymGfgtsdY1gnRrKU/742ZI6zQSzMV9uoThoXXhQwIPxUBeqgL1UBaxJQtYkoWsSULWQpgQ0uzkto8zxs/zfLSa3FHj4EBMh3JlTmp0XQ9Yw2v+E0YgAA"
+         }
+        },
+        "_localizable": true
+       },
+       "width": {
+        "type": "fixed",
+        "value": 216
+       },
+       "height": {
+        "type": "fixed",
+        "value": 444
+       },
+       "objectFit": "cover",
+       "position": {
+        "type": "absolute",
+        "top": 0,
+        "left": 0
+       }
+      },
+      "states": [],
+      "caption": "iPhone frame overlay"
+     },
+     "el_a1_010S": {
+      "id": "el_a1_010S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 18,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Bottom block"
+     },
+     "el_a1_007T": {
+      "id": "el_a1_007T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_body_strong"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "✓ No Payment Due Now",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       }
+      },
+      "states": [],
+      "caption": "No payment line"
+     },
+     "el_a1_009S": {
+      "id": "el_a1_009S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "fixed",
+        "value": 56
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "terracotta"
+         }
+        }
+       ],
+       "padding": {
+        "top": 0,
+        "left": 24,
+        "right": 24,
+        "bottom": 0
+       },
+       "borderRadius": {
+        "tl": 14,
+        "tr": 14,
+        "bl": 14,
+        "br": 14
+       }
+      },
+      "states": [],
+      "caption": "CTA",
+      "interactions": [
+       {
+        "id": "int_a1_009S",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_next",
+          "type": "navigate",
+          "payload": {
+           "type": "screen",
+           "screen": "PW_A2_reminder"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "el_a1_008T": {
+      "id": "el_a1_008T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_button"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Try Now",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "white"
+       }
+      },
+      "states": []
+     }
+    },
+    "hierarchy": {
+     "id": "root",
+     "children": [
+      {
+       "id": "el_a1_001T"
+      },
+      {
+       "id": "el_a1_006S",
+       "children": [
+        {
+         "id": "el_a1_005S",
+         "children": [
+          {
+           "id": "el_a1_004I"
+          },
+          {
+           "id": "el_a1_002V"
+          },
+          {
+           "id": "el_a1_003I"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "el_a1_010S",
+       "children": [
+        {
+         "id": "el_a1_007T"
+        },
+        {
+         "id": "el_a1_009S",
+         "children": [
+          {
+           "id": "el_a1_008T"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "selectableGroups": [],
+   "products": [],
+   "caption": "PW_A1_try"
+  },
+  {
+   "id": "PW_A2_reminder",
+   "props": {
+    "layout": {
+     "alignH": "start",
+     "alignV": "start",
+     "direction": "vertical",
+     "distribution": {
+      "type": "space-between"
+     }
+    },
+    "safeArea": true,
+    "statusBar": false,
+    "scrollable": false,
+    "progressBar": {
+     "enabled": false
+    },
+    "statusBarTheme": "light",
+    "fill": [
+     {
+      "type": "color",
+      "color": {
+       "type": "color-style",
+       "colorId": "bg"
+      }
+     }
+    ],
+    "padding": {
+     "top": 0,
+     "left": 16,
+     "right": 16,
+     "bottom": 24
+    }
+   },
+   "elements": {
+    "map": {
+     "el_a2_008S": {
+      "id": "el_a2_008S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Top"
+     },
+     "el_a2_007S": {
+      "id": "el_a2_007S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "center",
+        "direction": "horizontal",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "margin": {
+        "top": 6,
+        "left": 0,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Back row"
+     },
+     "el_a2_006S": {
+      "id": "el_a2_006S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 32
+       },
+       "height": {
+        "type": "fixed",
+        "value": 32
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "surface"
+         }
+        }
+       ],
+       "borderRadius": {
+        "tl": 16,
+        "tr": 16,
+        "bl": 16,
+        "br": 16
+       },
+       "border": {
+        "color": {
+         "type": "color-style",
+         "colorId": "hairline"
+        },
+        "width": 1
+       }
+      },
+      "states": [],
+      "caption": "Back",
+      "interactions": [
+       {
+        "id": "int_a2_006S",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_back",
+          "type": "navigateBack"
+         }
+        ]
+       }
+      ]
+     },
+     "el_a2_005I": {
+      "id": "el_a2_005I",
+      "type": "icon",
+      "props": {
+       "icon": {
+        "name": "CaretLeft",
+        "size": 18,
+        "type": "phosphor",
+        "weight": "regular",
+        "color": {
+         "type": "color-style",
+         "colorId": "ink"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": []
+     },
+     "el_a2_001T": {
+      "id": "el_a2_001T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "fr_h1"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "We'll send you a\nreminder before your\nfree trial ends",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       },
+       "margin": {
+        "top": 96,
+        "left": 0,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Headline"
+     },
+     "el_a2_004S": {
+      "id": "el_a2_004S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Bell block"
+     },
+     "el_a2_003S": {
+      "id": "el_a2_003S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 210
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Bell + badge"
+     },
+     "el_a2_002V": {
+      "id": "el_a2_002V",
+      "type": "video",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "fixed",
+        "value": 210
+       },
+       "objectFit": "fit",
+       "loop": true,
+       "position": {
+        "type": "relative"
+       },
+       "video": {
+        "values": {
+         "en": {
+          "videoUrl": "https://public-media.adapty.io/video/ee1ce31d-cb59-4c68-bc30-41b622c35ae4/hls/master.m3u8",
+          "previewUrl": "https://public-media.adapty.io/video/ee1ce31d-cb59-4c68-bc30-41b622c35ae4/preview.png"
+         }
+        },
+        "_localizable": true
+       }
+      },
+      "states": [],
+      "caption": "Bell animation (reminder_bell_loop_720.mp4)"
+     },
+     "el_a2_012S": {
+      "id": "el_a2_012S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 18,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Bottom block"
+     },
+     "el_a2_009T": {
+      "id": "el_a2_009T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_body_strong"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "✓ No payment for now",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       }
+      },
+      "states": [],
+      "caption": "No payment line"
+     },
+     "el_a2_011S": {
+      "id": "el_a2_011S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "fixed",
+        "value": 56
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "terracotta"
+         }
+        }
+       ],
+       "padding": {
+        "top": 0,
+        "left": 24,
+        "right": 24,
+        "bottom": 0
+       },
+       "borderRadius": {
+        "tl": 14,
+        "tr": 14,
+        "bl": 14,
+        "br": 14
+       }
+      },
+      "states": [],
+      "caption": "CTA",
+      "interactions": [
+       {
+        "id": "int_a2_011S",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_next",
+          "type": "navigate",
+          "payload": {
+           "type": "screen",
+           "screen": "PW_A3_plans"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "el_a2_010T": {
+      "id": "el_a2_010T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_button"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Continue for FREE",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "white"
+       }
+      },
+      "states": []
+     }
+    },
+    "hierarchy": {
+     "id": "root",
+     "children": [
+      {
+       "id": "el_a2_008S",
+       "children": [
+        {
+         "id": "el_a2_007S",
+         "children": [
+          {
+           "id": "el_a2_006S",
+           "children": [
+            {
+             "id": "el_a2_005I"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "id": "el_a2_001T"
+        }
+       ]
+      },
+      {
+       "id": "el_a2_004S",
+       "children": [
+        {
+         "id": "el_a2_003S",
+         "children": [
+          {
+           "id": "el_a2_002V"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "el_a2_012S",
+       "children": [
+        {
+         "id": "el_a2_009T"
+        },
+        {
+         "id": "el_a2_011S",
+         "children": [
+          {
+           "id": "el_a2_010T"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "selectableGroups": [],
+   "products": [],
+   "caption": "PW_A2_reminder"
+  },
+  {
+   "id": "PW_A3_plans",
+   "props": {
+    "layout": {
+     "alignH": "start",
+     "alignV": "start",
+     "direction": "vertical",
+     "distribution": {
+      "type": "space-between"
+     }
+    },
+    "safeArea": true,
+    "statusBar": false,
+    "scrollable": false,
+    "progressBar": {
+     "enabled": false
+    },
+    "statusBarTheme": "light",
+    "fill": [
+     {
+      "type": "color",
+      "color": {
+       "type": "color-style",
+       "colorId": "bg"
+      }
+     }
+    ],
+    "padding": {
+     "top": 0,
+     "left": 16,
+     "right": 16,
+     "bottom": 24
+    }
+   },
+   "elements": {
+    "map": {
+     "el_a3_023S": {
+      "id": "el_a3_023S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Header"
+     },
+     "el_a3_022S": {
+      "id": "el_a3_022S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "center",
+        "direction": "horizontal",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "margin": {
+        "top": 6,
+        "left": 0,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Back row"
+     },
+     "el_a3_021S": {
+      "id": "el_a3_021S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 32
+       },
+       "height": {
+        "type": "fixed",
+        "value": 32
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "surface"
+         }
+        }
+       ],
+       "borderRadius": {
+        "tl": 16,
+        "tr": 16,
+        "bl": 16,
+        "br": 16
+       },
+       "border": {
+        "color": {
+         "type": "color-style",
+         "colorId": "hairline"
+        },
+        "width": 1
+       }
+      },
+      "states": [],
+      "caption": "Back",
+      "interactions": [
+       {
+        "id": "int_a3_021S",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_back",
+          "type": "navigateBack"
+         }
+        ]
+       }
+      ]
+     },
+     "el_a3_020I": {
+      "id": "el_a3_020I",
+      "type": "icon",
+      "props": {
+       "icon": {
+        "name": "CaretLeft",
+        "size": 18,
+        "type": "phosphor",
+        "weight": "regular",
+        "color": {
+         "type": "color-style",
+         "colorId": "ink"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": []
+     },
+     "el_a3_003S": {
+      "id": "el_a3_003S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "margin": {
+        "top": 6,
+        "left": 0,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Headline"
+     },
+     "el_a3_001T": {
+      "id": "el_a3_001T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "fr_h1"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Reach ",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            },
+            {
+             "type": "variable",
+             "attrs": {
+              "variableId": "var_TARGET_WEIGHT"
+             }
+            },
+            {
+             "text": " by ",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            },
+            {
+             "type": "variable",
+             "attrs": {
+              "variableId": "var_TARGET_DATE"
+             }
+            },
+            {
+             "text": "\nStart for FREE today.",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       },
+       "visibility": {
+        "type": "conditional",
+        "condition": {
+         "type": "notEmpty",
+         "left": {
+          "type": "var",
+          "variableId": "var_TARGET_WEIGHT"
+         }
+        }
+       }
+      },
+      "states": [],
+      "caption": "Headline (target)"
+     },
+     "el_a3_002T": {
+      "id": "el_a3_002T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "fr_h1"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "variable",
+             "attrs": {
+              "variableId": "var_HERO_LINE"
+             }
+            },
+            {
+             "text": "\nStart for FREE today.",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       },
+       "visibility": {
+        "type": "conditional",
+        "condition": {
+         "type": "==",
+         "left": {
+          "type": "var",
+          "variableId": "var_TARGET_WEIGHT"
+         },
+         "right": {
+          "type": "const",
+          "value": ""
+         }
+        }
+       }
+      },
+      "states": [],
+      "caption": "Headline (fallback)"
+     },
+     "el_a3_044S": {
+      "id": "el_a3_044S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "margin": {
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Timeline"
+     },
+     "el_a3_030S": {
+      "id": "el_a3_030S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "horizontal",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Step"
+     },
+     "el_a3_025S": {
+      "id": "el_a3_025S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 30
+       },
+       "height": {
+        "type": "fixed",
+        "value": 30
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "absolute",
+        "top": 0,
+        "left": 0
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "terracotta"
+         }
+        }
+       ],
+       "borderRadius": {
+        "tl": 15,
+        "tr": 15,
+        "bl": 15,
+        "br": 15
+       }
+      },
+      "states": [],
+      "caption": "Step icon"
+     },
+     "el_a3_024I": {
+      "id": "el_a3_024I",
+      "type": "icon",
+      "props": {
+       "icon": {
+        "name": "LockOpen",
+        "size": 15,
+        "type": "phosphor",
+        "weight": "fill",
+        "color": {
+         "type": "color-style",
+         "colorId": "white"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": []
+     },
+     "el_a3_026S": {
+      "id": "el_a3_026S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 3
+       },
+       "height": {
+        "type": "auto"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "absolute",
+        "top": 34,
+        "left": 14,
+        "bottom": -2
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "terracotta_soft"
+         }
+        }
+       ]
+      },
+      "states": [],
+      "caption": "Rail"
+     },
+     "el_a3_029S": {
+      "id": "el_a3_029S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 2,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "padding": {
+        "top": 3,
+        "left": 44,
+        "right": 0,
+        "bottom": 20
+       }
+      },
+      "states": [],
+      "caption": "Step text"
+     },
+     "el_a3_027T": {
+      "id": "el_a3_027T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_body_strong"
+       },
+       "align": "left",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Today",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       }
+      },
+      "states": []
+     },
+     "el_a3_028T": {
+      "id": "el_a3_028T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_small"
+       },
+       "align": "left",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Unlock AI food calorie tracking",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       }
+      },
+      "states": []
+     },
+     "el_a3_037S": {
+      "id": "el_a3_037S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "horizontal",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Step"
+     },
+     "el_a3_032S": {
+      "id": "el_a3_032S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 30
+       },
+       "height": {
+        "type": "fixed",
+        "value": 30
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "absolute",
+        "top": 0,
+        "left": 0
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "hairline"
+         }
+        }
+       ],
+       "borderRadius": {
+        "tl": 15,
+        "tr": 15,
+        "bl": 15,
+        "br": 15
+       }
+      },
+      "states": [],
+      "caption": "Step icon"
+     },
+     "el_a3_031I": {
+      "id": "el_a3_031I",
+      "type": "icon",
+      "props": {
+       "icon": {
+        "name": "Bell",
+        "size": 15,
+        "type": "phosphor",
+        "weight": "fill",
+        "color": {
+         "type": "color-style",
+         "colorId": "ink_faint"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": []
+     },
+     "el_a3_033S": {
+      "id": "el_a3_033S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 3
+       },
+       "height": {
+        "type": "auto"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "absolute",
+        "top": 34,
+        "left": 14,
+        "bottom": -2
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "hairline"
+         }
+        }
+       ]
+      },
+      "states": [],
+      "caption": "Rail"
+     },
+     "el_a3_036S": {
+      "id": "el_a3_036S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 2,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "padding": {
+        "top": 3,
+        "left": 44,
+        "right": 0,
+        "bottom": 20
+       }
+      },
+      "states": [],
+      "caption": "Step text"
+     },
+     "el_a3_034T": {
+      "id": "el_a3_034T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_body_strong"
+       },
+       "align": "left",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "In 2 Days - Reminder",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       }
+      },
+      "states": []
+     },
+     "el_a3_035T": {
+      "id": "el_a3_035T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_small"
+       },
+       "align": "left",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "We'll send you a reminder that your trial is ending soon",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       }
+      },
+      "states": []
+     },
+     "el_a3_043S": {
+      "id": "el_a3_043S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "horizontal",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Step"
+     },
+     "el_a3_039S": {
+      "id": "el_a3_039S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fixed",
+        "value": 30
+       },
+       "height": {
+        "type": "fixed",
+        "value": 30
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "absolute",
+        "top": 0,
+        "left": 0
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "hairline"
+         }
+        }
+       ],
+       "borderRadius": {
+        "tl": 15,
+        "tr": 15,
+        "bl": 15,
+        "br": 15
+       }
+      },
+      "states": [],
+      "caption": "Step icon"
+     },
+     "el_a3_038I": {
+      "id": "el_a3_038I",
+      "type": "icon",
+      "props": {
+       "icon": {
+        "name": "Crown",
+        "size": 15,
+        "type": "phosphor",
+        "weight": "fill",
+        "color": {
+         "type": "color-style",
+         "colorId": "ink_faint"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": []
+     },
+     "el_a3_042S": {
+      "id": "el_a3_042S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 2,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "padding": {
+        "top": 3,
+        "left": 44,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Step text"
+     },
+     "el_a3_040T": {
+      "id": "el_a3_040T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_body_strong"
+       },
+       "align": "left",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "In 3 Days - Billing Starts",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       }
+      },
+      "states": []
+     },
+     "el_a3_041T": {
+      "id": "el_a3_041T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_small"
+       },
+       "align": "left",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "You'll be charged unless you cancel before",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       }
+      },
+      "states": []
+     },
+     "el_a3_045S": {
+      "type": "stack",
+      "caption": "Plan cards (catalog prod-horizontal-list)",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "direction": "horizontal",
+        "alignH": "start",
+        "alignV": "end",
+        "distribution": {
+         "type": "gap",
+         "gap": 10
+        }
+       }
+      },
+      "id": "el_a3_045S",
+      "states": []
+     },
+     "el_a3_046P": {
+      "type": "product",
+      "caption": "Product",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "direction": "vertical",
+        "alignH": "center",
+        "alignV": "center",
+        "distribution": {
+         "type": "gap",
+         "gap": 4
+        }
+       },
+       "product": {
+        "id": "cf5874b1-a1c2-46cc-900a-2ee04db8ddde"
+       },
+       "groupId": "plans",
+       "default": false,
+       "padding": {
+        "top": 14,
+        "left": 12,
+        "right": 12,
+        "bottom": 14
+       },
+       "borderRadius": {
+        "tl": 16,
+        "tr": 16,
+        "bl": 16,
+        "br": 16
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "surface"
+         }
+        }
+       ],
+       "border": {
+        "width": 1,
+        "color": {
+         "type": "color-style",
+         "colorId": "hairline"
+        }
+       }
+      },
+      "states": [
+       {
+        "id": "selected",
+        "type": "system"
+       }
+      ],
+      "propsByState": {
+       "selected": {
+        "border": {
+         "width": 2,
+         "color": {
+          "type": "color-style",
+          "colorId": "ink"
+         }
+        },
+        "fill": [
+         {
+          "type": "color",
+          "color": {
+           "type": "color-style",
+           "colorId": "card_sel"
+          }
+         }
+        ]
+       }
+      },
+      "id": "el_a3_046P"
+     },
+     "el_a3_047T": {
+      "type": "text",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "align": "center",
+       "verticalAlign": "top",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       },
+       "decoration": "none",
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Monthly",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "font": {
+        "preset": "in_small"
+       }
+      },
+      "id": "el_a3_047T",
+      "states": []
+     },
+     "el_a3_048T": {
+      "type": "text",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "align": "center",
+       "verticalAlign": "top",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       },
+       "decoration": "none",
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "variable",
+             "attrs": {
+              "variableId": "cf5874b1-a1c2-46cc-900a-2ee04db8ddde.prod_price",
+              "productRef": {
+               "target": {
+                "kind": "product",
+                "id": "cf5874b1-a1c2-46cc-900a-2ee04db8ddde"
+               },
+               "field": "prod_price"
+              }
+             }
+            },
+            {
+             "text": " /mo",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "font": {
+        "preset": "in_title"
+       }
+      },
+      "id": "el_a3_048T",
+      "states": []
+     },
+     "el_a3_052T": {
+      "id": "el_a3_052T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_caption"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "billed monthly",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       }
+      },
+      "states": []
+     },
+     "el_a3_049P": {
+      "type": "product",
+      "caption": "Product",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "direction": "vertical",
+        "alignH": "center",
+        "alignV": "center",
+        "distribution": {
+         "type": "gap",
+         "gap": 4
+        }
+       },
+       "product": {
+        "id": "7cbbdae3-6caa-4862-b05a-33960863c2f1"
+       },
+       "groupId": "plans",
+       "default": true,
+       "padding": {
+        "top": 14,
+        "left": 12,
+        "right": 12,
+        "bottom": 14
+       },
+       "borderRadius": {
+        "tl": 16,
+        "tr": 16,
+        "bl": 16,
+        "br": 16
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "surface"
+         }
+        }
+       ],
+       "border": {
+        "width": 1,
+        "color": {
+         "type": "color-style",
+         "colorId": "hairline"
+        }
+       }
+      },
+      "states": [
+       {
+        "id": "selected",
+        "type": "system"
+       }
+      ],
+      "propsByState": {
+       "selected": {
+        "border": {
+         "width": 2,
+         "color": {
+          "type": "color-style",
+          "colorId": "ink"
+         }
+        },
+        "fill": [
+         {
+          "type": "color",
+          "color": {
+           "type": "color-style",
+           "colorId": "card_sel"
+          }
+         }
+        ]
+       }
+      },
+      "id": "el_a3_049P"
+     },
+     "el_a3_050T": {
+      "type": "text",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "align": "center",
+       "verticalAlign": "top",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       },
+       "decoration": "none",
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Yearly",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "font": {
+        "preset": "in_small"
+       }
+      },
+      "id": "el_a3_050T",
+      "states": []
+     },
+     "el_a3_051T": {
+      "type": "text",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "align": "center",
+       "verticalAlign": "top",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       },
+       "decoration": "none",
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "variable",
+             "attrs": {
+              "variableId": "7cbbdae3-6caa-4862-b05a-33960863c2f1.prod_price_per_month",
+              "productRef": {
+               "target": {
+                "kind": "product",
+                "id": "7cbbdae3-6caa-4862-b05a-33960863c2f1"
+               },
+               "field": "prod_price_per_month"
+              }
+             }
+            },
+            {
+             "text": " /mo",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "font": {
+        "preset": "in_title"
+       }
+      },
+      "id": "el_a3_051T",
+      "states": []
+     },
+     "el_a3_053T": {
+      "id": "el_a3_053T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_caption"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "only ",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            },
+            {
+             "type": "variable",
+             "attrs": {
+              "variableId": "7cbbdae3-6caa-4862-b05a-33960863c2f1.prod_price",
+              "productRef": {
+               "target": {
+                "kind": "product",
+                "id": "7cbbdae3-6caa-4862-b05a-33960863c2f1"
+               },
+               "field": "prod_price"
+              }
+             }
+            },
+            {
+             "text": " per year",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       }
+      },
+      "states": []
+     },
+     "el_a3_054S": {
+      "type": "stack",
+      "caption": "Badge",
+      "props": {
+       "position": {
+        "type": "absolute",
+        "top": -14,
+        "right": 10
+       },
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "fixed",
+        "value": 28
+       },
+       "layout": {
+        "direction": "horizontal",
+        "alignH": "center",
+        "alignV": "center",
+        "distribution": {
+         "type": "gap",
+         "gap": 0
+        }
+       },
+       "padding": {
+        "top": 4,
+        "right": 8,
+        "bottom": 4,
+        "left": 8
+       },
+       "borderRadius": {
+        "tl": 9999,
+        "tr": 9999,
+        "bl": 9999,
+        "br": 9999
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "done_green"
+         }
+        }
+       ]
+      },
+      "id": "el_a3_054S",
+      "states": []
+     },
+     "el_a3_055T": {
+      "type": "text",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "align": "center",
+       "verticalAlign": "top",
+       "color": {
+        "type": "color-style",
+        "colorId": "white"
+       },
+       "decoration": "none",
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "🎁 SAVE 58%",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "font": {
+        "preset": "in_caption_strong"
+       }
+      },
+      "id": "el_a3_055T",
+      "states": []
+     },
+     "el_a3_019S": {
+      "id": "el_a3_019S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "start",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 14,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Bottom block"
+     },
+     "el_a3_004T": {
+      "id": "el_a3_004T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_body_strong"
+       },
+       "align": "center",
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "✓ No Payment Due Now",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       }
+      },
+      "states": [],
+      "caption": "No payment line"
+     },
+     "el_a3_005S": {
+      "type": "stack",
+      "caption": "CTA purchase (catalog btn-sub)",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "fixed",
+        "value": 56
+       },
+       "layout": {
+        "direction": "horizontal",
+        "alignH": "center",
+        "alignV": "center",
+        "distribution": {
+         "type": "gap",
+         "gap": 16
+        }
+       },
+       "borderRadius": {
+        "tl": 14,
+        "tr": 14,
+        "bl": 14,
+        "br": 14
+       },
+       "fill": [
+        {
+         "type": "color",
+         "color": {
+          "type": "color-style",
+          "colorId": "terracotta"
+         }
+        }
+       ]
+      },
+      "id": "el_a3_005S",
+      "states": [],
+      "interactions": [
+       {
+        "id": "int_a3_005S",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_buy",
+          "type": "purchase",
+          "payload": {
+           "product": {
+            "type": "var",
+            "variableId": "plans.selectedProduct"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "el_a3_006T": {
+      "type": "text",
+      "props": {
+       "position": {
+        "type": "relative"
+       },
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "align": "left",
+       "verticalAlign": "top",
+       "color": {
+        "type": "color-style",
+        "colorId": "white"
+       },
+       "decoration": "none",
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Start My 3-Day Free Trial",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "font": {
+        "preset": "in_button"
+       }
+      },
+      "id": "el_a3_006T",
+      "states": []
+     },
+     "el_a3_012S": {
+      "id": "el_a3_012S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "horizontal",
+        "distribution": {
+         "gap": 12,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Rating laurel"
+     },
+     "el_a3_010I": {
+      "id": "el_a3_010I",
+      "type": "image",
+      "props": {
+       "image": {
+        "values": {
+         "en": {
+          "url": "https://public-media.adapty.io/public/ab/9b/ab9bf575-fedf-411b-b234-7c0409fc9d94/laurel_left.png",
+          "id": "544116",
+          "previewValue": "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"
+         }
+        },
+        "_localizable": true
+       },
+       "width": {
+        "type": "fixed",
+        "value": 34
+       },
+       "height": {
+        "type": "fixed",
+        "value": 54
+       },
+       "objectFit": "fit",
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "laurel_left"
+     },
+     "el_a3_009S": {
+      "id": "el_a3_009S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "start",
+        "direction": "vertical",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "Rating text"
+     },
+     "el_a3_007T": {
+      "id": "el_a3_007T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_rating"
+       },
+       "align": "center",
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "variable",
+             "attrs": {
+              "variableId": "var_RATING"
+             }
+            },
+            {
+             "text": " ★",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink"
+       }
+      },
+      "states": []
+     },
+     "el_a3_008T": {
+      "id": "el_a3_008T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_small"
+       },
+       "align": "center",
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "avg App Store rating",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_muted"
+       }
+      },
+      "states": []
+     },
+     "el_a3_011I": {
+      "id": "el_a3_011I",
+      "type": "image",
+      "props": {
+       "image": {
+        "values": {
+         "en": {
+          "url": "https://public-media.adapty.io/public/cd/a1/cda11435-ace1-403b-8117-250bc0f7bd2d/laurel_right.png",
+          "id": "544117",
+          "previewValue": "UklGRvwMAABXRUJQVlA4IPAMAABQSQCdASqZACwBPtFeqk6oJSQiKVPKyQAaCWZu4W0Qzxw9dPJvpf+R/ZvSLtL+83/BCdt30T+YPzyPMB5w/pk/wm/Cegh0wP93wZqz5tCOyf9z42l8j4fwh/oNdDPP+FZ+tr6K29QYT2EW84nRPdW02exMbJUivcp1nLyOHDdlb8velzkUM85fih0/HbOHTlEixTM3SNklRQO7xfliI38DElLksWtEw1iDLaNlEjppx5IkeuOCT1OqI2Qp43aCEE+wTB9KuPVGJVQIMZf3owD57VyuAWghWnGv2nfw315YZ7gS6lT299aD1kvu0Ybwcipnizr2TR/ixkIeZ0KSSijjLaBzqp5d1Dnh6StpD08oDTQsfCTnPuXO8QPOZbHqOPa45u2rH3ndZNKmTqk5kDLbtS1p25xu4pb6FpRbXVdkqIDXWrLYlWcBRcAxBaRVwh1ARGubWeyx13xUOGjMdeR4Uyyh7/GED0opzz1XHYwuazhyVszsKBW5xwlRTQ8wRu8XaTBf4ZvSWsMcaxfjZryzXsozC4ABTa5kWtEb3ioWFCy0/9qTQcMZNDftetiwiiW0nZTAkBn1wY4ewH+imJBNeOKksl7F9S9WlbfnYE7lqZ9QOLNYpYArYFxJT15Pf7Xiaev+72zln1IDQeVTTpxt7tD9MjBVuiwr91DOjUfJj05TvodycVEFr+np1dtt/E1/5DWbYovV7aXyGlk/SrumDsEdthofLchsjpV3z8fM8zpofDgJWeO7a1UODK2E+P9XOcqtO+4jfaBMcLwpRcccVi4AAP78rSIoT3yCjM+P61E8NYWnToGhvqlcutMc4C88gIMp5QyiIc/zbVhGyL+v5QB0PcC5whSy5wM/BOx/wJGYCFlEg3nDBgOEAtNGale8p9DPbAeeDlZGfUwzROoSKS20b/7Dak2yqnmj8JD5FGrUj3ch0zSpU5lTw0m847MoVkUOpxiHUfMMcd8TeN5CfUpUwxgVDVc/wees3oJTQmESD+WDUgFNTpcJ1zfyjcvzaDYJzwrPvk0d/EWss2J8z2HJ8ljvFx46xU0DLOF4iT0LUdlCw3fEhi6Q1dpXEb2crmFCjQBn4W8cxLPs+wwyXXo0VW/6Px70koixL1yaXBLgDMA3hf4dr42Km54Evw4lcBCOb20Uk4kRGgc1pp2GbIl2alQiRUCBS+lMph+Dq4UBSpPV8GOSlv6aDlQcBQyctUBDBRDwZ5K/hzCMPs6/qdkxsyGh3JgtHi9EP633hKPIwVhSC0HK/cYOHBJa6xBSHN38wJjwzZr8U/B4mwreHAhBMmnsQXTK+WuS8QTI5qETJcXtoqIVDEx/Z1LKbvEK2GHqocF3nhlyxCt8HI5Hfz8EPv20QKh2Vxb4VTtC54Xy0Evjd/CVONKxGEjjaUTDJRUkljOzMAEQrPo7Y6cTWxII/fXmT5WPD8qhOIByrVu1lk/LfW1J2munHV/gkL02hGJLWBZILsmVxAFBejXE9QpICscsr2bi2yqNjl9przY3eHdgmf9pNAcVW76ybg0GaLtwoYYI5IuZEDuq6YwD3Iy2p34GzBfNwbFc1AwIA9BVrJSO7ZmJFIdg8tFcYrCt9PE8Kqt7CBj3O9N7fphNNZ6rmI2SdUITi6yaEWZRr1eUXT8hAiEGfZxUKxzeFkTpGT5pjCE4+ij9YSBDtIm+GkPFSOp3yl6eDcEGRTFolYAyv634AERFBssAyURd2wEugWdnvfWQK8LJbtabt3p7qVUm40mxeogti/W1Aos2kBnLT6nH1mLe49daeWTtyLaweQ/0fJgGAnCJIGqUH2g50Y1WkUKrxNQxxX2Iwm5xIxFuar0qwFDpSCIN93YRZrdrL0rpo6yxuX/2UN4E4yKTzieqtuCSBA9o+sPNlvYX0pEYr0eJEYE/xCPxKJDowsq0znPNPvL1QUzmYdAksge+M8LxQnnA15MWb0CpxJAkCS2RfcdgIWYtvvXu1WFP+uVqB4EcCzo0CgQ0FvFTJEXLFcz5AcrxO1CaCCLw590SB1s8KUE+uqaBeW+/03Wdjy6ZqMk/OyyUSz3yTFLj7wNbVjK4iTzraEvX70Y1jwChyA4UwDERUeqYbKVQCjlO+HID0HzANmxY7wIUQrE5dALV1N9pwSM9HrKQ9NgqqLLW82h8SX4RRlBtSzTvivpq+H/QyHZ4RVEImUxkjTFhm731PlSS87xnLgkbQUiJTn5xRmXJ5zXVpW9pUfT7soUaK/E0KvOyp4JUKZejV+1DH8wWvDe1zZQWNA0X3TX7e79H+k7WvmQJVvEi2z+1f+2PNfEk/WOa+zOvGnjI49sH00Pj1jMb4z8wtM161qfk0qiVleG26OmsJNb/cbbTLi5GlLFYTaBDZHyI59Coh/VmsZRKqT74Jgzpuj9n7CxbUyiE1HmoHpxxJSMUrOdkY952tLsCsiR0pElL8oY/EdDGn3TPXXifQhDRym8sFTaBNz2NY6NmSRfE6prGKS+2h93WilzQr0iTbyDBglwYx7G8jjqjLwu23bljKor8udl+DFZYD1v9NfAyWLoWDC3Lr4xcADZe1Srkexd62y4MWIlU4I2oo1ogEGHJXaXPvDIkrFL4LYUMggwHZ8SlgC7O6Y+qYe5bxb3VgoB6gSGt6CP0M3EwBjQtr6xDOMjjUolBSdl2Bzszu1enRQ0Zh5WWn+pnNs05USb0fb4MJR+QeYDJhKbKU7iQXZI6BaK2qyF0StR3KRw8L5wnFXJtG9BNuh7JvY7vY4I56y0F/Pn3CCoyJJSZcFU+QSmxu1e2EY1cGTWw8p+M0pMBaIUaUjg6i/foT0wNc8s5hddUAOZUPoDb9v7GfPCfR07Woj2Mb7NlXw8++z95UYQTyeLZXDIguBnl288Yw5+y0J7Uhb+pBYCskqGpaLHbXwBc9EV921GP8KY3Ohup+p5JCE6eTUpxwU5YKILNBKz1EexeIJMDrUGvAN02Dt7xyfEPGyDQrIxcM0ZCVoRtwlxGj9uoVuheIlpU4xB7+ZE+7OyBo9k0mLFdFjQWBdW0iUPBZX5Lh8Qfqx6GBEkrCoO7tz0TM343r/+5FaB+BXW2v8zih0EjQv4k+EqR0gGALcUBtD2vhArXx4xVr9qOcrdwhJTd4bIabl5H6Pc0jCg4K3SQ8OBpszjvSsaJTs4IFUQ7uLHoNqqucmmXosEyoG2wfVysqvi1HJkOxNkArO1tGCmhLbDoZtmB5xCB32o69nMZYZX5TgH8zK5w6if+f4L6nagHcBi8VJbzSiToQBGCZhYvPXAN26pVEw/C31atYh0AKu/AZVk9TKRFlu4SOgMO+CSX87tM5DgZZXXhvjjrtebfhOi3NrbEb55oFqP4bQN4e3fVvKtODJEd3JncA/swE7l/9hH2Yj986Jo8LDkts6P8KG5RbEw0oid4xbtJgtVQrPI1sNjcefe+irXPZs38GYIfhSUoxPB575LmhlUoQ0mcoG1lPnFqDxddDtsJLdas5NTwGcAG4IBKhqIcsUpgJfFbNDewiY1Zfbk+Sv2wJQSxt6FASNfZ6z56YqtuIM67whekHuGUK0Vyo23ugQO+I62mZ3Lg80Iyb9kkOUCY/w1MJtI8fUy4plPjmmXPUFESBAjG+vpo+JCQ/vkwMaxWPvbTZaqff62scGUfydLGfNgSAg4LOthfUHCHjXxIpDJDs/PF23V6+D4pq7yuaJz/yOC23FCsgEREYDX56pR2R6wP5xbn2jUSiks5t/16Dmnsx0nOfa1Bj0FCIW62LCEzLuD9OWlaAMr74o1rDj6trPzJtnTWMAdDTbvllHdGCEVE6nXCPkLYdNzv/7HLP1DtL84h1GRonYXLRdc8HN037gjE7FmGJB25BhMWNYAxsQvgmk8ltwoI801zbJjuXaq1IJBhJALLTRvgDWcKBPEeFahTb0Ks0iRkI+xKYxBFQw+fy7/hbP1g8rNOev038KfzKg6cPHE+TV2k9U4l3b7O7YvAyO+cD4vIamGlFjpJeCTpUyzoM+4BgtUHxDeWWGR5tAed7w8J20oNQmNX96C6lobg0jKflbgHhmBzJ6fQUWSCmZfCjmg4QVCsO80MuzQiy2UavuR05jcVkheGOvqLOKu5Lc+w9jICXx7q04qXSAapZQIU1RVNM77pWmkgfl+wGeLiPYNTzUZpYCp/j4LpK5mAKJRqOSzwGxTdPBqclPxEV95FN9LOFaQEqMB73n65fUAhQ8fnzFnpsTV2Bzoa9pz5+YD7MqC5frByaB6wEgCN6zpfGU/KB8BjEkP2aCXjDGvHbQt1Yr6MI9gPnLGmyquvSL+6wFFohmzYHcFDejfdRxONRAQ3lRS8pV7UdgKieTds/95HQd4M824DZI3asRI5zhQB7O7ON8pVzpWi4v/NFb/CjV3hFUJQEg5W0XztOqnmjj5BjOAAAAA="
+         }
+        },
+        "_localizable": true
+       },
+       "width": {
+        "type": "fixed",
+        "value": 34
+       },
+       "height": {
+        "type": "fixed",
+        "value": 54
+       },
+       "objectFit": "fit",
+       "position": {
+        "type": "relative"
+       }
+      },
+      "states": [],
+      "caption": "laurel_right"
+     },
+     "el_a3_018S": {
+      "id": "el_a3_018S",
+      "type": "stack",
+      "props": {
+       "width": {
+        "type": "fill"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": {
+        "alignH": "center",
+        "alignV": "center",
+        "direction": "horizontal",
+        "distribution": {
+         "gap": 0,
+         "type": "gap"
+        }
+       },
+       "position": {
+        "type": "relative"
+       },
+       "margin": {
+        "top": 4,
+        "left": 0,
+        "right": 0,
+        "bottom": 0
+       }
+      },
+      "states": [],
+      "caption": "Legal links"
+     },
+     "el_a3_013T": {
+      "id": "el_a3_013T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_caption"
+       },
+       "align": "left",
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Terms",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_faint"
+       }
+      },
+      "states": [],
+      "caption": "Terms",
+      "interactions": [
+       {
+        "id": "int_a3_013T",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_terms",
+          "type": "openUrl",
+          "payload": {
+           "url": "https://yumyummy.ai/terms.html",
+           "external": true
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "el_a3_014T": {
+      "id": "el_a3_014T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_caption"
+       },
+       "align": "left",
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": " · ",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_faint"
+       }
+      },
+      "states": []
+     },
+     "el_a3_015T": {
+      "id": "el_a3_015T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_caption"
+       },
+       "align": "left",
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Privacy",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_faint"
+       }
+      },
+      "states": [],
+      "caption": "Privacy",
+      "interactions": [
+       {
+        "id": "int_a3_015T",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_privacy",
+          "type": "openUrl",
+          "payload": {
+           "url": "https://yumyummy.ai/privacy.html",
+           "external": true
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "el_a3_016T": {
+      "id": "el_a3_016T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_caption"
+       },
+       "align": "left",
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": " · ",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_faint"
+       }
+      },
+      "states": []
+     },
+     "el_a3_017T": {
+      "id": "el_a3_017T",
+      "type": "text",
+      "props": {
+       "font": {
+        "preset": "in_caption"
+       },
+       "align": "left",
+       "width": {
+        "type": "hug"
+       },
+       "height": {
+        "type": "hug"
+       },
+       "layout": "auto-height",
+       "content": {
+        "values": {
+         "en": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "text": "Restore",
+             "type": "text",
+             "attrs": {
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "strikethrough": false
+             }
+            }
+           ]
+          }
+         ]
+        },
+        "_localizable": true
+       },
+       "position": {
+        "type": "relative"
+       },
+       "decoration": "none",
+       "color": {
+        "type": "color-style",
+        "colorId": "ink_faint"
+       }
+      },
+      "states": [],
+      "caption": "Restore",
+      "interactions": [
+       {
+        "id": "int_a3_017T",
+        "trigger": "tap",
+        "actions": [
+         {
+          "id": "act_restore",
+          "type": "restorePurchases"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "hierarchy": {
+     "id": "root",
+     "children": [
+      {
+       "id": "el_a3_023S",
+       "children": [
+        {
+         "id": "el_a3_022S",
+         "children": [
+          {
+           "id": "el_a3_021S",
+           "children": [
+            {
+             "id": "el_a3_020I"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "id": "el_a3_003S",
+         "children": [
+          {
+           "id": "el_a3_001T"
+          },
+          {
+           "id": "el_a3_002T"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "el_a3_044S",
+       "children": [
+        {
+         "id": "el_a3_030S",
+         "children": [
+          {
+           "id": "el_a3_025S",
+           "children": [
+            {
+             "id": "el_a3_024I"
+            }
+           ]
+          },
+          {
+           "id": "el_a3_026S"
+          },
+          {
+           "id": "el_a3_029S",
+           "children": [
+            {
+             "id": "el_a3_027T"
+            },
+            {
+             "id": "el_a3_028T"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "id": "el_a3_037S",
+         "children": [
+          {
+           "id": "el_a3_032S",
+           "children": [
+            {
+             "id": "el_a3_031I"
+            }
+           ]
+          },
+          {
+           "id": "el_a3_033S"
+          },
+          {
+           "id": "el_a3_036S",
+           "children": [
+            {
+             "id": "el_a3_034T"
+            },
+            {
+             "id": "el_a3_035T"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "id": "el_a3_043S",
+         "children": [
+          {
+           "id": "el_a3_039S",
+           "children": [
+            {
+             "id": "el_a3_038I"
+            }
+           ]
+          },
+          {
+           "id": "el_a3_042S",
+           "children": [
+            {
+             "id": "el_a3_040T"
+            },
+            {
+             "id": "el_a3_041T"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "el_a3_045S",
+       "children": [
+        {
+         "id": "el_a3_046P",
+         "children": [
+          {
+           "id": "el_a3_047T"
+          },
+          {
+           "id": "el_a3_048T"
+          },
+          {
+           "id": "el_a3_052T"
+          }
+         ]
+        },
+        {
+         "id": "el_a3_049P",
+         "children": [
+          {
+           "id": "el_a3_050T"
+          },
+          {
+           "id": "el_a3_051T"
+          },
+          {
+           "id": "el_a3_053T"
+          },
+          {
+           "id": "el_a3_054S",
+           "children": [
+            {
+             "id": "el_a3_055T"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "el_a3_019S",
+       "children": [
+        {
+         "id": "el_a3_004T"
+        },
+        {
+         "id": "el_a3_005S",
+         "children": [
+          {
+           "id": "el_a3_006T"
+          }
+         ]
+        },
+        {
+         "id": "el_a3_012S",
+         "children": [
+          {
+           "id": "el_a3_010I"
+          },
+          {
+           "id": "el_a3_009S",
+           "children": [
+            {
+             "id": "el_a3_007T"
+            },
+            {
+             "id": "el_a3_008T"
+            }
+           ]
+          },
+          {
+           "id": "el_a3_011I"
+          }
+         ]
+        },
+        {
+         "id": "el_a3_018S",
+         "children": [
+          {
+           "id": "el_a3_013T"
+          },
+          {
+           "id": "el_a3_014T"
+          },
+          {
+           "id": "el_a3_015T"
+          },
+          {
+           "id": "el_a3_016T"
+          },
+          {
+           "id": "el_a3_017T"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "selectableGroups": [
+    {
+     "id": "plans",
+     "type": "product"
+    }
+   ],
+   "products": [
+    {
+     "id": "cf5874b1-a1c2-46cc-900a-2ee04db8ddde"
+    },
+    {
+     "id": "7cbbdae3-6caa-4862-b05a-33960863c2f1"
+    }
+   ],
+   "caption": "PW_A3_plans"
+  }
+ ]
+}

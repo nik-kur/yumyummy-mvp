@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
@@ -43,6 +43,13 @@ engine = create_engine(
     f"sqlite:///{_db_path}", connect_args={"check_same_thread": False}
 )
 TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+
+# Enforce foreign keys like Postgres does (SQLite ignores them by default), so
+# a merge that would orphan rows fails here too.
+@event.listens_for(engine, "connect")
+def _sqlite_fk_on(dbapi_connection, _record):
+    dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
 
 def _override_get_db():

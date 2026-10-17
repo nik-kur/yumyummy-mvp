@@ -1,7 +1,9 @@
 /**
  * Journey completion popup — one at a time, with why-it-matters copy.
  */
-import { View, Pressable, StyleSheet, Modal, Linking } from 'react-native';
+import { View, Pressable, StyleSheet, Linking } from 'react-native';
+
+import { SheetModal } from './SheetModal';
 import { CircleCheck, ExternalLink } from 'lucide-react-native';
 
 import { AppText } from './AppText';
@@ -19,8 +21,7 @@ export function JourneyPopup({ questId, visible, onDismiss }: JourneyPopupProps)
   const copy = QUEST_WHY[questId];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <View style={s.overlay}>
+    <SheetModal visible={visible} onRequestClose={onDismiss}>
         <View style={s.sheet}>
           <View style={s.handle} />
           <View style={s.iconWrap}>
@@ -54,8 +55,7 @@ export function JourneyPopup({ questId, visible, onDismiss }: JourneyPopupProps)
             <AppText variant="small" color={colors.inkMuted}>Dismiss</AppText>
           </Pressable>
         </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

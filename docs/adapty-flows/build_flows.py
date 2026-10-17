@@ -694,7 +694,7 @@ PRIVACY_URL = 'https://yumyummy.ai/privacy'  # placeholder per brief (app uses /
 # Declared so they show up in the builder's variable panel; NOT referenced (the reference form
 # for a custom variable is unverified, flow-schema.md trap 4). Values = the app's own defaults.
 CUSTOM_VARS = [
-    {'id': 'var_HERO_LINE', 'name': 'HERO_LINE', 'valueType': 'string', 'value': ''},
+    {'id': 'var_HERO_LINE', 'name': 'HERO_LINE', 'valueType': 'string', 'value': 'Reach your goal'},  # builder preview only; the app always passes one
     {'id': 'var_TARGET_WEIGHT', 'name': 'TARGET_WEIGHT', 'valueType': 'string', 'value': ''},
     {'id': 'var_TARGET_DATE', 'name': 'TARGET_DATE', 'valueType': 'string', 'value': ''},
     {'id': 'var_DAILY_KCAL', 'name': 'DAILY_KCAL', 'valueType': 'string', 'value': ''},

@@ -2,7 +2,9 @@
  * QuestInfoSheet — how-to bottom sheet for an incomplete journey quest.
  * Opened by tapping a quest row on the Today card.
  */
-import { View, Pressable, StyleSheet, Modal } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
+
+import { SheetModal } from './SheetModal';
 
 import { AppText } from './AppText';
 import { Button } from './Button';
@@ -87,8 +89,7 @@ export function QuestInfoSheet({ quest, onDismiss, onGo }: QuestInfoSheetProps) 
   const how = QUEST_HOW[quest.id];
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onDismiss}>
-      <View style={s.overlay}>
+    <SheetModal visible onRequestClose={onDismiss}>
         <View style={s.sheet}>
           <View style={s.handle} />
 
@@ -109,8 +110,7 @@ export function QuestInfoSheet({ quest, onDismiss, onGo }: QuestInfoSheetProps) 
             <AppText variant="small" color={colors.inkMuted}>Maybe later</AppText>
           </Pressable>
         </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

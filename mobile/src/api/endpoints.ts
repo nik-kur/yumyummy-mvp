@@ -63,11 +63,31 @@ export async function requestEmailCode(email: string): Promise<EmailCodeRequestR
   });
 }
 
-export async function verifyEmailCode(email: string, code: string): Promise<AuthTokenResponse> {
-  if (USE_MOCKS) return { access_token: mock.MOCK_TOKEN, token_type: 'bearer', account_id: 1, created: false };
+/**
+ * Preview mode: the anonymous account of this install (`installId` lives in
+ * the Keychain). 503 when the backend has preview off or the network is over
+ * its daily cap — the app then keeps the paywall.
+ */
+export async function signInInstall(installId: string | null): Promise<AuthTokenResponse> {
+  if (USE_MOCKS) return mock.mockStartPreview();
+  return apiFetch<AuthTokenResponse>('/auth/install', {
+    method: 'POST',
+    auth: false,
+    body: installId ? { install_id: installId } : {},
+    timeoutMs: AUTH_TIMEOUT_MS,
+  });
+}
+
+export async function verifyEmailCode(
+  email: string,
+  code: string,
+  previewToken?: string | null,
+): Promise<AuthTokenResponse> {
+  if (USE_MOCKS) return mock.mockSignIn(false);
   return apiFetch<AuthTokenResponse>('/auth/email/verify', {
     method: 'POST',
     auth: false,
+    bearer: previewToken,
     body: { email, code },
     timeoutMs: AUTH_TIMEOUT_MS,
   });
@@ -81,21 +101,24 @@ export async function verifyEmailCode(email: string, code: string): Promise<Auth
 export async function signInApple(
   identityToken: string,
   fullName?: string | null,
+  previewToken?: string | null,
 ): Promise<AuthTokenResponse> {
-  if (USE_MOCKS) return { access_token: mock.MOCK_TOKEN, token_type: 'bearer', account_id: 1, created: true };
+  if (USE_MOCKS) return mock.mockSignIn(true);
   return apiFetch<AuthTokenResponse>('/auth/apple', {
     method: 'POST',
     auth: false,
+    bearer: previewToken,
     body: { identity_token: identityToken, full_name: fullName ?? null },
     timeoutMs: AUTH_TIMEOUT_MS,
   });
 }
 
-export async function signInGoogle(idToken: string): Promise<AuthTokenResponse> {
-  if (USE_MOCKS) return { access_token: mock.MOCK_TOKEN, token_type: 'bearer', account_id: 1, created: true };
+export async function signInGoogle(idToken: string, previewToken?: string | null): Promise<AuthTokenResponse> {
+  if (USE_MOCKS) return mock.mockSignIn(true);
   return apiFetch<AuthTokenResponse>('/auth/google', {
     method: 'POST',
     auth: false,
+    bearer: previewToken,
     body: { id_token: idToken },
   });
 }

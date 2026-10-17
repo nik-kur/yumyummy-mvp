@@ -34,13 +34,15 @@ from app.models.usage_record import UsageRecord
 from app.models.churn_survey import ChurnSurvey
 from app.models.payment_event import PaymentEvent
 from app.models.notification_event import NotificationEvent
+from app.models.weekly_recap import WeeklyRecap
 from app.models.acquisition_event import AcquisitionEvent
 from app.models.auth_code import AuthOneTimeCode
+from app.auth import preview
 from app.auth.service import get_primary_user, account_member_users, resolve_account_email
 from app.billing.account_access import account_billing_snapshot, account_has_access
 from app.billing.adapty_profile import push_profile_attributes
 from app.billing.plans import resolve_trial_days
-from app.services.agent_persist import persist_agent_result_for_user
+from app.services.agent_persist import MEAL_INTENTS, persist_agent_result_for_user
 from app.services.usage_guardrails import (
     record_usage_for_user,
     global_daily_cost_exceeded,
@@ -128,7 +130,14 @@ def _build_profile(db: Session, account: Account, user: User) -> AccountProfile:
         onboarding_completed=bool(user.onboarding_completed),
         timezone=user.timezone,
         billing=snapshot,
+        **_preview_fields(db, account, providers),
     )
+
+
+def _preview_fields(db: Session, account: Account, providers: list) -> dict:
+    if providers:
+        return {}
+    return {"is_preview": True, "preview_free_log_available": preview.free_log_available(db, account)}
 
 
 @router.get("/me", response_model=AccountProfile)
@@ -171,7 +180,9 @@ def delete_me(
     subscriptions are managed by Apple and cancelled by the user in Settings;
     we only remove our own copy of the account and its data.
     """
-    members = account_member_users(db, account.id)
+    # Read before the commit: the deleted account cannot be refreshed after it.
+    account_id = account.id
+    members = account_member_users(db, account_id)
     user_ids = [u.id for u in members]
     telegram_ids = [u.telegram_id for u in members if u.telegram_id]
 
@@ -202,6 +213,8 @@ def delete_me(
         db.query(UsageRecord).filter(UsageRecord.user_id.in_(user_ids)).delete(synchronize_session=False)
         db.query(ChurnSurvey).filter(ChurnSurvey.user_id.in_(user_ids)).delete(synchronize_session=False)
         db.query(PaymentEvent).filter(PaymentEvent.user_id.in_(user_ids)).delete(synchronize_session=False)
+        # Cached weekly recaps key on the user with no ON DELETE CASCADE either.
+        db.query(WeeklyRecap).filter(WeeklyRecap.user_id.in_(user_ids)).delete(synchronize_session=False)
 
     if telegram_ids:
         db.query(NotificationEvent).filter(
@@ -222,7 +235,7 @@ def delete_me(
     db.query(Account).filter(Account.id == account.id).delete(synchronize_session=False)
 
     db.commit()
-    logger.info("account_deleted account_id=%s users=%s", account.id, user_ids)
+    logger.info("account_deleted account_id=%s users=%s", account_id, user_ids)
     return {"status": "deleted"}
 
 
@@ -456,7 +469,7 @@ def recent_meals(
     return [MealRead.model_validate(m) for m in meals]
 
 
-@router.post("/meals", response_model=MealRead)
+@router.post("/meals", response_model=MealRead, dependencies=[Depends(preview.require_full_account)])
 def create_meal(
     payload: AppMealCreate,
     db: Session = Depends(get_db),
@@ -567,7 +580,7 @@ def update_meal(
     return MealRead.model_validate(meal)
 
 
-@router.post("/meals/{meal_id}/repeat", response_model=MealRead)
+@router.post("/meals/{meal_id}/repeat", response_model=MealRead, dependencies=[Depends(preview.require_full_account)])
 def repeat_meal(
     meal_id: int,
     db: Session = Depends(get_db),
@@ -677,7 +690,7 @@ def list_saved_meals(
     )
 
 
-@router.post("/saved-meals", response_model=SavedMealRead)
+@router.post("/saved-meals", response_model=SavedMealRead, dependencies=[Depends(preview.require_full_account)])
 def create_saved_meal(
     payload: SavedMealCreate,
     db: Session = Depends(get_db),
@@ -776,7 +789,11 @@ def delete_saved_meal(
     return {"status": "deleted", "saved_meal_id": saved_meal_id}
 
 
-@router.post("/saved-meals/{saved_meal_id}/log", response_model=MealRead)
+@router.post(
+    "/saved-meals/{saved_meal_id}/log",
+    response_model=MealRead,
+    dependencies=[Depends(preview.require_full_account)],
+)
 def log_saved_meal(
     saved_meal_id: int,
     db: Session = Depends(get_db),
@@ -860,7 +877,11 @@ def billing_status(db: Session = Depends(get_db), account: Account = Depends(get
     return BillingSnapshot(**account_billing_snapshot(db, account))
 
 
-@router.post("/billing/trial/start", response_model=AppTrialStartResponse)
+@router.post(
+    "/billing/trial/start",
+    response_model=AppTrialStartResponse,
+    dependencies=[Depends(preview.require_full_account)],
+)
 def start_trial(
     payload: AppTrialStartRequest,
     db: Session = Depends(get_db),
@@ -896,7 +917,7 @@ def start_trial(
     )
 
 
-@router.post("/billing/sync", response_model=BillingSnapshot)
+@router.post("/billing/sync", response_model=BillingSnapshot, dependencies=[Depends(preview.require_full_account)])
 def billing_sync(
     background: BackgroundTasks,
     payload: Optional[AppBillingSyncRequest] = None,
@@ -1065,6 +1086,17 @@ def _build_history_context(db: Session, user: User, days: int = 7) -> str:
     )
 
 
+def _preview_paywall_response() -> WorkflowRunResponse:
+    return WorkflowRunResponse(
+        intent="paywall",
+        message_text="That was your free log. Start your free trial to keep logging.",
+        confidence=None,
+        totals=_empty_totals(),
+        items=[],
+        source_url=None,
+    )
+
+
 @router.post("/agent/run", response_model=WorkflowRunResponse)
 async def app_agent_run(
     payload: AppAgentRunRequest,
@@ -1072,6 +1104,14 @@ async def app_agent_run(
     account: Account = Depends(get_current_account),
 ):
     """Run the AI logging/advisor workflow for the signed-in account."""
+    # Preview mode: an anonymous account gets exactly one free meal log per
+    # install — meal logging only (no advisor or any other forced intent) —
+    # then the same paywall answer as a lapsed trial.
+    is_preview = preview.is_anonymous_account(db, account)
+    if is_preview:
+        forced = (payload.force_intent or "").strip()
+        if (forced and forced not in MEAL_INTENTS) or not preview.free_log_available(db, account):
+            return _preview_paywall_response()
     # Defense-in-depth paywall, mirroring /agent/run. Distinguish "no access"
     # (trial ended / not subscribed) from "fair-use spend cap reached" so an
     # over-cap subscriber gets a fair-use notice, not a misleading upsell.
@@ -1139,6 +1179,13 @@ async def app_agent_run(
             )
 
 
+    # Claim the free preview log *before* the AI call, atomically, so two
+    # requests in flight cannot both get it. Given back below if the answer is
+    # not a meal (a question, a non-food photo) or the workflow fails; every
+    # call counts towards the install's AI call cap either way.
+    if is_preview and not preview.claim_free_log(db, account):
+        return _preview_paywall_response()
+
     user = get_primary_user(db, account)
     db.commit()
     # The workflow only uses this id as an opaque context key.
@@ -1204,6 +1251,8 @@ async def app_agent_run(
             )
     except WorkflowNotInstalledError as exc:
         logger.warning("[/app/agent/run] workflow unavailable: %s", exc)
+        if is_preview:
+            preview.release_free_log(db, account)
         return WorkflowRunResponse(
             intent="help",
             message_text="The assistant is temporarily unavailable. Please try again soon.",
@@ -1211,6 +1260,8 @@ async def app_agent_run(
         )
     except Exception as exc:  # never crash the client
         logger.error("[/app/agent/run] workflow error: %s", exc, exc_info=True)
+        if is_preview:
+            preview.release_free_log(db, account)
         return WorkflowRunResponse(
             intent="help",
             message_text="Something went wrong. Please try again.",
@@ -1233,10 +1284,13 @@ async def app_agent_run(
             if usage_data:
                 record_usage_for_user(db2, u2, usage_data, intent=intent)
             persist_agent_result_for_user(db2, u2, result)
+        # The free preview log stays spent only for an actual meal.
     except Exception as exc:
         logger.error("[/app/agent/run] persist failed: %s", exc, exc_info=True)
     finally:
         db2.close()
+    if is_preview and intent not in MEAL_INTENTS:
+        preview.release_free_log(db, account)
 
     try:
         return WorkflowRunResponse(**result)
@@ -1249,7 +1303,7 @@ async def app_agent_run(
         )
 
 
-@router.post("/voice/transcribe")
+@router.post("/voice/transcribe", dependencies=[Depends(preview.require_preview_ai_call)])
 async def app_voice_transcribe(
     audio: UploadFile = File(...),
     account: Account = Depends(get_current_account),

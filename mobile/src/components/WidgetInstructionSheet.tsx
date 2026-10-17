@@ -2,7 +2,9 @@
  * WidgetInstructionSheet — bottom-sheet modal that walks the user through
  * adding the YumYummy home-screen widget (quest "widget").
  */
-import { View, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
+
+import { SheetModal } from './SheetModal';
 import { Smartphone, Plus, CheckCircle } from 'lucide-react-native';
 
 import { AppText } from './AppText';
@@ -38,8 +40,7 @@ const STEPS = [
 
 export function WidgetInstructionSheet({ visible, onDismiss, onDone }: Props) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <View style={s.overlay}>
+    <SheetModal visible={visible} onRequestClose={onDismiss}>
         <View style={s.sheet}>
           <View style={s.handle} />
 
@@ -73,8 +74,7 @@ export function WidgetInstructionSheet({ visible, onDismiss, onDone }: Props) {
             <AppText variant="small" color={colors.inkMuted}>I’ll do it later</AppText>
           </Pressable>
         </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

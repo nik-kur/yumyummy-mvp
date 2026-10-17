@@ -11,6 +11,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.auth import preview
 from app.deps import get_current_account
 from app.models.account import Account
 from app.services import storage
@@ -21,7 +22,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/app/uploads", tags=["uploads"])
 
 
-@router.post("/meal-photo/presign", response_model=PresignResponse)
+@router.post(
+    "/meal-photo/presign",
+    response_model=PresignResponse,
+    dependencies=[Depends(preview.require_free_log_left)],
+)
 def presign_meal_photo(
     payload: PresignRequest,
     account: Account = Depends(get_current_account),
