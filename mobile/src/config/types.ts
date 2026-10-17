@@ -94,8 +94,9 @@ export interface PaywallArmConfig {
   /** Copy overrides by key, e.g. `headline` on the offer ("Try it FREE" / "50% OFF"). */
   copy: Record<string, string>;
   /**
-   * Which price is the big one on the plans screen. `design` = as drawn;
-   * `billed` = the amount actually charged leads (App Review 3.1.2(c) fallback).
+   * Which price is the big one on the plans screen and the offer. `billed`
+   * (default) = the amount actually charged leads and the trial terms are
+   * spelled out (App Review 3.1.2(c)); `design` = as drawn on the canvas.
    */
   price_emphasis: 'design' | 'billed';
 }

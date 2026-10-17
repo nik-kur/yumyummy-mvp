@@ -68,12 +68,14 @@ export interface BadgeSpec {
 
 const HOME_BADGE = { title: 'Chicken, rice and greens', kcal: '535', source: 'USDA FOODDATA' };
 const JOE_SOURCE = 'JOEANDTHEJUICE.COM';
+// Joe & The Juice UK figures as their menus list them on Deliveroo (Oct 2026):
+// Beets & Berries 16 oz 368 kcal (the pink smoothie), Tunacado 506 kcal.
 
 /** B3 photo per `pw_main` variant (19). */
 export const B3_PHOTOS: Record<string, { photo: number; badge: BadgeSpec }> = {
   b3_joe: {
     photo: PW.b3_joe,
-    badge: { right: 16, top: 60, width: 160, title: 'Joe & The Juice smoothie', kcal: '412', source: JOE_SOURCE },
+    badge: { right: 16, top: 60, width: 160, title: 'Beets & Berries smoothie', kcal: '368', source: JOE_SOURCE },
   },
   b3_home: { photo: PW.b3_home, badge: { right: 24, top: 64, width: 168, ...HOME_BADGE } },
   b3_office: {
@@ -82,7 +84,7 @@ export const B3_PHOTOS: Record<string, { photo: number; badge: BadgeSpec }> = {
   },
   b3_wide: {
     photo: PW.b3_wide,
-    badge: { left: 24, top: 336, width: 176, title: 'Joe & The Juice', kcal: '412', source: JOE_SOURCE },
+    badge: { left: 24, top: 336, width: 176, title: 'Joe & The Juice Tunacado', kcal: '506', source: JOE_SOURCE },
   },
 };
 

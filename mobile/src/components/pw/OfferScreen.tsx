@@ -34,7 +34,7 @@ export function OfferScreen({ config, product, purchasing, onBuy, onClose, onRes
   const insets = useSafeAreaInsets();
   const spec = OFFER_PHOTOS[config.variant] ?? OFFER_PHOTOS.costa;
   const copy = config.copy;
-  // `price_emphasis: billed` (App Review 3.1.2(c) fallback): the amount that
+  // `price_emphasis: billed` (default, App Review 3.1.2(c)): the amount that
   // will be charged is the big line, the trial the small one.
   const billedFirst = config.price_emphasis === 'billed';
   const days = trialDays(product);

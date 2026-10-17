@@ -4,10 +4,11 @@
  * `light` = P1 plans (paper cards, radio on the right).
  * The yearly card carries "SAVE N%" against the monthly one.
  *
- * Price emphasis (`price_emphasis`, App Review 3.1.2(c) fallback):
+ * Price emphasis (`price_emphasis`):
+ *   billed — the billed amount is always the big number (default, App Review
+ *            3.1.2(c));
  *   design — yearly shows the per-month figure big and the billed amount below
- *            on B3 (as drawn); P1 already leads with the billed amount;
- *   billed — the billed amount is always the big number.
+ *            on B3 (as drawn); P1 already leads with the billed amount.
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AdaptyPaywallProduct } from 'react-native-adapty';

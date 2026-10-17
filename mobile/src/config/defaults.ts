@@ -6,7 +6,11 @@
  *   - screen 16 and the loader review card hidden — the reviews we have are
  *     demo copy, and UK law bans showing invented reviews to consumers;
  *   - the after-cancel offer as "Try it FREE" (the "50% OFF" copy is a remote
- *     override, switched on only after release).
+ *     override, switched on only after release);
+ *   - paywall and offer with the billed amount as the big price and the trial
+ *     terms spelled out (`price_emphasis: "billed"`, App Review 3.1.2(c)). The
+ *     layout as drawn — per-month figure first, no terms line — is
+ *     `price_emphasis: "design"`, for A/B arms after review (decided 17 Oct).
  *
  * Copy for every screen lives with the screen; `onb_content.texts` overrides it
  * by key.
@@ -39,14 +43,14 @@ export const DEFAULT_PAYWALL_ARM: PaywallArmConfig = {
   render: 'native',
   variant: 'b3_joe',
   copy: {},
-  price_emphasis: 'design',
+  price_emphasis: 'billed',
 };
 
 export const DEFAULT_OFFER_ARM: PaywallArmConfig = {
   render: 'native',
   variant: 'costa',
   copy: {},
-  price_emphasis: 'design',
+  price_emphasis: 'billed',
 };
 
 export const PAYWALL_VARIANTS = [

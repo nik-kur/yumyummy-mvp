@@ -126,7 +126,7 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     next();
   }, [askPush, config.variant, next, step]);
 
-  // Billed amount next to the trial, for the 3.1.2(c) fallback arm only.
+  // Trial terms with the billed amount (`billed`, the default; App Review 3.1.2(c)).
   const terms = config.price_emphasis === 'billed' && selected && hasTrial ? trialThenPrice(selected) : null;
 
   const plans = {

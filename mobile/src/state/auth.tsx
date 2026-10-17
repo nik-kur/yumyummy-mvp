@@ -23,7 +23,7 @@ import {
 } from '@/billing/adapty';
 import { identify as phIdentify, reset as phReset, track } from '@/analytics/posthog';
 import { setUser as sentrySetUser, clearUser as sentryClearUser } from '@/analytics/sentry';
-import { setAttributionCustomerId, logAttributionEvent } from '@/analytics/attribution';
+import { getAppsFlyerId, setAttributionCustomerId, logAttributionEvent } from '@/analytics/attribution';
 import { clearPendingPurchase } from '@/state/pendingPurchase';
 
 /**
@@ -88,6 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'posthog_distinct_user_id',
         String(me.account_id),
       );
+      // Adapty → AppsFlyer server events (trial converted, renewals) are only
+      // sent for a profile carrying `appsflyer_id`, and the profile switch in
+      // identify() may drop the one set at launch: set it again right away.
+      const appsFlyerId = await getAppsFlyerId();
+      if (appsFlyerId) await setAdaptyIntegrationIdentifier('appsflyer_id', appsFlyerId);
       await setAdaptyEmail(me.email);
       try {
         const billing = await api.syncBilling(adaptyProfileId);

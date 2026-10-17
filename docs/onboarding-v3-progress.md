@@ -24,6 +24,8 @@
 - 15 окт: экран 16 и отзыв в лоадере в сборке рабочие, но скрыты (`social_proof.show: false`). Демо-отзывов в бинаре нет: контент только из `onb_content`. Никита включает экран для своего айфона через тестовую метку: секретная ссылка `yumyummy://tester?code=…` пишет код в custom attribute Adapty `qa_tester`, в Adapty аудитория по этому коду получает `show: true` и демо-контент. Код живёт только в Adapty, в приложении секрета нет.
 - 15 окт: имя события экрана остаётся `onboarding_screen_viewed` (а не `onb_screen_viewed`), версия онбординга — в свойстве `onboarding_version`, чтобы v1 и V3 считались в одной воронке.
 - 15 окт: тестовая сборка = `__DEV__` или `EXPO_PUBLIC_QA_BUILD=1`: AppsFlyer выключен, у событий PostHog super property `qa_build: true`, в Sentry environment `qa`, доступно QA-меню.
+- 17 окт (Никита): плашки Joe & The Juice — розовый смузи «Beets & Berries smoothie 368 kcal» (b3_joe), сэндвич на `b3_wide` «Joe & The Juice Tunacado 506 kcal» (оба по UK-меню на Deliveroo; 412 убрано). Рейтинг «5.0 ★» оставляем.
+- 17 окт (Никита): по умолчанию (и для ревью Apple) `price_emphasis: billed` — крупно сумма списания и строка «3 days free, then …» на пейволе и оффере. Вариант как на канвасе (`design`) включается в A/B тесте через Adapty без билда.
 
 ## Состояние Adapty (чтение, 15 окт)
 
@@ -105,7 +107,5 @@ QA-меню: заготовки ответов + прыжок на любой э
 ## Открытые вопросы
 
 - 16 окт (Никита): фраза «80% of users… maintain their weight loss» без источника заменена на «In a 6-month study of 142 adults, the people who logged their meals most often lost the most weight.» — Harvey et al., Log Often, Lose More, Obesity 2019 (PMID 30801989); `features.tsx` CLAIM_OVERRIDES.
-- 412 kcal Joe & The Juice (B3): подтвердить не удалось — joejuice.com не отдаёт меню, в UK-меню на Deliveroo розового смузи на 412 нет (Beets & Berries 368 kcal). Решение за Никитой.
-- Рейтинг «5.0 ★ avg App Store rating»: в UK App Store сейчас 5.0 по одной оценке.
-- App Review 3.1.2(c): на B3 по умолчанию (`design`) нет строки с длиной триала и суммой после; запасной ключ `price_emphasis: billed`.
+- AppsFlyer: триалы и покупки только с сервера Adapty (trial_started / subscription_started, поле Sandbox пустое) — Никита решает 17 окт; до релиза включить в Adapty. После входа приложение сразу заново передаёт `appsflyer_id` в Adapty (`state/auth.tsx`).
 - AppsFlyer: что с установкой, если приложение закрыли до ATT — тест на телефоне с `isDebug`.
