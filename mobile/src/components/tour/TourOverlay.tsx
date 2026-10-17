@@ -18,13 +18,15 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 
 import { track } from '@/analytics/posthog';
 import { C, F, SHADOW } from '@/onb/theme';
@@ -201,53 +203,101 @@ function Spotlight({ hole, width, height, dim, radius }: { hole: Box; width: num
   );
 }
 
-/** Step 2: the white arrow floating above "+" (canvas `yy-float`). */
 interface Pt {
   x: number;
   y: number;
 }
 
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
 /**
- * Arrow from the tip card to the element it explains: a dot on the card's
- * edge, an S-curve, an arrowhead on the element. It nudges towards the
- * element, so it is clear what points where.
+ * The hand-drawn swoosh between the tip card and the element: it leaves the
+ * card sideways and turns to hit the element head-on, so the head always
+ * points straight at what the card explains (`tip`, on the element's edge).
+ * `tailY` is the card's edge, `side` which side of the tip the tail sits on.
+ * It draws itself in, then nudges towards the element.
  */
-function ConnectorArrow({ from, to }: { from: Pt; to: Pt }) {
-  const t = useSharedValue(0);
+function CurvedArrow({ tip, tailY, side }: { tip: Pt; tailY: number; side: 1 | -1 }) {
+  // u: the way the head points (-1 up, 1 down), towards the element.
+  const u = tip.y < tailY ? -1 : 1;
+  const dy = Math.max(14, Math.abs(tailY - tip.y));
+  const dx = Math.min(42, Math.max(28, dy));
+  const pad = 12;
+  const w = dx + pad * 2;
+  const h = dy + pad * 2;
+  // Local frame: the tip on the near edge, the tail one swoosh away.
+  const tx = side === 1 ? pad : w - pad;
+  const ty = u === -1 ? pad : h - pad;
+  const sx = tx + side * dx;
+  const sy = ty - u * dy;
+  const c1x = sx - side * dx * 0.6;
+  const c1y = sy + u * dy * 0.12;
+  const c2x = tx;
+  const c2y = ty - u * dy * 0.62;
+  const d = `M${sx} ${sy}C${c1x} ${c1y} ${c2x} ${c2y} ${tx} ${ty}`;
+  const head = `M${tx - 6.5} ${ty - u * 8.5}L${tx} ${ty}L${tx + 6.5} ${ty - u * 8.5}`;
+  // Length of the curve, for the draw-in.
+  let len = 0;
+  let px = sx;
+  let py = sy;
+  for (let i = 1; i <= 16; i++) {
+    const k = i / 16;
+    const m = 1 - k;
+    const x = m * m * m * sx + 3 * m * m * k * c1x + 3 * m * k * k * c2x + k * k * k * tx;
+    const y = m * m * m * sy + 3 * m * m * k * c1y + 3 * m * k * k * c2y + k * k * k * ty;
+    len += Math.hypot(x - px, y - py);
+    px = x;
+    py = y;
+  }
+
+  const drawn = useSharedValue(0);
+  const nudge = useSharedValue(0);
   useEffect(() => {
     const e = Easing.inOut(Easing.ease);
-    t.value = withRepeat(withSequence(withTiming(1, { duration: 800, easing: e }), withTiming(0, { duration: 800, easing: e })), -1);
-    return () => cancelAnimation(t);
-  }, [t]);
-  const dir = to.y > from.y ? 1 : -1;
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: dir * 3 * t.value }] }));
-  const pad = 10;
-  const left = Math.min(from.x, to.x) - pad;
-  const top = Math.min(from.y, to.y) - pad;
-  const w = Math.abs(to.x - from.x) + pad * 2;
-  const h = Math.abs(to.y - from.y) + pad * 2;
-  const sx = from.x - left;
-  const sy = from.y - top;
-  const ex = to.x - left;
-  const ey = to.y - top;
-  const my = (sy + ey) / 2;
+    drawn.value = withDelay(120, withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }));
+    nudge.value = withDelay(
+      700,
+      withRepeat(withSequence(withTiming(1, { duration: 900, easing: e }), withTiming(0, { duration: 900, easing: e })), -1),
+    );
+    return () => {
+      cancelAnimation(drawn);
+      cancelAnimation(nudge);
+    };
+  }, [drawn, nudge]);
+  const lineProps = useAnimatedProps(() => ({ strokeDashoffset: len * (1 - drawn.value) }));
+  const headProps = useAnimatedProps(() => ({ strokeOpacity: drawn.value > 0.9 ? (drawn.value - 0.9) * 10 : 0 }));
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: u * 4 * nudge.value }] }));
+
   return (
-    <Animated.View style={[{ position: 'absolute', left, top, width: w, height: h }, style]} pointerEvents="none">
+    <Animated.View
+      style={[{ position: 'absolute', left: tip.x - tx, top: tip.y - ty, width: w, height: h }, style]}
+      pointerEvents="none"
+    >
       <Svg width={w} height={h}>
-        <Circle cx={sx} cy={sy} r={3.5} fill="#FFFFFF" />
-        <Path d={`M${sx} ${sy}C${sx} ${my} ${ex} ${my} ${ex} ${ey}`} stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" fill="none" />
-        <Path
-          d={`M${ex - 6} ${ey - 8 * dir}L${ex} ${ey}L${ex + 6} ${ey - 8 * dir}`}
+        <AnimatedPath
+          d={d}
           stroke="#FFFFFF"
-          strokeWidth={2.2}
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={[len, len]}
+          animatedProps={lineProps}
+        />
+        <AnimatedPath
+          d={head}
+          stroke="#FFFFFF"
+          strokeWidth={2.4}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
+          animatedProps={headProps}
         />
       </Svg>
     </Animated.View>
   );
 }
+
+/** Step 2: the white arrow floating above "+" (canvas `yy-float`). */
 
 function FloatingArrow({ x, y }: { x: number; y: number }) {
   const t = useSharedValue(0);
@@ -274,7 +324,14 @@ function arrowTargets(target: TourTargetId, hole: Box, width: number): number[] 
     return [8 + tab * 1.5, width - 8 - tab * 1.5];
   }
   if (target === 'dashboard') return [hole.x + hole.w / 2];
-  return [hole.x + hole.w * 0.32];
+  return [hole.x + hole.w * 0.3];
+}
+
+/** The tail goes towards the middle of the screen, never off its edge. */
+function tailSide(x: number, width: number): 1 | -1 {
+  if (x + 52 > width) return -1;
+  if (x - 52 < 0) return 1;
+  return x <= width / 2 + 1 ? 1 : -1;
 }
 
 export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
@@ -366,7 +423,7 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
   let cardBelow = false;
   const curved = def.target !== 'plus' && def.target !== 'capture_bar';
   if (hole) {
-    const gap = curved ? 46 : 18;
+    const gap = curved ? 54 : 18;
     const below = hole.y + hole.h + gap;
     const roof = ceiling !== null && ceiling < hole.y ? ceiling : hole.y;
     const above = roof - (def.circle ? 58 : gap) - cardH;
@@ -374,7 +431,7 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
     // arrow gap a little rather than covering the element from above).
     const floor = height - (scope === 'tabs' ? 92 : 40);
     const squeezed = Math.min(below, floor - cardH);
-    cardBelow = !def.above && squeezed >= hole.y + hole.h + (curved ? 34 : 12);
+    cardBelow = !def.above && squeezed >= hole.y + hole.h + (curved ? 40 : 12);
     cardTop = cardBelow ? squeezed : Math.max(56, above);
   }
 
@@ -399,11 +456,17 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
           <Spotlight hole={hole} width={width} height={height} dim={def.dim} radius={def.circle ? hole.w / 2 : def.radius} />
           {curved && cardH > 0
             ? arrowTargets(def.target, hole, width).map((ex, i) => {
-                const edge = cardBelow ? cardTop - 3 : cardTop + cardH + 3;
-                const end = cardBelow ? hole.y + hole.h + 5 : hole.y - 5;
-                // Start on the card a little towards its middle, so the curve reads.
-                const sx = Math.min(width - 48, Math.max(48, ex + (ex < width / 2 ? 48 : -48)));
-                return <ConnectorArrow key={i} from={{ x: sx, y: edge }} to={{ x: ex, y: end }} />;
+                // Clear of the white ring around the hole and of the card.
+                const tailY = cardBelow ? cardTop - 8 : cardTop + cardH + 8;
+                const tipY = cardBelow ? hole.y + hole.h + 11 : hole.y - 11;
+                return (
+                  <CurvedArrow
+                    key={`${tour.step}-${i}`}
+                    tip={{ x: ex, y: tipY }}
+                    tailY={tailY}
+                    side={tailSide(ex, width)}
+                  />
+                );
               })
             : null}
           {def.target === 'plus' ? (

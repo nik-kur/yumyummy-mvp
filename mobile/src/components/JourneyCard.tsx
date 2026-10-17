@@ -126,7 +126,10 @@ export function JourneyCard({ state, day, onHeaderPress, onQuestPress, unlockLin
             ? `You're behind — finish ${overdue.length} earlier ${
                 overdue.length === 1 ? 'quest' : 'quests'
               } to get back on track.`
-            : `✨ ${unlockLine ?? dayDef.unlock}`}
+            : day === 1 && isCompleted(state, 'first_log')
+              ? // Day 1's line asks for the first meal; once it is in, say so.
+                '✨ First meal in — the hardest step is done.'
+              : `✨ ${unlockLine ?? dayDef.unlock}`}
         </AppText>
       </View>
     </Card>
