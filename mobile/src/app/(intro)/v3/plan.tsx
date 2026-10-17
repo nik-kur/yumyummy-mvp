@@ -205,8 +205,8 @@ export default function PlanScreen() {
         <Image source={IMG.mascot_great} style={s.guideIcon} accessibilityIgnoresInvertColors />
         <View style={s.guideText}>
           <Text style={s.guideTitle}>{content.texts['plan.guide_title'] ?? 'We designed your first 7 days'}</Text>
-          <Text style={s.guideSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.9}>
-            {content.texts['plan.guide_sub'] ?? 'A personal start to make your plan stick.'}
+          <Text style={s.guideSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            {content.texts['plan.guide_sub'] ?? 'A personal start to make your plan stick'}
           </Text>
         </View>
       </View>
@@ -254,7 +254,8 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
-  guideIcon: { width: 40, height: 40 },
+  // Big on purpose; the negative margin keeps the plaque from growing as much.
+  guideIcon: { width: 60, height: 60, marginVertical: -10, marginLeft: -6, marginRight: -4 },
   guideText: { flex: 1, gap: 1 },
   guideTitle: { fontFamily: F.sansSemibold, fontSize: 15, lineHeight: 20, color: C.ink },
   guideSub: { fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: C.muted },
