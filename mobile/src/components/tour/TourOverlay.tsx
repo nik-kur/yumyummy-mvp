@@ -24,7 +24,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { track } from '@/analytics/posthog';
 import { C, F, SHADOW } from '@/onb/theme';
@@ -202,29 +202,48 @@ function Spotlight({ hole, width, height, dim, radius }: { hole: Box; width: num
 }
 
 /** Step 2: the white arrow floating above "+" (canvas `yy-float`). */
+interface Pt {
+  x: number;
+  y: number;
+}
+
 /**
- * Curved arrow from the card to the element, bobbing towards it. `down` =
- * the element is below the card; `flip` mirrors it left-right.
+ * Arrow from the tip card to the element it explains: a dot on the card's
+ * edge, an S-curve, an arrowhead on the element. It nudges towards the
+ * element, so it is clear what points where.
  */
-function CurvedArrow({ x, y, down, flip }: { x: number; y: number; down: boolean; flip: boolean }) {
+function ConnectorArrow({ from, to }: { from: Pt; to: Pt }) {
   const t = useSharedValue(0);
   useEffect(() => {
     const e = Easing.inOut(Easing.ease);
-    t.value = withRepeat(withSequence(withTiming(1, { duration: 900, easing: e }), withTiming(0, { duration: 900, easing: e })), -1);
+    t.value = withRepeat(withSequence(withTiming(1, { duration: 800, easing: e }), withTiming(0, { duration: 800, easing: e })), -1);
     return () => cancelAnimation(t);
   }, [t]);
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: (down ? 5 : -5) * t.value },
-      { scaleY: down ? -1 : 1 },
-      { scaleX: flip ? -1 : 1 },
-    ],
-  }));
+  const dir = to.y > from.y ? 1 : -1;
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: dir * 3 * t.value }] }));
+  const pad = 10;
+  const left = Math.min(from.x, to.x) - pad;
+  const top = Math.min(from.y, to.y) - pad;
+  const w = Math.abs(to.x - from.x) + pad * 2;
+  const h = Math.abs(to.y - from.y) + pad * 2;
+  const sx = from.x - left;
+  const sy = from.y - top;
+  const ex = to.x - left;
+  const ey = to.y - top;
+  const my = (sy + ey) / 2;
   return (
-    <Animated.View style={[{ position: 'absolute', left: x - 28, top: y - 6, width: 56, height: 52 }, style]} pointerEvents="none">
-      <Svg width={56} height={52} viewBox="0 0 44 40" fill="none">
-        <Path d="M8 37C8 22 18 11 34 7" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" />
-        <Path d="M26 3l8 4-5 7" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+    <Animated.View style={[{ position: 'absolute', left, top, width: w, height: h }, style]} pointerEvents="none">
+      <Svg width={w} height={h}>
+        <Circle cx={sx} cy={sy} r={3.5} fill="#FFFFFF" />
+        <Path d={`M${sx} ${sy}C${sx} ${my} ${ex} ${my} ${ex} ${ey}`} stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" fill="none" />
+        <Path
+          d={`M${ex - 6} ${ey - 8 * dir}L${ex} ${ey}L${ex + 6} ${ey - 8 * dir}`}
+          stroke="#FFFFFF"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
       </Svg>
     </Animated.View>
   );
@@ -245,6 +264,17 @@ function FloatingArrow({ x, y }: { x: number; y: number }) {
       </Svg>
     </Animated.View>
   );
+}
+
+/** Where the arrow(s) of a step land on the element (x in window points). */
+function arrowTargets(target: TourTargetId, hole: Box, width: number): number[] {
+  if (target === 'tabbar') {
+    // My Menu and Week: the bar is Today | My Menu | + (72 pt) | Week | Profile.
+    const tab = (width - 16 - 72) / 4;
+    return [8 + tab * 1.5, width - 8 - tab * 1.5];
+  }
+  if (target === 'dashboard') return [hole.x + hole.w / 2];
+  return [hole.x + hole.w * 0.32];
 }
 
 export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
@@ -367,18 +397,15 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
           accessibilityViewIsModal={scope === 'tabs'}
         >
           <Spotlight hole={hole} width={width} height={height} dim={def.dim} radius={def.circle ? hole.w / 2 : def.radius} />
-          {curved && cardH > 0 ? (
-            cardBelow ? (
-              <CurvedArrow
-                x={hole.x + hole.w * 0.62}
-                y={hole.y + hole.h + Math.max(0, (cardTop - hole.y - hole.h - 40) / 2)}
-                down={false}
-                flip={tour.step % 2 === 0}
-              />
-            ) : (
-              <CurvedArrow x={hole.x + hole.w * 0.62} y={hole.y - 46} down flip={tour.step % 2 === 0} />
-            )
-          ) : null}
+          {curved && cardH > 0
+            ? arrowTargets(def.target, hole, width).map((ex, i) => {
+                const edge = cardBelow ? cardTop - 3 : cardTop + cardH + 3;
+                const end = cardBelow ? hole.y + hole.h + 5 : hole.y - 5;
+                // Start on the card a little towards its middle, so the curve reads.
+                const sx = Math.min(width - 48, Math.max(48, ex + (ex < width / 2 ? 48 : -48)));
+                return <ConnectorArrow key={i} from={{ x: sx, y: edge }} to={{ x: ex, y: end }} />;
+              })
+            : null}
           {def.target === 'plus' ? (
             <>
               <FloatingArrow x={hole.x + hole.w / 2} y={hole.y} />
@@ -417,24 +444,22 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
 }
 
 const s = StyleSheet.create({
-  // Soft olive (the protein colour family), so a tip never reads as one of
-  // the app's own cream cards, without the weight of a dark card.
+  // Olive (the protein colour) with white text: clearly a tip, not one of
+  // the app's own cream cards, and softer than black.
   card: {
     position: 'absolute',
     left: 20,
     right: 20,
     paddingVertical: 16,
     paddingHorizontal: 18,
-    backgroundColor: '#E8EBD3',
-    borderWidth: 1.5,
-    borderColor: '#B9C197',
+    backgroundColor: C.protein,
     borderRadius: 16,
   },
-  title: { fontFamily: F.sansSemibold, fontSize: 17, lineHeight: 22, color: '#2F3A1C' },
-  body: { marginTop: 4, fontFamily: F.sans, fontSize: 15, lineHeight: 21, color: '#4E5934' },
+  title: { fontFamily: F.sansSemibold, fontSize: 17, lineHeight: 22, color: C.white },
+  body: { marginTop: 4, fontFamily: F.sans, fontSize: 15, lineHeight: 21, color: 'rgba(255,255,255,0.86)' },
   footer: { marginTop: 14, height: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  count: { fontFamily: F.sans, fontSize: 13, color: '#7A8459' },
+  count: { fontFamily: F.sans, fontSize: 13, color: 'rgba(255,255,255,0.62)' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  next: { height: 36, paddingHorizontal: 16, borderRadius: 10, backgroundColor: C.protein, alignItems: 'center', justifyContent: 'center' },
-  nextText: { fontFamily: F.sansSemibold, fontSize: 14, color: C.white },
+  next: { height: 36, paddingHorizontal: 16, borderRadius: 10, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
+  nextText: { fontFamily: F.sansSemibold, fontSize: 14, color: C.protein },
 });

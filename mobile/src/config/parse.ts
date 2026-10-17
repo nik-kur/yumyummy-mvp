@@ -89,6 +89,7 @@ export function parseOnboardingConfig(data: Json | undefined): OnboardingConfig 
     free_first_log: bool(data.free_first_log, d.free_first_log),
     after_cancel_offer: bool(data.after_cancel_offer, d.after_cancel_offer),
     tutorial: bool(data.tutorial, d.tutorial),
+    ai_consent: oneOf(data.ai_consent, ['save_plan', 'sheet'] as const, d.ai_consent),
   };
 }
 

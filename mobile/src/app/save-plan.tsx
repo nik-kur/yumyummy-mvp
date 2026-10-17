@@ -23,7 +23,7 @@
  * and Today's plan if the user relaunches before the profile has synced.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, Image, Text } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, Image, Linking, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -45,6 +45,8 @@ import { C, F, PAD } from '@/onb/theme';
 import { reportJourneyEvent } from '@/state/journey';
 import { startPostPurchase } from '@/state/tour';
 import { lastSignInCreatedAccount, useAuth } from '@/state/auth';
+import { AI_PROVIDERS_LABEL, grantAIConsent, hasAIConsent } from '@/state/aiConsent';
+import { PRIVACY_URL } from '@/components/pw/PwParts';
 import { loadDraft } from '@/state/introDraft';
 import {
   clearPendingPurchase,
@@ -90,6 +92,12 @@ export default function SavePlanScreen() {
   // non-compliant fallback never flashes where the official one is available
   // (App Review Guideline 4).
   const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
+  // AI consent on this screen (`ai_consent: save_plan`), unless already given.
+  const [showAiLine, setShowAiLine] = useState(false);
+  useEffect(() => {
+    if (getOnboardingConfig().ai_consent !== 'save_plan') return;
+    void hasAIConsent().then((has) => setShowAiLine(!has));
+  }, []);
 
   useEffect(() => {
     loadPendingPurchase().then(setPending).catch(() => {});
@@ -214,6 +222,9 @@ export default function SavePlanScreen() {
         return;
       }
       track('signin_gate_success', { placement: 'post_paywall' });
+      // The disclosure line above the button was the AI consent (App Review
+      // 5.1.2(i)): record it, so the first log in the tour asks nothing more.
+      if (showAiLine) await grantAIConsent();
 
       await syncDraft();
       await reconcilePurchase();
@@ -253,7 +264,7 @@ export default function SavePlanScreen() {
     } finally {
       setBusy(false);
     }
-  }, [busy, signInWithProvider, syncDraft, reconcilePurchase, refreshProfile, router, pending]);
+  }, [busy, signInWithProvider, syncDraft, reconcilePurchase, refreshProfile, router, pending, showAiLine]);
 
   return (
     <View style={[s.screen, { paddingTop: insets.top + PAD.topBelowStatus, paddingBottom: Math.max(insets.bottom, 20) }]}>
@@ -264,6 +275,15 @@ export default function SavePlanScreen() {
       </Text>
       <Text style={s.sub}>Your plan, diary and subscription stay safe in your account, on any device.</Text>
       <View style={{ flex: 1.3 }} />
+      {showAiLine ? (
+        <Text style={s.ai}>
+          By continuing, you agree that what you log (text, voice and photos) is analysed by our AI partners,{' '}
+          {AI_PROVIDERS_LABEL}.{' '}
+          <Text style={s.aiLink} onPress={() => void Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
+            Privacy Policy
+          </Text>
+        </Text>
+      ) : null}
 
       {/* Official Sign in with Apple button — HIG-required artwork with the
           Apple logo (App Review Guideline 4). The plain-button fallback only
@@ -303,6 +323,8 @@ const s = StyleSheet.create({
     color: C.ink,
   },
   sub: { marginTop: 10, textAlign: 'center', fontFamily: F.sans, fontSize: 18, lineHeight: 27, color: C.muted },
+  ai: { marginBottom: 14, textAlign: 'center', fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.muted },
+  aiLink: { color: C.info },
   appleButton: { alignSelf: 'stretch', height: 54 },
   busyBox: { height: 54, alignItems: 'center', justifyContent: 'center' },
 });

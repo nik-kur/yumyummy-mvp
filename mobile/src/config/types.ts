@@ -44,6 +44,13 @@ export interface OnboardingConfig {
   after_cancel_offer: boolean;
   /** Post-purchase 6-step tour over Today (24). */
   tutorial: boolean;
+  /**
+   * Where a buyer agrees to AI processing (App Review 5.1.2(i)): `save_plan`
+   * = a disclosure line on Save plan, agreed with Sign in with Apple (the tour
+   * then runs without the consent sheet); `sheet` = the sheet before the
+   * first AI log. Anyone who never saw the line still gets the sheet.
+   */
+  ai_consent: 'save_plan' | 'sheet';
 }
 
 /** One review on the carousel (16) or in the loader card (14). */

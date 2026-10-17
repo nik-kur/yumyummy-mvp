@@ -28,6 +28,7 @@ export const DEFAULT_ONBOARDING_CONFIG: OnboardingConfig = {
   free_first_log: true,
   after_cancel_offer: true,
   tutorial: true,
+  ai_consent: 'save_plan',
 };
 
 export const DEFAULT_ONBOARDING_CONTENT: OnboardingContent = {

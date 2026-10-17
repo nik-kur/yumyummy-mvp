@@ -191,6 +191,7 @@ export default function QaScreen() {
         <Choice label="free_first_log" value={onb.free_first_log} options={ON_OFF} onChange={(v) => setOnb({ free_first_log: v })} />
         <Choice label="after_cancel_offer" value={onb.after_cancel_offer} options={ON_OFF} onChange={(v) => setOnb({ after_cancel_offer: v })} />
         <Choice label="tutorial" value={onb.tutorial} options={ON_OFF} onChange={(v) => setOnb({ tutorial: v })} />
+        <Choice label="ai_consent" value={onb.ai_consent} options={['save_plan', 'sheet'] as const} onChange={(v) => setOnb({ ai_consent: v })} />
 
         <AppText variant="eyebrow">onb_content</AppText>
         <Choice label="content" value={o.content} options={['demo'] as const} onChange={(v) => update({ ...o, content: v })} />

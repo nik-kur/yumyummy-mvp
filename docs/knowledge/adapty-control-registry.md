@@ -51,6 +51,7 @@
 | `att` | `loader`, `welcome` | `loader` | Где спрашиваем разрешение на отслеживание (ATT) | O6 |
 | `after_cancel_offer` | `true`, `false` | `true` | Показывать оффер после отмены покупки | C5 |
 | `tutorial` | `true`, `false` | `true` | Тур по Today после покупки (заработает в этапе 4) | |
+| `ai_consent` | `save_plan`, `sheet` | `save_plan` | Где покупатель соглашается на обработку AI (правило Apple 5.1.2(i)): строка на экране Save plan (согласие вместе с Sign in with Apple, тур без окна) или отдельное окно «AI does the math» перед первым логом. Если Apple придерётся — переключить на `sheet` | |
 | `free_first_log` | `true`, `false` | `true` | Первый AI-лог бесплатно в preview mode (заработает в этапе 6) | PM2 |
 | `use_native` | `true` | — | Только для старых сборок (≤ 1.0.10). Не убирать там, где стоит | |
 
