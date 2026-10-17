@@ -108,5 +108,6 @@ QA-меню: заготовки ответов + прыжок на любой э
 ## Открытые вопросы
 
 - 16 окт (Никита): фраза «80% of users… maintain their weight loss» без источника заменена на «In a 6-month study of 142 adults, the people who logged their meals most often lost the most weight.» — Harvey et al., Log Often, Lose More, Obesity 2019 (PMID 30801989); `features.tsx` CLAIM_OVERRIDES.
+- Реестр всего, что меняется через Adapty: [knowledge/adapty-control-registry.md](knowledge/adapty-control-registry.md) (обновлять при каждом новом ключе).
 - AppsFlyer: исследование 17 окт → вариант A (только сервер Adapty), решение и план дня релиза в [knowledge/purchase-events-appsflyer-2026-10.md](knowledge/purchase-events-appsflyer-2026-10.md). В коде: ответ на ATT уходит в Adapty (после запроса, при запуске, после входа), `appsflyer_id` заново после входа. Переключатели в Adapty — в момент Release 1.0.11, с ок Никиты.
 - AppsFlyer: что с установкой, если приложение закрыли до ATT — тест на телефоне с `isDebug`.
