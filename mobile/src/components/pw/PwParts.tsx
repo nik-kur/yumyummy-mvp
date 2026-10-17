@@ -132,7 +132,10 @@ export function PhotoBadge({
         <Text style={s.badgeUnit}>kcal</Text>
       </View>
       <View style={s.badgeSource}>
-        <Text style={s.badgeSourceText}>◎ {source}</Text>
+        {/* One line, shrunk to fit: a long domain wrapped "◎" onto its own row. */}
+        <Text style={s.badgeSourceText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          ◎ {source}
+        </Text>
       </View>
     </View>
   );
@@ -214,11 +217,9 @@ const s = StyleSheet.create({
   badgeRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
   badgeKcal: { fontFamily: F.serif, fontSize: 30, lineHeight: 30, color: C.ink, fontVariant: ['tabular-nums'] },
   badgeUnit: { fontFamily: F.sans, fontSize: 14, color: C.muted },
-  // The domain never breaks mid-word on the canvas (CSS overflows instead), so
-  // the pill may run into the badge's right padding before wrapping after "◎".
   badgeSource: {
     alignSelf: 'flex-start',
-    marginRight: -14,
+    maxWidth: '100%',
     backgroundColor: C.infoSoft,
     borderRadius: 999,
     paddingVertical: 3,
