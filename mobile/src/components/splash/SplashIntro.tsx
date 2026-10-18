@@ -10,6 +10,10 @@
  *
  * Positions are the canvas's 390 × 844 coordinates on a stage centred on the
  * screen, so the "Y" lands on the native splash's "Y" on any iPhone.
+ *
+ * The times above are the canvas's; the app plays them `STRETCH` times slower
+ * and holds the finished frame a beat (at canvas speed it was over before one
+ * could tell what happened — phone test, 18 Oct).
  */
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View, useWindowDimensions } from 'react-native';
@@ -33,8 +37,11 @@ export const SPLASH_BG = '#B85A3A';
 const CREAM = '#F7F1E6';
 const STAGE_W = 390;
 const STAGE_H = 844;
-/** Earliest the splash may leave: the name is fully in by ~1.3 s. */
-export const SPLASH_MIN_MS = 1500;
+/** Canvas time → app time. */
+const STRETCH = 1.5;
+/** Earliest the splash may leave: the name is fully in by ~2 s, then a beat to read it. */
+export const SPLASH_MIN_MS = 2700;
+const EXIT_MS = 280;
 
 const POP = Easing.bezier(0.3, 0.7, 0.4, 1);
 const IN_OUT = Easing.inOut(Easing.ease);
@@ -49,8 +56,8 @@ const MASCOT = require('../../../assets/v3/splash/mascot_heart.png');
 const SPLASH_Y = require('../../../assets/v3/splash/splash_y.png');
 
 /**
- * Drive `sv` through absolute-time keyframes: `[[ms, value], …]`, starting from
- * the first frame's value at its time.
+ * Drive `sv` through absolute-time keyframes: `[[ms, value], …]` in canvas
+ * time, starting from the first frame's value at its time.
  */
 function keyframes(
   sv: SharedValue<number>,
@@ -60,9 +67,9 @@ function keyframes(
   const [t0, v0] = frames[0];
   sv.value = v0;
   const steps = frames.slice(1).map(([t, v], i) =>
-    withTiming(v, { duration: Math.max(1, t - frames[i][0]), easing }),
+    withTiming(v, { duration: Math.max(1, (t - frames[i][0]) * STRETCH), easing }),
   );
-  sv.value = withDelay(t0, withSequence(...(steps as [number]))) as number;
+  sv.value = withDelay(t0 * STRETCH, withSequence(...(steps as [number]))) as number;
 }
 
 interface Props {
@@ -141,9 +148,9 @@ export function SplashIntro({ ready, onDone }: Props) {
     });
 
     const timers = [
-      setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {}), 420),
-      setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}), 850),
-      setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}), 980),
+      setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {}), 420 * STRETCH),
+      setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}), 850 * STRETCH),
+      setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}), 980 * STRETCH),
       setTimeout(() => setIntroPlayed(true), SPLASH_MIN_MS),
     ];
     return () => timers.forEach(clearTimeout);
@@ -160,11 +167,11 @@ export function SplashIntro({ ready, onDone }: Props) {
       done = true;
       onDone();
     };
-    exit.value = withTiming(1, { duration: 200, easing: OUT }, () => {
+    exit.value = withTiming(1, { duration: EXIT_MS, easing: OUT }, () => {
       runOnJS(finish)();
     });
     // An interrupted animation must not strand the user on the splash.
-    const fallback = setTimeout(finish, 600);
+    const fallback = setTimeout(finish, EXIT_MS + 400);
     return () => clearTimeout(fallback);
   }, [ready, introPlayed, exit, onDone]);
 

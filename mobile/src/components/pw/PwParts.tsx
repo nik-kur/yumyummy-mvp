@@ -79,8 +79,21 @@ const CROWN = (
 );
 
 /** Trial timeline: today → reminder the day before → billing starts. */
-/** `compact`: titles only, for the plans screen on short iPhones (the plan cards must stay in view). */
-export function TrialTimeline({ trialDays, todayLine, compact }: { trialDays: number; todayLine: string; compact?: boolean }) {
+/**
+ * `compact`: titles only, for the plans screen on short iPhones (the plan cards must stay in view).
+ * `large`: bigger dots, type and rows, for B1 on tall iPhones (the timeline is all that screen has).
+ */
+export function TrialTimeline({
+  trialDays,
+  todayLine,
+  compact,
+  large,
+}: {
+  trialDays: number;
+  todayLine: string;
+  compact?: boolean;
+  large?: boolean;
+}) {
   const remind = trialDays - 1;
   const rows = [
     { icon: LOCK, on: true, title: 'Today', sub: todayLine },
@@ -100,12 +113,14 @@ export function TrialTimeline({ trialDays, todayLine, compact }: { trialDays: nu
   return (
     <View style={s.timeline}>
       {rows.map((r, i) => (
-        <View key={r.title} style={[s.tRow, compact && s.tRowCompact]}>
-          {i < rows.length - 1 ? <View style={s.tRail} /> : null}
-          <View style={[s.tDot, r.on ? s.tDotOn : s.tDotOff]}>{r.icon}</View>
-          <View style={s.tText}>
-            <Text style={s.tTitle}>{r.title}</Text>
-            {compact ? null : <Text style={s.tSub}>{r.sub}</Text>}
+        <View key={r.title} style={[s.tRow, compact && s.tRowCompact, large && s.tRowLarge]}>
+          {i < rows.length - 1 ? <View style={[s.tRail, large && s.tRailLarge]} /> : null}
+          <View style={[s.tDot, large && s.tDotLarge, r.on ? s.tDotOn : s.tDotOff]}>
+            {large ? <View style={s.tIconLarge}>{r.icon}</View> : r.icon}
+          </View>
+          <View style={[s.tText, large && s.tTextLarge]}>
+            <Text style={[s.tTitle, large && s.tTitleLarge]}>{r.title}</Text>
+            {compact ? null : <Text style={[s.tSub, large && s.tSubLarge]}>{r.sub}</Text>}
           </View>
         </View>
       ))}
@@ -206,6 +221,13 @@ const s = StyleSheet.create({
   tText: { flex: 1, gap: 2, paddingTop: 6 },
   tTitle: { fontFamily: F.sansSemibold, fontSize: 16, lineHeight: 21, color: C.ink },
   tSub: { fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: C.muted },
+  tRowLarge: { minHeight: 92, gap: 16 },
+  tRailLarge: { left: 22, top: 50, height: 42 },
+  tDotLarge: { width: 46, height: 46, borderRadius: 23 },
+  tIconLarge: { transform: [{ scale: 1.25 }] },
+  tTextLarge: { paddingTop: 10, gap: 3 },
+  tTitleLarge: { fontSize: 18, lineHeight: 24 },
+  tSubLarge: { fontSize: 15, lineHeight: 21 },
   badge: {
     paddingVertical: 12,
     paddingHorizontal: 14,

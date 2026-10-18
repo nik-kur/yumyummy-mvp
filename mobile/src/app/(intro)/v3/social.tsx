@@ -6,8 +6,8 @@
  * demo). Hero by goal: before/after photos for lose / gain (test O4 can switch
  * to the text hero), the 5.0 rating for maintain / track. Below, a carousel of
  * reviews for the goal: auto-advances every 4 s, swipeable, the next card
- * peeks, dots show where you are. Continue asks for an App Store rating
- * (SKStoreReviewController — Apple decides whether it shows) and moves on.
+ * peeks, dots show where you are. The App Store rating prompt comes up over
+ * it (`rating_prompt: "auto"`; with `plan` it came on the plan reveal).
  *
  * Slot: `social_proof.render: "flow"` shows the flow on `onb_social` instead
  * (custom actions `request_review` / `next`). No reviews for the goal → skip.
@@ -16,7 +16,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
-import * as StoreReview from 'expo-store-review';
 import { AdaptyFlowView } from 'react-native-adapty';
 import type { AdaptyFlow } from 'react-native-adapty';
 
@@ -28,12 +27,12 @@ import { OnbButton } from '@/components/onb/OnbButton';
 import { OnbLayout } from '@/components/onb/OnbLayout';
 import { Sticker } from '@/components/onb/Sticker';
 import { getFlowQuiet } from '@/config/onboardingConfig';
-import { qaOverrides } from '@/config/qa';
 import type { BeforeAfter, ContentGoal, Review } from '@/config/types';
 import { IMG } from '@/onb/assets';
 import { C, F, PAD } from '@/onb/theme';
 import { useOnbScreen } from '@/onb/useOnbScreen';
 import { useIntro } from '@/state/introContext';
+import { requestOnboardingReview } from '@/state/rateReview';
 
 const CARD_W = 318;
 const CARD_GAP = 10;
@@ -209,29 +208,20 @@ export default function SocialScreen() {
    * moment after it opens, as drawn (16 · Rating prompt) and as Cal AI does.
    * Apple decides whether it really shows (3 times a year at most).
    */
-  const askForRating = async (source: string) => {
+  const askForRating = (source: string) => {
     if (asked.current) return;
     asked.current = true;
-    // The QA auto tour takes screenshots: no system prompt over the screens after this one.
-    if (qaOverrides().auto_tour) return;
-    try {
-      if (!(await StoreReview.hasAction())) return;
-      track('rating_prompt_requested', { source });
-      await StoreReview.requestReview();
-    } catch (e) {
-      captureException(e, { where: 'v3_social_rating' });
-    }
+    void requestOnboardingReview(source);
   };
   const finish = () => {
     next({}, { reviews: reviews.length, hero: ba ? config.social_proof.hero : 'rating' }, undefined, { replace: true });
   };
 
   useEffect(() => {
-    if (!slotDone || slotFlow || reviews.length === 0) return;
-    const t = setTimeout(() => void askForRating('native'), 2000);
+    if (!slotDone || slotFlow || reviews.length === 0 || config.rating_prompt !== 'auto') return;
+    const t = setTimeout(() => askForRating('native'), 2000);
     return () => clearTimeout(t);
-     
-  }, [slotDone, slotFlow, reviews.length]);
+  }, [slotDone, slotFlow, reviews.length, config.rating_prompt]);
 
   // Nothing real to show for this goal: skip the screen rather than show an empty one.
   useEffect(() => {
@@ -255,7 +245,7 @@ export default function SocialScreen() {
           return false;
         }}
         onCustomAction={(actionId) => {
-          if (actionId === 'request_review') void askForRating('slot');
+          if (actionId === 'request_review') askForRating('slot');
           else if (actionId === 'next') next({}, {}, undefined, { replace: true });
           return false;
         }}

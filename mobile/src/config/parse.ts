@@ -91,6 +91,7 @@ export function parseOnboardingConfig(data: Json | undefined): OnboardingConfig 
     after_cancel_offer: bool(data.after_cancel_offer, d.after_cancel_offer),
     tutorial: bool(data.tutorial, d.tutorial),
     ai_consent: oneOf(data.ai_consent, ['save_plan', 'sheet'] as const, d.ai_consent),
+    rating_prompt: oneOf(data.rating_prompt, ['auto', 'plan', 'off'] as const, d.rating_prompt),
   };
 }
 

@@ -56,6 +56,13 @@ export interface OnboardingConfig {
    * first AI log. Anyone who never saw the line still gets the sheet.
    */
   ai_consent: 'save_plan' | 'sheet';
+  /**
+   * The onboarding's App Store rating prompt: `auto` = over screen 16 when it
+   * shows, else over the plan reveal (15); `plan` = always over the plan
+   * reveal; `off` = none in the onboarding. The in-app moments (a full day
+   * logged, the Week 1 report) ask either way, within their own caps.
+   */
+  rating_prompt: 'auto' | 'plan' | 'off';
 }
 
 /** One review on the carousel (16) or in the loader card (14). */

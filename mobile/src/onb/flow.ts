@@ -99,6 +99,11 @@ function hasSocialContent(d: IntroDraft, c: OnboardingConfig, content?: Onboardi
   return (content.reviews[CONTENT_GOAL[d.goal_type ?? 'lose']] ?? []).length > 0;
 }
 
+/** Screen 16 will show for these answers (the plan reveal asks for the rating when it won't). */
+export function socialScreenShows(d: IntroDraft, c: OnboardingConfig, content?: OnboardingContent): boolean {
+  return c.social_proof.show && hasSocialContent(d, c, content);
+}
+
 export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig, content?: OnboardingContent): string {
   const order: ScreenId[] = [
     'S1_welcome',
@@ -132,7 +137,7 @@ export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig
       case 'S12_features':
         return c.features === 'off';
       case 'S16_social':
-        return !c.social_proof.show || !hasSocialContent(d, c, content);
+        return !socialScreenShows(d, c, content);
       default:
         return false;
     }

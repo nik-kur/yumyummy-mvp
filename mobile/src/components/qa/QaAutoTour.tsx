@@ -5,7 +5,8 @@
  * Switched on by the QA override `auto_tour: true` (written into the app's
  * storage before launch). Each step applies its overrides and setup, opens
  * its screen, and records `{ i, name }` under `@yy_qa_autotour`; a script
- * outside watches that key and takes the screenshot.
+ * outside watches that key and takes the screenshot. `auto_tour_only` runs
+ * just the named steps.
  */
 import { useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +16,7 @@ import * as api from '@/api/endpoints';
 import { loadQaOverrides, saveQaOverrides, type QaOverrides } from '@/config/qa';
 import { grantAIConsent } from '@/state/aiConsent';
 import { useAuth } from '@/state/auth';
+import { loadDraft, notifyDraftReplaced, saveDraft, type IntroDraft } from '@/state/introDraft';
 import { startJourney } from '@/state/journey';
 import { resetTour, setTourStep, startPostPurchase, type TourStep } from '@/state/tour';
 
@@ -22,7 +24,16 @@ const STATE_KEY = '@yy_qa_autotour';
 const START_DELAY_MS = 7000;
 const HOLD_MS = 4500;
 
-type Setup = 'preview' | 'signin' | 'consent' | 'meal' | 'payoff' | { tour: TourStep };
+/** `draft` swaps answers in (on top of the draft the tour started with); `draft_reset` puts that draft back. */
+type Setup =
+  | 'preview'
+  | 'signin'
+  | 'consent'
+  | 'meal'
+  | 'payoff'
+  | 'draft_reset'
+  | { tour: TourStep }
+  | { draft: Partial<IntroDraft> };
 
 interface Step {
   name: string;
@@ -48,7 +59,15 @@ const STEPS: Step[] = [
   { name: 'target', route: '/(intro)/v3/target' },
   { name: 'goal_check', route: '/(intro)/v3/goal-check' },
   { name: 'pace', route: '/(intro)/v3/pace' },
-  { name: 'proof', route: '/(intro)/v3/proof' },
+  // Thumb asked past the fastest pace the calorie floor allows: it stops there.
+  { name: 'pace_limit', route: '/(intro)/v3/pace', setup: [{ draft: { pace_kg_week: 0.9 } }] },
+  // A small, older, sedentary body: even 0.1 kg a week is under the floor.
+  {
+    name: 'pace_capped',
+    route: '/(intro)/v3/pace',
+    setup: [{ draft: { gender: 'female', age: 62, height_cm: 155, weight_kg: 52, activity_level: 'sedentary', target_weight_kg: 49 } }],
+  },
+  { name: 'proof', route: '/(intro)/v3/proof', setup: ['draft_reset'] },
   { name: 'tracked', route: '/(intro)/v3/tracked' },
   { name: 'barriers', route: '/(intro)/v3/barriers' },
   { name: 'features', route: '/(intro)/v3/features' },
@@ -110,11 +129,14 @@ export function QaAutoTour() {
     void (async () => {
       const qa = await loadQaOverrides();
       if (!qa.auto_tour) return;
+      const only = qa.auto_tour_only;
+      const original = await loadDraft();
       await wait(START_DELAY_MS);
       for (let i = 0; i < STEPS.length && alive; i += 1) {
         const step = STEPS[i];
+        if (only && !only.includes(step.name)) continue;
         try {
-          await saveQaOverrides(withBase(step.overrides));
+          await saveQaOverrides({ ...withBase(step.overrides), auto_tour_only: only });
           for (const s of step.setup ?? []) {
             if (s === 'preview') await auth.current.startPreview();
             else if (s === 'signin') {
@@ -125,7 +147,12 @@ export function QaAutoTour() {
             else if (s === 'consent') await grantAIConsent();
             else if (s === 'meal') await api.agentRun({ text: 'Greek salad' });
             else if (s === 'payoff') await startPostPurchase(false);
-            else {
+            else if (s === 'draft_reset' || 'draft' in s) {
+              await saveDraft(s === 'draft_reset' ? original : { ...original, ...s.draft });
+              notifyDraftReplaced();
+              // Screens read the draft from context: let the reload land first.
+              await wait(400);
+            } else {
               if (s.tour === 1) await resetTour(true);
               await setTourStep(s.tour);
             }

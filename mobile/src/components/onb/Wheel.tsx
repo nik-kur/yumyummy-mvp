@@ -6,9 +6,17 @@
  *
  * Layout trick: rows sit on a 40 pt grid so snapping is a plain interval;
  * rows above / below the centre are pushed 8 pt apart to open the 56 pt slot.
+ *
+ * The selected value is drawn by a lens, like UIPickerView: an opaque window
+ * over the slot holds its own column of big labels that moves exactly with the
+ * rows next to the centre. A number is big inside the window and small outside
+ * it, never both at once (a crossfade of the two read as a doubled digit). At
+ * the window's edges the big number fades out before the small one fades in,
+ * so a half big / half small number never shows either.
  */
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import Animated, {
   runOnJS,
   scrollTo,
@@ -25,6 +33,12 @@ import { C, F } from '@/onb/theme';
 export const ROW = 40;
 const CENTER = 56;
 const GAP = (CENTER - ROW) / 2;
+/** Spacing of the lens labels: rows next to the centre move 48 pt per value. */
+const SLOT = ROW + GAP;
+/** The lens sits inside the band's 1 pt border. */
+const INSET = 1;
+/** Soft top and bottom edges inside the lens. */
+const FADE = 12;
 
 /** How one value reads: big parts in Fraunces, units in small muted Inter. */
 export type WheelLabel = { text: string; unit?: boolean }[];
@@ -47,49 +61,79 @@ function plain(label: WheelLabel): string {
   return label.map((p) => p.text).join(' ');
 }
 
-const Row = memo(function Row({
-  index,
-  y,
-  label,
-  bigSize,
-}: {
-  index: number;
-  y: SharedValue<number>;
-  label: WheelLabel;
-  bigSize: number;
-}) {
-  const wrap = useAnimatedStyle(() => {
+const Row = memo(function Row({ index, y, text }: { index: number; y: SharedValue<number>; text: string }) {
+  const style = useAnimatedStyle(() => {
     const d = index - y.value / ROW;
-    const shift = Math.max(-1, Math.min(1, d)) * GAP;
-    return { transform: [{ translateY: shift }] };
-  });
-  const small = useAnimatedStyle(() => {
-    const a = Math.abs(index - y.value / ROW);
-    const opacity = a < 1 ? a * 0.62 : a < 2 ? 0.62 - (a - 1) * 0.24 : a < 3 ? 0.38 - (a - 2) * 0.18 : 0.2;
+    const a = Math.abs(d);
+    // Hidden while any of it is under the lens; fades in once it has left.
+    const opacity = a < 0.55 ? 0 : a < 1 ? ((a - 0.55) / 0.45) * 0.62 : a < 2 ? 0.62 - (a - 1) * 0.24 : a < 3 ? 0.38 - (a - 2) * 0.18 : 0.2;
     const size = a < 1 ? 20 : Math.max(16, 20 - (a - 1) * 2);
-    return { opacity, transform: [{ scale: size / 20 }] };
-  });
-  const big = useAnimatedStyle(() => {
-    const a = Math.abs(index - y.value / ROW);
-    return { opacity: Math.max(0, 1 - a * 1.6) };
+    return { opacity, transform: [{ translateY: Math.max(-1, Math.min(1, d)) * GAP }, { scale: size / 20 }] };
   });
   return (
-    <Animated.View style={[s.row, wrap]}>
-      <Animated.Text style={[s.small, small]}>{plain(label)}</Animated.Text>
-      <Animated.View style={[s.bigWrap, big]} pointerEvents="none">
-        {label.map((p, i) =>
-          p.unit ? (
-            <Text key={i} style={s.unit}>
-              {p.text}
-            </Text>
-          ) : (
-            <Text key={i} style={[s.big, { fontSize: bigSize }, i > 0 && { marginLeft: 6 }]}>
-              {p.text}
-            </Text>
-          ),
-        )}
-      </Animated.View>
+    <Animated.View style={[s.row, style]}>
+      <Text style={s.small}>{text}</Text>
     </Animated.View>
+  );
+});
+
+function BigLabel({ label, bigSize }: { label: WheelLabel; bigSize: number }) {
+  return (
+    <View style={s.lensRow}>
+      {label.map((p, i) =>
+        p.unit ? (
+          <Text key={i} style={s.unit}>
+            {p.text}
+          </Text>
+        ) : (
+          <Text key={i} style={[s.big, { fontSize: bigSize }, i > 0 && { marginLeft: 6 }]}>
+            {p.text}
+          </Text>
+        ),
+      )}
+    </View>
+  );
+}
+
+function LensEdge({ at }: { at: 'top' | 'bottom' }) {
+  const id = `wheelLens_${at}`;
+  return (
+    <Svg width="100%" height={FADE} style={[s.edge, at === 'top' ? { top: 0 } : { bottom: 0 }]}>
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={C.surface} stopOpacity={at === 'top' ? 1 : 0} />
+          <Stop offset="1" stopColor={C.surface} stopOpacity={at === 'top' ? 0 : 1} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
+const Lens = memo(function Lens({
+  y,
+  labels,
+  bigSize,
+  top,
+}: {
+  y: SharedValue<number>;
+  labels: WheelLabel[];
+  bigSize: number;
+  top: number;
+}) {
+  const column = useAnimatedStyle(() => ({
+    transform: [{ translateY: (CENTER - 2 * INSET - SLOT) / 2 - (y.value / ROW) * SLOT }],
+  }));
+  return (
+    <View pointerEvents="none" style={[s.lens, { top: top + INSET }]}>
+      <Animated.View style={column}>
+        {labels.map((l, i) => (
+          <BigLabel key={i} label={l} bigSize={bigSize} />
+        ))}
+      </Animated.View>
+      <LensEdge at="top" />
+      <LensEdge at="bottom" />
+    </View>
   );
 });
 
@@ -161,9 +205,10 @@ export function Wheel({ values, value, onChange, half, label, bigSize = 34, band
         contentContainerStyle={{ paddingVertical: pad }}
       >
         {labels.map((l, i) => (
-          <Row key={values[i]} index={i} y={y} label={l} bigSize={bigSize} />
+          <Row key={values[i]} index={i} y={y} text={plain(l)} />
         ))}
       </Animated.ScrollView>
+      <Lens y={y} labels={labels} bigSize={bigSize} top={half * ROW} />
     </View>
   );
 }
@@ -186,16 +231,17 @@ const s = StyleSheet.create({
   },
   row: { height: ROW, alignItems: 'center', justifyContent: 'center' },
   small: { fontFamily: F.sans, fontSize: 20, color: C.ink, fontVariant: ['tabular-nums'] },
-  bigWrap: {
+  lens: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    top: -8,
-    bottom: -8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    left: INSET,
+    right: INSET,
+    height: CENTER - 2 * INSET,
+    overflow: 'hidden',
+    borderRadius: 14 - INSET,
+    backgroundColor: C.surface,
   },
+  lensRow: { height: SLOT, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  edge: { position: 'absolute', left: 0, right: 0 },
   big: { fontFamily: F.serif, lineHeight: 40, color: C.ink, fontVariant: ['tabular-nums'] },
   unit: { fontFamily: F.sans, fontSize: 15, color: C.muted, marginLeft: 6 },
 });

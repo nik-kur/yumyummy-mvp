@@ -25,7 +25,7 @@ import {
   whenAdaptyActivated,
 } from '@/billing/adapty';
 
-import { loadDraft } from '@/state/introDraft';
+import { isPreV3Draft, loadDraft } from '@/state/introDraft';
 
 import { DEFAULT_ONBOARDING_CONTENT, DEFAULT_ONBOARDING_CONFIG } from './defaults';
 import { parseOnboardingConfig, parseOnboardingContent, remoteConfigData } from './parse';
@@ -176,9 +176,10 @@ export function resolveOnboardingAssignment(): Promise<OnboardingAssignment> {
       return stored;
     }
     // Half-way through the pre-V3 onboarding when this build arrived: finish
-    // it as it started rather than jumping into V3 mid-quiz.
+    // it as it started rather than jumping into V3 mid-quiz. A finished V3
+    // draft (Save plan forgets the arm, then sign out + relaunch) is not one.
     const draft = await loadDraft();
-    const fresh: OnboardingAssignment = draft.goal_type && !explicitlyCleared
+    const fresh: OnboardingAssignment = isPreV3Draft(draft) && !explicitlyCleared
       ? {
           config: { ...DEFAULT_ONBOARDING_CONFIG, onboarding: 'v1' },
           meta: {

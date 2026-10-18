@@ -3,6 +3,7 @@
 #
 #   MOCKS=1 scripts/qa-sim-build.sh <any-udid>        # build the mock QA app first
 #   scripts/qa-sizes/run.sh <out-dir> label=udid ...  # e.g. se=A1B1… max=5660…
+#   ONLY=pace,pace_limit scripts/qa-sizes/run.sh ...  # just these steps
 #
 # For each simulator: fresh install, QA overrides with `auto_tour: true` (see
 # src/components/qa/QaAutoTour.tsx), then a screenshot whenever the app reports
@@ -13,6 +14,9 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 OUT="${1:?out dir}"; shift
 APP=ios/build/dd/Build/Products/Release-iphonesimulator/YumYummy.app
 OVR='{"auto_tour":true,"mock_purchase":true,"onboarding":{"att":"welcome"},"paywall":{"render":"native"},"offer":{"render":"native"}}'
+if [ -n "${ONLY:-}" ]; then
+  OVR=$(python3 -c 'import json,sys; o=json.loads(sys.argv[1]); o["auto_tour_only"]=sys.argv[2].split(","); print(json.dumps(o))' "$OVR" "$ONLY")
+fi
 DRAFT='{"goal_type":"lose","gender":"female","age":32,"height_cm":165,"weight_kg":72,"activity_level":"light","target_weight_kg":66,"deficit_pct":null,"source":"instagram","tracked_before":true,"barrier":"too_long","pain_points":["too_long"],"units":"metric","pace_kg_week":0.5,"target_date":"2027-01-16","target_weeks":13,"target_calories":1430,"target_protein_g":115,"target_fat_g":43,"target_carbs_g":148}'
 for pair in "$@"; do
   L="${pair%%=*}"; U="${pair#*=}"; D="$OUT/$L"; rm -rf "$D"; mkdir -p "$D"

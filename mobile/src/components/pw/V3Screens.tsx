@@ -104,15 +104,21 @@ export function TrialIntro({
   onNext: () => void;
   onRestore: () => void;
 }) {
+  // The timeline sits on a card and grows on tall iPhones: on its own it left
+  // half the screen empty (phone test, 18 Oct).
+  const { height } = useWindowDimensions();
+  const tall = height >= 800;
   return (
     <OnbLayout
       progress={null}
-      title={<HeroText hero={hero} size={32} line={38} top={44} />}
+      title={<HeroText hero={hero} size={tall ? 34 : 32} line={tall ? 40 : 38} top={44} />}
       footer={<LightFooter cta={cta} onPress={onNext} hasTrial onRestore={onRestore} />}
     >
+      <View style={{ flex: 0.8 }} />
+      <View style={[s.timelineCard, tall && s.timelineCardTall]}>
+        <TrialTimeline trialDays={trialDays} todayLine={todayLine} large={tall} />
+      </View>
       <View style={{ flex: 1 }} />
-      <TrialTimeline trialDays={trialDays} todayLine={todayLine} />
-      <View style={{ flex: 1.2 }} />
     </OnbLayout>
   );
 }
@@ -386,6 +392,16 @@ export function PwLoading({ dark }: { dark?: boolean }) {
 const s = StyleSheet.create({
   h1: { textAlign: 'center', fontFamily: F.serif, letterSpacing: -0.3, color: C.ink },
   note: { marginTop: 10, textAlign: 'center', fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.muted },
+  timelineCard: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.hair,
+    borderRadius: 20,
+    paddingTop: 18,
+    paddingBottom: 4,
+    paddingHorizontal: 12,
+  },
+  timelineCardTall: { paddingTop: 22, paddingBottom: 8, paddingHorizontal: 14 },
   bellBox: { alignSelf: 'center', width: 150, height: 150 },
   bell: { width: 150, height: 150, transformOrigin: '50% 12%' },
   // 30 pt + a 2 pt border outside it (CSS content-box), radius 15: a squircle.

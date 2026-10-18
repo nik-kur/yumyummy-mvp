@@ -30,6 +30,7 @@ export const DEFAULT_ONBOARDING_CONFIG: OnboardingConfig = {
   after_cancel_offer: true,
   tutorial: true,
   ai_consent: 'save_plan',
+  rating_prompt: 'auto',
 };
 
 export const DEFAULT_ONBOARDING_CONTENT: OnboardingContent = {

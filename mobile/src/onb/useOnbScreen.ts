@@ -48,10 +48,12 @@ export function useOnbScreen(id: ScreenId, variant?: string) {
       setTimeout(() => {
         leaving.current = false;
       }, 600);
-      if (Object.keys(patch).length > 0) introRef.current.set(patch);
+      // The stamp tells the next launch this draft is V3's, not a pre-V3 one to finish in v1.
+      const stamped: Partial<IntroDraft> = { ...patch, flow: 'v3' };
+      if (Object.keys(patch).length > 0 || introRef.current.flow !== 'v3') introRef.current.set(stamped);
       track('onboarding_screen_completed', { screen: id, variant: variant ?? null, ...answer });
       if (person) setPersonProperties(person);
-      const draft = { ...introRef.current, ...patch } as IntroDraft;
+      const draft = { ...introRef.current, ...stamped } as IntroDraft;
       const to = nextScreen(id, draft, config, content) as never;
       if (opts.replace) router.replace(to);
       else router.push(to);
