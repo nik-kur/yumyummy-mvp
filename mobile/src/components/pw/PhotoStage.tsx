@@ -47,9 +47,11 @@ export function PhotoStage({ photo, badge, fade, label, overlay, children }: Pro
   const [blockH, setBlockH] = useState(0);
   const [badgeH, setBadgeH] = useState(0);
   const blockTop = H - blockH;
-  // On a short phone a low badge (b3_wide) would sit on the headline: lift it
-  // above the block, and drop it if there is no room left under the status bar.
-  const badgeTop = badge ? Math.min(badge.top * k, blockTop - badgeH - 12) : 0;
+  // Under a tall status bar (Dynamic Island: 59–62 pt) a high badge moves down
+  // to clear it — it used to be dropped there (b3_joe on 17 Pro). On a short
+  // phone a low badge (b3_wide) would sit on the headline: lift it above the
+  // block, and drop it only if there is no room left under the status bar.
+  const badgeTop = badge ? Math.min(Math.max(badge.top * k, insets.top + 8), blockTop - badgeH - 12) : 0;
   const badgeFits = badgeTop >= insets.top + 4;
   const fadeEnd = PixelRatio.roundToNearestPixel(Math.min(photoH, Math.max(blockTop + fade.below, 80)));
   const fadeTop = PixelRatio.roundToNearestPixel(Math.min(fade.top * k, blockTop - fade.above, fadeEnd - 80));
