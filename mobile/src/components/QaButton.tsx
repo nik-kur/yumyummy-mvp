@@ -7,11 +7,12 @@ import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
+import { qaOverrides } from '@/config/qa';
 
 export function QaButton() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  if (pathname === '/qa') return null;
+  if (pathname === '/qa' || qaOverrides().auto_tour) return null;
   return (
     <Pressable
       onPress={() => router.push('/qa')}

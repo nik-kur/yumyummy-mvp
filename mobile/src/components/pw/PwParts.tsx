@@ -79,7 +79,8 @@ const CROWN = (
 );
 
 /** Trial timeline: today → reminder the day before → billing starts. */
-export function TrialTimeline({ trialDays, todayLine }: { trialDays: number; todayLine: string }) {
+/** `compact`: titles only, for the plans screen on short iPhones (the plan cards must stay in view). */
+export function TrialTimeline({ trialDays, todayLine, compact }: { trialDays: number; todayLine: string; compact?: boolean }) {
   const remind = trialDays - 1;
   const rows = [
     { icon: LOCK, on: true, title: 'Today', sub: todayLine },
@@ -99,12 +100,12 @@ export function TrialTimeline({ trialDays, todayLine }: { trialDays: number; tod
   return (
     <View style={s.timeline}>
       {rows.map((r, i) => (
-        <View key={r.title} style={s.tRow}>
+        <View key={r.title} style={[s.tRow, compact && s.tRowCompact]}>
           {i < rows.length - 1 ? <View style={s.tRail} /> : null}
           <View style={[s.tDot, r.on ? s.tDotOn : s.tDotOff]}>{r.icon}</View>
           <View style={s.tText}>
             <Text style={s.tTitle}>{r.title}</Text>
-            <Text style={s.tSub}>{r.sub}</Text>
+            {compact ? null : <Text style={s.tSub}>{r.sub}</Text>}
           </View>
         </View>
       ))}
@@ -197,6 +198,7 @@ const s = StyleSheet.create({
   legal: { fontFamily: F.sans, fontSize: 12, lineHeight: 16 },
   timeline: { gap: 4, paddingHorizontal: 6 },
   tRow: { flexDirection: 'row', gap: 14, minHeight: 74 },
+  tRowCompact: { minHeight: 44 },
   tRail: { position: 'absolute', left: 17, top: 40, width: 2, height: 34, backgroundColor: C.hair },
   tDot: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   tDotOn: { backgroundColor: C.terra, borderColor: C.terra },

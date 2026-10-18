@@ -47,3 +47,6 @@ example
 targets/*/generated.entitlements
 targets/*/Info.plist
 targets/*/Assets.xcassets/
+
+# Screenshots from scripts/qa-sizes (local only)
+qa-shots/

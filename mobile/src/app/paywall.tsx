@@ -52,7 +52,7 @@ import { VariantB2 } from '@/components/paywall/VariantB2';
 import { VariantC } from '@/components/paywall/VariantC';
 import { VariantSHero } from '@/components/paywall/VariantSHero';
 import { OfferScreen } from '@/components/pw/OfferScreen';
-import { V3Paywall } from '@/components/pw/V3Paywall';
+import { V3Paywall, type PwStep } from '@/components/pw/V3Paywall';
 import { PwLoading } from '@/components/pw/V3Screens';
 import { useAuth } from '@/state/auth';
 import { loadDraft, type IntroDraft } from '@/state/introDraft';
@@ -172,7 +172,9 @@ function legacyRemoteConfig(flow: AdaptyFlow): Record<string, unknown> | undefin
 export default function PaywallScreen() {
   const router = useRouter();
   const { status, profile, refreshProfile, startPreview } = useAuth();
-  const params = useLocalSearchParams<{ dismissable?: string; qa_offer?: string; last_offer?: string }>();
+  const params = useLocalSearchParams<{ dismissable?: string; qa_offer?: string; last_offer?: string; qa_step?: string }>();
+  // QA builds: open the V3 paywall on a given step (screenshots across sizes).
+  const qaStep = IS_QA_BUILD && typeof params.qa_step === 'string' ? (params.qa_step as PwStep) : undefined;
   const insets = useSafeAreaInsets();
   // Only Profile passes this — the acquisition/gate flows stay hard.
   const dismissable = params.dismissable === '1';
@@ -1083,6 +1085,7 @@ export default function PaywallScreen() {
         products={v3.products}
         draft={signedIn ? null : draft}
         plansOnly={dismissable || signedIn || lastOffer}
+        initialStep={qaStep}
         purchasing={purchasing}
         onPurchase={(p) => void handlePurchase(p, 'v3')}
         onRestore={() => void handleRestore()}

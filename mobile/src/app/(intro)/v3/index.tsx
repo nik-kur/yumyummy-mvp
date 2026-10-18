@@ -8,7 +8,7 @@
  * ATT is asked here only when the arm says `att: "welcome"` (test O6).
  */
 import { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
@@ -72,19 +72,31 @@ function LaurelStat({ value, label, big }: { value: string; label: string; big?:
   );
 }
 
-function PhoneDemo() {
+/** `scale` fits the 246 × 506 mockup on short screens (the button must stay in view). */
+function PhoneDemo({ scale = 1 }: { scale?: number }) {
   const player = useVideoPlayer(VIDEO.welcome_d, (p) => {
     p.loop = true;
     p.muted = true;
     p.play();
   });
   return (
-    <View style={[s.phone, SHADOW]}>
-      <View style={s.phoneScreen}>
+    <View
+      style={[
+        s.phone,
+        SHADOW,
+        { width: 246 * scale, height: 506 * scale, padding: 9 * scale, borderRadius: 46 * scale },
+      ]}
+    >
+      <View style={[s.phoneScreen, { borderRadius: 38 * scale }]}>
         <Image source={IMG.welcome_d_poster} style={StyleSheet.absoluteFill} />
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
       </View>
-      <View style={s.island} />
+      <View
+        style={[
+          s.island,
+          { left: 89 * scale, top: 18 * scale, width: 68 * scale, height: 20 * scale, borderRadius: 10 * scale },
+        ]}
+      />
     </View>
   );
 }
@@ -92,6 +104,7 @@ function PhoneDemo() {
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const initial = getOnboardingConfig().welcome;
   const { config, content, next } = useOnbScreen('S1_welcome', initial.render === 'flow' ? 'flow' : initial.variant);
   const welcome = config.welcome;
@@ -199,7 +212,7 @@ export default function WelcomeScreen() {
   if (variant === 'D') {
     return (
       <View style={[s.fill, s.colCenter, { paddingTop: insets.top + 9, paddingBottom: bottomPad }]}>
-        <PhoneDemo />
+        <PhoneDemo scale={Math.min(1, Math.max(0.55, (height - insets.top - bottomPad - 250) / 506))} />
         <View style={{ flex: 1 }} />
         {Headline}
         {Sub}

@@ -28,6 +28,7 @@ import { OnbButton } from '@/components/onb/OnbButton';
 import { OnbLayout } from '@/components/onb/OnbLayout';
 import { Sticker } from '@/components/onb/Sticker';
 import { getFlowQuiet } from '@/config/onboardingConfig';
+import { qaOverrides } from '@/config/qa';
 import type { BeforeAfter, ContentGoal, Review } from '@/config/types';
 import { IMG } from '@/onb/assets';
 import { C, F, PAD } from '@/onb/theme';
@@ -211,6 +212,8 @@ export default function SocialScreen() {
   const askForRating = async (source: string) => {
     if (asked.current) return;
     asked.current = true;
+    // The QA auto tour takes screenshots: no system prompt over the screens after this one.
+    if (qaOverrides().auto_tour) return;
     try {
       if (!(await StoreReview.hasAction())) return;
       track('rating_prompt_requested', { source });

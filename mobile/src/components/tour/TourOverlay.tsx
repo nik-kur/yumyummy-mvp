@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   cancelAnimation,
@@ -338,6 +339,7 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
   const tour = useTour();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const rootRef = useRef<View>(null);
   const [hole, setHole] = useState<Box | null>(null);
   const [ceiling, setCeiling] = useState<number | null>(null);
@@ -422,6 +424,7 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
   let cardTop = 0;
   let cardBelow = false;
   const curved = def.target !== 'plus' && def.target !== 'capture_bar';
+  let arrows = curved;
   if (hole) {
     const gap = curved ? 54 : 18;
     const below = hole.y + hole.h + gap;
@@ -429,10 +432,24 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
     const above = roof - (def.circle ? 58 : gap) - cardH;
     // Below the element if the card clears the tab bar there (squeezing the
     // arrow gap a little rather than covering the element from above).
-    const floor = height - (scope === 'tabs' ? 92 : 40);
+    // The card may cover the dimmed tab bar, except on the steps that point at
+    // it (the "+" and the bar itself, which put their card above anyway).
+    const floor = height - (scope === 'tabs' ? insets.bottom + 12 : 40);
     const squeezed = Math.min(below, floor - cardH);
-    cardBelow = !def.above && squeezed >= hole.y + hole.h + (curved ? 40 : 12);
-    cardTop = cardBelow ? squeezed : Math.max(56, above);
+    const minTop = insets.top + 8;
+    if (!def.above && squeezed >= hole.y + hole.h + (curved ? 40 : 12)) {
+      cardBelow = true;
+      cardTop = squeezed;
+    } else if (def.above || above >= minTop) {
+      cardTop = Math.max(minTop, above);
+    } else {
+      // A tall element on a small screen (the dashboard on an iPhone SE): no
+      // room on either side. The card sits at the bottom over the end of the
+      // element, so its top — the calories — stays clear; no arrow.
+      cardBelow = true;
+      cardTop = floor - cardH;
+      arrows = false;
+    }
   }
 
   // The app is blocked only while a step is actually on screen: a step still
@@ -454,7 +471,7 @@ export function TourOverlay({ scope }: { scope: 'tabs' | 'capture' }) {
           accessibilityViewIsModal={scope === 'tabs'}
         >
           <Spotlight hole={hole} width={width} height={height} dim={def.dim} radius={def.circle ? hole.w / 2 : def.radius} />
-          {curved && cardH > 0
+          {arrows && cardH > 0
             ? arrowTargets(def.target, hole, width).map((ex, i) => {
                 // Clear of the white ring around the hole and of the card.
                 const tailY = cardBelow ? cardTop - 8 : cardTop + cardH + 8;

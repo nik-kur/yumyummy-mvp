@@ -10,7 +10,7 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { C, F, PAD } from '@/onb/theme';
 
@@ -70,7 +70,11 @@ export function OnbLayout({ progress, title, sub, children, footer, canGoBack, o
   // and wheels / rulers inside never fight an outer scroll.
   const [boxH, setBoxH] = useState(0);
   const [contentH, setContentH] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
   const overflow = boxH > 0 && contentH > boxH + 1;
+  // On small iPhones some screens scroll: fade the last rows into the button
+  // so it reads as "there is more", not as cut-off content.
+  const moreBelow = overflow && scrollY + boxH < contentH - 4;
   return (
     <View
       style={[
@@ -89,18 +93,35 @@ export function OnbLayout({ progress, title, sub, children, footer, canGoBack, o
         )
       ) : null}
       {sub ? <Text style={[s.sub, center && s.center]}>{sub}</Text> : null}
-      <ScrollView
-        // Clip only while scrolling is needed, so card shadows are not cut.
-        style={[s.content, !overflow && s.visible]}
-        contentContainerStyle={[s.scrollContent, contentStyle]}
-        scrollEnabled={overflow}
-        showsVerticalScrollIndicator={overflow}
-        bounces={overflow}
-        onLayout={(e) => setBoxH(e.nativeEvent.layout.height)}
-        onContentSizeChange={(_, h) => setContentH(h)}
-      >
-        {children}
-      </ScrollView>
+      <View style={s.content}>
+        <ScrollView
+          // Clip only while scrolling is needed, so card shadows are not cut.
+          style={[s.content, !overflow && s.visible]}
+          contentContainerStyle={[s.scrollContent, contentStyle]}
+          scrollEnabled={overflow}
+          showsVerticalScrollIndicator={overflow}
+          bounces={overflow}
+          onLayout={(e) => setBoxH(e.nativeEvent.layout.height)}
+          onContentSizeChange={(_, h) => setContentH(h)}
+          onScroll={overflow ? (e) => setScrollY(e.nativeEvent.contentOffset.y) : undefined}
+          scrollEventThrottle={32}
+        >
+          {children}
+        </ScrollView>
+        {moreBelow ? (
+          <View style={s.fade} pointerEvents="none">
+            <Svg width="100%" height="100%">
+              <Defs>
+                <LinearGradient id="onbfade" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor={C.paper} stopOpacity="0" />
+                  <Stop offset="1" stopColor={C.paper} stopOpacity="1" />
+                </LinearGradient>
+              </Defs>
+              <Rect x="0" y="0" width="100%" height="100%" fill="url(#onbfade)" />
+            </Svg>
+          </View>
+        ) : null}
+      </View>
       {footer}
     </View>
   );
@@ -126,4 +147,5 @@ const s = StyleSheet.create({
   content: { flex: 1 },
   scrollContent: { flexGrow: 1 },
   visible: { overflow: 'visible' },
+  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 36 },
 });

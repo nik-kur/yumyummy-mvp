@@ -16,6 +16,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { track } from '@/analytics/posthog';
 import { defaultPlan, justPerYear, periodOf, trialDays, trialThenPrice } from '@/billing/v3Pricing';
 import { getOnboardingContent } from '@/config/onboardingConfig';
+import { qaOverrides } from '@/config/qa';
 import type { PaywallArmConfig } from '@/config/types';
 import { requestPermission as requestPushPermission } from '@/notifications/scheduler';
 import { C } from '@/onb/theme';
@@ -37,13 +38,15 @@ interface Props {
   draft: IntroDraft | null;
   /** Profile / signed-in gate: straight to the plans. */
   plansOnly: boolean;
+  /** QA builds: start on this step (screenshots). */
+  initialStep?: PwStep;
   purchasing: boolean;
   onPurchase: (p: AdaptyPaywallProduct) => void;
   onRestore: () => void;
   onRetry: () => void;
 }
 
-export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPurchase, onRestore, onRetry }: Props) {
+export function V3Paywall({ config, products, draft, plansOnly, initialStep, purchasing, onPurchase, onRestore, onRetry }: Props) {
   const isP1 = config.variant.startsWith('p1_');
   const copy = config.copy;
   const content = getOnboardingContent();
@@ -65,7 +68,7 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     if (plansOnly || products.length === 0 || !introTrial) return ['plans'];
     return isP1 ? ['p1', 'b2', 'plans'] : ['b1', 'b2', 'plans'];
   });
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => Math.max(0, initialStep ? steps.indexOf(initialStep) : 0));
   const step = steps[index];
   // B1 / P1 and B2 put their button in the same place: a double tap must not
   // skip B2 (and its push prompt), so a step ignores taps for its first beat.
@@ -100,7 +103,8 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     track('paywall_push_permission', { granted, variant: config.variant });
   }, [config.variant]);
   useEffect(() => {
-    if (step !== 'b2') return;
+    // The QA auto tour takes screenshots: no system alert over B2.
+    if (step !== 'b2' || qaOverrides().auto_tour) return;
     const t = setTimeout(() => void askPush(), PUSH_PROMPT_DELAY_MS);
     return () => clearTimeout(t);
   }, [step, askPush]);

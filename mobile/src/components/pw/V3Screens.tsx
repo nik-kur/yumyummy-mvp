@@ -7,7 +7,7 @@
  *   P1 PW_P1_plans  — light plan cards under the timeline.
  */
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { AdaptyPaywallProduct } from 'react-native-adapty';
 import Animated, {
   cancelAnimation,
@@ -271,6 +271,8 @@ export function LightPlans({
   ...p
 }: PlansProps & { canGoBack: boolean; onBack: () => void; todayLine: string; rating: string; users: string }) {
   const none = p.products.length === 0;
+  // iPhone SE and other short screens: the plan cards must stay in view.
+  const short = useWindowDimensions().height < 700;
   return (
     <OnbLayout
       progress={null}
@@ -301,8 +303,8 @@ export function LightPlans({
         ))}
       </View>
       {p.hasTrial ? (
-        <View style={{ marginTop: 18 }}>
-          <TrialTimeline trialDays={p.trialDays} todayLine={todayLine} />
+        <View style={{ marginTop: short ? 12 : 18 }}>
+          <TrialTimeline trialDays={p.trialDays} todayLine={todayLine} compact={short} />
         </View>
       ) : null}
       <View style={{ marginTop: 14 }}>
