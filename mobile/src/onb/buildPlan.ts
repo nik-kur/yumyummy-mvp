@@ -5,7 +5,7 @@
  */
 import type { IntroDraft } from '@/state/introDraft';
 
-import { dailyPlan, direction, planMode, type PlanMode } from './plan';
+import { dailyPlan, direction, PACE, planMode, type PlanMode } from './plan';
 
 export function buildPlan(d: IntroDraft): { patch: Partial<IntroDraft>; mode: PlanMode } {
   const target = d.target_weight_kg ?? d.weight_kg;
@@ -18,7 +18,7 @@ export function buildPlan(d: IntroDraft): { patch: Partial<IntroDraft>; mode: Pl
     weight_kg: d.weight_kg,
     activity_level: d.activity_level ?? 'light',
   } as const;
-  const pace = dir === 'same' ? null : d.pace_kg_week ?? (dir === 'up' ? 0.25 : 0.5);
+  const pace = dir === 'same' ? null : d.pace_kg_week ?? PACE[dir === 'up' ? 'up' : 'down'].recommended;
   const p = dailyPlan(body, mode, target, pace);
   return {
     mode,

@@ -51,6 +51,7 @@ import { VariantB } from '@/components/paywall/VariantB';
 import { VariantB2 } from '@/components/paywall/VariantB2';
 import { VariantC } from '@/components/paywall/VariantC';
 import { VariantSHero } from '@/components/paywall/VariantSHero';
+import { DelayedClose } from '@/components/pw/DelayedClose';
 import { OfferScreen } from '@/components/pw/OfferScreen';
 import { V3Paywall, type PwStep } from '@/components/pw/V3Paywall';
 import { PwLoading } from '@/components/pw/V3Screens';
@@ -233,6 +234,8 @@ export default function PaywallScreen() {
   // per visit, only when the App Store sheet was dismissed by the customer.
   const offerRef = useRef<Promise<OfferState | null> | null>(null);
   const offerShownRef = useRef(false);
+  /** Closes the offer on screen (set while one is shown): a second StoreKit cancel leaves it. */
+  const closeOfferRef = useRef<((reason: string) => void) | null>(null);
   const [offer, setOffer] = useState<OfferState | null>(null);
   // The `pw_main` arm on every paywall event, and as device super properties
   // so later events (sign-in, tour, first meal) can be split by paywall arm.
@@ -804,7 +807,10 @@ export default function PaywallScreen() {
         // point it still reads true and `maybeShowOffer` would bail out: the after-cancel
         // offer never showed on the code paywall (seen live 2026-10-06). Clear it first.
         purchasingRef.current = false;
-        if (renderer !== 'v3_offer') void maybeShowOffer(product.vendorProductId, renderer);
+        // A cancel on the offer itself is a second no: go on as its close button
+        // does (preview mode / back from Last offer) instead of showing it again.
+        if (renderer === 'v3_offer') closeOfferRef.current?.('purchase_cancelled');
+        else void maybeShowOffer(product.vendorProductId, renderer);
       } else if (result.type === 'pending') {
         // Ask-to-Buy / deferred: purchase may complete later out of band.
         ptrack('paywall_purchase_pending', { product: product.vendorProductId, variant, renderer });
@@ -939,6 +945,7 @@ export default function PaywallScreen() {
   // plans), not to the start. The gate itself stays hard. From stage 6 the
   // close leads to preview mode instead.
   let offerNode: ReactNode = null;
+  closeOfferRef.current = null;
   if (offer) {
     const variant = offerVariant(offer);
     const closeOffer = (reason: string) => {
@@ -957,6 +964,7 @@ export default function PaywallScreen() {
         if (!opened) setOffer(null);
       });
     };
+    closeOfferRef.current = closeOffer;
 
     if (offer.kind === 'native') {
       offerNode = (
@@ -996,6 +1004,7 @@ export default function PaywallScreen() {
                 void afterPurchaseSuccess(product, 'adapty_flow_offer', {}, result.profile).catch(captureException);
               } else if (result.type === 'user_cancelled') {
                 ptrack('paywall_purchase_cancelled', { product: product.vendorProductId, variant, renderer: 'adapty_flow_offer' });
+                closeOffer('purchase_cancelled');
               } else if (result.type === 'pending') {
                 ptrack('paywall_purchase_pending', { product: product.vendorProductId, renderer: 'adapty_flow_offer' });
               }
@@ -1041,15 +1050,17 @@ export default function PaywallScreen() {
             }}
             onRequestPermission={handleFlowPermissionRequest}
           />
-          <Pressable
-            onPress={() => closeOffer('close')}
-            style={[s.offerClose, { top: insets.top + 3 }]}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-          >
-            <X size={20} color={colors.white} strokeWidth={2} />
-          </Pressable>
+          <DelayedClose style={[s.offerCloseSpot, { top: insets.top + 3 }]}>
+            <Pressable
+              onPress={() => closeOffer('close')}
+              style={s.offerClose}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <X size={20} color={colors.white} strokeWidth={2} />
+            </Pressable>
+          </DelayedClose>
         </View>
       );
     }
@@ -1235,9 +1246,8 @@ export default function PaywallScreen() {
 const s = StyleSheet.create({
   previewStarting: { backgroundColor: 'rgba(20,16,12,0.45)', alignItems: 'center', justifyContent: 'center' },
   // Same as the code offer's close (OfferScreen): readable over any photo.
+  offerCloseSpot: { position: 'absolute', right: 12 },
   offerClose: {
-    position: 'absolute',
-    right: 12,
     width: 44,
     height: 44,
     borderRadius: 22,

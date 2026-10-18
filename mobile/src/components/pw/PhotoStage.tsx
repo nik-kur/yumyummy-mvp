@@ -6,10 +6,12 @@
  * The fade follows the bottom block, not fixed numbers: on a short phone the
  * block starts higher, so the fade starts higher too and the headline never
  * sits on a bright part of the photo. On the 390 × 844 artboard it lands
- * exactly where drawn.
+ * exactly where drawn. The fade always ends on the photo and solid ink runs
+ * a little past its bottom edge: an exposed edge showed as a thin light line
+ * across the screen (phone test, build 64).
  */
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { PixelRatio, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,8 +26,12 @@ const PHOTO_H = 694;
 interface Props {
   photo: number;
   badge: BadgeSpec | null;
-  /** Artboard fade: starts `fadeTop`, and sits `above` / `below` the block top as drawn. */
-  fade: { top: number; above: number; below: number };
+  /**
+   * Artboard fade: starts `fadeTop`, and sits `above` / `below` the block top
+   * as drawn; `atBlock` = how dark it already is at the block top (default:
+   * a straight ramp).
+   */
+  fade: { top: number; above: number; below: number; atBlock?: number };
   /** Accessible description of the photo. */
   label: string;
   /** Over the photo, e.g. the offer's close button. */
@@ -37,7 +43,7 @@ export function PhotoStage({ photo, badge, fade, label, overlay, children }: Pro
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const k = W / ART_W;
-  const photoH = PHOTO_H * k;
+  const photoH = PixelRatio.roundToNearestPixel(PHOTO_H * k);
   const [blockH, setBlockH] = useState(0);
   const [badgeH, setBadgeH] = useState(0);
   const blockTop = H - blockH;
@@ -45,8 +51,13 @@ export function PhotoStage({ photo, badge, fade, label, overlay, children }: Pro
   // above the block, and drop it if there is no room left under the status bar.
   const badgeTop = badge ? Math.min(badge.top * k, blockTop - badgeH - 12) : 0;
   const badgeFits = badgeTop >= insets.top + 4;
-  const fadeTop = Math.min(fade.top * k, blockTop - fade.above);
-  const fadeEnd = Math.max(fadeTop + 80, Math.min(photoH, blockTop + fade.below));
+  const fadeEnd = PixelRatio.roundToNearestPixel(Math.min(photoH, Math.max(blockTop + fade.below, 80)));
+  const fadeTop = PixelRatio.roundToNearestPixel(Math.min(fade.top * k, blockTop - fade.above, fadeEnd - 80));
+  // Where the block starts inside the fade, for an eased ramp.
+  const mid =
+    fade.atBlock !== undefined && blockTop > fadeTop && blockTop < fadeEnd
+      ? { at: (blockTop - fadeTop) / (fadeEnd - fadeTop), opacity: fade.atBlock }
+      : undefined;
   return (
     <View style={s.screen}>
       <Image
@@ -56,8 +67,8 @@ export function PhotoStage({ photo, badge, fade, label, overlay, children }: Pro
         contentPosition="top"
         accessibilityLabel={label}
       />
-      <InkFade top={fadeTop} height={fadeEnd - fadeTop} />
-      {photoH > fadeEnd ? <View style={[s.solid, { top: fadeEnd - 1, height: photoH - fadeEnd + 1 }]} /> : null}
+      <InkFade top={fadeTop} height={fadeEnd - fadeTop} mid={mid} />
+      <View style={[s.solid, { top: fadeEnd - 1, height: photoH - fadeEnd + 3 }]} />
       {badge ? (
         <View
           onLayout={(e) => setBadgeH(e.nativeEvent.layout.height)}

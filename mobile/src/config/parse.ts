@@ -179,5 +179,6 @@ export function parsePaywallArm(
     copy: stringMap(data.copy),
     price_emphasis: oneOf(data.price_emphasis, ['design', 'billed', 'weekly'] as const, d.price_emphasis),
     show_rating: bool(data.show_rating, d.show_rating),
+    plans: oneOf(data.plans, ['auto', 'light', 'b3_joe', 'b3_home', 'b3_office', 'b3_wide'] as const, d.plans),
   };
 }

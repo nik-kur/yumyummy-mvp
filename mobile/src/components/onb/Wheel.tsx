@@ -145,6 +145,11 @@ export function Wheel({ values, value, onChange, half, label, bigSize = 34, band
   const pad = half * ROW + GAP;
   const committed = useRef(value);
   const ref = useAnimatedRef<Animated.ScrollView>();
+  // Only the first offset: on the new architecture a changed `contentOffset`
+  // prop moves the scroll view at once, so passing the committed value back
+  // in jerked the wheel by up to half a row every time a number passed the
+  // centre (phone test, build 64).
+  const initialOffset = useRef({ x: 0, y: start * ROW }).current;
 
   const tick = useCallback(() => {
     void Haptics.selectionAsync().catch(() => {});
@@ -175,17 +180,13 @@ export function Wheel({ values, value, onChange, half, label, bigSize = 34, band
     },
     onMomentumEnd: (e) => {
       const idx = Math.round(e.contentOffset.y / ROW);
-      // snapToInterval can leave a slow fling between rows; finish the snap.
+      // A safety net only: snapToInterval normally lands on a row.
       if (Math.abs(e.contentOffset.y - idx * ROW) > 0.5) scrollTo(ref, 0, idx * ROW, true);
       runOnJS(commit)(idx);
     },
     onEndDrag: (e) => {
-      // A slow release without momentum never fires onMomentumEnd.
-      if (Math.abs(e.velocity?.y ?? 0) < 0.3) {
-        const idx = Math.round(e.contentOffset.y / ROW);
-        scrollTo(ref, 0, idx * ROW, true);
-        runOnJS(commit)(idx);
-      }
+      // The native snap animates the rest; a second animation on top of it read as a slip.
+      runOnJS(commit)(Math.round(e.contentOffset.y / ROW));
     },
   });
 
@@ -201,7 +202,7 @@ export function Wheel({ values, value, onChange, half, label, bigSize = 34, band
         showsVerticalScrollIndicator={false}
         snapToInterval={ROW}
         decelerationRate="fast"
-        contentOffset={{ x: 0, y: start * ROW }}
+        contentOffset={initialOffset}
         contentContainerStyle={{ paddingVertical: pad }}
       >
         {labels.map((l, i) => (

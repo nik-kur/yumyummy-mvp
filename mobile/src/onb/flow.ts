@@ -132,6 +132,9 @@ export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig
         return !weightMoves(d) && !belowHealthy(d);
       case 'S7_pace':
         return !weightMoves(d);
+      case 'S8_proof':
+        // "2× more likely to lose weight" speaks to losing only (Nikita, build 64).
+        return d.goal_type !== 'lose';
       case 'S10_barriers':
         return d.tracked_before !== true;
       case 'S12_features':

@@ -3,8 +3,9 @@
  * what App Review sees unless the dashboard says otherwise.
  *
  *   - Welcome A (photo + badge), design headline;
- *   - screen 16 and the loader review card hidden — the reviews we have are
- *     demo copy, and UK law bans showing invented reviews to consumers;
+ *   - screen 16 and the loader review card off in code: reviews exist only in
+ *     `onb_content` (real customers — Nikita, 18 Oct; screen 16 is switched
+ *     on there for everyone), so without Adapty there is nothing to show;
  *   - the after-cancel offer as "Try it FREE" (the "50% OFF" copy is a remote
  *     override, switched on only after release);
  *   - paywall and offer with the billed amount as the big price and the trial
@@ -48,6 +49,7 @@ export const DEFAULT_PAYWALL_ARM: PaywallArmConfig = {
   copy: {},
   price_emphasis: 'billed',
   show_rating: true,
+  plans: 'auto',
 };
 
 export const DEFAULT_OFFER_ARM: PaywallArmConfig = {
@@ -56,6 +58,7 @@ export const DEFAULT_OFFER_ARM: PaywallArmConfig = {
   copy: {},
   price_emphasis: 'billed',
   show_rating: true,
+  plans: 'auto',
 };
 
 export const PAYWALL_VARIANTS = [

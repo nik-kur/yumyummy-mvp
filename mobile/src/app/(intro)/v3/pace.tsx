@@ -1,9 +1,9 @@
 /**
  * V3 screen 7 (Pace) — kg per week on a slider; the goal date and daily
- * calories update live. Losing: 0.1–0.9 kg/week (recommended 0.5); gaining:
- * 0.1–0.4 (recommended 0.25). Calories never go under `minKcal`: losing paces
- * that would need less stay on the track, dashed and out of reach, and the
- * card says why when the thumb stops there.
+ * calories update live. Losing: 0.1–1.0 kg/week (recommended 0.4); gaining:
+ * 0.1–0.4 (recommended 0.25). Calories never go under `minKcal`: a faster
+ * pace can be picked, the plan then stays on the minimum (the date is the
+ * earliest the minimum allows) and the card says so (wording agreed 18 Oct).
  */
 import { useCallback, useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
@@ -52,30 +52,30 @@ export default function PaceScreen() {
     weight_kg: intro.weight_kg,
     activity_level: intro.activity_level ?? 'light',
   } as const;
-  // Last losing step that keeps calories on or above the floor (0: even the slowest is capped).
+  // Fastest losing step that keeps calories on or above the floor (-1: not even the slowest).
   const maxPace = dir === 'up' ? Infinity : maxLossPace(body);
-  const limit = steps.reduce((last, v, i) => (v <= maxPace + 1e-6 ? i : last), 0);
+  const safeIndex = steps.reduce((last, v, i) => (v <= maxPace + 1e-6 ? i : last), -1);
   const initial = intro.pace_kg_week ?? p.recommended;
-  const [picked, setIndex] = useState(() => {
+  const [index, setIndex] = useState(() => {
     const i = steps.findIndex((v) => Math.abs(v - initial) < 1e-6);
     return i >= 0 ? i : steps.findIndex((v) => Math.abs(v - p.recommended) < 1e-6);
   });
-  const index = Math.min(picked, limit);
   const pace = steps[index];
   const zone = paceZone(dir, pace);
   const zoneOf = useCallback((i: number) => paceZone(dir, steps[i]), [dir, steps]);
 
   const mode = planMode(intro.goal_type ?? 'lose', direction(intro.weight_kg, target));
   const plan = dailyPlan(body, mode, target, pace);
+  const imperial = intro.units === 'imperial';
+  const fmtPace = (kg: number) => (imperial ? String(Math.round(kg * LB_PER_KG * 10) / 10) : String(kg));
   const floor = minKcal(body).toLocaleString('en-GB');
   const kcal = plan.calories.toLocaleString('en-GB');
-  const cardLine = plan.capped
-    ? `${kcal} kcal a day, the safe minimum. Moving more gets you there sooner.`
-    : index === limit && limit < steps.length - 1
-      ? `${kcal} kcal a day. Any faster would mean under ${floor}.`
-      : `${kcal} kcal a day. ${ZONE_LINE[zone]}`;
-  const imperial = intro.units === 'imperial';
-  const paceText = imperial ? String(Math.round(pace * LB_PER_KG * 10) / 10) : String(pace);
+  const cardLine = !plan.capped
+    ? `${kcal} kcal a day. ${ZONE_LINE[zone]}`
+    : safeIndex >= 0
+      ? `Faster than ${fmtPace(steps[safeIndex])} ${imperial ? 'lb' : 'kg'} a week would mean under ${floor} kcal a day, which is hard to maintain. Consider a slower pace.`
+      : `Even the gentlest pace would mean under ${floor} kcal a day, which is hard to maintain. Moving more gets you there sooner.`;
+  const paceText = fmtPace(pace);
   const targetText = imperial ? fmtStLb(target) : `${fmtKg(target)} kg`;
 
   const zones: { z: PaceZone; label: string; img: number }[] = [
@@ -127,7 +127,7 @@ export default function PaceScreen() {
         })}
       </View>
       <View style={s.slider}>
-        <PaceSlider steps={steps} index={index} onChange={setIndex} zoneOf={zoneOf} limit={limit} />
+        <PaceSlider steps={steps} index={index} onChange={setIndex} zoneOf={zoneOf} />
       </View>
       <View style={{ flex: 1 }} />
       <View style={s.card}>

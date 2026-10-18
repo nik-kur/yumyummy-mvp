@@ -96,6 +96,8 @@ export function Ruler({ count, index, currentIndex, perMajor, majorLabel, onChan
   const last = useSharedValue(index);
   const reported = useRef(index);
   const ref = useAnimatedRef<Animated.ScrollView>();
+  // Only the first offset: a changed `contentOffset` prop moves the scroll view at once (new architecture).
+  const initialOffset = useRef({ x: index * STEP_PX, y: 0 }).current;
 
   const onStep = useCallback(
     (i: number) => {
@@ -150,7 +152,7 @@ export function Ruler({ count, index, currentIndex, perMajor, majorLabel, onChan
         showsHorizontalScrollIndicator={false}
         snapToInterval={STEP_PX}
         decelerationRate="fast"
-        contentOffset={{ x: index * STEP_PX, y: 0 }}
+        contentOffset={initialOffset}
       >
         <View>
           <Animated.View style={[s.band, band]} />

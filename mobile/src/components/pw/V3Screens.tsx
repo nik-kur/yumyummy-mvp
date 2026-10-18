@@ -278,7 +278,11 @@ export function LightPlans({
 }: PlansProps & { canGoBack: boolean; onBack: () => void; todayLine: string; rating: string; users: string }) {
   const none = p.products.length === 0;
   // iPhone SE and other short screens: the plan cards must stay in view.
-  const short = useWindowDimensions().height < 700;
+  // Tall ones get the big timeline. Spare height is shared out between the
+  // blocks (phone test, build 64: everything sat at the top over an empty band).
+  const { height } = useWindowDimensions();
+  const short = height < 700;
+  const tall = height >= 840;
   return (
     <OnbLayout
       progress={null}
@@ -308,12 +312,10 @@ export function LightPlans({
           </Text>
         ))}
       </View>
-      {p.hasTrial ? (
-        <View style={{ marginTop: short ? 12 : 18 }}>
-          <TrialTimeline trialDays={p.trialDays} todayLine={todayLine} compact={short} />
-        </View>
-      ) : null}
-      <View style={{ marginTop: 14 }}>
+      <View style={{ flex: 1, minHeight: short ? 12 : 18 }} />
+      {p.hasTrial ? <TrialTimeline trialDays={p.trialDays} todayLine={todayLine} compact={short} large={tall} /> : null}
+      <View style={{ flex: 1, minHeight: 14 }} />
+      <View>
         {none ? (
           <NoPlans onRetry={p.onRetry} />
         ) : (
@@ -345,7 +347,8 @@ export function PhotoPlans({
     <PhotoStage
       photo={spec.photo}
       badge={spec.badge}
-      fade={{ top: 380, above: 98, below: 216 }}
+      // Dark well before the headline (phone test, build 64: it sat on the bright photo).
+      fade={{ top: 300, above: 190, below: 180, atBlock: 0.8 }}
       label={`A phone scanning a meal: ${spec.badge.title}, ${spec.badge.kcal} kcal`}
     >
       <Text style={s.darkH1} accessibilityRole="header">

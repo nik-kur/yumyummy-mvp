@@ -190,12 +190,16 @@ export function PhoneVideo({ video, poster }: { video: number; poster: number })
 }
 
 /** Transparent → ink, as `linear-gradient(rgba(25,21,15,0), #19150F)` on B3 and the offer. */
-export function InkFade({ top, height }: { top: number; height: number }) {
+/** Transparent → ink; `mid` adds a stop (e.g. already dark where a headline sits). */
+export function InkFade({ top, height, mid }: { top: number; height: number; mid?: { at: number; opacity: number } }) {
+  // A middle stop at (0.5, 0.5) is the plain straight ramp.
+  const m = mid ?? { at: 0.5, opacity: 0.5 };
   return (
     <Svg style={{ position: 'absolute', left: 0, right: 0, top, height }} width="100%" height={height} pointerEvents="none">
       <Defs>
         <LinearGradient id="inkFade" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={C.ink} stopOpacity={0} />
+          <Stop offset={m.at} stopColor={C.ink} stopOpacity={m.opacity} />
           <Stop offset="1" stopColor={C.ink} stopOpacity={1} />
         </LinearGradient>
       </Defs>

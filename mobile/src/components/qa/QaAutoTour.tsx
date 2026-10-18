@@ -83,6 +83,8 @@ const STEPS: Step[] = [
   { name: 'pw_plans_wide_design', route: '/paywall?qa_step=plans', overrides: { paywall: { render: 'native', variant: 'b3_wide', price_emphasis: 'design' } }, hold: 5000 },
   { name: 'pw_p1', route: '/paywall', overrides: { paywall: { render: 'native', variant: 'p1_photo' } }, hold: 5000 },
   { name: 'pw_p1_plans', route: '/paywall?qa_step=plans', overrides: { paywall: { render: 'native', variant: 'p1_photo' } }, hold: 5000 },
+  // P1's video first, the photo plans third (`plans` key).
+  { name: 'pw_p1_b3_plans', route: '/paywall?qa_step=plans', overrides: { paywall: { render: 'native', variant: 'p1_photo', plans: 'b3_joe' } }, hold: 5000 },
   { name: 'offer', route: '/paywall?qa_offer=1', hold: 6000 },
   { name: 'offer_closeup_design', route: '/paywall?qa_offer=1', overrides: { offer: { render: 'native', variant: 'closeup', price_emphasis: 'design' } }, hold: 6000 },
   { name: 'success', route: '/success' },

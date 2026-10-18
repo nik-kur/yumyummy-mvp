@@ -2,8 +2,6 @@
  * Pace slider (screen 7, Pace): 6 pt track, terracotta fill, 28 pt thumb with
  * a terracotta ring. Drag or tap; snaps to `steps`. Haptics: a light tick per
  * step, a firmer impact when the zone changes (Gentle → Recommended → Fast).
- * Steps past `limit` stay on the track as a dashed segment the thumb cannot
- * enter (paces that would take calories under the safe floor).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
@@ -21,17 +19,13 @@ interface Props {
   onChange: (index: number) => void;
   /** Zone of a step; a change fires the firmer haptic. */
   zoneOf: (index: number) => string;
-  /** Last step the thumb can reach (default: the last step). */
-  limit?: number;
 }
 
-export function PaceSlider({ steps, index, onChange, zoneOf, limit: limitProp }: Props) {
+export function PaceSlider({ steps, index, onChange, zoneOf }: Props) {
   const [w, setW] = useState(0);
   const x = useSharedValue(0);
   const last = useRef(index);
   const n = steps.length - 1;
-  const limit = Math.max(0, Math.min(n, limitProp ?? n));
-  const limitX = n > 0 ? (limit / n) * w : 0;
 
   useEffect(() => {
     if (w > 0) x.value = withTiming((index / n) * w, { duration: 120 });
@@ -52,7 +46,7 @@ export function PaceSlider({ steps, index, onChange, zoneOf, limit: limitProp }:
   const toIndex = (px: number) => {
     'worklet';
     if (w <= 0) return 0;
-    return Math.max(0, Math.min(limit, Math.round((px / w) * n)));
+    return Math.max(0, Math.min(n, Math.round((px / w) * n)));
   };
 
   const pan = Gesture.Pan()
@@ -63,7 +57,7 @@ export function PaceSlider({ steps, index, onChange, zoneOf, limit: limitProp }:
       runOnJS(step)(i);
     })
     .onUpdate((e) => {
-      const px = Math.max(0, Math.min(limitX, e.x - THUMB / 2));
+      const px = Math.max(0, Math.min(w, e.x - THUMB / 2));
       x.value = px;
       runOnJS(step)(toIndex(px));
     })
@@ -83,14 +77,7 @@ export function PaceSlider({ steps, index, onChange, zoneOf, limit: limitProp }:
   return (
     <GestureDetector gesture={pan}>
       <View style={s.wrap} onLayout={onLayout} hitSlop={{ top: 12, bottom: 12 }}>
-        {limit < n ? (
-          <>
-            <View style={[s.trackPart, { width: limitX + THUMB / 2 }]} />
-            <View style={[s.locked, { left: limitX + THUMB / 2 + 4 }]} />
-          </>
-        ) : (
-          <View style={s.track} />
-        )}
+        <View style={s.track} />
         <Animated.View style={[s.fill, fill]} />
         <Animated.View style={[s.thumb, SHADOW, thumb]} />
       </View>
@@ -101,17 +88,6 @@ export function PaceSlider({ steps, index, onChange, zoneOf, limit: limitProp }:
 const s = StyleSheet.create({
   wrap: { height: THUMB, justifyContent: 'center' },
   track: { position: 'absolute', left: 0, right: 0, top: 11, height: 6, borderRadius: 3, backgroundColor: C.hair },
-  trackPart: { position: 'absolute', left: 0, top: 11, height: 6, borderRadius: 3, backgroundColor: C.hair },
-  locked: {
-    position: 'absolute',
-    right: 0,
-    top: 11,
-    height: 6,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: C.hair2,
-  },
   fill: { position: 'absolute', left: 0, top: 11, height: 6, borderRadius: 3, backgroundColor: C.terra },
   thumb: {
     position: 'absolute',

@@ -1,9 +1,11 @@
 /**
- * DEMO content for QA builds only — invented people from the V3 canvas
- * ("SYNTHETIC — INTERNAL DESIGN TEST ONLY"). Never in a production bundle: the
- * only require sits behind a build-time constant in `onboardingConfig.ts`, and
- * `expo export --clear` with EXPO_PUBLIC_QA_BUILD=0 was checked for the marker
- * below. Real, consented reviews reach production through `onb_content`.
+ * Review content bundled for QA builds (the QA menu works without Adapty).
+ * The reviews and before/after photos are real customers (Nikita, 18 Oct: the
+ * "SYNTHETIC / demo" marks in the analyst's table were template leftovers).
+ * Production gets the same content from `onb_content`, never from this file:
+ * the only require sits behind a build-time constant in `onboardingConfig.ts`,
+ * and `expo export --clear` with EXPO_PUBLIC_QA_BUILD=0 was checked for the
+ * marker below.
  */
 import type { OnboardingContent } from './types';
 

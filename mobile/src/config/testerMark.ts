@@ -15,7 +15,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { adapty } from 'react-native-adapty';
 
-import { register, setPersonProperties, track } from '@/analytics/posthog';
+import { registerDevice, setPersonProperties, track } from '@/analytics/posthog';
 import { captureException } from '@/analytics/sentry';
 import { waitForAdaptyIdentify, whenAdaptyActivated } from '@/billing/adapty';
 import { sha256Hex } from '@/utils/sha256';
@@ -57,7 +57,8 @@ export async function applyTesterCode(code: string): Promise<TesterResult> {
     return 'failed';
   }
   // PostHog gets the flag, never the code itself (that is the segment's key).
-  register({ qa_tester: !clearing });
+  // A device property: it has to outlive PostHog's reset on sign-out.
+  registerDevice({ qa_tester: !clearing });
   setPersonProperties({ qa_tester: !clearing });
   track(clearing ? 'qa_tester_cleared' : 'qa_tester_marked');
   if (clearing) await AsyncStorage.removeItem(TESTER_CODE_KEY).catch(() => {});

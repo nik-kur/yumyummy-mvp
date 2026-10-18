@@ -54,11 +54,11 @@ export function planMode(goal: GoalType, dir: Direction): PlanMode {
 }
 
 /**
- * Pace options in kg per week; the recommended pace sits mid-track as drawn.
- * Losing stays under 1 kg/week (CAP 13.10).
+ * Pace options in kg per week. Losing goes up to 1 kg/week — the CAP 13.10
+ * ceiling, never more — with 0.4 recommended (Nikita, 18 Oct).
  */
 export const PACE = {
-  down: { min: 0.1, max: 0.9, step: 0.1, recommended: 0.5, gentleMax: 0.3, fastMin: 0.7 },
+  down: { min: 0.1, max: 1.0, step: 0.1, recommended: 0.4, gentleMax: 0.2, fastMin: 0.6 },
   up: { min: 0.1, max: 0.4, step: 0.05, recommended: 0.25, gentleMax: 0.15, fastMin: 0.35 },
 } as const;
 

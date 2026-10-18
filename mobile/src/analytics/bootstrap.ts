@@ -11,11 +11,12 @@
  * can be slow, and nothing here is worth stalling the paywall for.
  */
 import { initSentry } from '@/analytics/sentry';
-import { initPostHog, getDistinctId } from '@/analytics/posthog';
+import { initPostHog, getDistinctId, registerDevice } from '@/analytics/posthog';
 import { initAttribution, getAppsFlyerId, syncTrackingStatusToAdapty } from '@/analytics/attribution';
 import { activateAdapty, setAdaptyCustomAttributes, setAdaptyIntegrationIdentifier } from '@/billing/adapty';
 import { IS_QA_BUILD } from '@/config/buildFlags';
 import { loadQaOverrides } from '@/config/qa';
+import { isTesterDevice } from '@/config/testerDevice';
 
 /** How long we let ATT + AppsFlyer settle before activating Adapty anyway. */
 const PRE_ACTIVATION_TIMEOUT_MS = 5000;
@@ -36,6 +37,10 @@ export async function bootstrapSdks(): Promise<void> {
 
   initSentry();
   initPostHog();
+  // The tester phone stays out of the funnels after every sign-out (reset), not only until the first one.
+  void isTesterDevice().then((tester) => {
+    if (tester) registerDevice({ qa_tester: true });
+  });
   void loadQaOverrides();
 
   await withTimeout(initAttribution(), PRE_ACTIVATION_TIMEOUT_MS, undefined);

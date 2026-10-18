@@ -48,6 +48,9 @@ interface Props {
 
 export function V3Paywall({ config, products, draft, plansOnly, initialStep, purchasing, onPurchase, onRestore, onRetry }: Props) {
   const isP1 = config.variant.startsWith('p1_');
+  // The plans screen can be picked apart from the first screen (`plans` on pw_main).
+  const plansLook = config.plans === 'auto' ? (isP1 ? 'light' : config.variant) : config.plans;
+  const lightPlans = plansLook === 'light';
   const copy = config.copy;
   const content = getOnboardingContent();
 
@@ -86,11 +89,12 @@ export function V3Paywall({ config, products, draft, plansOnly, initialStep, pur
     track('paywall_step_viewed', {
       step,
       variant: config.variant,
+      plans: plansLook,
       step_index: index,
       steps: steps.join('>'),
       products: productCount.current,
     });
-  }, [step, index, steps, config.variant]);
+  }, [step, index, steps, config.variant, plansLook]);
 
   // B2: ask for push on arrival, once per visit — the reminder it promises
   // only fires with permission. Declined before = iOS answers without a prompt.
@@ -146,7 +150,7 @@ export function V3Paywall({ config, products, draft, plansOnly, initialStep, pur
     hasTrial,
     trialDays: days,
     terms,
-    cta: copy.plans_cta ?? (isP1 ? (hasTrial ? `Start my ${days}-day free trial` : 'Continue') : 'Continue'),
+    cta: copy.plans_cta ?? (lightPlans ? (hasTrial ? `Start my ${days}-day free trial` : 'Continue') : 'Continue'),
     purchasing,
     onBuy,
     onRestore,
@@ -159,7 +163,7 @@ export function V3Paywall({ config, products, draft, plansOnly, initialStep, pur
       <TrialIntro
         hero={hero}
         trialDays={days}
-        todayLine={copy.b1_today ?? 'Unlock AI food calorie tracking'}
+        todayLine={copy.b1_today ?? 'Full access to YumYummy free, including your personalised first 7 days'}
         cta={copy.b1_cta ?? 'Try for free'}
         onNext={() => void onIntroCta()}
         onRestore={onRestore}
@@ -187,7 +191,7 @@ export function V3Paywall({ config, products, draft, plansOnly, initialStep, pur
         onRestore={onRestore}
       />
     );
-  } else if (isP1) {
+  } else if (lightPlans) {
     screen = (
       <LightPlans
         {...plans}
@@ -202,14 +206,14 @@ export function V3Paywall({ config, products, draft, plansOnly, initialStep, pur
     screen = (
       <PhotoPlans
         {...plans}
-        variant={config.variant}
+        variant={plansLook}
         title={copy.plans_title ?? (hasTrial ? 'Reach your goal.\nStart for FREE today.' : 'Reach your goal.\nStart today.')}
         rating={content.rating}
       />
     );
   }
 
-  const dark = step === 'plans' && !isP1;
+  const dark = step === 'plans' && !lightPlans;
   return (
     <View style={{ flex: 1, backgroundColor: dark ? C.ink : C.paper }}>
       <Animated.View key={step} entering={FadeIn.duration(220)} style={{ flex: 1 }}>
