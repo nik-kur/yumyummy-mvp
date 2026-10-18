@@ -193,7 +193,7 @@ TestFlight (17 окт): 1.0.11 (63), EAS e29d8936, в App Store Connect VALID, �
 - PostHog: три воронки дашборда 1031724 исключают и `qa_tester` (телефон с пометкой), не только `qa_build`.
 - Переключение тестового телефона: `scripts/adapty_tester_switch.sh`.
 
-Сборка 1.0.11 (65), 18 окт — правки по двум кругам замечаний Никиты на 64 ([onboarding-v3-feedback-64.md](onboarding-v3-feedback-64.md), коммиты `b766658`, `007e453`):
+Сборка 1.0.11 (65), 18 окт, EAS `329ab093`, в App Store Connect VALID, внутренний TestFlight — IN_BETA_TESTING, на ревью не отправлялась. Правки по двум кругам замечаний Никиты на 64 ([onboarding-v3-feedback-64.md](onboarding-v3-feedback-64.md), коммиты `b766658`, `007e453`):
 - Колёса и линейка: `contentOffset` задаётся один раз. Причина рывков найдена по записи и исходникам RN 0.81 (Fabric применяет смену `contentOffset` сразу, `RCTScrollViewComponentView.mm:388`): на каждом новом числе прокрутка прыгала ~23 pt. После правки при медленном жесте сдвиг ровный (18 px/кадр), медленное отпускание на полпути само встаёт на значение.
 - Темп: 0,1–1,0 кг/нед, рекомендованный 0,4; быстрее минимума калорий — план на минимуме и строка «Faster than X kg a week would mean under N kcal a day, which is hard to maintain. Consider a slower pace.»
 - Экраны с фото: полоса (край фото) убрана в `PhotoStage`, затемнение на B3 плотное у заголовка, плашка B3 больше не пропадает под Dynamic Island.
