@@ -13,6 +13,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IS_QA_BUILD } from '@/config/buildFlags';
+import { TESTER_CODE_KEY } from '@/config/testerDevice';
 import { adapty, AppTrackingTransparencyStatus, LogLevel } from 'react-native-adapty';
 import type {
   AdaptyExternalAttributionProvider,
@@ -131,7 +132,7 @@ export async function whenAdaptyActivated(graceMs: number): Promise<boolean> {
  */
 async function reapplyDeviceAttributes(): Promise<void> {
   try {
-    const code = await AsyncStorage.getItem('@yy_qa_tester');
+    const code = await AsyncStorage.getItem(TESTER_CODE_KEY);
     await adapty.updateProfile({
       codableCustomAttributes: { qa_build: IS_QA_BUILD ? 'true' : 'false', ...(code ? { qa_tester: code } : {}) },
     });
