@@ -48,6 +48,8 @@
 | `pw_main_qa` | `pw_main_qa` (`88072cc9`), экраны и продукты как у `pw_welmi` | `{"render": "native", "variant": "b3_joe", "price_emphasis": "billed", "show_rating": true}` |
 | `pw_after_cancel_qa` | `pw_after_cancel_qa` (`29900e97`), экран и продукт как у `pw_offer_free` | `{"render": "native", "variant": "costa", "price_emphasis": "billed", "show_rating": true}` |
 
+Переключить: `scripts/adapty_tester_switch.sh <двойник> '<json>'` (пишет remote config флоу и публикует, ~1 мин) или в дашборде: флоу → Remote config → Publish.
+
 Когда изменение доходит до телефона: онбординг и контент — при каждом запуске (полностью закрыть и открыть приложение; если вошёл — Profile → Sign out); пейвол и оффер — при каждом открытии. Ключи — в разделах ниже. Демо-отзывы живут только в `onb_content_qa`: живым пользователям их не показываем (UK).
 
 Почему двойники, а не аудитория: API Adapty строит сегменты только по системным полям (`customer_user_id`, `app_version`, …), свой атрибут `qa_tester` туда не подставить. Атрибут `qa_tester` приложение всё равно пишет — пригодится, если сегмент когда-нибудь соберут в дашборде.
