@@ -27,7 +27,7 @@
 | Плейсмент | Что | Есть в Adapty? |
 |---|---|---|
 | `onb_main` | Онбординг: тесты и переключатели | есть (флоу a8b7ec17) |
-| `onb_content` | Тексты, цифры, отзывы для всех армов (без A/B) | есть с 17 окт: флоу `onb_content` (`8ac539f4`), значения как в коде (`rating` 5.0, `users` 12,000+, `plan.guide_*`) |
+| `onb_content` | Тексты, цифры, отзывы для всех армов (без A/B) | есть с 17 окт: флоу `onb_content` (`8ac539f4`). С 18 окт: `rating` 5.0, `users` 12,000+, `plan.guide_*`, отзывы по целям, отзыв для лоадера. Фото до/после — только у тестового телефона (`onb_content_qa`), для всех — после подтверждения, что это реальные клиенты с согласием |
 | `onb_welcome` | Слот: экран из Adapty вместо Welcome | нет, создаётся под тест |
 | `onb_social` | Слот: экран из Adapty вместо экрана 16 (отзывы) | нет, создаётся под тест |
 | `pw_main` | Пейвол 17–19 | есть. С 18 окт обе аудитории (All users и «Nikita tester» по `customer_user_id`) → флоу `pw_v3_b3_joe` (`b2d3d236`): 1.0.11 показывает V3 в коде (`b3_joe`, `billed`), ≤ 1.0.10 — экраны Welmi, как раньше (в remote config нет `use_native`). Теста нет: native-monthly vs pw_welmi закончился, с ~10 окт у всех был `pw_welmi` |
@@ -64,7 +64,7 @@
 | `welcome.headline` | текст или `null` | `null` (как в дизайне) | Заголовок Welcome | |
 | `welcome.subline` | текст или `null` | `null` | Подзаголовок Welcome | |
 | `features` | `screen`, `off` | `screen` | Показывать экран Features (12) | O1 |
-| `social_proof.show` | `true`, `false` | `false` | Экран 16 с отзывами. Выключен, пока нет настоящих отзывов (UK запрещает выдуманные) | |
+| `social_proof.show` | `true`, `false` | `false` (в коде); в Adapty с 18 окт `true` | Экран 16 с отзывами. С 18 окт включён для всех: отзывы настоящие (Никита: пометка «демо» в таблице — остаток шаблона аналитика). Окно оценки — на этом экране (`rating_prompt: auto`) | |
 | `social_proof.hero` | `before_after`, `text` | `before_after` | Верх экрана 16: фото до/после или текст | O4 |
 | `social_proof.render` | `native`, `flow` | `native` | `flow` = экран 16 из флоу на `onb_social` | слот |
 | `loader_review` | `true`, `false` | `false` | Карточка отзыва в лоадере (14) | |
@@ -127,6 +127,8 @@
 
 Тарифы — это продукты на флоу арма в Adapty: 1–3 карточки, годовой выбран по умолчанию, «SAVE N%» считается сам. Цены и триал берутся из App Store. Тесты цен и триала — продуктами на флоу, без сборки. B1/P1/B2 показываются только если у человека есть триал; из Profile и у вошедших сразу тарифы.
 
+Сейчас у всех (`pw_v3_b3_joe`, 18 окт): `{"render": "native", "variant": "b3_joe", "price_emphasis": "billed", "show_rating": true, "copy": {"b1_today": "Full access to YumYummy free, including your personalised first 7 days"}}`.
+
 Пример (вариант как на макете, без рейтинга):
 ```json
 {"use_native": true, "render": "native", "variant": "b3_home", "price_emphasis": "design", "show_rating": false}
@@ -169,5 +171,5 @@
 
 - `pw_main`: ни один арм не стоит на `design` / `weekly` и не отдаёт флоу Adapty, где крупно цена за месяц. Безопасно: `price_emphasis: "billed"` (или ключа нет).
 - `pw_after_cancel`: идущий тест — экраны флоу Adapty; проверить, что на них видна сумма списания.
-- `onb_main`: `social_proof.show` и `loader_review` выключены (демо-отзывы ревьюеру не показываем). Двойники `_qa` ревьюер не увидит: их читает только телефон с пометкой.
+- `onb_main`: отзывы на экране 16 — только настоящие (с 18 окт включены для всех); фото до/после — только реальные клиенты с согласием. Двойники `_qa` ревьюер не увидит: их читает только телефон с пометкой.
 - Тексты в `onb_content.texts` без обещаний, которые приложение не выполняет.
