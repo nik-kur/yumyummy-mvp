@@ -27,12 +27,12 @@ export interface OnboardingConfig {
   features: 'screen' | 'off';
   social_proof: {
     render: SlotRender;
-    /** Screen 16. Off by default until real, consented reviews exist. */
+    /** Screen 16. Off in code; on in Adapty for everyone since 18 Oct (real reviews from `onb_content`). */
     show: boolean;
     /** O4: before/after photos or a text-only hero. */
     hero: 'before_after' | 'text';
   };
-  /** Review card inside the loader (14). Off by default, same reason as screen 16. */
+  /** Review card inside the loader (14). Off by default. */
   loader_review: boolean;
   /** O7: dated weight chart (control) or the "See what's ahead" milestones. */
   plan: 'chart' | 'ahead';
@@ -56,6 +56,13 @@ export interface OnboardingConfig {
    * first AI log. Anyone who never saw the line still gets the sheet.
    */
   ai_consent: 'save_plan' | 'sheet';
+  /**
+   * The onboarding's App Store rating prompt: `auto` = over screen 16 when it
+   * shows, else over the plan reveal (15); `plan` = always over the plan
+   * reveal; `off` = none in the onboarding. The in-app moments (a full day
+   * logged, the Week 1 report) ask either way, within their own caps.
+   */
+  rating_prompt: 'auto' | 'plan' | 'off';
 }
 
 /** One review on the carousel (16) or in the loader card (14). */
@@ -114,6 +121,12 @@ export interface PaywallArmConfig {
   price_emphasis: 'design' | 'billed' | 'weekly';
   /** "5.0 ★ avg App Store rating" on B3 and the rating chip on P1 plans. */
   show_rating: boolean;
+  /**
+   * `pw_main` plans screen (19), apart from the first screen: `auto` follows
+   * the variant (p1_* → light cards, b3_* → that photo); `light`, or a B3
+   * photo (`b3_joe` …) to pair e.g. P1's video with the photo plans.
+   */
+  plans: 'auto' | 'light' | 'b3_joe' | 'b3_home' | 'b3_office' | 'b3_wide';
 }
 
 /** How a config reached the app — goes to PostHog as `config_source`. */

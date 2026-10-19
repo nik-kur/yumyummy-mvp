@@ -79,7 +79,21 @@ const CROWN = (
 );
 
 /** Trial timeline: today → reminder the day before → billing starts. */
-export function TrialTimeline({ trialDays, todayLine }: { trialDays: number; todayLine: string }) {
+/**
+ * `compact`: titles only, for the plans screen on short iPhones (the plan cards must stay in view).
+ * `large`: bigger dots, type and rows, for B1 on tall iPhones (the timeline is all that screen has).
+ */
+export function TrialTimeline({
+  trialDays,
+  todayLine,
+  compact,
+  large,
+}: {
+  trialDays: number;
+  todayLine: string;
+  compact?: boolean;
+  large?: boolean;
+}) {
   const remind = trialDays - 1;
   const rows = [
     { icon: LOCK, on: true, title: 'Today', sub: todayLine },
@@ -99,12 +113,14 @@ export function TrialTimeline({ trialDays, todayLine }: { trialDays: number; tod
   return (
     <View style={s.timeline}>
       {rows.map((r, i) => (
-        <View key={r.title} style={s.tRow}>
-          {i < rows.length - 1 ? <View style={s.tRail} /> : null}
-          <View style={[s.tDot, r.on ? s.tDotOn : s.tDotOff]}>{r.icon}</View>
-          <View style={s.tText}>
-            <Text style={s.tTitle}>{r.title}</Text>
-            <Text style={s.tSub}>{r.sub}</Text>
+        <View key={r.title} style={[s.tRow, compact && s.tRowCompact, large && s.tRowLarge]}>
+          {i < rows.length - 1 ? <View style={[s.tRail, large && s.tRailLarge]} /> : null}
+          <View style={[s.tDot, large && s.tDotLarge, r.on ? s.tDotOn : s.tDotOff]}>
+            {large ? <View style={s.tIconLarge}>{r.icon}</View> : r.icon}
+          </View>
+          <View style={[s.tText, large && s.tTextLarge]}>
+            <Text style={[s.tTitle, large && s.tTitleLarge]}>{r.title}</Text>
+            {compact ? null : <Text style={[s.tSub, large && s.tSubLarge]}>{r.sub}</Text>}
           </View>
         </View>
       ))}
@@ -174,12 +190,16 @@ export function PhoneVideo({ video, poster }: { video: number; poster: number })
 }
 
 /** Transparent → ink, as `linear-gradient(rgba(25,21,15,0), #19150F)` on B3 and the offer. */
-export function InkFade({ top, height }: { top: number; height: number }) {
+/** Transparent → ink; `mid` adds a stop (e.g. already dark where a headline sits). */
+export function InkFade({ top, height, mid }: { top: number; height: number; mid?: { at: number; opacity: number } }) {
+  // A middle stop at (0.5, 0.5) is the plain straight ramp.
+  const m = mid ?? { at: 0.5, opacity: 0.5 };
   return (
     <Svg style={{ position: 'absolute', left: 0, right: 0, top, height }} width="100%" height={height} pointerEvents="none">
       <Defs>
         <LinearGradient id="inkFade" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={C.ink} stopOpacity={0} />
+          <Stop offset={m.at} stopColor={C.ink} stopOpacity={m.opacity} />
           <Stop offset="1" stopColor={C.ink} stopOpacity={1} />
         </LinearGradient>
       </Defs>
@@ -197,6 +217,7 @@ const s = StyleSheet.create({
   legal: { fontFamily: F.sans, fontSize: 12, lineHeight: 16 },
   timeline: { gap: 4, paddingHorizontal: 6 },
   tRow: { flexDirection: 'row', gap: 14, minHeight: 74 },
+  tRowCompact: { minHeight: 44 },
   tRail: { position: 'absolute', left: 17, top: 40, width: 2, height: 34, backgroundColor: C.hair },
   tDot: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   tDotOn: { backgroundColor: C.terra, borderColor: C.terra },
@@ -204,6 +225,13 @@ const s = StyleSheet.create({
   tText: { flex: 1, gap: 2, paddingTop: 6 },
   tTitle: { fontFamily: F.sansSemibold, fontSize: 16, lineHeight: 21, color: C.ink },
   tSub: { fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: C.muted },
+  tRowLarge: { minHeight: 92, gap: 16 },
+  tRailLarge: { left: 22, top: 50, height: 42 },
+  tDotLarge: { width: 46, height: 46, borderRadius: 23 },
+  tIconLarge: { transform: [{ scale: 1.25 }] },
+  tTextLarge: { paddingTop: 10, gap: 3 },
+  tTitleLarge: { fontSize: 18, lineHeight: 24 },
+  tSubLarge: { fontSize: 15, lineHeight: 21 },
   badge: {
     paddingVertical: 12,
     paddingHorizontal: 14,

@@ -8,7 +8,7 @@
  * ATT is asked here only when the arm says `att: "welcome"` (test O6).
  */
 import { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
@@ -72,19 +72,31 @@ function LaurelStat({ value, label, big }: { value: string; label: string; big?:
   );
 }
 
-function PhoneDemo() {
+/** `scale` fits the 246 × 506 mockup on short screens (the button must stay in view). */
+function PhoneDemo({ scale = 1 }: { scale?: number }) {
   const player = useVideoPlayer(VIDEO.welcome_d, (p) => {
     p.loop = true;
     p.muted = true;
     p.play();
   });
   return (
-    <View style={[s.phone, SHADOW]}>
-      <View style={s.phoneScreen}>
+    <View
+      style={[
+        s.phone,
+        SHADOW,
+        { width: 246 * scale, height: 506 * scale, padding: 9 * scale, borderRadius: 46 * scale },
+      ]}
+    >
+      <View style={[s.phoneScreen, { borderRadius: 38 * scale }]}>
         <Image source={IMG.welcome_d_poster} style={StyleSheet.absoluteFill} />
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
       </View>
-      <View style={s.island} />
+      <View
+        style={[
+          s.island,
+          { left: 89 * scale, top: 18 * scale, width: 68 * scale, height: 20 * scale, borderRadius: 10 * scale },
+        ]}
+      />
     </View>
   );
 }
@@ -92,6 +104,7 @@ function PhoneDemo() {
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const initial = getOnboardingConfig().welcome;
   const { config, content, next } = useOnbScreen('S1_welcome', initial.render === 'flow' ? 'flow' : initial.variant);
   const welcome = config.welcome;
@@ -170,10 +183,15 @@ export default function WelcomeScreen() {
     );
   }
 
+  // A and B set the headline bigger and centred in the sheet (phone test, 18 Oct:
+  // a small left-aligned line left an empty band above the button). Both arms
+  // share it, so the O3 test still differs by the rating laurel only.
   const Headline = (
-    <Text style={[variant === 'C' ? s.h1C : s.h1, (variant === 'C' || variant === 'D') && s.centerText]}>{headline}</Text>
+    <Text style={[variant === 'C' ? s.h1C : variant === 'D' ? s.h1 : s.h1Sheet, (variant === 'C' || variant === 'D') && s.centerText]}>
+      {headline}
+    </Text>
   );
-  const Sub = subline ? <Text style={[s.sub, (variant === 'C' || variant === 'D') && s.centerText]}>{subline}</Text> : null;
+  const Sub = subline ? <Text style={[s.sub, s.centerText]}>{subline}</Text> : null;
 
   if (variant === 'C') {
     return (
@@ -199,7 +217,7 @@ export default function WelcomeScreen() {
   if (variant === 'D') {
     return (
       <View style={[s.fill, s.colCenter, { paddingTop: insets.top + 9, paddingBottom: bottomPad }]}>
-        <PhoneDemo />
+        <PhoneDemo scale={Math.min(1, Math.max(0.55, (height - insets.top - bottomPad - 250) / 506))} />
         <View style={{ flex: 1 }} />
         {Headline}
         {Sub}
@@ -224,7 +242,9 @@ export default function WelcomeScreen() {
       <View style={[s.badgeWrap, { bottom: sheetH + 32 }, variant === 'B' && { right: 17 }]}>
         <CalorieBadge />
       </View>
-      <View style={[s.sheet, { height: sheetH + Math.max(0, bottomPad - 30), paddingTop: variant === 'B' ? 32 : 34, paddingBottom: bottomPad }]}>
+      <View style={[s.sheet, { height: sheetH + Math.max(0, bottomPad - 30), paddingTop: variant === 'B' ? 32 : 12, paddingBottom: bottomPad }]}>
+        {/* A: the headline sits midway between the sheet's top and the button. */}
+        {variant === 'B' ? null : <View style={{ flex: 1 }} />}
         {Headline}
         {Sub}
         <View style={{ flex: 1 }} />
@@ -277,6 +297,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
   h1: { fontFamily: F.serif, fontSize: 34, lineHeight: 39, letterSpacing: -0.34, color: C.ink },
+  h1Sheet: { fontFamily: F.serif, fontSize: 40, lineHeight: 45, letterSpacing: -0.4, color: C.ink, textAlign: 'center' },
   h1C: { fontFamily: F.serif, fontSize: 36, lineHeight: 41, letterSpacing: -0.36, color: C.terra },
   sub: { marginTop: 10, fontFamily: F.sans, fontSize: 17, lineHeight: 25, color: C.muted },
   linkWrap: { marginTop: 16, alignSelf: 'center' },

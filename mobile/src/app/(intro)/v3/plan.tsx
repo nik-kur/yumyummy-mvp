@@ -6,25 +6,31 @@
  *   recomp      → "Same weight · more muscle, less fat in 12 weeks";
  *   test O7 `plan: "ahead"` → milestones instead of the chart (moving weight only).
  * "Not medical advice" under the CTA (agreed 15 Oct, same text as sources.tsx).
+ * The App Store rating prompt comes up here when screen 16 is hidden
+ * (`rating_prompt: "auto"`) or always (`plan`), once, 2.5 s in.
  * Charts are the canvas SVGs with the person's numbers swapped in.
  */
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useFocusEffect } from 'expo-router';
 
 import { OnbButton } from '@/components/onb/OnbButton';
 import { getOnboardingConfig } from '@/config/onboardingConfig';
 import { OnbLayout } from '@/components/onb/OnbLayout';
 import { SvgSpec, type SvgSpecData } from '@/components/onb/SvgSpec';
+import { socialScreenShows } from '@/onb/flow';
 import { PLAN_CHARTS } from '@/onb/generated/planCharts';
 import { direction, fmtKg, fmtStLb, formatLongDate, formatShortDate, planMode, type PlanMode } from '@/onb/plan';
 import { IMG } from '@/onb/assets';
 import { C, F, PAD } from '@/onb/theme';
 import { useOnbScreen } from '@/onb/useOnbScreen';
 import { useIntro } from '@/state/introContext';
+import { requestOnboardingReview } from '@/state/rateReview';
 
 const DISCLAIMER = 'YumYummy provides general nutrition information for healthy adults. It is not medical advice.';
 const RECOMP_WEEKS = 12;
+const RATING_DELAY_MS = 2500;
 
 /** Swap chart labels; widen a pill drawn right under a swapped label so the text fits. */
 function withLabels(spec: SvgSpecData, labels: Record<string, string>): SvgSpecData {
@@ -73,12 +79,32 @@ export default function PlanScreen() {
   const target = intro.target_weight_kg ?? intro.weight_kg;
   const mode: PlanMode = planMode(intro.goal_type ?? 'just_track', direction(intro.weight_kg, target));
   const { config, content, next } = useOnbScreen('S15_plan', `${mode}_${getOnboardingConfig().plan}`);
-  const { width } = useWindowDimensions();
-  const chartW = width - PAD.side * 2 - 34;
+  const { width, height } = useWindowDimensions();
+  // Short screens keep the first-week plaque in view above the button: no
+  // check mark below 830 pt (13 mini), also a smaller chart and tighter cards
+  // below 700 pt (iPhone SE).
+  const short = height < 830;
+  const tight = height < 700;
+  const chartW = (width - PAD.side * 2 - 34) * (tight ? 0.66 : 1);
   const imperial = intro.units === 'imperial';
   const show = (kg: number) => (imperial ? fmtStLb(kg) : `${fmtKg(kg)} kg`);
   const moving = mode === 'lose' || mode === 'cut' || mode === 'gain';
   const ahead = config.plan === 'ahead' && moving;
+
+  // Once, and only while this screen is in front: pushed under the paywall, a
+  // pending prompt would come up over it.
+  const askHere = config.rating_prompt === 'plan' || (config.rating_prompt === 'auto' && !socialScreenShows(intro, config, content));
+  const asked = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!askHere || asked.current) return undefined;
+      const t = setTimeout(() => {
+        asked.current = true;
+        void requestOnboardingReview('plan');
+      }, RATING_DELAY_MS);
+      return () => clearTimeout(t);
+    }, [askHere]),
+  );
 
   const diff = target - intro.weight_kg;
   const date = intro.target_date;
@@ -152,15 +178,20 @@ export default function PlanScreen() {
         </>
       }
     >
-      <View style={{ flex: 0.3 }} />
-      <View style={s.check}>
-        <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
-          <Path d="M20 6 9 17l-5-5" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-      </View>
-      <Text style={s.h1}>Your plan is ready</Text>
+      {/* Spare height splits between the top and the gap over the plaque, so
+          the plaque always sits on the button (phone test, 18 Oct: an empty
+          band opened under it on tall iPhones). */}
+      <View style={{ flex: 1 }} />
+      {short ? null : (
+        <View style={s.check}>
+          <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+            <Path d="M20 6 9 17l-5-5" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </View>
+      )}
+      <Text style={[s.h1, short && s.h1Short]}>Your plan is ready</Text>
 
-      <View style={[s.card, s.kcalCard]}>
+      <View style={[s.card, s.kcalCard, tight && s.kcalCardTight]}>
         <View style={s.baseline}>
           <Text style={s.kcal}>{(intro.target_calories ?? 0).toLocaleString('en-GB')}</Text>
           <Text style={s.kcalUnit}>kcal a day</Text>
@@ -189,7 +220,7 @@ export default function PlanScreen() {
           </>
         ) : (
           <>
-            <View style={s.chart}>
+            <View style={[s.chart, tight && s.chartShort]}>
               <SvgSpec spec={chart} width={chartW} />
             </View>
             <View style={s.axis}>
@@ -200,6 +231,7 @@ export default function PlanScreen() {
         )}
       </View>
 
+      <View style={{ flex: 1, minHeight: 10 }} />
       {/* The first-week ladder (state/journey.ts) is what turns the plan into a habit. */}
       <View style={s.guide}>
         <Image source={IMG.mascot_great} style={s.guideIcon} accessibilityIgnoresInvertColors />
@@ -210,7 +242,6 @@ export default function PlanScreen() {
           </Text>
         </View>
       </View>
-      <View style={{ flex: 1 }} />
     </OnbLayout>
   );
 }
@@ -226,8 +257,10 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   h1: { marginTop: 10, textAlign: 'center', fontFamily: F.serif, fontSize: 30, lineHeight: 36, letterSpacing: -0.3, color: C.ink },
+  h1Short: { marginTop: 0 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.hair, borderRadius: 16 },
   kcalCard: { marginTop: 16, padding: 18 },
+  kcalCardTight: { marginTop: 10, padding: 12 },
   goalCard: { marginTop: 10, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14 },
   aheadCard: { marginTop: 10, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 6 },
   baseline: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', columnGap: 8 },
@@ -241,10 +274,10 @@ const s = StyleSheet.create({
   goalBig: { fontFamily: F.serif, color: C.terra, fontVariant: ['tabular-nums'] },
   goalSmall: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: C.muted },
   chart: { marginTop: 10 },
+  chartShort: { alignItems: 'center' },
   axis: { marginTop: 4, height: 18, flexDirection: 'row', justifyContent: 'space-between' },
   axisText: { fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.muted },
   guide: {
-    marginTop: 10,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',

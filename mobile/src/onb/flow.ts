@@ -99,6 +99,11 @@ function hasSocialContent(d: IntroDraft, c: OnboardingConfig, content?: Onboardi
   return (content.reviews[CONTENT_GOAL[d.goal_type ?? 'lose']] ?? []).length > 0;
 }
 
+/** Screen 16 will show for these answers (the plan reveal asks for the rating when it won't). */
+export function socialScreenShows(d: IntroDraft, c: OnboardingConfig, content?: OnboardingContent): boolean {
+  return c.social_proof.show && hasSocialContent(d, c, content);
+}
+
 export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig, content?: OnboardingContent): string {
   const order: ScreenId[] = [
     'S1_welcome',
@@ -127,12 +132,15 @@ export function nextScreen(current: ScreenId, d: IntroDraft, c: OnboardingConfig
         return !weightMoves(d) && !belowHealthy(d);
       case 'S7_pace':
         return !weightMoves(d);
+      case 'S8_proof':
+        // "2× more likely to lose weight" speaks to losing only (Nikita, build 64).
+        return d.goal_type !== 'lose';
       case 'S10_barriers':
         return d.tracked_before !== true;
       case 'S12_features':
         return c.features === 'off';
       case 'S16_social':
-        return !c.social_proof.show || !hasSocialContent(d, c, content);
+        return !socialScreenShows(d, c, content);
       default:
         return false;
     }

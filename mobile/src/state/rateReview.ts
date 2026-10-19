@@ -17,6 +17,8 @@ import * as StoreReview from 'expo-store-review';
 import { Linking } from 'react-native';
 
 import { track } from '@/analytics/posthog';
+import { captureException } from '@/analytics/sentry';
+import { qaOverrides } from '@/config/qa';
 
 const LAST_KEY = 'yy.review.last_prompt.v1';
 const COUNT_KEY = 'yy.review.count.v1';
@@ -91,5 +93,23 @@ export async function openStoreReviewFromSettings(): Promise<void> {
     }
   } catch {
     // No-op on failure.
+  }
+}
+
+/**
+ * The onboarding's one rating prompt, over screen 16 or the plan reveal
+ * (`rating_prompt` on onb_main). Not counted in the caps above, so the in-app
+ * moments still get their turn; Apple shows the sheet 3 times a year at most,
+ * and never in TestFlight.
+ */
+export async function requestOnboardingReview(source: string): Promise<void> {
+  // The QA auto tour takes screenshots: no system prompt over the screens after this one.
+  if (qaOverrides().auto_tour) return;
+  try {
+    if (!(await StoreReview.hasAction())) return;
+    track('rating_prompt_requested', { source });
+    await StoreReview.requestReview();
+  } catch (e) {
+    captureException(e, { where: 'onboarding_rating' });
   }
 }

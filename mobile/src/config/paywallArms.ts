@@ -17,6 +17,7 @@ import { waitForAdaptyIdentify, whenAdaptyActivated } from '@/billing/adapty';
 import { DEFAULT_OFFER_ARM, DEFAULT_PAYWALL_ARM } from './defaults';
 import { parsePaywallArm } from './parse';
 import { loadQaOverrides } from './qa';
+import { testerPlacement } from './testerDevice';
 import type { ConfigSource, PaywallArmConfig } from './types';
 
 const ACTIVATION_GRACE_MS = 1200;
@@ -41,7 +42,10 @@ export async function resolvePaywallArm(
     // at once in the acquisition flow, where no identify() is in flight.
     await waitForAdaptyIdentify();
     try {
-      flow = await adapty.getFlow(placement, { loadTimeoutMs: timeoutMs });
+      // A tester install reads the `_qa` twin first (switched for that phone only).
+      const twin = await testerPlacement(placement);
+      if (twin) flow = await adapty.getFlow(twin, { loadTimeoutMs: timeoutMs }).catch(() => null);
+      if (!flow) flow = await adapty.getFlow(placement, { loadTimeoutMs: timeoutMs });
     } catch (e) {
       addBreadcrumb('config', 'Paywall arm fetch failed', {
         placement,

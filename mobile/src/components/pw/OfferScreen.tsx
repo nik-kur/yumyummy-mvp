@@ -18,6 +18,7 @@ import type { PaywallArmConfig } from '@/config/types';
 import { C, F } from '@/onb/theme';
 
 import { OFFER_PHOTOS } from './copy';
+import { DelayedClose } from './DelayedClose';
 import { PhotoStage } from './PhotoStage';
 import { LegalRow } from './PwParts';
 
@@ -51,17 +52,13 @@ export function OfferScreen({ config, product, purchasing, onBuy, onClose, onRes
           : 'A phone scanning a Costa coffee and a croissant, with the calories and source on screen'
       }
       overlay={
-        <Pressable
-          onPress={onClose}
-          style={[s.close, { top: insets.top + 3 }]}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        >
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 6 6 18M6 6l12 12" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-        </Pressable>
+        <DelayedClose style={[s.closeSpot, { top: insets.top + 3 }]}>
+          <Pressable onPress={onClose} style={s.close} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              <Path d="M18 6 6 18M6 6l12 12" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </Pressable>
+        </DelayedClose>
       }
     >
       <Text style={s.pill}>{copy.badge ?? 'Last offer'}</Text>
@@ -83,9 +80,8 @@ export function OfferScreen({ config, product, purchasing, onBuy, onClose, onRes
 }
 
 const s = StyleSheet.create({
+  closeSpot: { position: 'absolute', right: 12 },
   close: {
-    position: 'absolute',
-    right: 12,
     width: 44,
     height: 44,
     borderRadius: 22,

@@ -15,6 +15,7 @@ import { bootstrapSdks } from '@/analytics/bootstrap';
 import { colors } from '@/theme/tokens';
 import { IS_QA_BUILD } from '@/config/buildFlags';
 import { QaButton } from '@/components/QaButton';
+import { QaAutoTour } from '@/components/qa/QaAutoTour';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -87,6 +88,7 @@ export default function RootLayout() {
               <Stack.Screen name="qa" options={{ presentation: 'modal' }} />
             </Stack>
             {IS_QA_BUILD ? <QaButton /> : null}
+            {IS_QA_BUILD ? <QaAutoTour /> : null}
           </PendingMealsProvider>
         </AuthProvider>
       </SafeAreaProvider>

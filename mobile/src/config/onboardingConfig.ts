@@ -25,11 +25,12 @@ import {
   whenAdaptyActivated,
 } from '@/billing/adapty';
 
-import { loadDraft } from '@/state/introDraft';
+import { isPreV3Draft, loadDraft } from '@/state/introDraft';
 
 import { DEFAULT_ONBOARDING_CONTENT, DEFAULT_ONBOARDING_CONFIG } from './defaults';
 import { parseOnboardingConfig, parseOnboardingContent, remoteConfigData } from './parse';
 import { hasQaOverrides, loadQaOverrides, qaOverrides, subscribeQa } from './qa';
+import { isTesterDevice, testerPlacement } from './testerDevice';
 import type { AssignmentMeta, OnboardingConfig, OnboardingContent } from './types';
 
 /** Longest the first launch waits for `onb_main` (agreed 2–3 s; Adapty activation alone takes ~2 s on a fresh install). */
@@ -85,6 +86,19 @@ export async function getFlowQuiet(placement: string, timeoutMs: number): Promis
   }
 }
 
+/**
+ * `placement`, or on a tester install its `_qa` twin first — the live one
+ * still answers when the twin has nothing.
+ */
+async function getFlowFor(placement: string, timeoutMs: number): Promise<{ flow: AdaptyFlow | null; placement: string }> {
+  const twin = await testerPlacement(placement);
+  if (twin) {
+    const flow = await getFlowQuiet(twin, timeoutMs);
+    if (flow) return { flow, placement: twin };
+  }
+  return { flow: await getFlowQuiet(placement, timeoutMs), placement };
+}
+
 function analyticsProps(a: OnboardingAssignment): Record<string, unknown> {
   const qa = hasQaOverrides();
   return {
@@ -112,8 +126,8 @@ async function fetchAssignment(): Promise<OnboardingAssignment> {
   const attempt = (async () => {
     if (!(await whenAdaptyActivated(ACTIVATION_GRACE_MS))) return 'adapty_unavailable' as const;
     const left = Math.max(500, ONB_CONFIG_TIMEOUT_MS - (Date.now() - started));
-    const flow = await getFlowQuiet(ADAPTY_PLACEMENT_ONBOARDING_FLOW, left);
-    return flow ?? ('error' as const);
+    const got = await getFlowFor(ADAPTY_PLACEMENT_ONBOARDING_FLOW, left);
+    return got.flow ? { flow: got.flow, placement: got.placement } : ('error' as const);
   })();
 
   const result = await withTimeout(attempt, ONB_CONFIG_TIMEOUT_MS);
@@ -129,15 +143,17 @@ async function fetchAssignment(): Promise<OnboardingAssignment> {
     });
   }
   if (typeof result === 'string') return fallback(result);
+  const { flow, placement } = result;
   return {
-    config: parseOnboardingConfig(remoteConfigData(result)),
+    config: parseOnboardingConfig(remoteConfigData(flow)),
     meta: {
       ...base,
+      placement,
       source: 'adapty',
-      variation_id: result.variationId,
-      variation_name: result.variationName,
-      ab_test: result.placement?.abTestName,
-      audience: result.placement?.audienceName,
+      variation_id: flow.variationId,
+      variation_name: flow.variationName,
+      ab_test: flow.placement?.abTestName,
+      audience: flow.placement?.audienceName,
       fetch_ms: Date.now() - started,
     },
   };
@@ -166,7 +182,8 @@ export function resolveOnboardingAssignment(): Promise<OnboardingAssignment> {
   const run = (async (): Promise<OnboardingAssignment> => {
     await loadQaOverrides();
     void refreshOnboardingContent();
-    const stored = await loadStoredAssignment();
+    // A tester's arm is switched remotely while they test: ask Adapty on every launch.
+    const stored = (await isTesterDevice()) ? null : await loadStoredAssignment();
     if (gen !== generation) return resolveOnboardingAssignment();
     if (stored) {
       assignment = stored;
@@ -176,9 +193,10 @@ export function resolveOnboardingAssignment(): Promise<OnboardingAssignment> {
       return stored;
     }
     // Half-way through the pre-V3 onboarding when this build arrived: finish
-    // it as it started rather than jumping into V3 mid-quiz.
+    // it as it started rather than jumping into V3 mid-quiz. A finished V3
+    // draft (Save plan forgets the arm, then sign out + relaunch) is not one.
     const draft = await loadDraft();
-    const fresh: OnboardingAssignment = draft.goal_type && !explicitlyCleared
+    const fresh: OnboardingAssignment = isPreV3Draft(draft) && !explicitlyCleared
       ? {
           config: { ...DEFAULT_ONBOARDING_CONFIG, onboarding: 'v1' },
           meta: {
@@ -253,6 +271,8 @@ export async function clearOnboardingAssignment(): Promise<void> {
   explicitlyCleared = true;
   assignment = null;
   resolving = null;
+  // A tester mark changes where content comes from too: fetch it again with the arm.
+  contentRefresh = null;
   await AsyncStorage.removeItem(ASSIGNMENT_KEY).catch(() => {});
   emit();
 }
@@ -320,7 +340,7 @@ export function refreshOnboardingContent(): Promise<void> {
       // cache is a convenience
     }
     if (!(await whenAdaptyActivated(ACTIVATION_GRACE_MS))) return;
-    const flow = await getFlowQuiet(ADAPTY_PLACEMENT_ONBOARDING_CONTENT, CONTENT_TIMEOUT_MS);
+    const { flow } = await getFlowFor(ADAPTY_PLACEMENT_ONBOARDING_CONTENT, CONTENT_TIMEOUT_MS);
     const data = remoteConfigData(flow);
     if (!data) return;
     content = parseOnboardingContent(data);

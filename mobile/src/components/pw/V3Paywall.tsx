@@ -16,6 +16,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { track } from '@/analytics/posthog';
 import { defaultPlan, justPerYear, periodOf, trialDays, trialThenPrice } from '@/billing/v3Pricing';
 import { getOnboardingContent } from '@/config/onboardingConfig';
+import { qaOverrides } from '@/config/qa';
 import type { PaywallArmConfig } from '@/config/types';
 import { requestPermission as requestPushPermission } from '@/notifications/scheduler';
 import { C } from '@/onb/theme';
@@ -37,14 +38,19 @@ interface Props {
   draft: IntroDraft | null;
   /** Profile / signed-in gate: straight to the plans. */
   plansOnly: boolean;
+  /** QA builds: start on this step (screenshots). */
+  initialStep?: PwStep;
   purchasing: boolean;
   onPurchase: (p: AdaptyPaywallProduct) => void;
   onRestore: () => void;
   onRetry: () => void;
 }
 
-export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPurchase, onRestore, onRetry }: Props) {
+export function V3Paywall({ config, products, draft, plansOnly, initialStep, purchasing, onPurchase, onRestore, onRetry }: Props) {
   const isP1 = config.variant.startsWith('p1_');
+  // The plans screen can be picked apart from the first screen (`plans` on pw_main).
+  const plansLook = config.plans === 'auto' ? (isP1 ? 'light' : config.variant) : config.plans;
+  const lightPlans = plansLook === 'light';
   const copy = config.copy;
   const content = getOnboardingContent();
 
@@ -65,7 +71,7 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     if (plansOnly || products.length === 0 || !introTrial) return ['plans'];
     return isP1 ? ['p1', 'b2', 'plans'] : ['b1', 'b2', 'plans'];
   });
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => Math.max(0, initialStep ? steps.indexOf(initialStep) : 0));
   const step = steps[index];
   // B1 / P1 and B2 put their button in the same place: a double tap must not
   // skip B2 (and its push prompt), so a step ignores taps for its first beat.
@@ -83,11 +89,12 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     track('paywall_step_viewed', {
       step,
       variant: config.variant,
+      plans: plansLook,
       step_index: index,
       steps: steps.join('>'),
       products: productCount.current,
     });
-  }, [step, index, steps, config.variant]);
+  }, [step, index, steps, config.variant, plansLook]);
 
   // B2: ask for push on arrival, once per visit — the reminder it promises
   // only fires with permission. Declined before = iOS answers without a prompt.
@@ -100,7 +107,8 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     track('paywall_push_permission', { granted, variant: config.variant });
   }, [config.variant]);
   useEffect(() => {
-    if (step !== 'b2') return;
+    // The QA auto tour takes screenshots: no system alert over B2.
+    if (step !== 'b2' || qaOverrides().auto_tour) return;
     const t = setTimeout(() => void askPush(), PUSH_PROMPT_DELAY_MS);
     return () => clearTimeout(t);
   }, [step, askPush]);
@@ -142,7 +150,7 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     hasTrial,
     trialDays: days,
     terms,
-    cta: copy.plans_cta ?? (isP1 ? (hasTrial ? `Start my ${days}-day free trial` : 'Continue') : 'Continue'),
+    cta: copy.plans_cta ?? (lightPlans ? (hasTrial ? `Start my ${days}-day free trial` : 'Continue') : 'Continue'),
     purchasing,
     onBuy,
     onRestore,
@@ -155,7 +163,7 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
       <TrialIntro
         hero={hero}
         trialDays={days}
-        todayLine={copy.b1_today ?? 'Unlock AI food calorie tracking'}
+        todayLine={copy.b1_today ?? 'Full access to YumYummy free, including your personalised first 7 days'}
         cta={copy.b1_cta ?? 'Try for free'}
         onNext={() => void onIntroCta()}
         onRestore={onRestore}
@@ -183,7 +191,7 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
         onRestore={onRestore}
       />
     );
-  } else if (isP1) {
+  } else if (lightPlans) {
     screen = (
       <LightPlans
         {...plans}
@@ -198,14 +206,14 @@ export function V3Paywall({ config, products, draft, plansOnly, purchasing, onPu
     screen = (
       <PhotoPlans
         {...plans}
-        variant={config.variant}
+        variant={plansLook}
         title={copy.plans_title ?? (hasTrial ? 'Reach your goal.\nStart for FREE today.' : 'Reach your goal.\nStart today.')}
         rating={content.rating}
       />
     );
   }
 
-  const dark = step === 'plans' && !isP1;
+  const dark = step === 'plans' && !lightPlans;
   return (
     <View style={{ flex: 1, backgroundColor: dark ? C.ink : C.paper }}>
       <Animated.View key={step} entering={FadeIn.duration(220)} style={{ flex: 1 }}>

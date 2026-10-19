@@ -54,11 +54,11 @@ export function planMode(goal: GoalType, dir: Direction): PlanMode {
 }
 
 /**
- * Pace options in kg per week; the recommended pace sits mid-track as drawn.
- * Losing stays under 1 kg/week (CAP 13.10).
+ * Pace options in kg per week. Losing goes up to 1 kg/week — the CAP 13.10
+ * ceiling, never more — with 0.4 recommended (Nikita, 18 Oct).
  */
 export const PACE = {
-  down: { min: 0.1, max: 0.9, step: 0.1, recommended: 0.5, gentleMax: 0.3, fastMin: 0.7 },
+  down: { min: 0.1, max: 1.0, step: 0.1, recommended: 0.4, gentleMax: 0.2, fastMin: 0.6 },
   up: { min: 0.1, max: 0.4, step: 0.05, recommended: 0.25, gentleMax: 0.15, fastMin: 0.35 },
 } as const;
 
@@ -84,10 +84,19 @@ export function maintenanceKcal(body: BodyInput): number {
   return computePlan({ ...body, goal_type: 'maintain' }).tdee;
 }
 
-/** A floor no plan goes under, whatever the pace. */
+/**
+ * A floor no plan goes under, whatever the pace: the usual 1,200 kcal for
+ * women and 1,500 for men (1,350 in between). Not BMR: a deficit below BMR is
+ * normal for a sedentary body, and a BMR floor made every pace past 0.4 kg a
+ * week land on the same calories and date.
+ */
 export function minKcal(body: BodyInput): number {
-  const sexFloor = body.gender === 'male' ? 1500 : body.gender === 'female' ? 1200 : 1350;
-  return Math.max(sexFloor, Math.round(computePlan({ ...body, goal_type: 'maintain' }).bmr / 10) * 10);
+  return body.gender === 'male' ? 1500 : body.gender === 'female' ? 1200 : 1350;
+}
+
+/** Fastest weekly loss that keeps calories at or above `minKcal`. */
+export function maxLossPace(body: BodyInput): number {
+  return Math.max(0, ((maintenanceKcal(body) - minKcal(body)) * 7) / KCAL_PER_KG);
 }
 
 export interface DailyPlan {
@@ -99,6 +108,8 @@ export interface DailyPlan {
   weeks: number | null;
   /** ISO date of the target, or null. */
   target_date: string | null;
+  /** The pace asked for would go under `minKcal`: calories sit on the floor, the date follows the slower real pace. */
+  capped: boolean;
 }
 
 function round10(n: number): number {
@@ -120,22 +131,25 @@ export function dailyPlan(
   const tdee = maintenanceKcal(body);
   let calories = tdee;
   let weeks: number | null = null;
+  let capped = false;
+  // 5 kg at 0.5 kg a week is 10 weeks, not 11: float noise must not tip the ceil.
+  const weeksFor = (kg: number, pace: number) => Math.max(1, Math.ceil(kg / pace - 1e-9));
   if ((mode === 'lose' || mode === 'cut' || mode === 'gain') && kgPerWeek && kgPerWeek > 0) {
     const daily = (kgPerWeek * KCAL_PER_KG) / 7;
+    const kg = Math.abs(targetKg - body.weight_kg);
     if (mode === 'gain') {
       calories = tdee + daily;
-      weeks = Math.max(1, Math.ceil(Math.abs(targetKg - body.weight_kg) / kgPerWeek));
+      weeks = weeksFor(kg, kgPerWeek);
+    } else if (tdee - daily >= minKcal(body)) {
+      calories = tdee - daily;
+      weeks = weeksFor(kg, kgPerWeek);
     } else {
-      calories = Math.max(minKcal(body), tdee - daily);
-      // The floor can cap — or erase — the deficit for small, older bodies.
+      // The floor caps — or erases — the deficit for small, older bodies.
+      capped = true;
+      calories = minKcal(body);
       const realDaily = tdee - calories;
-      if (realDaily <= 0) {
-        calories = tdee;
-        weeks = null;
-      } else {
-        const realPace = (realDaily * 7) / KCAL_PER_KG;
-        weeks = Math.max(1, Math.ceil(Math.abs(body.weight_kg - targetKg) / realPace));
-      }
+      if (realDaily <= 0) calories = tdee;
+      else weeks = weeksFor(kg, (realDaily * 7) / KCAL_PER_KG);
     }
   }
   calories = round10(calories);
@@ -152,7 +166,7 @@ export function dailyPlan(
     const dd = String(d.getDate()).padStart(2, '0');
     target_date = `${d.getFullYear()}-${mm}-${dd}`;
   }
-  return { calories, protein, fat, carbs, weeks, target_date };
+  return { calories, protein, fat, carbs, weeks, target_date, capped };
 }
 
 /** "31 December" (UK order; the year only when the date is ~a year or more away). */

@@ -25,6 +25,10 @@ export interface QaOverrides {
   simulate_timeout?: boolean;
   /** Skip StoreKit: a tap on "buy" succeeds at once (post-purchase screens in the simulator). */
   mock_purchase?: boolean;
+  /** Walk every V3 screen on its own for screenshots (`components/qa/QaAutoTour`). */
+  auto_tour?: boolean;
+  /** Only these auto-tour steps, by name (a targeted re-check). */
+  auto_tour_only?: string[];
 }
 
 let cache: QaOverrides = {};

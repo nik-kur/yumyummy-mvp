@@ -91,6 +91,7 @@ export function parseOnboardingConfig(data: Json | undefined): OnboardingConfig 
     after_cancel_offer: bool(data.after_cancel_offer, d.after_cancel_offer),
     tutorial: bool(data.tutorial, d.tutorial),
     ai_consent: oneOf(data.ai_consent, ['save_plan', 'sheet'] as const, d.ai_consent),
+    rating_prompt: oneOf(data.rating_prompt, ['auto', 'plan', 'off'] as const, d.rating_prompt),
   };
 }
 
@@ -178,5 +179,6 @@ export function parsePaywallArm(
     copy: stringMap(data.copy),
     price_emphasis: oneOf(data.price_emphasis, ['design', 'billed', 'weekly'] as const, d.price_emphasis),
     show_rating: bool(data.show_rating, d.show_rating),
+    plans: oneOf(data.plans, ['auto', 'light', 'b3_joe', 'b3_home', 'b3_office', 'b3_wide'] as const, d.plans),
   };
 }

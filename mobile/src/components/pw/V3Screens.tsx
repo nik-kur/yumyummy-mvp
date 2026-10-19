@@ -7,7 +7,7 @@
  *   P1 PW_P1_plans  — light plan cards under the timeline.
  */
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { AdaptyPaywallProduct } from 'react-native-adapty';
 import Animated, {
   cancelAnimation,
@@ -104,15 +104,21 @@ export function TrialIntro({
   onNext: () => void;
   onRestore: () => void;
 }) {
+  // The timeline sits on a card and grows on tall iPhones: on its own it left
+  // half the screen empty (phone test, 18 Oct).
+  const { height } = useWindowDimensions();
+  const tall = height >= 800;
   return (
     <OnbLayout
       progress={null}
-      title={<HeroText hero={hero} size={32} line={38} top={44} />}
+      title={<HeroText hero={hero} size={tall ? 34 : 32} line={tall ? 40 : 38} top={44} />}
       footer={<LightFooter cta={cta} onPress={onNext} hasTrial onRestore={onRestore} />}
     >
+      <View style={{ flex: 0.8 }} />
+      <View style={[s.timelineCard, tall && s.timelineCardTall]}>
+        <TrialTimeline trialDays={trialDays} todayLine={todayLine} large={tall} />
+      </View>
       <View style={{ flex: 1 }} />
-      <TrialTimeline trialDays={trialDays} todayLine={todayLine} />
-      <View style={{ flex: 1.2 }} />
     </OnbLayout>
   );
 }
@@ -271,6 +277,12 @@ export function LightPlans({
   ...p
 }: PlansProps & { canGoBack: boolean; onBack: () => void; todayLine: string; rating: string; users: string }) {
   const none = p.products.length === 0;
+  // iPhone SE and other short screens: the plan cards must stay in view.
+  // Tall ones get the big timeline. Spare height is shared out between the
+  // blocks (phone test, build 64: everything sat at the top over an empty band).
+  const { height } = useWindowDimensions();
+  const short = height < 700;
+  const tall = height >= 840;
   return (
     <OnbLayout
       progress={null}
@@ -300,12 +312,10 @@ export function LightPlans({
           </Text>
         ))}
       </View>
-      {p.hasTrial ? (
-        <View style={{ marginTop: 18 }}>
-          <TrialTimeline trialDays={p.trialDays} todayLine={todayLine} />
-        </View>
-      ) : null}
-      <View style={{ marginTop: 14 }}>
+      <View style={{ flex: 1, minHeight: short ? 12 : 18 }} />
+      {p.hasTrial ? <TrialTimeline trialDays={p.trialDays} todayLine={todayLine} compact={short} large={tall} /> : null}
+      <View style={{ flex: 1, minHeight: 14 }} />
+      <View>
         {none ? (
           <NoPlans onRetry={p.onRetry} />
         ) : (
@@ -337,7 +347,8 @@ export function PhotoPlans({
     <PhotoStage
       photo={spec.photo}
       badge={spec.badge}
-      fade={{ top: 380, above: 98, below: 216 }}
+      // Dark well before the headline (phone test, build 64: it sat on the bright photo).
+      fade={{ top: 300, above: 190, below: 180, atBlock: 0.8 }}
       label={`A phone scanning a meal: ${spec.badge.title}, ${spec.badge.kcal} kcal`}
     >
       <Text style={s.darkH1} accessibilityRole="header">
@@ -384,6 +395,16 @@ export function PwLoading({ dark }: { dark?: boolean }) {
 const s = StyleSheet.create({
   h1: { textAlign: 'center', fontFamily: F.serif, letterSpacing: -0.3, color: C.ink },
   note: { marginTop: 10, textAlign: 'center', fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: C.muted },
+  timelineCard: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.hair,
+    borderRadius: 20,
+    paddingTop: 18,
+    paddingBottom: 4,
+    paddingHorizontal: 12,
+  },
+  timelineCardTall: { paddingTop: 22, paddingBottom: 8, paddingHorizontal: 14 },
   bellBox: { alignSelf: 'center', width: 150, height: 150 },
   bell: { width: 150, height: 150, transformOrigin: '50% 12%' },
   // 30 pt + a 2 pt border outside it (CSS content-box), radius 15: a squircle.

@@ -42,6 +42,8 @@ export interface IntroDraft {
   pace_kg_week: number | null;
   /** ISO date the target weight is reached (null when the weight holds). */
   target_date: string | null;
+  /** Which quiz wrote the draft: V3 screens stamp `v3`, so a launch can tell a pre-V3 draft apart. */
+  flow: 'v3' | null;
   // Computed
   target_calories: number | null;
   target_protein_g: number | null;
@@ -66,6 +68,7 @@ export const DEFAULT_DRAFT: IntroDraft = {
   units: 'metric',
   pace_kg_week: null,
   target_date: null,
+  flow: null,
   target_calories: null,
   target_protein_g: null,
   target_fat_g: null,
@@ -97,6 +100,15 @@ export function draftProfilePatch(d: IntroDraft): AccountProfileUpdate {
     target_carbs_g: d.target_carbs_g,
     onboarding_completed: true,
   };
+}
+
+/**
+ * A draft the pre-V3 onboarding left half-way. V3 drafts carry the `flow`
+ * stamp, or (written by 1.0.11 before the stamp) an answer only V3 asks.
+ */
+export function isPreV3Draft(d: IntroDraft): boolean {
+  if (!d.goal_type || d.flow === 'v3') return false;
+  return d.source == null && d.tracked_before == null && d.barrier == null && d.pace_kg_week == null && d.target_date == null;
 }
 
 export async function saveDraft(draft: IntroDraft): Promise<void> {

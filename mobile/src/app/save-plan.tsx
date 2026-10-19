@@ -44,6 +44,7 @@ import {
   resolveOnboardingAssignment,
   restoreOnboardingAssignment,
 } from '@/config/onboardingConfig';
+import { isTesterDevice } from '@/config/testerDevice';
 import { enableRemindersAfterPurchase } from '@/notifications/scheduler';
 import { IMG } from '@/onb/assets';
 import { C, F, PAD } from '@/onb/theme';
@@ -231,7 +232,8 @@ export default function SavePlanScreen() {
       await clearPendingPurchase();
       // A new buyer on a new account gets reminders (if allowed on B2), the
       // tour (if this arm has `tutorial` on) and the first-log payoff. A
-      // restore, or an Apple ID that already had an account, goes straight in.
+      // restore, or an Apple ID that already had an account, goes straight in —
+      // except on the tester phone, which gets the tour every time to review it.
       // The arm is read after a cold start too (resolve reads the stored one);
       // then it has done its job: forget it, keep the super properties.
       if (marker?.source === 'purchase') {
@@ -242,7 +244,7 @@ export default function SavePlanScreen() {
         } catch (e) {
           captureException(e);
         }
-        if (lastSignInCreatedAccount()) {
+        if (lastSignInCreatedAccount() || (await isTesterDevice())) {
           await resolveOnboardingAssignment().catch(() => null);
           await startPostPurchase(getOnboardingConfig().tutorial);
         }
